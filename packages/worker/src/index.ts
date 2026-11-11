@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { requireUser, type AppEnv } from './auth/access';
 import { me } from './api/me';
+import { entries } from './api/entries';
 
 export type { AppUser, AppEnv } from './auth/access';
 export type { Env } from './env';
@@ -15,6 +16,7 @@ app.get('/api/health', (c) => c.json({ ok: true }));
 export const api = new Hono<AppEnv>();
 api.use('*', requireUser);
 api.route('/me', me);
+api.route('/', entries);
 app.route('/api', api);
 
 app.notFound((c) => {

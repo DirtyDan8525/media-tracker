@@ -258,15 +258,59 @@ describe('Spotify links', () => {
 });
 
 describe('chain cache', () => {
-  it('key is trimmed, lowercased term|hint|typedTitle', () => {
-    expect(chainCacheKey({ term: ' Speed Racer ', hint: 'X', typedTitle: ' Speed  ' })).toBe('speed racer|x|speed');
+  it('key is JSON of trimmed, lowercased [term, hint, typedTitle]', () => {
+    expect(chainCacheKey({ term: ' Speed Racer ', hint: 'X', typedTitle: ' Speed  ' })).toBe('["speed racer","x","speed"]');
+  });
+
+  it('key parts cannot collide through the delimiter', () => {
+    const a = chainCacheKey({ term: 'a|b', hint: '', typedTitle: '' });
+    const b = chainCacheKey({ term: 'a', hint: 'b|', typedTitle: '' });
+    expect(a).not.toBe(b);
+  });
+
+  it('a Spotify link keys on the canonical URL with its case preserved', () => {
+    expect(chainCacheKey({ term: 'https://open.spotify.com/intl-de/album/AbC123?si=x', hint: '', typedTitle: ' T ' }))
+      .toBe('["https://open.spotify.com/album/AbC123","","t"]');
+  });
+
+  it('two Spotify album IDs differing only by case get two cache rows', async () => {
+    const spotify: SourceEntry = { search: vi.fn(async (qq: LookupQuery) => info('spotify', qq.term)) };
+    register({ spotify });
+    const r1 = await lookupChain('albums', q('https://open.spotify.com/album/AbCdE', { category: 'albums' }), deps(fakeFetch({})));
+    const r2 = await lookupChain('albums', q('https://open.spotify.com/album/abcde', { category: 'albums' }), deps(fakeFetch({})));
+    expect(r1?.title).toBe('https://open.spotify.com/album/AbCdE');
+    expect(r2?.title).toBe('https://open.spotify.com/album/abcde');
+    expect(spotify.search).toHaveBeenCalledTimes(2);
+    const rows = await env.DB.prepare("SELECT query_key FROM lookup_cache WHERE source = 'chain:albums' ORDER BY query_key").all<{ query_key: string }>();
+    expect(rows.results.map((r) => r.query_key)).toEqual([
+      '["https://open.spotify.com/album/AbCdE","",""]',
+      '["https://open.spotify.com/album/abcde","",""]',
+    ]);
+  });
+
+  it('the same album pasted with different ?si= and /intl-xx/ is a cache hit with zero fetches', async () => {
+    const spotify: SourceEntry = {
+      search: vi.fn(async (qq: LookupQuery, d: LookupDeps) => {
+        const r = await fetchJson<{ title: string }>(`https://open.spotify.com/oembed?url=${encodeURIComponent(qq.term)}`, {}, d);
+        return r.body ? info('spotify', r.body.title) : null;
+      }),
+    };
+    register({ spotify });
+    const f1 = fakeFetch({ 'https://open.spotify.com/oembed': { body: '{"title":"Live At Electric Lady"}' } });
+    const r1 = await lookupChain('albums', q('https://open.spotify.com/album/1A2bC?si=a', { category: 'albums' }), deps(f1));
+    expect(r1?.title).toBe('Live At Electric Lady');
+    const f2 = fakeFetch({});
+    const r2 = await lookupChain('albums', q('https://open.spotify.com/intl-de/album/1A2bC?si=b', { category: 'albums' }), deps(f2));
+    expect(r2).toEqual(r1);
+    expect(f2.calls).toEqual([]);
+    expect(spotify.search).toHaveBeenCalledTimes(1);
   });
 
   it('a stale row (> 30 days) is ignored and overwritten', async () => {
     register({ tmdb: fixed('tmdb', info('tmdb', 'Fresh')) });
     const old = new Date(Date.now() - 31 * 864e5).toISOString();
     await env.DB.prepare('INSERT INTO lookup_cache (source, query_key, result_json, fetched_at) VALUES (?, ?, ?, ?)')
-      .bind('chain:movies', 'speed racer||', JSON.stringify(info('tmdb', 'Stale')), old).run();
+      .bind('chain:movies', '["speed racer","",""]', JSON.stringify(info('tmdb', 'Stale')), old).run();
     const r = await lookupChain('movies', q('speed racer'), deps(fakeFetch({})));
     expect(r?.title).toBe('Fresh');
     const row = await env.DB.prepare("SELECT result_json, fetched_at FROM lookup_cache WHERE source = 'chain:movies'").first<{ result_json: string; fetched_at: string }>();
@@ -279,7 +323,7 @@ describe('chain cache', () => {
     register({ tmdb });
     const t = new Date(Date.now() - 29 * 864e5).toISOString();
     await env.DB.prepare('INSERT INTO lookup_cache (source, query_key, result_json, fetched_at) VALUES (?, ?, ?, ?)')
-      .bind('chain:movies', 'speed racer||', JSON.stringify(info('tmdb', 'Cached')), t).run();
+      .bind('chain:movies', '["speed racer","",""]', JSON.stringify(info('tmdb', 'Cached')), t).run();
     expect((await lookupChain('movies', q('speed racer'), deps(fakeFetch({}))))?.title).toBe('Cached');
     expect(tmdb.search).not.toHaveBeenCalled();
   });
@@ -323,7 +367,7 @@ describe('POST /api/lookup', () => {
     expect(await r2.json()).toEqual({ info: j1.info });
     expect(spy).not.toHaveBeenCalled();
     const row = await env.DB.prepare('SELECT source, query_key FROM lookup_cache').first();
-    expect(row).toEqual({ source: 'chain:movies', query_key: 'speed racer||speed racer' });
+    expect(row).toEqual({ source: 'chain:movies', query_key: '["speed racer","","speed racer"]' });
   });
 
   it('a non-admin debug:true gets no log', async () => {
@@ -449,7 +493,33 @@ describe('POST /api/lookup/details', () => {
     expect(await (await post(USER, '/api/lookup/details', { source: 'itunes', sourceId: '620' })).json()).toEqual({ details: null });
   });
 
+  it('a source whose key is missing gives { details: null } without being called', async () => {
+    const details = vi.fn(async () => ({ releaseDate: '2000', synopsis: '', lengthLabel: '', origin: '' }));
+    register({ tmdb: { search: async () => null, details }, igdb: { search: async () => null, details } });
+    expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' }, { TMDB_KEY: undefined })).json()).toEqual({ details: null });
+    expect(await (await post(USER, '/api/lookup/details', { source: 'igdb', sourceId: '1' }, { IGDB_SECRET: '' })).json()).toEqual({ details: null });
+    expect(details).not.toHaveBeenCalled();
+    // a registered needsKey wins, as in the chain
+    register({ tmdb: { search: async () => null, details, needsKey: () => false } });
+    expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' })).json()).toEqual({ details: null });
+    expect(details).not.toHaveBeenCalled();
+  });
+
+  it('accepts ids like tt0811080, 11155, /works/OL123W-style keys without slashes, and a:b.c-d_e', async () => {
+    const details = vi.fn(async () => ({ releaseDate: '2000', synopsis: '', lengthLabel: '', origin: '' }));
+    register({ openlibrary: { search: async () => null, details } });
+    for (const sourceId of ['tt0811080', '11155', 'OL123W', 'a:b.c-d_e', 'x'.repeat(200)]) {
+      expect((await post(USER, '/api/lookup/details', { source: 'openlibrary', sourceId })).status).toBe(200);
+    }
+    expect(details).toHaveBeenCalledTimes(5);
+  });
+
   it.each([
+    ['whitespace-only sourceId', { source: 'tmdb', sourceId: '   ' }],
+    ['sourceId with a slash', { source: 'tmdb', sourceId: '../movie/1' }],
+    ['sourceId with query chars', { source: 'tmdb', sourceId: '1?api_key=x' }],
+    ['sourceId with a space', { source: 'tmdb', sourceId: '1 2' }],
+    ['sourceId with &', { source: 'tmdb', sourceId: '1&x=2' }],
     ['unknown source', { source: 'netflix', sourceId: '1' }],
     ['missing sourceId', { source: 'tmdb' }],
     ['empty sourceId', { source: 'tmdb', sourceId: '' }],

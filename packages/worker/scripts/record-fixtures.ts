@@ -4,7 +4,7 @@
 //   npm run record -w packages/worker                               every case in test/fixtures/cases.ts
 //   npm run record -w packages/worker -- <source> <case> <url...>   save these URLs as one case
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Env } from '../src/env';
@@ -12,7 +12,8 @@ import { lookupChain } from '../src/lookup/chain';
 import { SOURCES, type LookupDeps } from '../src/lookup/sources/index';
 import { CASES, type FixtureCase } from '../test/fixtures/cases';
 import {
-  buildFixtureFiles, createRecorder, memoryD1, parseDevVars, secretsFromVars, summarize, type CaseResult,
+  buildFixtureFiles, createRecorder, memoryD1, parseDevVars, secretsFromVars, shouldReplaceFixtures, summarize,
+  type CaseResult,
 } from './recordLib';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,13 +43,23 @@ function envFrom(vars: Record<string, string>): Env {
   } as unknown as Env; // ASSETS isn't used by lookups
 }
 
+// Writes the case into a temp directory beside the target, then swaps it in only
+// when the case succeeded (shouldReplaceFixtures); a failed or empty recording
+// never touches the committed fixtures.
 async function writeCase(source: string, caseName: string, result: CaseResult): Promise<void> {
-  const dir = join(FIXTURES, source, caseName);
-  await rm(dir, { recursive: true, force: true });
-  if (result.records.length === 0) return;
-  await mkdir(dir, { recursive: true });
-  const { files } = buildFixtureFiles(result.records);
-  for (const f of files) await writeFile(join(dir, f.name), f.content);
+  const parent = join(FIXTURES, source);
+  const dir = join(parent, caseName);
+  if (!shouldReplaceFixtures(result)) return;
+  await mkdir(parent, { recursive: true });
+  const tmp = await mkdtemp(join(parent, `.${caseName}.tmp-`));
+  try {
+    const { files } = buildFixtureFiles(result.records);
+    for (const f of files) await writeFile(join(tmp, f.name), f.content);
+    await rm(dir, { recursive: true, force: true });
+    await rename(tmp, dir);
+  } finally {
+    await rm(tmp, { recursive: true, force: true }); // no-op after a successful rename
+  }
 }
 
 const message = (err: unknown) => String(err instanceof Error ? err.message : err);

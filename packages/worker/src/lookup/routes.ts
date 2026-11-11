@@ -7,13 +7,14 @@ import { CATEGORIES } from '../api/entryValidation';
 import { getCached, putCached } from './cache';
 import { lookupChain } from './chain';
 import { envSecrets, redactSecrets } from './http';
-import { SOURCE_IDS, SOURCES, type LookupDeps } from './sources/index';
+import { SOURCE_IDS, SOURCES, keysPresent, type LookupDeps } from './sources/index';
 
 export const lookup = new Hono<AppEnv>();
 
 const invalid = { error: 'invalid' } as const;
 const MAX_TERM = 500;
-const MAX_SOURCE_ID = 200;
+// Source ids are numbers, slugs or keys like OL123W / tt0811080: no slashes, spaces or query characters.
+const SOURCE_ID_RE = /^[\w.:\-]{1,200}$/;
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -61,11 +62,13 @@ lookup.post('/details', async (c) => {
   if (!body) return c.json(invalid, 400);
   const { source, sourceId } = body;
   if (typeof source !== 'string' || !(SOURCE_IDS as string[]).includes(source)) return c.json(invalid, 400);
-  if (typeof sourceId !== 'string' || sourceId === '' || sourceId.length > MAX_SOURCE_ID) return c.json(invalid, 400);
+  if (typeof sourceId !== 'string' || !SOURCE_ID_RE.test(sourceId)) return c.json(invalid, 400);
 
   const id = source as SourceId;
-  const detailsFn = SOURCES[id]?.details;
-  if (!detailsFn) return c.json({ details: null });
+  const entry = SOURCES[id];
+  const detailsFn = entry?.details;
+  // Same key rule as the chain: a source whose key isn't set is never called.
+  if (!entry || !detailsFn || !keysPresent(id, entry, c.env)) return c.json({ details: null });
 
   const key = `details:${sourceId}`;
   const cached = await getCached<Details>(c.env.DB, id, key);

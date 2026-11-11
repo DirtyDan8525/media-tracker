@@ -132,6 +132,15 @@ export interface CaseResult {
   error?: string;
 }
 
+/**
+ * Whether a case's new recording may replace the committed fixtures: only if it
+ * finished without an error and made at least one request. Otherwise the old
+ * fixtures stay untouched (the case still fails the run).
+ */
+export function shouldReplaceFixtures(r: CaseResult): boolean {
+  return !r.error && r.records.length > 0;
+}
+
 /** Human summary (case -> files, statuses). Exit code 1 if any case made zero requests or failed. */
 export function summarize(results: readonly CaseResult[]): { lines: string[]; exitCode: number } {
   const lines: string[] = [];
@@ -146,6 +155,7 @@ export function summarize(results: readonly CaseResult[]): { lines: string[]; ex
       lines.push(`  ${name}  ${rec.status}  ${rec.method} ${rec.url}`);
     }
     if (r.records.length === 0) lines.push('  !! no requests recorded');
+    if (!shouldReplaceFixtures(r)) lines.push('  !! kept existing fixtures (nothing was replaced)');
     if (r.records.length === 0 || r.error) exitCode = 1;
   }
   return { lines, exitCode };

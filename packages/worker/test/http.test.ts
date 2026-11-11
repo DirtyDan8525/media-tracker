@@ -33,6 +33,16 @@ describe('stripUrl / redactSecrets', () => {
     expect(stripUrl('not a url api_key=1')).toBe('not a url api_key=1'.replace(/api_key=1/, 'api_key=REDACTED'));
   });
 
+  it('replaces longer secrets first, so a substring secret leaves nothing behind', () => {
+    const out = redactSecrets('xxabcyy abc', ['abc', 'xxabcyy']);
+    expect(out).toBe('REDACTED REDACTED');
+    for (const frag of ['xx', 'yy', 'abc']) expect(out).not.toContain(frag);
+  });
+
+  it('skips empty and whitespace-only secrets', () => {
+    expect(redactSecrets('a b  c', ['', ' ', '  '])).toBe('a b  c');
+  });
+
   it('replaces each secret value', () => {
     expect(redactSecrets('a KEY1 b KEY2 KEY1', ['KEY1', 'KEY2', ''])).toBe('a REDACTED b REDACTED REDACTED');
   });

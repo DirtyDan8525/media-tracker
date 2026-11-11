@@ -42,10 +42,15 @@ function decodeURIComponentSafe(s: string): string {
   }
 }
 
-/** Replaces each (non-empty) secret value in `text` with REDACTED. */
+/**
+ * Replaces each secret value in `text` with REDACTED, longest first (so a
+ * secret that contains another is never half-replaced). Empty and
+ * whitespace-only secrets are ignored.
+ */
 export function redactSecrets(text: string, secrets: readonly string[]): string {
+  const ordered = [...new Set(secrets)].filter((s) => s.trim() !== '').sort((a, b) => b.length - a.length);
   let out = text;
-  for (const s of secrets) if (s) out = out.split(s).join('REDACTED');
+  for (const s of ordered) out = out.split(s).join('REDACTED');
   return out;
 }
 

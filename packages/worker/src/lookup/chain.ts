@@ -2,7 +2,7 @@
 import type { Category, LookupInfo, SourceId } from '@media-tracker/shared';
 import { getCached, putCached } from './cache';
 import { logLine } from './http';
-import { KEY_CHECKS, SOURCES, type LookupDeps, type LookupQuery } from './sources/index';
+import { SOURCES, keysPresent, type LookupDeps, type LookupQuery } from './sources/index';
 
 /** Sources tried in order per tab, exactly as lookup_ does after the Spotify check. */
 export const CHAINS: Record<Category, SourceId[]> = {
@@ -31,8 +31,16 @@ export function parseSpotifyLink(term: string): { kind: 'album' | 'track'; id: s
   return null;
 }
 
+/**
+ * Cache key for a chain lookup: JSON of [term, hint, typedTitle], each trimmed
+ * and lowercased (JSON so no part can bleed into another). A Spotify link keys
+ * on its canonical URL with case preserved, since Spotify IDs are case-sensitive
+ * and the same album pasted with another ?si= or /intl-xx/ should hit.
+ */
 export function chainCacheKey(q: Pick<LookupQuery, 'term' | 'hint' | 'typedTitle'>): string {
-  return [q.term, q.hint, q.typedTitle].map((s) => s.trim().toLowerCase()).join('|');
+  const norm = (s: string) => s.trim().toLowerCase();
+  const term = parseSpotifyLink(q.term)?.url ?? norm(q.term);
+  return JSON.stringify([term, norm(q.hint), norm(q.typedTitle)]);
 }
 
 const TIMED_OUT = Symbol('timeout');
@@ -44,8 +52,7 @@ async function runSource(id: SourceId, q: LookupQuery, d: LookupDeps): Promise<L
     logLine(d, `${id}: skipped (not registered)`);
     return null;
   }
-  const canRun = entry.needsKey ?? KEY_CHECKS[id];
-  if (canRun && !canRun(d.env)) {
+  if (!keysPresent(id, entry, d.env)) {
     logLine(d, `${id}: skipped (no key)`);
     return null;
   }

@@ -3,7 +3,7 @@
 // these cover everything it does to a response before writing it.
 import { describe, expect, it } from 'vitest';
 import {
-  buildFixtureFiles, createRecorder, extFor, memoryD1, parseDevVars, redactBody, secretsFromVars, summarize, type Recorded,
+  buildFixtureFiles, createRecorder, extFor, memoryD1, parseDevVars, redactBody, secretsFromVars, shouldReplaceFixtures, summarize, type Recorded,
 } from '../scripts/recordLib';
 import { getCached, putCached } from '../src/lookup/cache';
 import { replayFromIndex } from './fakeFetch';
@@ -171,5 +171,20 @@ describe('memoryD1', () => {
 
   it('throws on SQL it does not know', async () => {
     await expect(memoryD1().prepare('DELETE FROM users').bind().run()).rejects.toThrow('unsupported');
+  });
+});
+
+describe('shouldReplaceFixtures', () => {
+  const rec: Recorded = { url: 'u', method: 'GET', status: 200, contentType: '', body: '' };
+  it('replaces only when the case finished without error and made at least one request', () => {
+    expect(shouldReplaceFixtures({ label: 'a/b', records: [rec] })).toBe(true);
+    expect(shouldReplaceFixtures({ label: 'a/b', records: [] })).toBe(false);
+    expect(shouldReplaceFixtures({ label: 'a/b', records: [rec], error: 'adapter threw' })).toBe(false);
+    expect(shouldReplaceFixtures({ label: 'a/b', records: [], error: 'not registered' })).toBe(false);
+  });
+
+  it('summary says when existing fixtures were kept', () => {
+    expect(summarize([{ label: 'a/b', records: [rec], error: 'x' }]).lines.join('\n')).toContain('kept existing fixtures');
+    expect(summarize([{ label: 'a/b', records: [rec] }]).lines.join('\n')).not.toContain('kept existing fixtures');
   });
 });

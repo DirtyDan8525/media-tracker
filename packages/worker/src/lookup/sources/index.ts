@@ -47,3 +47,9 @@ export const KEY_CHECKS: Partial<Record<SourceId, (env: Env) => boolean>> = {
 
 /** Registered adapters. Empty until Tasks 6-11 add theirs. */
 export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {};
+
+/** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */
+export function keysPresent(id: SourceId, entry: SourceEntry, env: Env): boolean {
+  const check = entry.needsKey ?? KEY_CHECKS[id];
+  return check ? check(env) : true;
+}

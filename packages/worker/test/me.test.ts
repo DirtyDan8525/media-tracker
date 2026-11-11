@@ -117,6 +117,18 @@ describe('PUT /api/me/settings', () => {
     expect((await putSettings('a@example.com', 'x')).status).toBe(400);
   });
 
+  it('ignores prototype keys', async () => {
+    const raw = '{"settings":{"tabs":{"__proto__":{"x":true}},"colors":{"constructor":"#000000"}}}';
+    const res = await as('a@example.com', '/api/me/settings', 'PUT', undefined, raw);
+    expect(res.status).toBe(200);
+    const row = await env.DB.prepare('SELECT settings_json FROM users').first<{ settings_json: string }>();
+    const stored = JSON.parse(row!.settings_json);
+    expect(Object.keys(stored.tabs)).not.toContain('x');
+    expect(Object.keys(stored.tabs)).not.toContain('__proto__');
+    expect(Object.keys(stored.colors)).toEqual([]);
+    expect(({} as any).x).toBeUndefined();
+  });
+
   it('does not touch other users', async () => {
     await putSettings('a@example.com', { theme: 'Ocean' });
     const other = (await (await as('b@example.com', '/api/me')).json()) as { settings: { theme: string } };
@@ -136,6 +148,10 @@ describe('sanitizeSettings', () => {
     expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off', compareWindow: 10 } });
   });
 
+  it('accepts decimal and boundary compareWindow', () => {
+    for (const w of [0.5, 1.5, 10]) expect(sanitizeSettings({ compareWindow: w }, cur)).toMatchObject({ ok: true, settings: { compareWindow: w } });
+  });
+
   it('rejects bad values', () => {
     bad({ theme: 'Nope' });
     bad({ theme: 5 });
@@ -147,9 +163,12 @@ describe('sanitizeSettings', () => {
     bad({ compareStyle: 'x' });
     bad({ compareRoom: 'x' });
     bad({ compareWindow: 0 });
+    bad({ compareWindow: -1 });
+    bad({ compareWindow: 10.5 });
     bad({ compareWindow: 11 });
-    bad({ compareWindow: 1.5 });
     bad({ compareWindow: '2' });
+    bad({ compareWindow: NaN });
+    bad({ compareWindow: Infinity });
     bad(null);
     bad([]);
   });

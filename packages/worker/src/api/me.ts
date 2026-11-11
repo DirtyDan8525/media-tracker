@@ -9,7 +9,8 @@ const HEX_RE = /^#[0-9a-f]{6}$/i;
 const COMPARE_ASK = ['Both', 'Only when I start it', 'Only for new ratings', 'Off'];
 const COMPARE_STYLE = ['Meet in the middle', 'Swap the numbers'];
 const COMPARE_ROOM = ['Use in-between scores', 'Give the same score', 'Push others down'];
-// The reference script only requires > 0; ratings are 1-10, so a window past 10 is meaningless.
+// A rating-difference window (script: `Number(x) > 0`, used as `y.rating - x.rating > window`), so decimals are fine.
+// Ratings span 1-10, so a window past 10 is meaningless.
 const COMPARE_WINDOW_MAX = 10;
 
 const ROLE_KEYS = Object.keys(THEMES.Midnight!);
@@ -65,7 +66,7 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
   }
   if ('compareWindow' in partial) {
     const w = partial.compareWindow;
-    if (typeof w !== 'number' || !Number.isInteger(w) || w < 1 || w > COMPARE_WINDOW_MAX) return { ok: false };
+    if (typeof w !== 'number' || !Number.isFinite(w) || w <= 0 || w > COMPARE_WINDOW_MAX) return { ok: false };
     next.compareWindow = w;
   }
   return { ok: true, settings: next };

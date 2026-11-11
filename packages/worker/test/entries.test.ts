@@ -207,6 +207,16 @@ describe('duplicateOf', () => {
   });
 });
 
+describe('duplicateOf user scoping', () => {
+  it("never matches another user's entry (only B owns the matching row)", async () => {
+    const theirs = await mk(B, { category: 'albums', title: 'Discovery', creator: 'Daft Punk' });
+    const { res, json } = await create(A, { category: 'albums', title: 'Discovery', creator: 'Daft Punk' });
+    expect(res.status).toBe(201);
+    expect(json.duplicateOf).toBeNull();
+    expect(JSON.stringify(json)).not.toContain(theirs.id);
+  });
+});
+
 describe('PATCH /api/entries/:id', () => {
   it('updates fields, bumps updatedAt, returns the full entry with seasonAvg', async () => {
     const e = await mk(A, { category: 'anime', title: 'Old' });

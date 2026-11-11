@@ -1,0 +1,22 @@
+{
+  "name": "@media-tracker/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.7.0",
+    "@cloudflare/workers-types": "5.20261110.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12",
+    "wrangler": "4.160.0"
+  },
+  "dependencies": {
+    "hono": "4.13.17",
+    "jose": "6.2.17"
+  }
+}

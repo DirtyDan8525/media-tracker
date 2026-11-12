@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LookupInfo, SourceId } from '@media-tracker/shared';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
+import { isEmptyDetails } from '../src/lookup/routes';
 import { fetchJson } from '../src/lookup/http';
 import { CHAINS, chainCacheKey, lookupChain, parseSpotifyLink } from '../src/lookup/chain';
 import { KEY_CHECKS, SOURCES, type LookupDeps, type LookupQuery, type SourceEntry } from '../src/lookup/sources/index';
@@ -476,6 +477,24 @@ describe('POST /api/lookup/details', () => {
     expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '9' })).json()).toEqual({ details: null });
     await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '9' });
     expect(tmdb.details).toHaveBeenCalledTimes(2);
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM lookup_cache').first<{ n: number }>();
+    expect(n!.n).toBe(0);
+  });
+
+  it('isEmptyDetails: only all-empty (or null) counts as empty', () => {
+    expect(isEmptyDetails(null)).toBe(true);
+    expect(isEmptyDetails({ releaseDate: '', synopsis: '', lengthLabel: '', origin: '' })).toBe(true);
+    for (const k of ['releaseDate', 'synopsis', 'lengthLabel', 'origin'] as const) {
+      expect(isEmptyDetails({ releaseDate: '', synopsis: '', lengthLabel: '', origin: '', [k]: 'x' })).toBe(false);
+    }
+  });
+
+  it('all-empty details give { details: null } and are not cached', async () => {
+    const details = vi.fn(async () => ({ releaseDate: '', synopsis: '', lengthLabel: '', origin: '' }));
+    register({ tmdb: { search: async () => null, details } });
+    expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' })).json()).toEqual({ details: null });
+    await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' });
+    expect(details).toHaveBeenCalledTimes(2);
     const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM lookup_cache').first<{ n: number }>();
     expect(n!.n).toBe(0);
   });

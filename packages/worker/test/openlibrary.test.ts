@@ -159,11 +159,15 @@ describe('details pieces', () => {
     expect(formatDetails({ description: { value: 'A <b>Bob</b>.' } }, { first_publish_year: 2016, number_of_pages_median: 432, publisher: ['Audible', 'Ethan Ellenberg'] }))
       .toEqual({ releaseDate: '2016', synopsis: 'A Bob.', lengthLabel: '432 pages', origin: 'Audible' });
   });
+  it('every field empty gives null', () => {
+    expect(formatDetails({}, {})).toBeNull();
+    expect(formatDetails({ description: '' }, { publisher: [] })).toBeNull();
+  });
   it('either half alone still gives a result; both missing gives null; no "undefined"', () => {
     expect(formatDetails({ description: 'Only text.' }, null)).toEqual({ releaseDate: '', synopsis: 'Only text.', lengthLabel: '', origin: '' });
     expect(formatDetails(null, { first_publish_year: 1999 })).toEqual({ releaseDate: '1999', synopsis: '', lengthLabel: '', origin: '' });
     expect(formatDetails(null, null)).toBeNull();
-    expect(JSON.stringify(formatDetails({}, {}))).not.toMatch(/undefined|null/);
+    expect(JSON.stringify(formatDetails({ description: 'x' }, {}))).not.toMatch(/undefined|null/);
   });
   it('trims a long synopsis to 600 characters', () => {
     expect(formatDetails({ description: 'word '.repeat(300) }, null)!.synopsis.length).toBeLessThanOrEqual(601);
@@ -265,6 +269,13 @@ describe('details input and requests', () => {
   it('an empty docs list counts as no facts', async () => {
     expect(await details('OL17618W', deps(fakeFetch({ [work]: workBody, [meta]: { body: '{"docs":[]}' } }))))
       .toEqual({ releaseDate: '', synopsis: 'Bob wakes up.', lengthLabel: '', origin: '' });
+  });
+  it('work 500 + facts 200 with empty or missing docs gives null', async () => {
+    expect(await details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{"docs":[]}' } })))).toBeNull();
+    expect(await details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{}' } })))).toBeNull();
+  });
+  it('work 200 without a description + facts with no docs gives null', async () => {
+    expect(await details('OL17618W', deps(fakeFetch({ [work]: { body: '{"title":"x"}' }, [meta]: { body: '{"docs":[]}' } })))).toBeNull();
   });
 });
 

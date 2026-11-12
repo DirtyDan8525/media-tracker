@@ -19,6 +19,11 @@ const SOURCE_ID_RE = /^[\w.:\-]{1,200}$/;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/** True for a Details object with nothing in it (all four fields empty): treated as a miss, never cached. */
+export function isEmptyDetails(d: Details | null | undefined): boolean {
+  return !d || [d.releaseDate, d.synopsis, d.lengthLabel, d.origin].every((v) => !v);
+}
+
 async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   try {
     const body = await req.json();
@@ -80,6 +85,7 @@ lookup.post('/details', async (c) => {
   } catch (err) {
     console.warn(`details ${id} failed`, redactSecrets(String(err instanceof Error ? err.message : err), envSecrets(c.env)));
   }
+  if (isEmptyDetails(details)) details = null;
   if (details) await putCached(c.env.DB, id, key, details);
   return c.json({ details });
 });

@@ -142,18 +142,19 @@ export function descriptionOf(desc: unknown): string {
   return '';
 }
 
-/** Null only when neither request gave anything; a missing half leaves its fields ''. */
+/** Null when neither request gave anything; a missing half leaves its fields ''. */
 export function formatDetails(work: { description?: unknown } | null, meta: WorkMeta | null): Details | null {
   if (!work && !meta) return null;
   const year = meta?.first_publish_year;
   const publisher = Array.isArray(meta?.publisher) ? meta!.publisher![0] : '';
   const synopsis = descriptionOf(work?.description);
-  return {
+  const out: Details = {
     releaseDate: typeof year === 'number' && Number.isFinite(year) && year > 0 ? String(year) : '',
     synopsis: synopsis ? trimSynopsis(synopsis, 600) : '',
     lengthLabel: pagesLabel(meta?.number_of_pages_median),
     origin: typeof publisher === 'string' ? publisher : '',
   };
+  return out.releaseDate || out.synopsis || out.lengthLabel || out.origin ? out : null;
 }
 
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
@@ -164,6 +165,6 @@ export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promi
     fetchJson<{ docs?: WorkMeta[] }>(metaUrl, { headers: OL_HEADERS }, d),
   ]);
   const work = w.status === 200 && w.body && typeof w.body === 'object' ? w.body : null;
-  const meta = m.status === 200 ? (Array.isArray(m.body?.docs) ? m.body!.docs![0] ?? {} : {}) : null;
+  const meta = m.status === 200 && Array.isArray(m.body?.docs) ? m.body!.docs![0] ?? null : null;
   return formatDetails(work, meta);
 };

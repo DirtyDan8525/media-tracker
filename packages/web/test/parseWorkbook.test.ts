@@ -43,6 +43,14 @@ describe('sample workbook', () => {
     expect(row('Odd Status').status).toBeNull();
   });
 
+  it("maps the Sheet's status words to the app's statuses without warnings", () => {
+    expect(row('Eight').status).toBe('Watching / In Progress'); // Watching
+    expect(row('Dark').status).toBe('Watching / In Progress'); // In Progress
+    expect(row('Celeste').status).toBe('Plan to watch'); // Planned
+    expect(row('Dune').status).toBe('Plan to watch'); // Plan to Watch
+    expect(p.warnings.filter((w) => /status/i.test(w.message)).map((w) => w.row)).toEqual([7]); // only "Finished"
+  });
+
   it('detects a renamed tab by its headers', () => {
     expect(p.rows.filter((r) => r.category === 'anime')).toHaveLength(6);
   });
@@ -93,6 +101,55 @@ describe('sample workbook', () => {
     });
     expect(p.warnings.find((w) => w.tab === 'Settings')!).toMatchObject({ row: 15 });
     expect(p.warnings.find((w) => w.tab === 'Settings')!.message).toMatch(/Highlight/);
+  });
+});
+
+describe('Settings tab selection', () => {
+  const real: Cell[][] = [[null, 'Theme', 'Ocean'], [null, 'Movies', true], [null, 'TV Shows', 'TRUE']];
+
+  it('a stats-style tab before Settings does not win or switch categories off', async () => {
+    const p = await parseRows([
+      { name: 'Stats', rows: [[null, 'Movies', 12], [null, 'TV Shows', 4], [null, 'Books', 3]] },
+      { name: 'Settings', rows: real },
+    ]);
+    expect(p.settings).toEqual({ theme: 'Ocean', tabs: { movies: true, tv: true } });
+    expect(p.warnings).toEqual([]);
+  });
+
+  it('without any Theme, the sheet with the most switch labels wins', async () => {
+    const p = await parseRows([
+      { name: 'A', rows: [[null, 'Movies', true]] },
+      { name: 'B', rows: [[null, 'Movies', false], [null, 'Books', true]] },
+    ]);
+    expect(p.settings).toEqual({ tabs: { movies: false, books: true } });
+  });
+
+  it('two sheets with a Theme row: the first wins and a warning is added', async () => {
+    const p = await parseRows([
+      { name: 'S1', rows: [[null, 'Theme', 'Ocean']] },
+      { name: 'S2', rows: [[null, 'Theme', 'Light']] },
+    ]);
+    expect(p.settings).toEqual({ theme: 'Ocean' });
+    expect(p.warnings).toEqual([{ tab: 'S2', row: 1, message: expect.stringMatching(/second Settings/i) }]);
+  });
+
+  it('a non-boolean switch value is skipped with a warning, never read as false', async () => {
+    const p = await parseRows([
+      { name: 'Settings', rows: [[null, 'Theme', 'Ocean'], [null, 'Movies', 12], [null, 'Books', 'false'], [null, 'Songs', 'yes']] },
+    ]);
+    expect(p.settings).toEqual({ theme: 'Ocean', tabs: { books: false } });
+    expect(p.warnings.map((w) => w.row)).toEqual([2, 4]);
+  });
+
+  // (lower-cased by the parser; exact-case "constructor" cells make read-excel-file itself throw, so mixed case here)
+  it('labels like Constructor / __Proto__ do not match inherited object keys', async () => {
+    const p = await parseRows([
+      { name: 'X', rows: [[null, 'Constructor', 1], [null, '__Proto__', 1]] },
+      { name: 'Anime', rows: [['Cover', 'Rating', 'Title', 'Status', 'Genres', 'Studio', 'Season Avg', 'Notes', 'Cover URL'], [null, 5, 'T', 'Constructor', '', '', null, '', '']] },
+    ]);
+    expect(p.settings).toBeNull();
+    expect(p.rows[0]!.status).toBeNull();
+    expect(p.warnings).toHaveLength(1);
   });
 });
 
@@ -162,8 +219,8 @@ describe('parseWorkbook edge cases', () => {
         ],
       },
     ]);
-    expect(p.settings).toEqual({ compareStyle: 'Meet in the middle', compareWindow: 1, tabs: { movies: true, books: false } });
-    expect(p.warnings.map((w) => w.row).sort()).toEqual([1, 2]);
+    expect(p.settings).toEqual({ compareStyle: 'Meet in the middle', compareWindow: 1, tabs: { movies: true } });
+    expect(p.warnings.map((w) => w.row).sort()).toEqual([1, 2, 6]); // Books "no" is not TRUE/FALSE
   });
 
   it('settings: compare window is capped at 10', async () => {

@@ -13,6 +13,24 @@ export const STATUSES = [
 ] as const;
 export type Status = (typeof STATUSES)[number];
 
+/**
+ * Status words found in the Sheet (its Lists tab) and in the app, lower-case, trimmed -> canonical Status.
+ * Look up with Object.hasOwn(STATUS_ALIASES, key).
+ */
+export const STATUS_ALIASES: Readonly<Record<string, Status>> = {
+  'completed': 'Completed',
+  'watching / in progress': 'Watching / In Progress',
+  'watching': 'Watching / In Progress',
+  'in progress': 'Watching / In Progress',
+  'rewatching': 'Rewatching',
+  'on hold': 'On Hold',
+  'dropped': 'Dropped',
+  'plan to watch': 'Plan to watch',
+  'planned': 'Plan to watch',
+  'plan to read': 'Plan to watch',
+  'plan to play': 'Plan to watch',
+};
+
 export interface LookupInfo {
   title: string;
   trusted: boolean;

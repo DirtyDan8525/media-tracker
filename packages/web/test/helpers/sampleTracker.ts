@@ -26,7 +26,7 @@ export const SAMPLE_SHEETS: SheetSpec[] = [
       [null], // blank row
       ['https://wrong.test/mushishi.jpg', '8,5', 'Mushishi', 'completed', 'Slice of Life', 'Artland', null, '', ''],
       [null, 11, 'Overrated', 'Dropped', '', '', null, '', ''],
-      [null, 'eight', 'Eight', 'Watching / In Progress', '', '', null, '', ''],
+      [null, 'eight', 'Eight', 'Watching', '', '', null, '', ''],
       [null, 7, 'Odd Status', 'Finished', '', '', null, '', ''],
       [null, 6, 'Bad Cover', '', '', '', null, '', 'javascript:alert(1)'],
     ],
@@ -44,7 +44,7 @@ export const SAMPLE_SHEETS: SheetSpec[] = [
     rows: [
       TV,
       [null, 9, 'Severance', 'Completed', 'Thriller', avg(), '', 'https://img.test/severance.jpg'],
-      [null, 8.75, 'Dark', 'Watching / In Progress', 'Sci-Fi', avg(), '', ''],
+      [null, 8.75, 'Dark', 'In Progress', 'Sci-Fi', avg(), '', ''],
     ],
   },
   { name: 'Albums', rows: [ALBUMS, [null, 9, 'In Rainbows', 'Rock', 'Radiohead', '', '']] },
@@ -62,10 +62,10 @@ export const SAMPLE_SHEETS: SheetSpec[] = [
     rows: [
       GAMES,
       [null, 9.5, 'Hades', 'Completed', 'Roguelike', 'Supergiant Games', '', ''],
-      [null, 9, 'Celeste', 'Completed', 'Platformer', 'Maddy Makes Games', '', ''],
+      [null, 9, 'Celeste', 'Planned', 'Platformer', 'Maddy Makes Games', '', ''],
     ],
   },
-  { name: 'Books', rows: [BOOKS, [null, 9, 'Dune', 'Completed', 'Sci-Fi', 'Frank Herbert', '', '']] },
+  { name: 'Books', rows: [BOOKS, [null, 9, 'Dune', 'Plan to Watch', 'Sci-Fi', 'Frank Herbert', '', '']] },
   {
     name: 'Anime Seasons',
     hidden: true,

@@ -4,7 +4,7 @@ import {
   COMPARE_ASK,
   COMPARE_ROOM,
   COMPARE_STYLE,
-  STATUSES,
+  STATUS_ALIASES,
   THEMES,
   normTitle,
   type Category,
@@ -77,11 +77,19 @@ function findHeader(grid: Grid): { kind: Kind; headerIdx: number; headers: strin
   return null;
 }
 
-const isSettingsSheet = (grid: Grid) =>
-  grid.some((r) => {
+const hasLabel = (label: string) => Object.hasOwn(TAB_LABELS, label);
+
+/** How Settings-like a sheet is: has a "Theme" label, and how many tab-switch labels sit in column B. */
+function settingsScore(grid: Grid): { theme: boolean; labels: number } {
+  let theme = false;
+  let labels = 0;
+  for (const r of grid) {
     const label = norm(r?.[1]);
-    return label === 'theme' || label in TAB_LABELS;
-  });
+    if (label === 'theme') theme = true;
+    else if (hasLabel(label)) labels++;
+  }
+  return { theme, labels };
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -123,8 +131,8 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
   function parseStatus(v: Raw, tab: string, row: number): Status | null {
     const s = text(v);
     if (s === '') return null;
-    const hit = STATUSES.find((x) => x.toLowerCase() === s.toLowerCase());
-    if (hit) return hit;
+    const key = s.toLowerCase();
+    if (Object.hasOwn(STATUS_ALIASES, key)) return STATUS_ALIASES[key]!;
     warn(tab, row, `Status "${s}" is not one of the known statuses; imported without a status.`);
     return null;
   }
@@ -146,16 +154,14 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
 
   const seen = new Set<Kind>();
   const seasonSheets: { tab: string; kind: 'animeSeasons' | 'tvSeasons'; grid: Grid; headerIdx: number; headers: string[] }[] = [];
-  let settingsGrid: { tab: string; grid: Grid } | null = null;
+  const settingsCandidates: { tab: string; grid: Grid; theme: boolean; labels: number }[] = [];
 
   for (const { sheet: tab, data } of sheets) {
     const grid = data as Grid;
     const found = findHeader(grid);
     if (!found) {
-      if (isSettingsSheet(grid)) {
-        if (settingsGrid) warn(tab, 1, 'A second Settings tab was found; it was ignored.');
-        else settingsGrid = { tab, grid };
-      }
+      const sc = settingsScore(grid);
+      if (sc.theme || sc.labels > 0) settingsCandidates.push({ tab, grid, ...sc });
       continue; // Start Here, Top 5, Stats, Lists, ...
     }
     const { kind, headerIdx, headers } = found;
@@ -233,7 +239,16 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
     }
   }
 
-  if (settingsGrid) settings = readSettings(settingsGrid.tab, settingsGrid.grid, warn);
+  // The real Settings tab has a "Theme" label; otherwise the sheet with the most tab-switch labels.
+  const withTheme = settingsCandidates.filter((x) => x.theme);
+  const chosen = withTheme.length
+    ? withTheme[0]
+    : settingsCandidates.reduce<(typeof settingsCandidates)[number] | undefined>(
+        (best, x) => (!best || x.labels > best.labels ? x : best),
+        undefined,
+      );
+  for (const extra of withTheme.slice(1)) warn(extra.tab, 1, 'A second Settings tab (with a Theme row) was found; it was ignored.');
+  if (chosen) settings = readSettings(chosen.tab, chosen.grid, warn);
 
   const counts: ImportPreview['counts'] = {};
   for (const r of rows) counts[r.category] = (counts[r.category] ?? 0) + 1;
@@ -268,8 +283,11 @@ function readSettings(
     const label = rawLabel.toLowerCase();
     const value = r?.[2];
     const v = text(value);
-    if (label in TAB_LABELS) {
-      tabs[TAB_LABELS[label]!] = value === true || v.toUpperCase() === 'TRUE';
+    if (hasLabel(label)) {
+      const up = v.toUpperCase();
+      if (typeof value === 'boolean') tabs[TAB_LABELS[label]!] = value;
+      else if (typeof value === 'string' && (up === 'TRUE' || up === 'FALSE')) tabs[TAB_LABELS[label]!] = up === 'TRUE';
+      else warn(tab, rowNo, `${rawLabel} switch "${v}" is not TRUE or FALSE; that switch was not imported.`);
     } else if (label === 'theme') {
       if (v === '') return;
       const hit = [...Object.keys(THEMES), 'Custom'].find((t) => t.toLowerCase() === v.toLowerCase());

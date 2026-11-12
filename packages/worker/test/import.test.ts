@@ -124,6 +124,33 @@ describe('POST /api/import', () => {
   });
 });
 
+describe('undo across chunks', () => {
+  it('undo after a 600-row multi-chunk import removes all 600 and leaves other entries', async () => {
+    await as(A, '/api/entries', 'POST', { category: 'movies', title: 'Keep me' });
+    const id = crypto.randomUUID();
+    const rows = Array.from({ length: 600 }, (_, i) => row(i));
+    for (let i = 0; i < rows.length; i += IMPORT_CHUNK_ROWS) {
+      expect((await post(A, id, rows.slice(i, i + IMPORT_CHUNK_ROWS))).status).toBe(200);
+    }
+    const res = await as(A, `/api/import/${id}`, 'DELETE');
+    expect(await res.json()).toEqual({ deleted: 600 });
+    expect(await count('SELECT COUNT(*) n FROM entries')).toBe(1);
+    expect(await count('SELECT COUNT(*) n FROM imports')).toBe(0);
+  });
+
+  it('a later chunk failing validation leaves earlier chunks, and undo removes them', async () => {
+    const id = crypto.randomUUID();
+    expect((await post(A, id, [row(1), row(2)])).status).toBe(200);
+    expect((await post(A, id, [row(3), row(4, { rating: 11 })])).status).toBe(400);
+    expect(await count('SELECT COUNT(*) n FROM entries')).toBe(2);
+    const imp = await env.DB.prepare('SELECT counts_json FROM imports WHERE id = ?').bind(id).first<{ counts_json: string }>();
+    expect(JSON.parse(imp!.counts_json)).toMatchObject({ total: 2 });
+    const res = await as(A, `/api/import/${id}`, 'DELETE');
+    expect(await res.json()).toEqual({ deleted: 2 });
+    expect(await count('SELECT COUNT(*) n FROM entries')).toBe(0);
+  });
+});
+
 describe('DELETE /api/import/:id', () => {
   it('removes exactly that import (entries + seasons + imports row); other entries untouched', async () => {
     const keep = await as(A, '/api/entries', 'POST', { category: 'movies', title: 'Keep me' });

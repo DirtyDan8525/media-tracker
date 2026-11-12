@@ -24,6 +24,7 @@ export interface FakeResponse {
   file?: string; // fixture path relative to test/fixtures/
   body?: string; // literal body (when no file)
   contentType?: string; // default from the file extension, else application/json
+  headers?: Record<string, string>; // extra response headers (e.g. Retry-After)
   hang?: boolean; // never answers; rejects with AbortError when the request's signal aborts
 }
 
@@ -52,9 +53,12 @@ function hangUntilAborted(signal: AbortSignal | null | undefined): Promise<Respo
   });
 }
 
-function respond(status: number, body: string, contentType: string): Response {
+function respond(status: number, body: string, contentType: string, headers: Record<string, string> = {}): Response {
   if (status === 0) throw new TypeError('Network connection lost.'); // recorded network failure
-  return new Response(NULL_BODY.has(status) ? null : body, { status, headers: { 'content-type': contentType } });
+  return new Response(NULL_BODY.has(status) ? null : body, {
+    status,
+    headers: { 'content-type': contentType, ...headers },
+  });
 }
 
 /**
@@ -80,7 +84,7 @@ export function fakeFetch(map: Record<string, string | number | FakeResponse>): 
     if (typeof v === 'string') return respond(200, fixture(v), typeFor(v));
     if (v.hang) return hangUntilAborted(init?.signal ?? (input instanceof Request ? input.signal : undefined));
     const body = v.file !== undefined ? fixture(v.file) : (v.body ?? '');
-    return respond(v.status ?? 200, body, v.contentType ?? typeFor(v.file));
+    return respond(v.status ?? 200, body, v.contentType ?? typeFor(v.file), v.headers);
   };
   return Object.assign(f, { calls, unmatched }) as FakeFetch;
 }
@@ -114,6 +118,11 @@ export function replayFromIndex(index: FixtureIndex, read: (file: string) => str
     return respond(e.status, e.file ? read(e.file) : '', e.contentType);
   };
   return Object.assign(f, { calls, unmatched }) as FakeFetch;
+}
+
+/** Whether test/fixtures/<source>/<caseName>/ has been recorded (lets a fixture test skip until then). */
+export function hasFixtures(source: string, caseName: string): boolean {
+  return RAW[`./fixtures/${source}/${caseName}/index.json`] !== undefined;
 }
 
 /** Serves test/fixtures/<source>/<caseName>/ as recorded by scripts/record-fixtures.ts. */

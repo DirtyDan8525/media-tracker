@@ -71,7 +71,7 @@ export interface FetchOpts {
 
 export const DEFAULT_TIMEOUT_MS = 8000;
 
-type Outcome = { ok: true; status: number; text: string } | { ok: false };
+type Outcome = { ok: true; status: number; text: string; retryAfter: string | null } | { ok: false };
 
 // One request with a timeout; reads the whole body as text. Never throws.
 async function fetchRaw(url: string, init: RequestInit, d: LookupDeps, opts: FetchOpts | undefined): Promise<Outcome> {
@@ -86,7 +86,7 @@ async function fetchRaw(url: string, init: RequestInit, d: LookupDeps, opts: Fet
     const res = await d.fetch(url, { ...init, signal: ctrl.signal });
     const text = await res.text();
     logLine(d, `${shown} → ${res.status}`);
-    return { ok: true, status: res.status, text };
+    return { ok: true, status: res.status, text, retryAfter: res.headers.get('retry-after') };
   } catch (err) {
     if (ctrl.signal.aborted) logLine(d, `${shown} → timeout after ${timeoutMs} ms`);
     else logLine(d, `${shown} → network error: ${String(err instanceof Error ? err.message : err).slice(0, 200)}`);
@@ -109,16 +109,29 @@ export async function fetchJson<T>(
   d: LookupDeps,
   opts?: FetchOpts,
 ): Promise<{ status: number; body: T | null }> {
+  const { status, body } = await fetchJsonMeta<T>(url, init, d, opts);
+  return { status, body };
+}
+
+/** fetchJson plus the `Retry-After` header as whole seconds (null when absent or not a plain number). */
+export async function fetchJsonMeta<T>(
+  url: string,
+  init: RequestInit,
+  d: LookupDeps,
+  opts?: FetchOpts,
+): Promise<{ status: number; body: T | null; retryAfterSec: number | null }> {
   const r = await fetchRaw(url, init, d, opts);
-  if (!r.ok) return { status: 0, body: null };
+  if (!r.ok) return { status: 0, body: null, retryAfterSec: null };
+  const ra = r.retryAfter?.trim() ?? '';
+  const retryAfterSec = /^\d{1,6}$/.test(ra) ? Number(ra) : null;
   try {
-    return { status: r.status, body: JSON.parse(r.text) as T };
+    return { status: r.status, body: JSON.parse(r.text) as T, retryAfterSec };
   } catch {
     if (r.status >= 200 && r.status < 300) {
       logLine(d, `${stripUrl(url)} → bad json`);
-      return { status: 0, body: null };
+      return { status: 0, body: null, retryAfterSec: null };
     }
-    return { status: r.status, body: null };
+    return { status: r.status, body: null, retryAfterSec };
   }
 }
 
@@ -156,6 +169,11 @@ export function setPacingClock(c: PacingClock | null): void {
 /** Forget all pacing state (tests). */
 export function resetPacing(): void {
   nextStart.clear();
+}
+
+/** Waits `ms` on the pacing clock (so tests can replace it). */
+export function sleep(ms: number): Promise<void> {
+  return clock.sleep(ms);
 }
 
 /**

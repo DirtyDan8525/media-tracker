@@ -10,6 +10,13 @@ export type FixtureCase =
   | { source: SourceId; case: string; details: string };
 
 export const CASES: FixtureCase[] = [
+  // Kitsu requests (the typo fallback) are recorded inside the anilist cases.
+  { source: 'anilist', case: 'frieren',
+    query: { term: 'frieren', typedTitle: 'frieren', hint: '', category: 'anime' } },
+  { source: 'anilist', case: 'jojos-bizzare',
+    query: { term: 'jojos bizzare', typedTitle: 'jojos bizzare', hint: '', category: 'anime' } },
+  // Frieren's AniList media id (public); the recording shows whether it is right.
+  { source: 'anilist', case: 'details-154587', details: '154587' },
   // Example (shape only):
   // { source: 'tmdb', case: 'speed-racer-2008',
   //   query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer', hint: '', category: 'movies' } },

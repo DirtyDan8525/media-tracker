@@ -3,6 +3,7 @@
 // up through this map, so an unregistered source is simply skipped.
 import type { Category, Details, LookupInfo, SourceId } from '@media-tracker/shared';
 import type { Env } from '../../env';
+import * as anilist from './anilist';
 
 export interface LookupQuery {
   term: string;
@@ -45,8 +46,10 @@ export const KEY_CHECKS: Partial<Record<SourceId, (env: Env) => boolean>> = {
   igdb: hasIgdbKeys,
 };
 
-/** Registered adapters. Empty until Tasks 6-11 add theirs. */
-export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {};
+/** Registered adapters (Tasks 6-11 add theirs here). */
+export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
+  anilist: { search: anilist.search, details: anilist.details },
+};
 
 /** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */
 export function keysPresent(id: SourceId, entry: SourceEntry, env: Env): boolean {

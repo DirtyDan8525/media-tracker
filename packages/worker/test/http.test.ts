@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
 import {
-  envSecrets, fetchJson, fetchText, paced, redactSecrets, resetPacing, setPacingClock, stripUrl,
+  envSecrets, fetchJson, fetchJsonMeta, fetchText, paced, redactSecrets, resetPacing, setPacingClock, stripUrl,
 } from '../src/lookup/http';
 import { CACHE_TTL_MS, getCached, putCached } from '../src/lookup/cache';
 import type { LookupDeps } from '../src/lookup/sources/index';
@@ -106,6 +106,19 @@ describe('fetchJson', () => {
   it('works without a log array', async () => {
     const d: LookupDeps = { fetch: fakeFetch({}), env: env as Env };
     expect(await fetchJson('https://a.test/', {}, d)).toEqual({ status: 0, body: null });
+  });
+});
+
+describe('fetchJsonMeta', () => {
+  it('reports Retry-After as whole seconds, null when absent or a date', async () => {
+    const d = deps(fakeFetch({
+      'https://a.test/n': { status: 429, body: '{}', headers: { 'Retry-After': '7' } },
+      'https://a.test/d': { status: 429, body: '{}', headers: { 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' } },
+      'https://a.test/x': { body: '{"x":1}' },
+    }));
+    expect(await fetchJsonMeta('https://a.test/n', {}, d)).toEqual({ status: 429, body: {}, retryAfterSec: 7 });
+    expect((await fetchJsonMeta('https://a.test/d', {}, d)).retryAfterSec).toBeNull();
+    expect(await fetchJsonMeta('https://a.test/x', {}, d)).toEqual({ status: 200, body: { x: 1 }, retryAfterSec: null });
   });
 });
 

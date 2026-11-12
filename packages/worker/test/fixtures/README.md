@@ -15,6 +15,9 @@ Needs network access, so run it on your own machine:
 
 1. Put the API keys in `packages/worker/.dev.vars` (see `.dev.vars.example`):
    `TMDB_KEY`, `IGDB_ID`, `IGDB_SECRET`. Sources without keys don't need any.
+   The `spotify/live-at-electric-lady` case also needs `SPOTIFY_ALBUM_URL` (a Spotify
+   album link for Clairo – Live at Electric Lady); without it the recorder skips that
+   case and says so, and the run still succeeds.
 2. Record every case in `cases.ts` through the real adapters:
    `npm run record -w packages/worker`
    or save specific URLs as one case:

@@ -12,7 +12,7 @@ import { lookupChain } from '../src/lookup/chain';
 import { SOURCES, type LookupDeps } from '../src/lookup/sources/index';
 import { CASES, type FixtureCase } from '../test/fixtures/cases';
 import {
-  buildFixtureFiles, caseMode, createRecorder, detailsTarget, memoryD1, parseDevVars, secretsFromVars, shouldReplaceFixtures, summarize,
+  buildFixtureFiles, caseMode, createRecorder, detailsTarget, memoryD1, parseDevVars, resolveCaseTerm, secretsFromVars, shouldReplaceFixtures, summarize,
   type CaseResult,
 } from './recordLib';
 
@@ -66,6 +66,12 @@ const message = (err: unknown) => String(err instanceof Error ? err.message : er
 
 async function runCase(c: FixtureCase, vars: Record<string, string>, secrets: string[]): Promise<CaseResult> {
   const label = `${c.source}/${c.case}`;
+  const resolved = 'query' in c ? resolveCaseTerm(c, vars, process.env) : null;
+  if (resolved && 'skip' in resolved) {
+    console.log(`${label}: skipped: ${resolved.skip}`);
+    return { label, records: [], skipped: resolved.skip };
+  }
+  const query = resolved && 'query' in resolved ? resolved.query : undefined; // the case's query, with an env-sourced term filled in
   const rec = createRecorder(globalThis.fetch, secrets);
   const d: LookupDeps = { fetch: rec.fetch, env: envFrom(vars), log: [] };
   let error: string | undefined;
@@ -79,15 +85,15 @@ async function runCase(c: FixtureCase, vars: Record<string, string>, secrets: st
       // One case holds both: the search, then details of its first result (no ids to guess).
       const entry = SOURCES[c.source];
       if (!entry?.details) throw new Error(`${c.source} has no registered details function`);
-      const found = await entry.search(c.query, d);
+      const found = await entry.search(query!, d);
       console.log(`${label}:`, JSON.stringify(found));
       console.log(`${label} details:`, JSON.stringify(await entry.details(detailsTarget(found), d)));
     } else if ('chain' in c && c.chain) {
-      console.log(`${label}:`, JSON.stringify(await lookupChain(c.query.category, c.query, d)));
+      console.log(`${label}:`, JSON.stringify(await lookupChain(query!.category, query!, d)));
     } else {
       const entry = SOURCES[c.source];
       if (!entry) throw new Error(`${c.source} is not registered in SOURCES`);
-      console.log(`${label}:`, JSON.stringify(await entry.search(c.query, d)));
+      console.log(`${label}:`, JSON.stringify(await entry.search(query!, d)));
     }
   } catch (err) {
     error = message(err);

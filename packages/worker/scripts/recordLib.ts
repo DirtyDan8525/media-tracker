@@ -130,6 +130,8 @@ export interface CaseResult {
   label: string; // '<source>/<case>'
   records: readonly Recorded[];
   error?: string;
+  /** Why the case wasn't run (e.g. a required variable is unset). Not a failure. */
+  skipped?: string;
 }
 
 /**
@@ -138,7 +140,7 @@ export interface CaseResult {
  * fixtures stay untouched (the case still fails the run).
  */
 export function shouldReplaceFixtures(r: CaseResult): boolean {
-  return !r.error && r.records.length > 0;
+  return !r.skipped && !r.error && r.records.length > 0;
 }
 
 /** Human summary (case -> files, statuses). Exit code 1 if any case made zero requests or failed. */
@@ -147,6 +149,10 @@ export function summarize(results: readonly CaseResult[]): { lines: string[]; ex
   let exitCode = 0;
   for (const r of results) {
     const { files } = buildFixtureFiles(r.records);
+    if (r.skipped) {
+      lines.push(`${r.label}: skipped (${r.skipped})`);
+      continue;
+    }
     const data = files.filter((f) => f.name !== 'index.json');
     lines.push(`${r.label}: ${r.records.length} request(s)${r.error ? ` (error: ${r.error})` : ''}`);
     let i = 0;
@@ -205,4 +211,24 @@ export function detailsTarget(result: { sourceId?: string } | null): string {
   if (!result) throw new Error('the search found nothing, so there is nothing to ask details for');
   if (!result.sourceId) throw new Error('the search result has no sourceId to ask details for');
   return result.sourceId;
+}
+
+/** A case whose search term comes from an environment variable (a value that isn't ours to commit). */
+export interface TermFromEnv {
+  name: string;
+  /** Completes "set <name> in .dev.vars to …" in the skip message. */
+  describe: string;
+}
+
+export function resolveCaseTerm<Q extends { term: string; typedTitle: string }>(
+  c: { query?: Q; termFromEnv?: TermFromEnv },
+  vars: Record<string, string>,
+  procEnv: Record<string, string | undefined>,
+): { query: Q } | { skip: string } {
+  const src = c.termFromEnv;
+  if (!c.query) return { skip: 'the case has no query' };
+  if (!src) return { query: c.query };
+  const value = (vars[src.name] || procEnv[src.name] || '').trim();
+  if (!value) return { skip: `set ${src.name} in .dev.vars to ${src.describe}` };
+  return { query: { ...c.query, term: value, typedTitle: value } };
 }

@@ -4,9 +4,11 @@
 // and is saved to test/fixtures/<source>/<case>/. Tasks 6-11 append theirs.
 import type { SourceId } from '@media-tracker/shared';
 import type { LookupQuery } from '../../src/lookup/sources/index';
+import type { TermFromEnv } from '../../scripts/recordLib';
 
 export type FixtureCase =
-  | { source: SourceId; case: string; query: LookupQuery; chain?: boolean }
+  // termFromEnv: the term is read from .dev.vars / the environment (query.term is a placeholder); the case is skipped when it is unset.
+  | { source: SourceId; case: string; query: LookupQuery; chain?: boolean; termFromEnv?: TermFromEnv }
   // Search, then the details call for the first result's sourceId, both saved in the one case.
   | { source: SourceId; case: string; query: LookupQuery; detailsFromSearch: true }
   | { source: SourceId; case: string; details: string };
@@ -33,4 +35,20 @@ export const CASES: FixtureCase[] = [
     query: { term: 'Chuck (2007)', typedTitle: 'Chuck (2007)', hint: '', category: 'tv' } },
   { source: 'tvmaze', case: 'details-chuck', detailsFromSearch: true,
     query: { term: 'Chuck (2007)', typedTitle: 'Chuck (2007)', hint: '', category: 'tv' } },
+  // Deezer, iTunes and Spotify need no key. Deezer details are a case of their own (album, then song).
+  { source: 'deezer', case: 'dark-side-of-the-moon',
+    query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
+  { source: 'deezer', case: 'details-dark-side', detailsFromSearch: true,
+    query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
+  { source: 'deezer', case: 'time-pink-floyd',
+    query: { term: 'time', typedTitle: 'time', hint: 'pink floyd', category: 'songs' } },
+  { source: 'deezer', case: 'details-time-pink-floyd', detailsFromSearch: true,
+    query: { term: 'time', typedTitle: 'time', hint: 'pink floyd', category: 'songs' } },
+  // Recorded directly: the "Deezer finds nothing, iTunes answers" chain test pairs it with an empty Deezer answer.
+  { source: 'itunes', case: 'dark-side-of-the-moon',
+    query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
+  // The link is the user's to supply (R25): SPOTIFY_ALBUM_URL in .dev.vars. Goes through the chain, like a pasted link.
+  { source: 'spotify', case: 'live-at-electric-lady', chain: true,
+    termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady' },
+    query: { term: '', typedTitle: '', hint: '', category: 'albums' } },
 ];

@@ -3,3 +3,5 @@ DEV_EMAIL=dan@example.com
 # TMDB_KEY=
 # IGDB_ID=
 # IGDB_SECRET=
+# Only for recording the Spotify fixture (npm run record): a Spotify album link for Clairo – Live at Electric Lady.
+# SPOTIFY_ALBUM_URL=

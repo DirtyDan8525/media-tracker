@@ -4,6 +4,9 @@
 import type { Category, Details, LookupInfo, SourceId } from '@media-tracker/shared';
 import type { Env } from '../../env';
 import * as anilist from './anilist';
+import * as deezer from './deezer';
+import * as itunes from './itunes';
+import * as spotify from './spotify';
 import * as tmdb from './tmdb';
 import * as tvmaze from './tvmaze';
 import * as wiki from './wiki';
@@ -55,6 +58,9 @@ export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
   tmdb: { search: tmdb.search, details: tmdb.details },
   wiki: { search: wiki.search, details: wiki.details },
   tvmaze: { search: tvmaze.search, details: tvmaze.details },
+  deezer: { search: deezer.search, details: deezer.details },
+  itunes: { search: itunes.search, details: itunes.details },
+  spotify: { search: spotify.search, details: spotify.details },
 };
 
 /** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */

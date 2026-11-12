@@ -3,7 +3,7 @@
 // these cover everything it does to a response before writing it.
 import { describe, expect, it } from 'vitest';
 import {
-  buildFixtureFiles, caseMode, createRecorder, detailsTarget, extFor, memoryD1, parseDevVars, redactBody, secretsFromVars, shouldReplaceFixtures, summarize, type Recorded,
+  buildFixtureFiles, caseMode, createRecorder, detailsTarget, extFor, memoryD1, parseDevVars, redactBody, resolveCaseTerm, secretsFromVars, shouldReplaceFixtures, summarize, type Recorded,
 } from '../scripts/recordLib';
 import { getCached, putCached } from '../src/lookup/cache';
 import { replayFromIndex } from './fakeFetch';
@@ -205,12 +205,54 @@ describe('caseMode and detailsTarget (search-then-details cases)', () => {
       expect(`${c.source}/${c.case}`).toMatch(/^[a-z0-9]+\/[a-z0-9][a-z0-9_-]*$/i);
     }
     expect(CASES.filter((c) => caseMode(c) === 'search-then-details').map((c) => `${c.source}/${c.case}`).sort())
-      .toEqual(['tmdb/details-speed-racer', 'tvmaze/details-chuck', 'wiki/details-speed-racer']);
+      .toEqual(['deezer/details-dark-side', 'deezer/details-time-pink-floyd', 'tmdb/details-speed-racer', 'tvmaze/details-chuck', 'wiki/details-speed-racer']);
   });
 
   it('detailsTarget returns the first result\'s sourceId, and throws when there is none', () => {
     expect(detailsTarget({ sourceId: 'Q5' })).toBe('Q5');
     expect(() => detailsTarget(null)).toThrow(/found nothing/);
     expect(() => detailsTarget({})).toThrow(/no sourceId/);
+  });
+});
+
+describe('resolveCaseTerm (cases whose term comes from the environment)', () => {
+  const query = { term: '', typedTitle: '', hint: '', category: 'albums' as const };
+  const c = { query, termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo – Live at Electric Lady' } };
+
+  it('a case without termFromEnv keeps its own query', () => {
+    expect(resolveCaseTerm({ query: { ...query, term: 'abc', typedTitle: 'abc' } }, {}, {})).toEqual({ query: { ...query, term: 'abc', typedTitle: 'abc' } });
+  });
+  it('takes the term from .dev.vars, setting term and typedTitle', () => {
+    expect(resolveCaseTerm(c, { SPOTIFY_ALBUM_URL: 'https://open.spotify.com/album/x' }, {})).toEqual({
+      query: { ...query, term: 'https://open.spotify.com/album/x', typedTitle: 'https://open.spotify.com/album/x' },
+    });
+  });
+  it('falls back to the process environment; .dev.vars wins', () => {
+    expect(resolveCaseTerm(c, {}, { SPOTIFY_ALBUM_URL: 'from-env' })).toMatchObject({ query: { term: 'from-env' } });
+    expect(resolveCaseTerm(c, { SPOTIFY_ALBUM_URL: 'from-vars' }, { SPOTIFY_ALBUM_URL: 'from-env' })).toMatchObject({ query: { term: 'from-vars' } });
+  });
+  it('unset or blank: skip with a clear message', () => {
+    const msg = 'set SPOTIFY_ALBUM_URL in .dev.vars to a Spotify album link for Clairo – Live at Electric Lady';
+    expect(resolveCaseTerm(c, {}, {})).toEqual({ skip: msg });
+    expect(resolveCaseTerm(c, { SPOTIFY_ALBUM_URL: '  ' }, {})).toEqual({ skip: msg });
+  });
+});
+
+describe('a skipped case', () => {
+  it('is listed as skipped, replaces nothing, and does not fail the run', () => {
+    const r = { label: 'spotify/live-at-electric-lady', records: [], skipped: 'set X in .dev.vars' };
+    expect(shouldReplaceFixtures(r)).toBe(false);
+    const s = summarize([r]);
+    expect(s.exitCode).toBe(0);
+    expect(s.lines.join('\n')).toContain('skipped');
+    expect(s.lines.join('\n')).toContain('set X in .dev.vars');
+    expect(s.lines.join('\n')).not.toContain('no requests recorded');
+  });
+  it('the shipped Spotify case is env-sourced, goes through the chain and is skipped without the variable', async () => {
+    const { CASES } = await import('./fixtures/cases');
+    const c = CASES.find((x) => x.source === 'spotify' && x.case === 'live-at-electric-lady');
+    expect(c && 'chain' in c && c.chain).toBe(true);
+    expect(c && 'termFromEnv' in c && c.termFromEnv?.name).toBe('SPOTIFY_ALBUM_URL');
+    expect(resolveCaseTerm(c as never, {}, {})).toHaveProperty('skip');
   });
 });

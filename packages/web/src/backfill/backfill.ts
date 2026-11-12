@@ -86,6 +86,8 @@ export interface BackfillRunnerOptions extends BackfillDeps {
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
   onProgress?: (p: BackfillProgress) => void;
+  /** Per-item worker; defaults to backfillOne. Injectable for tests. */
+  processItem?: (entry: Entry, deps: BackfillDeps) => Promise<unknown>;
 }
 
 export interface BackfillRunner {
@@ -105,6 +107,7 @@ export interface BackfillRunner {
  */
 export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunner {
   const interval = opts.intervalMs ?? 1500;
+  const processItem = opts.processItem ?? backfillOne;
   const setTimer = opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
   const clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
 
@@ -119,6 +122,9 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
   const emit = () => opts.onProgress?.({ done, total, running });
 
   async function run(id: number): Promise<void> {
+    // Capture before listing: the item may settle while listPending() is still fetching, and the
+    // listing taken meanwhile can still contain it.
+    const prior = inFlight;
     let queue: Entry[];
     try {
       queue = await opts.listPending();
@@ -129,9 +135,8 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
     if (id !== runId) return;
     // A previous run may still have an item in flight (stop() doesn't cancel it): let it settle and
     // leave that entry out so it is neither concurrent nor repeated.
-    const prior = inFlight;
     if (prior) {
-      await prior.promise;
+      await prior.promise.catch(() => {});
       if (id !== runId) return;
     }
     const seen = new Set<string>(prior ? [prior.id] : []);
@@ -145,10 +150,15 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
       if (id !== runId || !running) return;
       if (i >= queue.length) { running = false; emit(); return; }
       const item = queue[i++]!;
-      const promise = backfillOne(item, opts); // never rejects
+      const promise = Promise.resolve().then(() => processItem(item, opts));
       inFlight = { id: item.id, promise };
-      await promise;
-      if (inFlight?.promise === promise) inFlight = null;
+      try {
+        await promise;
+      } catch {
+        // backfillOne never rejects; a custom processItem must not stop the run either.
+      } finally {
+        if (inFlight?.promise === promise) inFlight = null;
+      }
       if (id !== runId) return; // stopped (and possibly restarted) while in flight
       done++;
       emit();

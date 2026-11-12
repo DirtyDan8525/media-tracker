@@ -301,4 +301,67 @@ describe('createBackfillRunner', () => {
     expect(started).toEqual(['A', 'B', 'C']);
     expect(maxInFlight).toBe(1);
   });
+
+  it('an item that settles while listPending is still fetching is not processed again', async () => {
+    const started: string[] = [];
+    const gates: Array<() => void> = [];
+    const listGates: Array<() => void> = [];
+    let listCalls = 0;
+    const t = manualTimers();
+    const runner = createBackfillRunner({
+      listPending: async () => {
+        if (++listCalls === 2) await new Promise<void>((r) => listGates.push(r));
+        return three;
+      },
+      lookup: async (q) => {
+        started.push(q.typedTitle);
+        if (q.typedTitle === 'A' && started.length === 1) await new Promise<void>((r) => gates.push(r));
+        return { info: null };
+      },
+      details: async () => ({ details: null }), patch: async () => undefined,
+      setTimer: t.setTimer as never, clearTimer: t.clearTimer as never,
+    });
+    runner.start();
+    await flush();
+    runner.stop();
+    runner.start(); // second listPending is now pending
+    await flush();
+    gates[0]!(); // A settles while listing
+    await flush();
+    listGates[0]!(); // stale list (still containing A) arrives
+    await flush();
+    for (let i = 0; i < 5; i++) await t.tick();
+    expect(started.filter((x) => x === 'A')).toHaveLength(1);
+    expect(started).toEqual(['A', 'B', 'C']);
+  });
+
+  it('a rejecting in-flight item never wedges later runs', async () => {
+    const processed: string[] = [];
+    let reject!: (e: Error) => void;
+    const t = manualTimers();
+    const runner = createBackfillRunner({
+      listPending: async () => three,
+      lookup: async () => ({ info: null }), details: async () => ({ details: null }), patch: async () => undefined,
+      processItem: async (e) => {
+        processed.push(e.id);
+        if (processed.length === 1) await new Promise<void>((_, rj) => { reject = rj; });
+        return 'skipped';
+      },
+      setTimer: t.setTimer as never, clearTimer: t.clearTimer as never,
+    });
+    runner.start();
+    await flush();
+    runner.stop();
+    runner.start();
+    await flush();
+    reject(new Error('boom'));
+    await flush();
+    for (let i = 0; i < 5; i++) await t.tick();
+    expect(processed).toEqual(['a', 'b', 'c']);
+    expect(runner.running).toBe(false);
+    runner.start();
+    await flush();
+    for (let i = 0; i < 5; i++) await t.tick();
+    expect(processed).toEqual(['a', 'b', 'c', 'a', 'b', 'c']);
+  });
 });

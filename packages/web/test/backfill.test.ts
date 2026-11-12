@@ -108,14 +108,10 @@ describe('backfillOne', () => {
     expect(await backfillOne(entry(), b)).toBe('skipped');
   });
 
-  it('null/empty details: filled only when all four fields are already present, else skipped', async () => {
-    const full = entry({ releaseDate: '1998', synopsis: 's', lengthLabel: 'l', origin: 'o' });
-    const a = deps(info(), null);
-    expect(await backfillOne(full, a)).toBe('filled');
-    expect(a.patch).toHaveBeenCalledWith('e1', { detailsState: 'filled' });
-    const b = deps(info(), null);
-    expect(await backfillOne(entry({ synopsis: 's' }), b)).toBe('skipped');
-    expect(b.patch).not.toHaveBeenCalled();
+  it('null details on a confirmed match still marks filled with only detailsState', async () => {
+    const dp = deps(info(), null);
+    expect(await backfillOne(entry(), dp)).toBe('filled');
+    expect(dp.patch).toHaveBeenCalledWith('e1', { detailsState: 'filled' });
   });
 
   it('partial details that fill some gaps still mark filled with only the new fields', async () => {
@@ -252,14 +248,13 @@ describe('createBackfillRunner', () => {
   });
 
   it('reports a stop and ignores a second start() while running', async () => {
-    const { runner, t, processed, onProgress } = runnerFor(three);
+    const { runner, processed, onProgress } = runnerFor(three);
     runner.start();
     runner.start();
     await flush();
     expect(processed).toEqual(['A']);
     runner.stop();
     expect(onProgress).toHaveBeenLastCalledWith({ done: 1, total: 3, running: false });
-    void t;
   });
 
   it('with nothing pending, finishes immediately', async () => {
@@ -269,5 +264,41 @@ describe('createBackfillRunner', () => {
     expect(runner.running).toBe(false);
     expect(runner.total).toBe(0);
     expect(onProgress).toHaveBeenLastCalledWith({ done: 0, total: 0, running: false });
+  });
+
+  it('stop then immediate start while an item is in flight: no concurrent or duplicate processing', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const started: string[] = [];
+    const gates: Array<() => void> = [];
+    const t = manualTimers();
+    const runner = createBackfillRunner({
+      listPending: async () => three,
+      lookup: async (q) => {
+        started.push(q.typedTitle);
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        if (q.typedTitle === 'A' && started.filter((x) => x === 'A').length === 1) {
+          await new Promise<void>((r) => gates.push(r));
+        }
+        inFlight--;
+        return { info: null };
+      },
+      details: async () => ({ details: null }), patch: async () => undefined,
+      setTimer: t.setTimer as never, clearTimer: t.clearTimer as never,
+    });
+    runner.start();
+    await flush();
+    expect(started).toEqual(['A']);
+    runner.stop();
+    runner.start();
+    await flush();
+    expect(started).toEqual(['A']); // new run waits for A to settle
+    gates[0]!();
+    await flush();
+    expect(started).toEqual(['A', 'B']); // A is not repeated in the new run
+    for (let i = 0; i < 5; i++) await t.tick();
+    expect(started).toEqual(['A', 'B', 'C']);
+    expect(maxInFlight).toBe(1);
   });
 });

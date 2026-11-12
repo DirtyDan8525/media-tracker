@@ -33,10 +33,9 @@ const CREATOR_MIN = 0.8;
 
 /**
  * Tries to fill the empty detail fields of one imported entry.
- *  - 'filled': details were applied (or every field was already present) and detailsState is now 'filled'.
+ *  - 'filled': the match was confirmed; any new detail fields were applied (possibly none) and detailsState is 'filled'.
  *  - 'needs_review': the best lookup result is not clearly the same title/creator; flagged for the picker.
- *  - 'skipped': nothing was written (error, nothing found, no sourceId, or the source had nothing new
- *    to add while fields are still empty). detailsState stays 'none' so a later run retries.
+ *  - 'skipped': nothing was written (error, nothing found, no sourceId, or a thrown/rejected call). detailsState stays 'none' so a later run retries.
  */
 export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<BackfillResult> {
   try {
@@ -65,9 +64,7 @@ export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<Bac
       const incoming = details?.[f];
       if (!entry[f] && incoming) body[f] = incoming;
     }
-    const addedSomething = DETAIL_FIELDS.some((f) => f in body);
-    // Nothing new: only call it done if there is nothing left that a source could fill.
-    if (!addedSomething && DETAIL_FIELDS.some((f) => !entry[f])) return 'skipped';
+    // A confirmed match with nothing (more) to add is still done: mark it filled so it isn't re-queried.
 
     await deps.patch(entry.id, body);
     return 'filled';
@@ -116,6 +113,8 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
   let total = 0;
   let timer: unknown = null;
   let runId = 0;
+  /** The item currently being processed, kept across stop()/start() so two never overlap. */
+  let inFlight: { id: string; promise: Promise<unknown> } | null = null;
 
   const emit = () => opts.onProgress?.({ done, total, running });
 
@@ -128,7 +127,14 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
       return;
     }
     if (id !== runId) return;
-    const seen = new Set<string>();
+    // A previous run may still have an item in flight (stop() doesn't cancel it): let it settle and
+    // leave that entry out so it is neither concurrent nor repeated.
+    const prior = inFlight;
+    if (prior) {
+      await prior.promise;
+      if (id !== runId) return;
+    }
+    const seen = new Set<string>(prior ? [prior.id] : []);
     queue = queue.filter((e) => !seen.has(e.id) && !!seen.add(e.id));
     total = queue.length;
     emit();
@@ -138,7 +144,11 @@ export function createBackfillRunner(opts: BackfillRunnerOptions): BackfillRunne
       timer = null;
       if (id !== runId || !running) return;
       if (i >= queue.length) { running = false; emit(); return; }
-      await backfillOne(queue[i++]!, opts); // never rejects
+      const item = queue[i++]!;
+      const promise = backfillOne(item, opts); // never rejects
+      inFlight = { id: item.id, promise };
+      await promise;
+      if (inFlight?.promise === promise) inFlight = null;
       if (id !== runId) return; // stopped (and possibly restarted) while in flight
       done++;
       emit();

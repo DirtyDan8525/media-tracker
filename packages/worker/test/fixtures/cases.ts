@@ -58,4 +58,14 @@ export const CASES: FixtureCase[] = [
     termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady',
       accept: (v) => parseSpotifyRef(v)?.kind === 'album' },
     query: { term: '', typedTitle: '', hint: '', category: 'albums' } },
+  // IGDB needs IGDB_ID and IGDB_SECRET in .dev.vars; the token flow is recorded for real (secrets never reach the files).
+  // Steam needs no key; the steam cases call the steam source directly, so they run with or without IGDB keys.
+  { source: 'igdb', case: 'breath-of-the-wild',
+    query: { term: 'breath of the wild', typedTitle: 'breath of the wild', hint: '', category: 'games' } },
+  { source: 'igdb', case: 'details-breath-of-the-wild', detailsFromSearch: true,
+    query: { term: 'breath of the wild', typedTitle: 'breath of the wild', hint: '', category: 'games' } },
+  { source: 'steam', case: 'portal-2',
+    query: { term: 'portal 2', typedTitle: 'portal 2', hint: '', category: 'games' } },
+  { source: 'steam', case: 'details-portal-2', detailsFromSearch: true,
+    query: { term: 'portal 2', typedTitle: 'portal 2', hint: '', category: 'games' } },
 ];

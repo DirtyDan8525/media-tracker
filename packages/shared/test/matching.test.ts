@@ -73,7 +73,9 @@ describe('trimSynopsis', () => {
   });
   it('strips tags and entities', () => {
     expect(trimSynopsis('<p>Hi &amp; bye</p>', 600)).toBe('Hi & bye');
-    expect(trimSynopsis('a<br>b &lt;i&gt; &quot;q&quot; it&#39;s&nbsp;ok &#8217; &#x41;', 600)).toBe('ab <i> "q" it\'s ok ’ A');
+    expect(trimSynopsis('one<BR/>two<br class="x" />three</p><p>four</DIV>five</li>six <b>bold</b>', 600))
+      .toBe('one two three four five six bold');
+    expect(trimSynopsis('a<br>b &lt;i&gt; &quot;q&quot; it&#39;s&nbsp;ok &#8217; &#x41;', 600)).toBe('a b <i> "q" it\'s ok ’ A');
   });
   it('cuts at the last sentence end before max', () => {
     const s = 'First one. Second one! Third one? Fourth sentence runs long and long.';

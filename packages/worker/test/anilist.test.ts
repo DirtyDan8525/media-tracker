@@ -153,7 +153,7 @@ suite('formatDetails', () => {
 
   it('formats all four fields', () => {
     expect(formatDetails(frieren)).toEqual({
-      releaseDate: '2023-09-29', synopsis: 'A mage & her party.Second line.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023',
+      releaseDate: '2023-09-29', synopsis: 'A mage & her party. Second line.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023',
     });
   });
 

@@ -76,9 +76,13 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** Strips HTML, collapses whitespace, and cuts long text at a sentence end (or a space) with "…". */
+/**
+ * Strips HTML, collapses whitespace, and cuts long text at a sentence end (or a space) with "…".
+ * Line breaks and block ends (<br>, </p>, </div>, </li>) become a space first so sentences don't run together.
+ */
 export function trimSynopsis(s: string, max: number): string {
-  const text = decodeEntities(String(s).replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
+  const spaced = String(s).replace(/<br\b[^>]*>|<\/(?:p|div|li)\s*>/gi, ' ');
+  const text = decodeEntities(spaced.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
   if (text.length <= max) return text;
   const win = text.slice(0, max + 1);
   const end = Math.max(...['. ', '! ', '? '].map((p) => win.lastIndexOf(p)));

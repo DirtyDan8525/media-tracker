@@ -6,6 +6,7 @@ import type { Env } from '../../env';
 import * as anilist from './anilist';
 import * as deezer from './deezer';
 import * as itunes from './itunes';
+import * as openlibrary from './openlibrary';
 import * as spotify from './spotify';
 import * as tmdb from './tmdb';
 import * as tvmaze from './tvmaze';
@@ -61,6 +62,7 @@ export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
   deezer: { search: deezer.search, details: deezer.details },
   itunes: { search: itunes.search, details: itunes.details },
   spotify: { search: spotify.search, details: spotify.details },
+  openlibrary: { search: openlibrary.search, details: openlibrary.details },
 };
 
 /** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */

@@ -48,6 +48,11 @@ export const CASES: FixtureCase[] = [
   // Recorded directly: the "Deezer finds nothing, iTunes answers" chain test pairs it with an empty Deezer answer.
   { source: 'itunes', case: 'dark-side-of-the-moon',
     query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
+  // Open Library needs no key.
+  { source: 'openlibrary', case: 'we-are-legion',
+    query: { term: 'We Are Legion (We Are Bob)', typedTitle: 'We Are Legion (We Are Bob)', hint: 'Dennis E. Taylor', category: 'books' } },
+  { source: 'openlibrary', case: 'details-we-are-legion', detailsFromSearch: true,
+    query: { term: 'We Are Legion (We Are Bob)', typedTitle: 'We Are Legion (We Are Bob)', hint: 'Dennis E. Taylor', category: 'books' } },
   // The link is the user's to supply (R25): SPOTIFY_ALBUM_URL in .dev.vars. Goes through the chain, like a pasted link.
   { source: 'spotify', case: 'live-at-electric-lady', chain: true,
     termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady',

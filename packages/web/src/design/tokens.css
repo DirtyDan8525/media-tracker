@@ -1,0 +1,87 @@
+/*
+ * Design tokens. Colors are set at runtime by applyTheme() (src/design/theme.ts); the values here
+ * are Midnight so the first paint is right before any JS runs.
+ *
+ * Theme role        -> variable          | CF set key -> variable
+ * Background        -> --bg              | low     -> --cf-low      (rating 1)
+ * Alternate rows    -> --alt-row         | mid     -> --cf-mid      (rating 6)
+ * Header row        -> --header-row      | high    -> --cf-high     (rating 10)
+ * Cards             -> --card            | done    -> --cf-done     (Completed)
+ * Panels            -> --panel           | active  -> --cf-active   (Watching / Rewatching)
+ * Text              -> --text            | hold    -> --cf-hold     (On Hold)
+ * Bright text       -> --bright-text     | dropped -> --cf-dropped  (Dropped)
+ * Muted text        -> --muted-text      | dup     -> --cf-dup      (duplicate)
+ * Grid lines        -> --grid-line       |
+ * Highlight         -> --highlight       | derived: --on-highlight (text on Highlight fills)
+ *
+ * Spacing, radii and type are measured from the approved mockups (docs/design/mockups).
+ */
+:root {
+  --bg: #1b1b25;
+  --alt-row: #1f1f2c;
+  --header-row: #13131c;
+  --card: #232339;
+  --panel: #2a2a3b;
+  --text: #e6e6ed;
+  --bright-text: #ffffff;
+  --muted-text: #a6a6bb;
+  --grid-line: #2e2e3e;
+  --highlight: #ffd166;
+  --on-highlight: #13131c;
+
+  --cf-low: #6b2a35;
+  --cf-mid: #6b5a22;
+  --cf-high: #1f6b45;
+  --cf-done: #1f3d2c;
+  --cf-active: #1e3350;
+  --cf-hold: #4a3f1c;
+  --cf-dropped: #4a2026;
+  --cf-dup: #5a1f2a;
+
+  /* spacing (px steps used in the mockups) */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 18px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+
+  /* radii */
+  --radius-pill: 6px;    /* status pill */
+  --radius-sm: 8px;      /* covers, small buttons */
+  --radius-md: 10px;     /* rating badge, inputs, PC buttons, side-nav items */
+  --radius-lg: 12px;     /* icon buttons */
+  --radius-xl: 14px;     /* cards, grouped rows */
+  --radius-chip: 18px;   /* filter chips */
+  --radius-fab: 28px;    /* Add button */
+
+  /* type */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-tab: 11px;        /* bottom-tab label */
+  --fs-pill: 12px;       /* status pill */
+  --fs-meta: 13px;       /* sub-lines, section headers, chips */
+  --fs-sm: 14px;         /* PC table, side-nav footer */
+  --fs-body: 15px;       /* rows, settings items */
+  --fs-lg: 16px;         /* rating, paragraphs, primary buttons */
+  --fs-brand: 18px;      /* side-nav brand */
+  --fs-title: 26px;      /* phone screen title */
+  --fs-title-pc: 28px;   /* PC screen title */
+
+  /* sizes */
+  --tap: 44px;           /* minimum tap target */
+  --bottom-tabs-h: 76px;
+  --side-nav-w: 240px;
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+}

@@ -52,6 +52,19 @@ describe('GET /api/health', () => {
   });
 });
 
+describe('GET /api/auth/reauth', () => {
+  it('redirects to / with no auth and returns no data', async () => {
+    const res = await call('/api/auth/reauth', prod);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('content-type') ?? '').not.toContain('json');
+    expect(await res.text()).toBe('');
+    const users = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
+    expect(users?.n).toBe(0);
+  });
+});
+
 describe('dev bypass', () => {
   it('signs in DEV_EMAIL in dev and makes the admin email an admin', async () => {
     const res = await call('/api/me', { ENVIRONMENT: 'dev', DEV_EMAIL: 'dan@example.com', ADMIN_EMAIL: 'dan@example.com' });

@@ -72,6 +72,24 @@ describe('PUT /api/me/username', () => {
 });
 
 describe('PUT /api/me/settings', () => {
+  it('accepts the shape the Sheet importer produces (canonical enums, lowercase hex colours, 8 tab keys)', async () => {
+    const imported = {
+      theme: 'Ocean', colors: { Background: '#0f1c2b' },
+      tabs: { movies: true, tv: true, tvSeasons: true, animeSeasons: true, albums: true, songs: false, games: true, books: true },
+      compareAsk: 'Only when I start it', compareStyle: 'Swap the numbers', compareRoom: 'Give the same score', compareWindow: 1.5,
+    };
+    const res = await putSettings('a@example.com', imported);
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts the Sheet season tab switches (animeSeasons / tvSeasons) and defaults them on', async () => {
+    const res = await putSettings('a@example.com', { tabs: { animeSeasons: false, tvSeasons: false } });
+    expect(res.status).toBe(200);
+    const { settings } = (await res.json()) as { settings: { tabs: Record<string, boolean> } };
+    expect(settings.tabs).toMatchObject({ animeSeasons: false, tvSeasons: false, anime: true });
+    expect(DEFAULT_USER_SETTINGS.tabs).toMatchObject({ animeSeasons: true, tvSeasons: true });
+  });
+
   it('merges a partial update and keeps the other keys', async () => {
     const res = await putSettings('a@example.com', { theme: 'Ocean' });
     expect(res.status).toBe(200);

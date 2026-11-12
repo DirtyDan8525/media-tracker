@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireUser, type AppEnv } from './auth/access';
 import { me } from './api/me';
 import { entries } from './api/entries';
+import { importApi } from './api/import';
 import { lookup } from './lookup/routes';
 
 export type { AppUser, AppEnv } from './auth/access';
@@ -19,6 +20,7 @@ api.use('*', requireUser);
 api.route('/me', me);
 api.route('/lookup', lookup);
 api.route('/', entries);
+api.route('/import', importApi);
 app.route('/api', api);
 
 app.notFound((c) => {

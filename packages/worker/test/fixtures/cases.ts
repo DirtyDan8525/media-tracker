@@ -7,6 +7,8 @@ import type { LookupQuery } from '../../src/lookup/sources/index';
 
 export type FixtureCase =
   | { source: SourceId; case: string; query: LookupQuery; chain?: boolean }
+  // Search, then the details call for the first result's sourceId, both saved in the one case.
+  | { source: SourceId; case: string; query: LookupQuery; detailsFromSearch: true }
   | { source: SourceId; case: string; details: string };
 
 export const CASES: FixtureCase[] = [
@@ -17,8 +19,13 @@ export const CASES: FixtureCase[] = [
     query: { term: 'jojos bizzare', typedTitle: 'jojos bizzare', hint: '', category: 'anime' } },
   // Frieren's AniList media id (public); the recording shows whether it is right.
   { source: 'anilist', case: 'details-154587', details: '154587' },
-  // Example (shape only):
-  // { source: 'tmdb', case: 'speed-racer-2008',
-  //   query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer', hint: '', category: 'movies' } },
-  // { source: 'tmdb', case: 'details-11155', details: '11155' },
+  // TMDB needs a key in .dev.vars. The wiki cases call the wiki source directly, so they need none.
+  { source: 'tmdb', case: 'speed-racer-2008',
+    query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer 2008', hint: '', category: 'movies' } },
+  { source: 'tmdb', case: 'details-speed-racer', detailsFromSearch: true,
+    query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer 2008', hint: '', category: 'movies' } },
+  { source: 'wiki', case: 'speed-racer',
+    query: { term: 'speed racer', typedTitle: 'speed racer', hint: '', category: 'movies' } },
+  { source: 'wiki', case: 'details-speed-racer', detailsFromSearch: true,
+    query: { term: 'speed racer', typedTitle: 'speed racer', hint: '', category: 'movies' } },
 ];

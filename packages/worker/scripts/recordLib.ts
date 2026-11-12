@@ -190,3 +190,19 @@ export function memoryD1(): D1Database {
   };
   return { prepare } as unknown as D1Database;
 }
+
+/** How a recorder case runs: `details` (details of a fixed id), `search-then-details` (search, then details of the first result), `chain` or `search`. */
+export type CaseMode = 'details' | 'search-then-details' | 'chain' | 'search';
+
+export function caseMode(c: { details?: string; detailsFromSearch?: boolean; chain?: boolean }): CaseMode {
+  if (c.details !== undefined) return 'details';
+  if (c.detailsFromSearch) return 'search-then-details';
+  return c.chain ? 'chain' : 'search';
+}
+
+/** The sourceId to ask details for after a search; throws (so the case fails and nothing is saved) when the search gave none. */
+export function detailsTarget(result: { sourceId?: string } | null): string {
+  if (!result) throw new Error('the search found nothing, so there is nothing to ask details for');
+  if (!result.sourceId) throw new Error('the search result has no sourceId to ask details for');
+  return result.sourceId;
+}

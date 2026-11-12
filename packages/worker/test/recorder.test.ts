@@ -3,7 +3,7 @@
 // these cover everything it does to a response before writing it.
 import { describe, expect, it } from 'vitest';
 import {
-  buildFixtureFiles, createRecorder, extFor, memoryD1, parseDevVars, redactBody, secretsFromVars, shouldReplaceFixtures, summarize, type Recorded,
+  buildFixtureFiles, caseMode, createRecorder, detailsTarget, extFor, memoryD1, parseDevVars, redactBody, secretsFromVars, shouldReplaceFixtures, summarize, type Recorded,
 } from '../scripts/recordLib';
 import { getCached, putCached } from '../src/lookup/cache';
 import { replayFromIndex } from './fakeFetch';
@@ -186,5 +186,31 @@ describe('shouldReplaceFixtures', () => {
   it('summary says when existing fixtures were kept', () => {
     expect(summarize([{ label: 'a/b', records: [rec], error: 'x' }]).lines.join('\n')).toContain('kept existing fixtures');
     expect(summarize([{ label: 'a/b', records: [rec] }]).lines.join('\n')).not.toContain('kept existing fixtures');
+  });
+});
+
+describe('caseMode and detailsTarget (search-then-details cases)', () => {
+
+  it('tells the case shapes apart', () => {
+    expect(caseMode({ details: '154587' })).toBe('details');
+    expect(caseMode({ detailsFromSearch: true })).toBe('search-then-details');
+    expect(caseMode({ chain: true })).toBe('chain');
+    expect(caseMode({})).toBe('search');
+  });
+
+  it('every shipped case has a valid shape and the details-from-search cases carry a query', async () => {
+    const { CASES } = await import('./fixtures/cases');
+    for (const c of CASES) {
+      if (caseMode(c) === 'search-then-details') expect('query' in c && c.query.term).toBeTruthy();
+      expect(`${c.source}/${c.case}`).toMatch(/^[a-z0-9]+\/[a-z0-9][a-z0-9_-]*$/i);
+    }
+    expect(CASES.filter((c) => caseMode(c) === 'search-then-details').map((c) => `${c.source}/${c.case}`).sort())
+      .toEqual(['tmdb/details-speed-racer', 'wiki/details-speed-racer']);
+  });
+
+  it('detailsTarget returns the first result\'s sourceId, and throws when there is none', () => {
+    expect(detailsTarget({ sourceId: 'Q5' })).toBe('Q5');
+    expect(() => detailsTarget(null)).toThrow(/found nothing/);
+    expect(() => detailsTarget({})).toThrow(/no sourceId/);
   });
 });

@@ -12,7 +12,7 @@ import { lookupChain } from '../src/lookup/chain';
 import { SOURCES, type LookupDeps } from '../src/lookup/sources/index';
 import { CASES, type FixtureCase } from '../test/fixtures/cases';
 import {
-  buildFixtureFiles, createRecorder, memoryD1, parseDevVars, secretsFromVars, shouldReplaceFixtures, summarize,
+  buildFixtureFiles, caseMode, createRecorder, detailsTarget, memoryD1, parseDevVars, secretsFromVars, shouldReplaceFixtures, summarize,
   type CaseResult,
 } from './recordLib';
 
@@ -70,11 +70,19 @@ async function runCase(c: FixtureCase, vars: Record<string, string>, secrets: st
   const d: LookupDeps = { fetch: rec.fetch, env: envFrom(vars), log: [] };
   let error: string | undefined;
   try {
+    const mode = caseMode(c);
     if ('details' in c) {
       const fn = SOURCES[c.source]?.details;
       if (!fn) throw new Error(`${c.source} has no registered details function`);
       console.log(`${label}:`, JSON.stringify(await fn(c.details, d)));
-    } else if (c.chain) {
+    } else if (mode === 'search-then-details') {
+      // One case holds both: the search, then details of its first result (no ids to guess).
+      const entry = SOURCES[c.source];
+      if (!entry?.details) throw new Error(`${c.source} has no registered details function`);
+      const found = await entry.search(c.query, d);
+      console.log(`${label}:`, JSON.stringify(found));
+      console.log(`${label} details:`, JSON.stringify(await entry.details(detailsTarget(found), d)));
+    } else if ('chain' in c && c.chain) {
       console.log(`${label}:`, JSON.stringify(await lookupChain(c.query.category, c.query, d)));
     } else {
       const entry = SOURCES[c.source];

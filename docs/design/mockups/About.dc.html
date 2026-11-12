@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>About Media Tracker</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 12px 12px 0">
+    <a href="Settings.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #e6e6ed">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+  </div>
+  <div style="flex: 1; padding: 12px 24px 28px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.04em; color: #ffd166">WELCOME TO MEDIA TRACKER</h1>
+      <span style="font-size: 15px; font-style: italic; color: #a6a6bb">Created by Dan</span>
+    </div>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #e6e6ed">Hey! I got tired of keeping track of everything I watch, listen to, play and read across a bunch of different websites and random notes apps, so I made this to keep it all in one spot. Just type in a title, give it a rating, and it fills in the cover and the rest for you.</p>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #e6e6ed">I'm super hyped that other people might actually use this. Make it yours, fill it up with your favorite stuff, and let's compare and share what we love!</p>
+    <section aria-label="Credits" style="margin-top: auto; padding: 16px; border-radius: 14px; background: #232339; display: flex; flex-direction: column; gap: 10px">
+      <span style="font-size: 13px; line-height: 1.5; color: #a6a6bb">This product uses the TMDB API but is not endorsed or certified by TMDB.</span>
+      <span style="font-size: 13px; line-height: 1.5; color: #a6a6bb">Game data from IGDB.com.</span>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

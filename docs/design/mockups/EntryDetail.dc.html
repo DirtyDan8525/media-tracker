@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Entry details</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 0">
+    <a href="Main.dc.html" aria-label="Back to Anime" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #e6e6ed">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <button aria-label="More actions" style="width: 44px; height: 44px; border-radius: 12px; border: none; background: transparent; color: #e6e6ed; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+    </button>
+  </div>
+
+  <div style="flex: 1; overflow: hidden; padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 18px">
+    <div style="display: flex; gap: 16px">
+      <div style="width: 120px; height: 180px; border-radius: 12px; background: #2a4a5e; flex-shrink: 0"></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.25">Frieren: Beyond Journey's End</h1>
+        <span style="font-size: 14px; color: #e6e6ed">Madhouse</span>
+        <span style="font-size: 13px; color: #a6a6bb">2023 · 28 ep · 24 min</span>
+        <span style="font-size: 13px; color: #a6a6bb">Format: TV · Fall 2023</span>
+        <span style="font-size: 13px; color: #a6a6bb">Adventure, Drama, Fantasy</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <div style="padding: 12px; border-radius: 14px; background: #232339; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #a6a6bb">Rating</span>
+        <span style="font-size: 26px; font-weight: 700; color: #ffffff">9.5</span>
+      </div>
+      <div style="padding: 12px; border-radius: 14px; background: #232339; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 12px; color: #a6a6bb">Status</span>
+        <span style="align-self: flex-start; font-size: 14px; font-weight: 600; padding: 5px 10px; border-radius: 8px; background: #1f3d2c; color: #ffffff">Completed</span>
+      </div>
+    </div>
+
+    <section aria-label="Synopsis" style="display: flex; flex-direction: column; gap: 6px">
+      <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #e6e6ed">[Synopsis from AniList: a few sentences about the show, trimmed at 600 characters at a sentence end.]</p>
+      <a href="#" style="font-size: 14px; font-weight: 600">More</a>
+    </section>
+
+    <section aria-label="Seasons" style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #ffffff">Seasons <span style="font-weight: 500; color: #a6a6bb">· avg 9.25</span></h2>
+        <button style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #2e2e3e; background: transparent; color: #ffd166; font: 600 13px Inter, sans-serif">Add season</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: #1f1f2c"><span style="font-size: 14px">Season 1</span><span style="font-weight: 700; color: #ffffff">9.5</span></div>
+      <div style="display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: #1f1f2c"><span style="font-size: 14px">Season 2</span><span style="font-weight: 700; color: #ffffff">9.0</span></div>
+    </section>
+
+    <section aria-label="Notes" style="display: flex; flex-direction: column; gap: 8px">
+      <label for="n" style="font-size: 16px; font-weight: 700; color: #ffffff">Notes</label>
+      <textarea id="n" rows="2" placeholder="Anything you want to remember" style="border-radius: 12px; border: 1px solid #2e2e3e; background: #1f1f2c; color: #e6e6ed; font: 400 14px Inter, sans-serif; padding: 10px 12px; resize: none"></textarea>
+    </section>
+
+    <div style="display: flex; gap: 10px; margin-top: auto">
+      <button style="flex: 1; height: 48px; border-radius: 12px; border: 1px solid #2e2e3e; background: #232339; color: #e6e6ed; font: 600 14px Inter, sans-serif">Re-fetch</button>
+      <button style="flex: 1; height: 48px; border-radius: 12px; border: 1px solid #6b2a35; background: transparent; color: #ff9aa7; font: 600 14px Inter, sans-serif">Delete</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

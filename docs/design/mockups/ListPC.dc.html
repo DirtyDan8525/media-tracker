@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Anime list — PC table</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+</style>
+</helmet>
+<div style="min-height: 900px; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-wrap: wrap">
+  <nav aria-label="Lists" style="flex: 1 1 220px; max-width: 260px; background: #13131c; border-right: 1px solid #2e2e3e; padding: 24px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+    <span style="font-size: 18px; font-weight: 800; color: #ffd166; padding: 0 10px 18px">Media Tracker</span>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="7">
+      <a href="ListPC.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px; text-decoration: none; background: {{n.bg}}; color: {{n.fg}}; font-size: 15px; font-weight: {{n.weight}}"><span>{{n.name}}</span><span style="font-size: 13px; color: #a6a6bb">{{n.count}}</span></a>
+    </sc-for>
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid #2e2e3e; padding-top: 12px">
+      <a href="Import.dc.html" style="min-height: 40px; display: flex; align-items: center; padding: 0 12px; color: #e6e6ed; text-decoration: none; font-size: 14px">Import</a>
+      <a href="Settings.dc.html" style="min-height: 40px; display: flex; align-items: center; padding: 0 12px; color: #e6e6ed; text-decoration: none; font-size: 14px">Settings</a>
+      <a href="About.dc.html" style="min-height: 40px; display: flex; align-items: center; padding: 0 12px; color: #e6e6ed; text-decoration: none; font-size: 14px">About</a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff">Anime</h1>
+        <span style="font-size: 14px; color: #a6a6bb">48 titles · 44 rated · average 8.6</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+        <label for="f" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Filter</label>
+        <input id="f" placeholder="Filter titles, studios, genres…" style="width: 280px; height: 42px; border-radius: 10px; border: 1px solid #2e2e3e; background: #232339; color: #ffffff; font: 400 14px Inter, sans-serif; padding: 0 12px">
+        <button style="height: 42px; padding: 0 14px; border-radius: 10px; border: 1px solid #2e2e3e; background: #232339; color: #e6e6ed; font: 500 14px Inter, sans-serif">Sort: Rating</button>
+        <button style="height: 42px; padding: 0 18px; border-radius: 10px; border: none; background: #ffd166; color: #13131c; font: 700 14px Inter, sans-serif">+ Add anime</button>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto; border-radius: 14px; border: 1px solid #2e2e3e">
+      <table style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 14px">
+        <thead>
+          <tr style="background: #13131c; text-align: left; color: #a6a6bb">
+            <th scope="col" style="padding: 12px 14px; width: 56px; font-weight: 600">Cover</th>
+            <th scope="col" style="padding: 12px 14px; width: 84px; font-weight: 600">Rating</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Title</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Status</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Genres</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Studio</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Season Avg</th>
+            <th scope="col" style="padding: 12px 14px; font-weight: 600">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+            <tr style="background: {{r.bg}}; border-top: 1px solid #2e2e3e">
+              <td style="padding: 8px 14px"><div style="width: 36px; height: 54px; border-radius: 6px; background: {{r.tint}}"></div></td>
+              <td style="padding: 8px 14px"><span style="display: inline-flex; min-width: 44px; height: 32px; align-items: center; justify-content: center; border-radius: 8px; background: {{r.ratingBg}}; color: #ffffff; font-weight: 700">{{r.rating}}</span></td>
+              <td style="padding: 8px 14px; color: #ffffff; font-weight: 600"><a href="EntryDetail.dc.html" style="color: #ffffff; text-decoration: none">{{r.title}}</a></td>
+              <td style="padding: 8px 14px"><span style="padding: 4px 9px; border-radius: 6px; background: {{r.statusBg}}; color: #e6e6ed; font-size: 13px">{{r.status}}</span></td>
+              <td style="padding: 8px 14px; color: #a6a6bb">{{r.genres}}</td>
+              <td style="padding: 8px 14px">{{r.studio}}</td>
+              <td style="padding: 8px 14px; color: #a6a6bb">{{r.avg}}</td>
+              <td style="padding: 8px 14px; color: #a6a6bb">{{r.notes}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+    <span style="font-size: 13px; color: #a6a6bb">Click a rating, status or note to edit it in place. Arrow keys move between rows.</span>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var navs = [['Anime',48,true],['Movies',52],['TV Shows',31],['Albums',40],['Games',27],['Books',14]];
+    var nav = navs.map(function (n) { return { name: n[0], count: n[1], bg: n[2] ? '#2a2a3b' : 'transparent', fg: n[2] ? '#ffd166' : '#e6e6ed', weight: n[2] ? 700 : 500 }; });
+    var data = [
+      ['Cyberpunk: Edgerunners','TRIGGER','Action, Drama, Psychological, Sci-Fi','Completed','10.0','#1f6b45','#5b2b4a'],
+      ['Fullmetal Alchemist: Brotherhood','bones','Action, Adventure, Drama, Fantasy','Completed','10.0','#1f6b45','#5a3b22'],
+      ['Naruto: Shippuden','Studio Pierrot','Action, Adventure, Comedy, Drama','Completed','9.9','#216b44','#5e4520'],
+      ['My Hero Academia','bones','Action, Adventure, Comedy','Completed','9.8','#236a43','#24456b'],
+      ['Gurren Lagann','GAINAX','Action, Comedy, Drama, Mecha','Completed','9.7','#256a42','#6b2a2a'],
+      ['Evangelion (Shinsaku Series)','CloverWorks, Studio Khara','Mecha, Sci-Fi','Completed','9.6','#266a42','#2a3b5e'],
+      ['JoJo’s Bizarre Adventure (TV)','david production','Action, Adventure, Supernatural','Completed','9.5','#286941','#3d2a6b'],
+      ['Mob Psycho 100','bones','Action, Comedy, Drama, Psychological','On Hold','9.4','#2a6940','#2a5a5a'],
+      ['FLCL','GAINAX, Production I.G','Action, Comedy, Mecha, Sci-Fi','Completed','9.3','#2c6840','#5e2b5e'],
+      ['Vivy -Fluorite Eye’s Song-','WIT STUDIO','Action, Drama, Music, Sci-Fi','Completed','9.2','#2e683e','#2b4a5e']
+    ];
+    var rows = data.map(function (r, i) {
+      return { title: r[0], studio: r[1], genres: r[2], status: r[3], rating: r[4], ratingBg: r[5], tint: r[6],
+        statusBg: r[3] === 'On Hold' ? '#4a3f1c' : '#1f3d2c', bg: i % 2 ? '#1f1f2c' : '#1b1b25', avg: '', notes: '' };
+    });
+    return { nav: nav, rows: rows };
+  }
+}
+</script>
+</body>
+</html>

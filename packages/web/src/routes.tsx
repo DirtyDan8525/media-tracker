@@ -1,0 +1,36 @@
+import { Navigate, type RouteObject } from 'react-router';
+import { AboutScreen } from './screens/AboutScreen';
+import { ListScreen } from './screens/ListScreen';
+import { MoreScreen } from './screens/MoreScreen';
+import { EntryScreen, ImportScreen } from './screens/Placeholders';
+import { SettingsScreen } from './screens/SettingsScreen';
+import { UsernameSetup } from './screens/UsernameSetup';
+import { AppFrame } from './shell/AppFrame';
+import { HomeRedirect } from './shell/HomeRedirect';
+import { SessionGate, SETUP_PATH } from './shell/SessionGate';
+
+/**
+ * `/` → first enabled list. Everything sits under SessionGate, which sends a user with no
+ * username to /setup/username first. Setup has no nav; every other screen is in the AppFrame.
+ */
+export const routes: RouteObject[] = [
+  {
+    element: <SessionGate />,
+    children: [
+      { path: SETUP_PATH, element: <UsernameSetup /> },
+      {
+        element: <AppFrame />,
+        children: [
+          { index: true, element: <HomeRedirect /> },
+          { path: 'list/:category', element: <ListScreen /> },
+          { path: 'entry/:id', element: <EntryScreen /> },
+          { path: 'import', element: <ImportScreen /> },
+          { path: 'settings', element: <SettingsScreen /> },
+          { path: 'about', element: <AboutScreen /> },
+          { path: 'more', element: <MoreScreen /> },
+          { path: '*', element: <Navigate to="/" replace /> },
+        ],
+      },
+    ],
+  },
+];

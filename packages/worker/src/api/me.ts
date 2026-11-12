@@ -1,14 +1,18 @@
 import { Hono } from 'hono';
-import { DEFAULT_USER_SETTINGS, THEMES, type UserSettings } from '@media-tracker/shared';
+import {
+  COMPARE_ASK,
+  COMPARE_ROOM,
+  COMPARE_STYLE,
+  DEFAULT_USER_SETTINGS,
+  THEMES,
+  type UserSettings,
+} from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 
 export const me = new Hono<AppEnv>();
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-const COMPARE_ASK = ['Both', 'Only when I start it', 'Only for new ratings', 'Off'];
-const COMPARE_STYLE = ['Meet in the middle', 'Swap the numbers'];
-const COMPARE_ROOM = ['Use in-between scores', 'Give the same score', 'Push others down'];
 // A rating-difference window (script: `Number(x) > 0`, used as `y.rating - x.rating > window`), so decimals are fine.
 // Ratings span 1-10, so a window past 10 is meaningless.
 const COMPARE_WINDOW_MAX = 10;
@@ -61,7 +65,7 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
   for (const [key, allowed] of enums) {
     if (!(key in partial)) continue;
     const v = partial[key];
-    if (typeof v !== 'string' || !allowed.includes(v)) return { ok: false };
+    if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) return { ok: false };
     next[key] = v;
   }
   if ('compareWindow' in partial) {

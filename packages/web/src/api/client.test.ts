@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mockFetch } from '../test/mockApi';
+import { isSignedOut, REAUTH_FLAG, REAUTH_PATH } from './auth';
 import { api, ApiError } from './client';
 
 describe('api client', () => {
@@ -34,11 +35,68 @@ describe('api client', () => {
     await expect(api.get('/api/x')).rejects.toMatchObject({ status: 502, error: 'http_502' });
   });
 
-  it('on a 401 reloads to / so Access can sign in', async () => {
+  it('sends /api fetches with redirect: manual', async () => {
+    const calls = mockFetch({ 'GET /api/x': { body: {} } });
+    await api.get('/api/x');
+    expect(calls[0]!.init?.redirect).toBe('manual');
+  });
+});
+
+describe('signed out (Access session expired)', () => {
+  const stubAssign = () => {
     const assign = vi.fn();
     vi.stubGlobal('location', { ...window.location, assign });
+    return assign;
+  };
+
+  it('the first 401 navigates once to /api/auth/reauth and sets the session flag', async () => {
+    const assign = stubAssign();
     mockFetch({ 'GET /api/me': { status: 401, body: { error: 'unauthorized' } } });
-    await expect(api.get('/api/me')).rejects.toBeInstanceOf(ApiError);
-    expect(assign).toHaveBeenCalledWith('/');
+    await expect(api.get('/api/me')).rejects.toMatchObject({ status: 401, error: 'unauthorized' });
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith(REAUTH_PATH);
+    expect(sessionStorage.getItem(REAUTH_FLAG)).toBe('1');
+    expect(isSignedOut()).toBe(false);
+  });
+
+  it('a second 401 in the same session does not navigate; it flags signed-out', async () => {
+    const assign = stubAssign();
+    sessionStorage.setItem(REAUTH_FLAG, '1');
+    mockFetch({ 'GET /api/entries': { status: 401, body: { error: 'unauthorized' } } });
+    await expect(api.get('/api/entries')).rejects.toBeInstanceOf(ApiError);
+    expect(assign).not.toHaveBeenCalled();
+    expect(isSignedOut()).toBe(true);
+  });
+
+  it('an opaqueredirect (Access redirecting the fetch) is treated like a 401', async () => {
+    const assign = stubAssign();
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      type: 'opaqueredirect', status: 0, ok: false, text: async () => '',
+    }) as unknown as Response));
+    await expect(api.get('/api/me')).rejects.toMatchObject({ status: 401 });
+    expect(assign).toHaveBeenCalledWith(REAUTH_PATH);
+  });
+
+  it('a network TypeError stays offline: rethrown, no navigation, no flag', async () => {
+    const assign = stubAssign();
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    await expect(api.get('/api/me')).rejects.toBeInstanceOf(TypeError);
+    expect(assign).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(REAUTH_FLAG)).toBeNull();
+    expect(isSignedOut()).toBe(false);
+  });
+
+  it('a successful /api/me clears the flag', async () => {
+    sessionStorage.setItem(REAUTH_FLAG, '1');
+    mockFetch({ 'GET /api/me': { body: { id: 'u1' } } });
+    await api.get('/api/me');
+    expect(sessionStorage.getItem(REAUTH_FLAG)).toBeNull();
+  });
+
+  it('other successful calls leave the flag alone', async () => {
+    sessionStorage.setItem(REAUTH_FLAG, '1');
+    mockFetch({ 'GET /api/entries': { body: [] } });
+    await api.get('/api/entries');
+    expect(sessionStorage.getItem(REAUTH_FLAG)).toBe('1');
   });
 });

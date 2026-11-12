@@ -1,3 +1,5 @@
+import { clearReauthFlag, handleSignedOut } from './auth';
+
 /** A failed API call. `error` is the server's `{error}` code (e.g. 'taken'), or `http_<status>`. */
 export class ApiError extends Error {
   constructor(
@@ -15,9 +17,16 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const res = await fetch(path, {
     method,
     credentials: 'include',
+    // Access answers an expired session with a redirect to its login domain. Followed, that is
+    // a CORS TypeError indistinguishable from offline; unfollowed, it is an 'opaqueredirect'.
+    redirect: 'manual',
     headers: hasBody ? { 'content-type': 'application/json' } : undefined,
     body: hasBody ? JSON.stringify(body) : undefined,
   });
+  if (res.type === 'opaqueredirect' || res.status === 401) {
+    handleSignedOut();
+    throw new ApiError(401, 'unauthorized');
+  }
   const text = await res.text();
   let data: unknown;
   try {
@@ -25,15 +34,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     data = undefined;
   }
-  if (res.status === 401) {
-    // Cloudflare Access session expired: a full reload of / lets Access show its sign-in.
-    location.assign('/');
-    throw new ApiError(401, 'unauthorized', data);
-  }
   if (!res.ok) {
     const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
     throw new ApiError(res.status, code, data);
   }
+  if (method === 'GET' && path === '/api/me') clearReauthFlag();
   return data as T;
 }
 

@@ -275,3 +275,4 @@ a.group__row:focus-visible { outline-offset: -2px; }
 /* phone: content fills the screen above the bar so About's credits can sit at the bottom */
 .frame--phone .frame__main { min-height: 100dvh; display: flex; flex-direction: column; }
 .frame--phone .screen { flex: 1; }
+.splash__text { max-width: 36ch; text-align: center; }

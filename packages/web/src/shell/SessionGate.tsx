@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { useAuthState } from '../api/auth';
 import { useMe } from '../data/useMe';
+import { SignedOutScreen } from '../screens/SignedOutScreen';
 import { CfSetContext } from '../design/ThemeContext';
 import { cfFor, applyTheme } from '../design/theme';
 import { Button } from '../design/components/Button';
@@ -23,14 +25,16 @@ export function useSessionMe(): Me {
 export function SessionGate() {
   const { data: me, isError, refetch, isFetching } = useMe();
   const { pathname } = useLocation();
+  const auth = useAuthState();
   const settings = me?.settings;
 
   useEffect(() => {
     if (settings) applyTheme(settings);
   }, [settings]);
 
-  if (!me) {
-    if (isError) {
+  if (auth === 'signedOut') return <SignedOutScreen />;
+  if (!me || auth === 'reauthing') {
+    if (isError && auth === 'ok') {
       return (
         <div className="splash">
           <h1 className="splash__title">Couldn't reach Media Tracker</h1>

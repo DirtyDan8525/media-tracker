@@ -28,4 +28,9 @@ export const CASES: FixtureCase[] = [
     query: { term: 'speed racer', typedTitle: 'speed racer', hint: '', category: 'movies' } },
   { source: 'wiki', case: 'details-speed-racer', detailsFromSearch: true,
     query: { term: 'speed racer', typedTitle: 'speed racer', hint: '', category: 'movies' } },
+  // TVmaze needs no key.
+  { source: 'tvmaze', case: 'chuck-2007',
+    query: { term: 'Chuck (2007)', typedTitle: 'Chuck (2007)', hint: '', category: 'tv' } },
+  { source: 'tvmaze', case: 'details-chuck', detailsFromSearch: true,
+    query: { term: 'Chuck (2007)', typedTitle: 'Chuck (2007)', hint: '', category: 'tv' } },
 ];

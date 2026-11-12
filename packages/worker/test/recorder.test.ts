@@ -205,7 +205,7 @@ describe('caseMode and detailsTarget (search-then-details cases)', () => {
       expect(`${c.source}/${c.case}`).toMatch(/^[a-z0-9]+\/[a-z0-9][a-z0-9_-]*$/i);
     }
     expect(CASES.filter((c) => caseMode(c) === 'search-then-details').map((c) => `${c.source}/${c.case}`).sort())
-      .toEqual(['tmdb/details-speed-racer', 'wiki/details-speed-racer']);
+      .toEqual(['tmdb/details-speed-racer', 'tvmaze/details-chuck', 'wiki/details-speed-racer']);
   });
 
   it('detailsTarget returns the first result\'s sourceId, and throws when there is none', () => {

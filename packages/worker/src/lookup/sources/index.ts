@@ -5,6 +5,7 @@ import type { Category, Details, LookupInfo, SourceId } from '@media-tracker/sha
 import type { Env } from '../../env';
 import * as anilist from './anilist';
 import * as tmdb from './tmdb';
+import * as tvmaze from './tvmaze';
 import * as wiki from './wiki';
 
 export interface LookupQuery {
@@ -53,6 +54,7 @@ export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
   anilist: { search: anilist.search, details: anilist.details },
   tmdb: { search: tmdb.search, details: tmdb.details },
   wiki: { search: wiki.search, details: wiki.details },
+  tvmaze: { search: tvmaze.search, details: tvmaze.details },
 };
 
 /** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */

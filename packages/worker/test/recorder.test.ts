@@ -231,6 +231,13 @@ describe('resolveCaseTerm (cases whose term comes from the environment)', () => 
     expect(resolveCaseTerm(c, {}, { SPOTIFY_ALBUM_URL: 'from-env' })).toMatchObject({ query: { term: 'from-env' } });
     expect(resolveCaseTerm(c, { SPOTIFY_ALBUM_URL: 'from-vars' }, { SPOTIFY_ALBUM_URL: 'from-env' })).toMatchObject({ query: { term: 'from-vars' } });
   });
+  it('a value the case does not accept is skipped with a clear message', () => {
+    const strict = { ...c, termFromEnv: { ...c.termFromEnv, accept: (v: string) => v.startsWith('https://open.spotify.com/album/') } };
+    expect(resolveCaseTerm(strict, { SPOTIFY_ALBUM_URL: 'dark side of the moon' }, {})).toEqual({
+      skip: 'SPOTIFY_ALBUM_URL is not usable: it must be a Spotify album link for Clairo – Live at Electric Lady',
+    });
+    expect(resolveCaseTerm(strict, { SPOTIFY_ALBUM_URL: 'https://open.spotify.com/album/x' }, {})).toHaveProperty('query');
+  });
   it('unset or blank: skip with a clear message', () => {
     const msg = 'set SPOTIFY_ALBUM_URL in .dev.vars to a Spotify album link for Clairo – Live at Electric Lady';
     expect(resolveCaseTerm(c, {}, {})).toEqual({ skip: msg });
@@ -254,5 +261,10 @@ describe('a skipped case', () => {
     expect(c && 'chain' in c && c.chain).toBe(true);
     expect(c && 'termFromEnv' in c && c.termFromEnv?.name).toBe('SPOTIFY_ALBUM_URL');
     expect(resolveCaseTerm(c as never, {}, {})).toHaveProperty('skip');
+    const link = (v: string) => resolveCaseTerm(c as never, { SPOTIFY_ALBUM_URL: v }, {});
+    expect(link('https://open.spotify.com/intl-de/album/4aBcD3fG?si=abc')).toHaveProperty('query');
+    for (const bad of ['dark side of the moon', 'https://open.spotify.com/track/4aBcD3fG', 'https://open.spotify.com/playlist/abc', 'https://example.com/album/x']) {
+      expect(link(bad)).toHaveProperty('skip');
+    }
   });
 });

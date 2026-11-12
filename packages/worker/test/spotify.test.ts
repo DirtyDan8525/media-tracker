@@ -38,6 +38,17 @@ describe('ogMeta', () => {
   it('decodes &amp; &#x27; &#39; &quot;', () => {
     expect(ogMeta('<meta property="og:title" content="Rock &amp; Roll &#x27;n&#39; &quot;Roll&quot;">', 'og:title')).toBe('Rock & Roll \'n\' "Roll"');
   });
+  it('only looks in <head> when there is one', () => {
+    expect(ogMeta('<head></head><body><meta property="og:title" content="Body"></body>', 'og:title')).toBe('');
+    expect(ogMeta('<head><meta property="og:title" content="Head"></head><body></body>', 'og:title')).toBe('Head');
+  });
+  it('a 100 KB malformed input returns empty without backtracking blowup', () => {
+    const bad = '<meta property="og:title" '.repeat(4000);
+    const t0 = Date.now();
+    expect(ogMeta(bad, 'og:title')).toBe('');
+    expect(ogMeta(`<head>${bad}</head>`, 'og:title')).toBe('');
+    expect(Date.now() - t0).toBeLessThan(500);
+  });
   it('is case-insensitive on the tag and empty when absent', () => {
     expect(ogMeta('<META PROPERTY="og:title" CONTENT="Hi">', 'og:title')).toBe('Hi');
     expect(ogMeta('<meta property="og:image" content="x">', 'og:title')).toBe('');

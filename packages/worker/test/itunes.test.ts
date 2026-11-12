@@ -38,6 +38,15 @@ describe('itunesInfo', () => {
       sub: 'Pink Floyd · 1973 · Rock', source: 'itunes', sourceId: '111',
     });
   });
+  it('album titles use the script\'s edition regex (nothing stripEdition-only)', () => {
+    const t = (collectionName: string) => itunesInfo(ALBUM, { collectionId: 1, collectionName }).title;
+    expect(t('Pet Sounds (Mono & Stereo)')).toBe('Pet Sounds (Mono & Stereo)');
+    expect(t('Abbey Road - Remastered 2009')).toBe('Abbey Road - Remastered 2009');
+    expect(t('Abbey Road (Super Deluxe Edition) [Explicit]')).toBe('Abbey Road [Explicit]');
+    expect(t('Rumours (Deluxe Edition) (Live)')).toBe('Rumours (Live)');
+    expect(t('The Wall (Remastered) - Live')).toBe('The Wall - Live');
+    expect(t('Abbey Road (Remastered 2019) - EP')).toBe('Abbey Road');
+  });
   it('album: " - EP" and " - Single" suffixes are dropped', () => {
     expect(itunesInfo(ALBUM, { collectionId: 1, collectionName: 'Abcd - EP' }).title).toBe('Abcd');
     expect(itunesInfo(ALBUM, { collectionId: 1, collectionName: 'Abcd - Single' }).title).toBe('Abcd');

@@ -19,3 +19,12 @@ export function formatMmSs(sec: number | null | undefined): string {
   if (total <= 0) return '';
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
+
+/**
+ * The script's own edition cleaning for album titles, verbatim: removes every
+ * "(...)" or "[...]" group that mentions remaster/deluxe/edition/expanded/anniversary/version
+ * (anywhere in the title), then trims. Deliberately not the shared stripEdition.
+ */
+export function cleanEditionGroups(t: unknown): string {
+  return String(t ?? '').replace(/\s*[\(\[][^\)\]]*(remaster|deluxe|edition|expanded|anniversary|version)[^\)\]]*[\)\]]/gi, '').trim();
+}

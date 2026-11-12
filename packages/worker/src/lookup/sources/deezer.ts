@@ -5,9 +5,9 @@
 // Worst case per lookup: albums 1 search + 6 album pages = 7 requests (the pages
 // run in parallel); songs 1 + 4 = 5; details 1 (album) or 2 (track + its album).
 import type { Details, LookupInfo } from '@media-tracker/shared';
-import { normTitle, similarity, splitYear, stripEdition } from '@media-tracker/shared';
+import { normTitle, similarity, splitYear } from '@media-tracker/shared';
 import { fetchJson, logLine } from '../http';
-import { formatMmSs, trackCountLabel } from './format';
+import { cleanEditionGroups, formatMmSs, trackCountLabel } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const BASE = 'https://api.deezer.com';
@@ -74,10 +74,8 @@ interface TrackPage {
   error?: unknown;
 }
 
-/** An album title without edition groups: "Abbey Road (Remastered)" -> "Abbey Road". */
-export function cleanAlbumTitle(t: unknown): string {
-  return stripEdition(String(t ?? '').trim());
-}
+/** An album title without edition groups, exactly as the script does it: "Abbey Road (Remastered)" -> "Abbey Road". */
+export const cleanAlbumTitle = cleanEditionGroups;
 
 /** A song title without remaster/version/edit/mono/stereo/live groups (verbatim from deezerTrack_). */
 export function cleanTrackTitle(t: unknown): string {

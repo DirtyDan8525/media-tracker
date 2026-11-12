@@ -4,6 +4,7 @@
 // and is saved to test/fixtures/<source>/<case>/. Tasks 6-11 append theirs.
 import type { SourceId } from '@media-tracker/shared';
 import type { LookupQuery } from '../../src/lookup/sources/index';
+import { parseSpotifyRef } from '../../src/lookup/sources/spotify';
 import type { TermFromEnv } from '../../scripts/recordLib';
 
 export type FixtureCase =
@@ -49,6 +50,7 @@ export const CASES: FixtureCase[] = [
     query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
   // The link is the user's to supply (R25): SPOTIFY_ALBUM_URL in .dev.vars. Goes through the chain, like a pasted link.
   { source: 'spotify', case: 'live-at-electric-lady', chain: true,
-    termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady' },
+    termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady',
+      accept: (v) => parseSpotifyRef(v)?.kind === 'album' },
     query: { term: '', typedTitle: '', hint: '', category: 'albums' } },
 ];

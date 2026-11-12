@@ -2,9 +2,9 @@
 // books (port of itunes_ and itunesInfo_ from the script), plus /lookup details.
 // Free, no key, not paced (one request per lookup). Worst case per lookup: 1 request.
 import type { Category, Details, LookupInfo } from '@media-tracker/shared';
-import { normTitle, similarity, splitYear, stripEdition, trimSynopsis } from '@media-tracker/shared';
+import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
 import { fetchJson, logLine } from '../http';
-import { trackCountLabel } from './format';
+import { cleanEditionGroups, trackCountLabel } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const BASE = 'https://itunes.apple.com';
@@ -54,7 +54,7 @@ function idOf(cfg: ItunesCfg, hit: ItunesHit): string | undefined {
 export function itunesInfo(cfg: ItunesCfg, hit: ItunesHit): LookupInfo {
   // Official name: the album name for music, otherwise the book title.
   let title = (cfg.entity === 'album' ? hit.collectionName : hit.trackName || hit.collectionName) || '';
-  if (title && cfg.entity === 'album') title = stripEdition(title.replace(/\s+-\s+(EP|Single)$/i, '').trim());
+  if (title && cfg.entity === 'album') title = cleanEditionGroups(title.replace(/\s+-\s+(EP|Single)$/i, ''));
   const listed = Array.isArray(hit.genres) ? (hit.genres as unknown[]).filter((g): g is string => typeof g === 'string' && g !== 'Books') : [];
   const genreList = Array.isArray(hit.genres) && hit.genres.length ? listed : [hit.primaryGenreName].filter((g): g is string => !!g);
   const year = (hit.releaseDate || '').slice(0, 4);

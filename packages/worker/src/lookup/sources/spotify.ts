@@ -32,12 +32,34 @@ export function parseSpotifyRef(term: string): { kind: Kind; id: string } | null
   return m ? { kind: m[1] as Kind, id: m[2]! } : null;
 }
 
-/** An og:/meta tag's content, either attribute order, HTML entities decoded; '' when absent. */
+const MAX_SCAN = 200_000; // no </head>: scan only this much of the page
+const MAX_TAG = 4000; // a <meta ...> tag longer than this is not one of ours
+
+/**
+ * An og:/meta tag's content, either attribute order, HTML entities decoded; ''
+ * when absent. Only the <head> is searched (the first 200 KB when there is no
+ * </head>), tag by tag, with no nested quantifiers, so malformed markup costs
+ * linear time (Workers allow ~10 ms of CPU per request).
+ */
 export function ogMeta(html: string, prop: string): string {
+  const end = html.search(/<\/head>/i);
+  const head = html.slice(0, end >= 0 ? end : MAX_SCAN);
   const p = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]+content="([^"]*)"`, 'i').exec(html)
-    ?? new RegExp(`<meta[^>]+content="([^"]*)"[^>]+(?:property|name)="${p}"`, 'i').exec(html);
-  return m ? m[1]!.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"') : '';
+  const named = new RegExp(`(?:property|name)="${p}"`, 'i');
+  const tag = /<meta\b/gi;
+  let close = -1; // position of the next '>' at or after the current tag start
+  for (let m = tag.exec(head); m; m = tag.exec(head)) {
+    if (close < m.index) {
+      close = head.indexOf('>', m.index);
+      if (close < 0) return ''; // no tag can end after this point
+    }
+    if (close - m.index > MAX_TAG) continue;
+    const t = head.slice(m.index, close);
+    if (!named.test(t)) continue;
+    const c = /content="([^"]*)"/i.exec(t);
+    if (c) return c[1]!.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"');
+  }
+  return '';
 }
 
 const blank = (): SpotifyPage => ({ title: '', artist: '', album: '', year: '', type: '', songs: '', cover: '' });

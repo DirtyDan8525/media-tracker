@@ -218,6 +218,8 @@ export interface TermFromEnv {
   name: string;
   /** Completes "set <name> in .dev.vars to …" in the skip message. */
   describe: string;
+  /** Rejects a value that isn't what the case needs (skips the case instead of recording the wrong thing). */
+  accept?: (value: string) => boolean;
 }
 
 export function resolveCaseTerm<Q extends { term: string; typedTitle: string }>(
@@ -230,5 +232,6 @@ export function resolveCaseTerm<Q extends { term: string; typedTitle: string }>(
   if (!src) return { query: c.query };
   const value = (vars[src.name] || procEnv[src.name] || '').trim();
   if (!value) return { skip: `set ${src.name} in .dev.vars to ${src.describe}` };
+  if (src.accept && !src.accept(value)) return { skip: `${src.name} is not usable: it must be ${src.describe}` };
   return { query: { ...c.query, term: value, typedTitle: value } };
 }

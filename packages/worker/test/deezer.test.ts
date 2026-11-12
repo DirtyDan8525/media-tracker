@@ -35,7 +35,7 @@ describe('trackCountLabel / formatMmSs', () => {
   });
 });
 
-describe('cleanAlbumTitle (stripEdition)', () => {
+describe('cleanAlbumTitle (script regex)', () => {
   it('drops edition groups, keeps other brackets', () => {
     expect(cleanAlbumTitle('The Dark Side of the Moon (2011 Remastered Version)')).toBe('The Dark Side of the Moon');
     expect(cleanAlbumTitle('Abbey Road [Deluxe Edition]')).toBe('Abbey Road');
@@ -44,6 +44,23 @@ describe('cleanAlbumTitle (stripEdition)', () => {
     expect(cleanAlbumTitle('Plain')).toBe('Plain');
     expect(cleanAlbumTitle(null)).toBe('');
   });
+});
+
+// Expected values come from running the script's own regex (see the fix report), not from assumption.
+describe.each([
+  ['Abbey Road (Remastered 2019)', 'Abbey Road'],
+  ['Blue (Live)', 'Blue (Live)'],
+  ["Fearless (Taylor's Version)", 'Fearless'],
+  ['Pet Sounds (Mono & Stereo)', 'Pet Sounds (Mono & Stereo)'],
+  ['Nevermind (Bonus Tracks)', 'Nevermind (Bonus Tracks)'],
+  ['Dummy (Reissue)', 'Dummy (Reissue)'],
+  ['Abbey Road - Remastered 2009', 'Abbey Road - Remastered 2009'],
+  ['Album - The Expanded Edition', 'Album - The Expanded Edition'],
+  ['Abbey Road (Super Deluxe Edition) [Explicit]', 'Abbey Road [Explicit]'],
+  ['Rumours (Deluxe Edition) (Live)', 'Rumours (Live)'],
+  ['The Wall (Remastered) - Live', 'The Wall - Live'],
+])('cleanAlbumTitle matches the script: %s', (input, expected) => {
+  it(`-> ${expected}`, () => expect(cleanAlbumTitle(input)).toBe(expected));
 });
 
 describe('cleanTrackTitle', () => {

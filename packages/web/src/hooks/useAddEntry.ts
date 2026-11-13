@@ -7,6 +7,7 @@ import { useToast } from '../design/components/Toast';
 import { LIST_LABEL } from '../nav';
 import { fillDetails } from '../lookup/details';
 import { buildInfoPatch, buildLookupQuery } from '../lookup/query';
+import { runLookup } from '../lookup/run';
 
 export interface AddInput {
   title: string;
@@ -36,14 +37,6 @@ export function closestFirst(typed: string, choices: LookupInfo[]): LookupInfo[]
 }
 
 let tempCounter = 0;
-
-async function runLookup(q: ReturnType<typeof buildLookupQuery>): Promise<LookupInfo | null> {
-  try {
-    return (await api.post<{ info: LookupInfo | null }>('/api/lookup', q)).info ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Adding to a list. add() saves the row at once (pending), then looks it up: one match fills it,

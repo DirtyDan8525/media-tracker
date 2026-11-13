@@ -1,13 +1,30 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
-import { EntryScreen, ImportScreen } from './screens/Placeholders';
+import { ImportScreen } from './screens/Placeholders';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { UsernameSetup } from './screens/UsernameSetup';
+import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
 import { HomeRedirect } from './shell/HomeRedirect';
 import { SessionGate, SETUP_PATH } from './shell/SessionGate';
+
+// Entry details load on demand: the list screen is what most visits need.
+const EntryDetail = lazy(() => import('./screens/EntryDetail').then((m) => ({ default: m.EntryDetail })));
+
+function EntryRoute() {
+  return (
+    <Suspense fallback={
+      <div className="screen" aria-busy="true" aria-label="Loading">
+        <div className="screen__body"><Skeleton height={180} /></div>
+      </div>
+    }>
+      <EntryDetail />
+    </Suspense>
+  );
+}
 
 /**
  * `/` → first enabled list. Everything sits under SessionGate, which sends a user with no
@@ -23,7 +40,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomeRedirect /> },
           { path: 'list/:category', element: <ListScreen /> },
-          { path: 'entry/:id', element: <EntryScreen /> },
+          { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportScreen /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'about', element: <AboutScreen /> },

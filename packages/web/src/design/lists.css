@@ -129,3 +129,5 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .switch-row--detail { min-height: var(--tap); }
 .detail__edit { display: flex; flex-direction: column; gap: var(--space-7); }
 .detail__edit summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; font-weight: 700; color: var(--bright-text); }
+.detail-top { padding: var(--space-6) var(--space-6) 0; min-height: var(--space-6); }
+.center { text-align: center; }

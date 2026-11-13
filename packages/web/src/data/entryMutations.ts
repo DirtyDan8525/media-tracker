@@ -3,6 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { patchLocal, restoreLocal, writeEntry } from './entryCache';
 
+export const SAVE_FAILED = "Couldn't save that change";
+
 /**
  * PATCH an entry: the change shows at once; the server's row replaces it on success, and on failure
  * the old row comes back and `onFail` runs. Resolves to the saved entry, or null on failure.

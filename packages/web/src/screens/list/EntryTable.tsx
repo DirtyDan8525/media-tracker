@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
 import { effectiveLookupState } from '../../data/entryCache';
-import { saveEntryChange } from '../../data/entryMutations';
+import { SAVE_FAILED, saveEntryChange } from '../../data/entryMutations';
 import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { useToast } from '../../design/components/Toast';
@@ -12,8 +12,6 @@ import { parseRating } from '../../lists/validate';
 import { EditableCell } from './EditableCell';
 import { LookupNote } from './LookupNote';
 import type { RowActions } from './EntryCards';
-
-export const SAVE_FAILED = "Couldn't save that change";
 
 /** Moves focus to the same column in the nearest row above/below that has it. */
 function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {

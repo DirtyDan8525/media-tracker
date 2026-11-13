@@ -2,7 +2,7 @@ import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/share
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
-import { saveEntryChange } from '../data/entryMutations';
+import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { EmptyState } from '../design/components/EmptyState';
@@ -17,7 +17,7 @@ import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { EntryCards } from './list/EntryCards';
-import { EntryTable, SAVE_FAILED } from './list/EntryTable';
+import { EntryTable } from './list/EntryTable';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));

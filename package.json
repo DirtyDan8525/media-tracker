@@ -9,7 +9,13 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "e2e": "playwright test",
+    "deploy": "npm run build -w packages/web && npm exec -w packages/worker -- wrangler deploy --env production",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.json"
   },
-  "packageManager": "npm@11.21.2"
+  "packageManager": "npm@11.21.2",
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
 }

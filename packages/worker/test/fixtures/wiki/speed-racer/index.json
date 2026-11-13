@@ -1,0 +1,17 @@
+{
+  "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=15&gsrsearch=speed%20racer%20film&prop=pageimages|description|pageprops&piprop=thumbnail&pithumbsize=500&pilicense=any&ppprop=wikibase_item": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&props=claims&ids=Q312078": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&props=labels&languages=en&ids=Q9544977|Q9545711|Q188473|Q1339864|Q157443": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  }
+}

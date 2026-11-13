@@ -1,0 +1,17 @@
+{
+  "https://openlibrary.org/search.json?limit=20&fields=key,title,subtitle,author_name,first_publish_year,cover_i,subject,edition_count&q=We%20Are%20Legion%20(We%20Are%20Bob)&author=Dennis%20E.%20Taylor": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  },
+  "https://openlibrary.org/works/OL19123425W.json": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json"
+  },
+  "https://openlibrary.org/search.json?q=key%3A%2Fworks%2FOL19123425W&fields=first_publish_year,number_of_pages_median,publisher&limit=1": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

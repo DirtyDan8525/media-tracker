@@ -1,0 +1,12 @@
+{
+  "https://api.deezer.com/search/album?limit=40&q=artist%3A%22pink%20floyd%22%20album%3A%22dark%20side%20of%20the%20moon%22": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://api.deezer.com/album/12114240": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  }
+}

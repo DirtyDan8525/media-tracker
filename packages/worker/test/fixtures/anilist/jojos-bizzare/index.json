@@ -1,0 +1,29 @@
+{
+  "https://graphql.anilist.co": [
+    {
+      "file": "1.json",
+      "status": 200,
+      "contentType": "application/json"
+    },
+    {
+      "file": "2.json",
+      "status": 200,
+      "contentType": "application/json"
+    },
+    {
+      "file": "3.json",
+      "status": 200,
+      "contentType": "application/json"
+    },
+    {
+      "file": "5.json",
+      "status": 200,
+      "contentType": "application/json"
+    }
+  ],
+  "https://kitsu.io/api/edge/anime?page[limit]=1&filter[text]=jojos%20bizzare": {
+    "file": "4.json",
+    "status": 200,
+    "contentType": "application/vnd.api+json"
+  }
+}

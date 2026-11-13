@@ -1,0 +1,7 @@
+{
+  "https://graphql.anilist.co": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

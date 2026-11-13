@@ -1,0 +1,7 @@
+{
+  "https://itunes.apple.com/search?country=US&limit=50&media=music&entity=album&term=dark%20side%20of%20the%20moon": {
+    "file": "1.txt",
+    "status": 200,
+    "contentType": "text/javascript; charset=utf-8"
+  }
+}

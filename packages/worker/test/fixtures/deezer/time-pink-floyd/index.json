@@ -1,0 +1,7 @@
+{
+  "https://api.deezer.com/search/track?limit=40&q=artist%3A%22pink%20floyd%22%20track%3A%22time%22": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  }
+}

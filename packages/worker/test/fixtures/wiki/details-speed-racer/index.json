@@ -1,0 +1,27 @@
+{
+  "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=15&gsrsearch=speed%20racer%20film&prop=pageimages|description|pageprops&piprop=thumbnail&pithumbsize=500&pilicense=any&ppprop=wikibase_item": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&props=claims&ids=Q312078": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&props=labels&languages=en&ids=Q9544977|Q9545711|Q188473|Q1339864|Q157443": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&props=claims|sitelinks&sitefilter=enwiki&ids=Q312078": {
+    "file": "4.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=extracts|pageprops&exintro=1&explaintext=1&exsentences=3&redirects=1&ppprop=wikibase_item&titles=Speed%20Racer%20(film)": {
+    "file": "5.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  }
+}

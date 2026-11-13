@@ -1,0 +1,812 @@
+[
+  {
+    "id": 243459,
+    "cover": {
+      "id": 319439,
+      "image_id": "co6uhb"
+    },
+    "first_release_date": 1680566400,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 209532,
+        "company": {
+          "id": 46444,
+          "name": "Breath of the Wild Multiplayer Team"
+        },
+        "developer": true
+      },
+      {
+        "id": 210762,
+        "company": {
+          "id": 46801,
+          "name": "PointCrow"
+        },
+        "developer": false
+      }
+    ],
+    "name": "Breath of the Wild Multiplayer",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ],
+    "summary": "An online multiplayer mod for The Legend of Zelda: Breath of the Wild.\nIts development started due to the streamer PointCrow offering U$10,000 for a modder to make an online multiplayer mod for The Legend of Zelda: Breath of the Wild with some conditions, like being the first to stream and that the project needed to be finished before the release of the sequel (Tears of the Kingdom, known as Breath of the Wild 2 at that time).\nBreath of the Wild Multiplayer Team, lead by modder AlexMangue, took on the challenge and released the mod in April 4th, 2023.\nSince then, PointCrow started streaming the mod and recording videos of it, but Nintendo decided to take down his videos. The mod is currently unavailable for download and unsupported, as a prevention from legal actions by Nintendo."
+  },
+  {
+    "id": 237895,
+    "cover": {
+      "id": 289882,
+      "image_id": "co67oa"
+    },
+    "first_release_date": 1512691200,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 205656,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": true
+      },
+      {
+        "id": 268449,
+        "company": {
+          "id": 45209,
+          "name": "Nintendo EPD Production Group No. 3"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild and The Legend of Zelda: Breath of the Wild Expansion Pass Bundle",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The Legend of Zelda: Breath of the Wild game packs countless hours of play into a vast world of discovery. That makes it an ideal foundation for more adventures! This special bundle comes with the full game for the Nintendo Switch system and the Expansion Pass, which grants access to three new treasure chests, The Master Trials DLC Pack 1, and The Champions Ballad DLC Pack 2."
+  },
+  {
+    "id": 7346,
+    "cover": {
+      "id": 172453,
+      "image_id": "co3p2d"
+    },
+    "first_release_date": 1488499200,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 200269,
+        "company": {
+          "id": 1119,
+          "name": "Monolith Soft"
+        },
+        "developer": false
+      },
+      {
+        "id": 200267,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": false
+      },
+      {
+        "id": 200268,
+        "company": {
+          "id": 45209,
+          "name": "Nintendo EPD Production Group No. 3"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild",
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The Legend of Zelda: Breath of the Wild is the first 3D open-world game in the Zelda series. Link can travel anywhere and be equipped with weapons and armor found throughout the world to grant him various bonuses. Unlike many games in the series, Breath of the Wild does not impose a specific order in which quests or dungeons must be completed. While the game still has environmental obstacles such as weather effects, inhospitable lands, or powerful enemies, many of them can be overcome using the right method. A lot of critics ranked Breath of the Wild as one of the best video games of all time.",
+    "total_rating_count": 3040
+  },
+  {
+    "id": 210652,
+    "cover": {
+      "id": 275095,
+      "image_id": "co5w9j"
+    },
+    "first_release_date": 1659052800,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 181000,
+        "company": {
+          "id": 42449,
+          "name": "Kirbymimi"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild Multiplayer",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ],
+    "summary": "A mod which adds the ability to play in local multiplayer in Breath of the Wild."
+  },
+  {
+    "id": 41826,
+    "cover": {
+      "id": 86233,
+      "image_id": "co1ujd"
+    },
+    "first_release_date": 1512604800,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 388495,
+        "company": {
+          "id": 45209,
+          "name": "Nintendo EPD Production Group No. 3"
+        },
+        "developer": true
+      },
+      {
+        "id": 388494,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": false
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - The Champions\u0027 Ballad",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 508,
+        "abbreviation": "Switch 2"
+      },
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "DLC Pack 2 cannot be purchased outside of the expansion pass.\n\nThe Champions\u0027 Ballad. Following the guidance of an unseen voice, Link encounters a new test: the Divine Beast Tamer\u0027s Trial. Take hold of the One-Hit Obliterator to clear out monster encampments, discover new shrines, conquer a huge dungeon and more. Overcoming all these obstacles will earn you the power to call upon the Master Cycle Zero.\n\nAdditionally, help the travelling bard Kass complete an unfinished song left behind by his mentor. Better still, Kass is also inspired to write some verses of his own, revealing scenes from the Champions\u0027 and Princess Zelda\u0027s past that even Link never knew of. And what exactly could Kass\u0027s mentor\u0027s song be...?\n\nNine hidden items for you to find. The following items, which pay tribute to The Legend of Zelda series, can now be found scattered across Hyrule: Island Lobster Shirt, Ravio\u0027s Hood, Zant\u0027s Helmet, Phantom Ganon Skull, Phantom Ganon Armor and Phantom Ganon Greaves. You can also find the Royal Guard Cap, Royal Guard Uniform and Royal Guard Boots, which were once worn by Hyrule\u0027s royal guards.\n\nAncient Horse Gear. The Ancient Bridle, which increases the spurs available when riding the equipped horse, and the Ancient Saddle, which lets you summon the equipped horse wherever it is, are hidden in treasure chests somewhere in Hyrule, waiting to be found.",
+    "total_rating_count": 55
+  },
+  {
+    "id": 240878,
+    "cover": {
+      "id": 291038,
+      "image_id": "co68ke"
+    },
+    "first_release_date": 1637366400,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 216497,
+        "company": {
+          "id": 47529,
+          "name": "Waikuteru"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild Randomizer",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "This Randomizer will randomize items you will find in chests and be given by NPCs. Randomized enemy drops are included too. Additionally, warping via both the Sheikah Slate as well as going inside and outside of shrines has the chance of getting randomized too.\n\nIt was taken down from GameBanana by request from Nintendo of America."
+  },
+  {
+    "id": 254406,
+    "cover": {
+      "id": 310752,
+      "image_id": "co6ns0"
+    },
+    "first_release_date": 1584489600,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 220460,
+        "company": {
+          "id": 47529,
+          "name": "Waikuteru"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - The Lost Records",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ],
+    "summary": "A mod for The Legend of Zelda: Breath of the Wild which adds a dungeon based on The Legend of Zelda: Skyward Sword."
+  },
+  {
+    "id": 149979,
+    "cover": {
+      "id": 141750,
+      "image_id": "co31di"
+    },
+    "first_release_date": 1587600000,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 136311,
+        "company": {
+          "id": 34345,
+          "name": "The Legend of Zelda: Second Wind Development Team"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Second Wind",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The Legend of Zelda: Second Wind is a fan expansion/mod of The Legend of Zelda: Breath of the Wild. This expansion adds new maps, new enemies, armor, weapons and game mechanics to the original game.",
+    "total_rating_count": 7
+  },
+  {
+    "id": 41825,
+    "cover": {
+      "id": 86236,
+      "image_id": "co1ujg"
+    },
+    "first_release_date": 1498780800,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 51582,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - The Master Trials",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "DLC pack 1 cannot be purchased outside of the expansion pass. This first DLC pack for The Legend of Zelda: Breath of the wild doesn\u0027t include any story additions but does include new side quests, armour, features and a new trial.\nMaster mode is a new game mode which makes all monsters stronger and gives them regenerating health. You\u0027ll also encounter powerful new enemies, and even enemies and treasure chests up in the air.\nThe Trial of the Sword is a new challenge where you start with no equipment, and has to fight through 45 rooms of enemies. Your reward: powering up the Master Sword.\nHero\u0027s Path allows you to see the path you\u0027ve travelled. About 200 hours of gameplay can be tracked.\nTravel medallion is a new item which allows you to register your location as a travel gate on the map.\nThe Korok Mask is Found in a chest. If equipped, it will shake to inform you when a Korok is nearby.\nThere are also eight hidden items for you to find. The following items, which pay tribute to The Legend of Zelda series, can now be found scattered across Hyrule: Majora\u0027s Mask, Midna\u0027s Helmet, Tingle\u0027s Hood, Tingle\u0027s Shirt, Tingle\u0027s Tights, Phantom Helmet, Phantom Armor and Phantom Greaves.",
+    "total_rating_count": 30
+  },
+  {
+    "id": 50598,
+    "cover": {
+      "id": 275752,
+      "image_id": "co5wrs"
+    },
+    "first_release_date": 1488412800,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 14,
+        "name": "Sport"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Limited Edition",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "Forget everything you know about The Legend of Zelda games. Step into a world of discovery, exploration and adventure in The Legend of Zelda: Breath of the Wild, a boundary-breaking game in the acclaimed series. The limited edition contains the game (Nintendo Switch version), The Legend of Zelda: Breath of the Wild Sound Selection CD and a Master Sword of Resurrection figurine.",
+    "version_parent": 7346
+  },
+  {
+    "id": 45137,
+    "cover": {
+      "id": 275759,
+      "image_id": "co5wrz"
+    },
+    "first_release_date": 1488499200,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 14,
+        "name": "Sport"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Master Edition",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "In this 3D open-world entry in the Zelda series, Link is awakened from a deep slumber without his past memories in the post-apocalyptic Kingdom of Hyrule, and sets off on a journey to defeat the ancient evil Calamity Ganon. Link treks, climbs and glides through fields, forests and mountain ranges while meeting and helping friendly folk and defeating enemies in order to gather up the strength to face Ganon.\n\nThis bundle includes the game, a Nintendo Switch Sheikah Slate Carrying Case, a Sheikah Eye Collectible Coin, the Relic of Hyrule: Calamity Ganon Tapestry and Weather-Worn Map, a Sound Selection CD, and the Master Sword of Resurrection statue.",
+    "version_parent": 7346
+  },
+  {
+    "id": 41829,
+    "cover": {
+      "id": 469315,
+      "image_id": "coa24j"
+    },
+    "first_release_date": 1488499200,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 268537,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": false
+      },
+      {
+        "id": 327888,
+        "company": {
+          "id": 45209,
+          "name": "Nintendo EPD Production Group No. 3"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Expansion Pass",
+    "platforms": [
+      {
+        "id": 508,
+        "abbreviation": "Switch 2"
+      },
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      },
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The expansion pass is the only way to purchase the DLC packs for the game.\n\nThe pass includes 2 DLC packs: The Master Trials and the Champions\u0027 Ballad.\n\nDLC Pack 1: The Master Trials.\nMaster Mode, a new game mode which makes all monsters stronger adds powerful new enemies.\nThe Trial of the Sword is a new challenge where you start with no equipment, and has to fight through 45 rooms of enemies.\nHero\u0027s Path allows you to see the path you\u0027ve travelled.\nTravel Medallion is a new item which allows you to register your location as a travel gate on the map.\nThere are also several hidden items for you to find. The following items, which pay tribute to The Legend of Zelda series, can now be found scattered across Hyrule: Majora\u0027s Mask, Midna\u0027s Helmet, Tingle\u0027s Hood, Tingle\u0027s Shirt, Tingle\u0027s Tights, Phantom Helmet, Korok Mask, Phantom Armor and Phantom Greaves.\n\nDLC Pack 2: The Champions\u0027 Ballad.\nThe Champions\u0027 Ballad. Following the guidance of an unseen voice, Link encounters a new test: the Divine Beast Tamer\u0027s Trial. Take hold of the One-Hit Obliterator to clear out monster encampments, discover new shrines, conquer a huge dungeon and more. Overcoming all these obstacles will earn you the power to call upon the Master Cycle Zero.\nNine hidden items for you to find. The following items, which pay tribute to The Legend of Zelda series, can now be found scattered across Hyrule: Island Lobster Shirt, Ravio\u0027s Hood, Zant\u0027s Helmet, Phantom Ganon Skull, Phantom Ganon Armor and Phantom Ganon Greaves. You can also find the Royal Guard Cap, Royal Guard Uniform and Royal Guard Boots, which were once worn by Hyrule\u0027s royal guards. Ancient Horse Gear.\nThe Ancient Bridle and the Ancient Saddle are hidden in treasure chests somewhere in Hyrule, waiting to be found.",
+    "total_rating_count": 21
+  },
+  {
+    "id": 216236,
+    "cover": {
+      "id": 275764,
+      "image_id": "co5ws4"
+    },
+    "first_release_date": 1538092800,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 191843,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Starter Edition",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The Starter Edition includes the base game and an Explorer\u0027s Guide.\n\nForget everything you know about The Legend of Zelda games. Step into a world of discovery, exploration, and adventure in The Legend of Zelda: Breath of the Wild, a boundary-breaking new game in the acclaimed series. Travel across vast fields, through forests, and to mountain peaks as you discover what has become of the kingdom of Hyrule in this stunning Open-Air Adventure. Now on Nintendo Switch, your journey is freer and more open than ever. Take your system anywhere, and adventure as Link any way you like.",
+    "version_parent": 7346
+  },
+  {
+    "id": 136337,
+    "cover": {
+      "id": 275757,
+      "image_id": "co5wrx"
+    },
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Special Edition",
+    "version_parent": 7346
+  },
+  {
+    "id": 250327,
+    "first_release_date": 1577750400,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Hyrule Rebalance",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ]
+  },
+  {
+    "id": 250324,
+    "cover": {
+      "id": 309534,
+      "image_id": "co6mu6"
+    },
+    "first_release_date": 1672444800,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 248305,
+        "company": {
+          "id": 52153,
+          "name": "xUnleqitTV"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Islands Expansion",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ],
+    "summary": "A mod for The Legend of Zelda: Breath of the Wild which adds new maps in the form of floating islands across Hyrule.",
+    "total_rating_count": 0
+  },
+  {
+    "id": 254404,
+    "cover": {
+      "id": 310650,
+      "image_id": "co6np6"
+    },
+    "first_release_date": 1607817600,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 220459,
+        "company": {
+          "id": 47529,
+          "name": "Waikuteru"
+        },
+        "developer": true
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Throwback Expansion",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ],
+    "summary": "A The Legend of Zelda: Breath of the Wild mod which adds Whomp\u0027s Fortress from Super Mario 64 in the game."
+  },
+  {
+    "id": 75295,
+    "cover": {
+      "id": 275770,
+      "image_id": "co5wsa"
+    },
+    "first_release_date": 1511395200,
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 14,
+        "name": "Sport"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Explorer\u0027s Edition",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "In this 3D open-world entry in the Zelda series, Link is awakened from a deep slumber without his past memories in the post-apocalyptic Kingdom of Hyrule, and sets off on a journey to defeat the ancient evil Calamity Ganon. Link treks, climbs and glides through fields, forests and mountain ranges while meeting and helping friendly folk and defeating enemies in order to gather up the strength to face Ganon.\n\nThe Explorer\u0027s Edition includes a copy of the game, 100-page explorer\u0027s guide, and a two-sided map.",
+    "version_parent": 7346
+  },
+  {
+    "id": 136841,
+    "cover": {
+      "id": 275751,
+      "image_id": "co5wrr"
+    },
+    "first_release_date": 1511395200,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 108443,
+        "company": {
+          "id": 7902,
+          "name": "Nintendo Entertainment Planning \u0026 Development"
+        },
+        "developer": true
+      },
+      {
+        "id": 108444,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": false
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Collector\u0027s Edition",
+    "platforms": [
+      {
+        "id": 130,
+        "abbreviation": "Switch"
+      }
+    ],
+    "summary": "The Legend of Zelda: Breath of the Wild is the first 3D open-world game in the Zelda series. Link can travel anywhere and be equipped with weapons and armor found throughout the world to grant him various bonuses. Unlike many games in the series, Breath of the Wild does not impose a specific order in which quests or dungeons must be completed. While the game still has environmental obstacles such as weather effects, inhospitable lands, or powerful enemies, many of them can be overcome using the right method. A lot of critics ranked Breath of the Wild as one of the best video games of all time.",
+    "version_parent": 7346
+  },
+  {
+    "id": 338072,
+    "cover": {
+      "id": 525778,
+      "image_id": "cob9oy"
+    },
+    "first_release_date": 1749081600,
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "involved_companies": [
+      {
+        "id": 314030,
+        "company": {
+          "id": 45209,
+          "name": "Nintendo EPD Production Group No. 3"
+        },
+        "developer": true
+      },
+      {
+        "id": 314017,
+        "company": {
+          "id": 1119,
+          "name": "Monolith Soft"
+        },
+        "developer": false
+      },
+      {
+        "id": 314019,
+        "company": {
+          "id": 70,
+          "name": "Nintendo"
+        },
+        "developer": false
+      }
+    ],
+    "name": "The Legend of Zelda: Breath of the Wild - Nintendo Switch 2 Edition",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 508,
+        "abbreviation": "Switch 2"
+      }
+    ],
+    "summary": "Travel across vast fields, through forests, and to mountain peaks as you discover what has become of the kingdom of Hyrule-and step into a world of discovery, exploration, and adventure that\u0027s been upgraded with performance enhancements in The Legend of Zelda: Breath of the Wild - Nintendo Switch 2 Edition! With improved framerates, faster load times, and enhanced resolution and textures, this thrilling open-air adventure has never looked better!\n\nThe wilds of Hyrule make for a puzzling game of survival. Climb cliffs to scope out a destination; then cross great distances with the Paraglider or the horses you\u0027ve tamed. You\u0027ll discover items for crafting, beasts to hunt, and plants to forage. Scavenge weapons and armor...or claim them from enemies! From hammers to helmets, items have specific stats, resistances, effects, and levels of durability. Use everything at your disposal to find and conquer more than 100 shrines. Luckily, the in-game Sheikah Slate can project Runes that manipulate objects and enemies in clever ways.",
+    "total_rating_count": 11
+  },
+  {
+    "id": 313334,
+    "cover": {
+      "id": 406354,
+      "image_id": "co8pjm"
+    },
+    "genres": [
+      {
+        "id": 13,
+        "name": "Simulator"
+      }
+    ],
+    "name": "The Bells\u0027 Arietta",
+    "parent_game": 33615
+  },
+  {
+    "id": 250328,
+    "cover": {
+      "id": 303841,
+      "image_id": "co6ig1"
+    },
+    "first_release_date": 1672444800,
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "name": "Dark Army Resurrection",
+    "parent_game": 7346,
+    "platforms": [
+      {
+        "id": 41,
+        "abbreviation": "WiiU"
+      }
+    ]
+  }
+]

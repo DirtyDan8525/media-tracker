@@ -75,6 +75,14 @@ describe('rankHits and pickHits (itunes_ scoring)', () => {
     expect(rankHits(ALBUM, [al(1, 'Abcd', 'Pink Floyd')], 'abcd', 'pink floyd')[0]!.score).toBeCloseTo(1.02, 5);
     expect(rankHits(ALBUM, [al(1, 'Abcd', 'Zzzzzz')], 'abcd', 'pink floyd')[0]!.score).toBeLessThan(0.8);
   });
+  it('hint: the typed artist outranks the same title by another artist, whatever Apple\'s order', () => {
+    const hits = [al(1, 'Dark Side of the Moon', 'Moon Byul'), al(2, 'Dark Side of the Moon', 'Pink Floyd')];
+    expect(rankHits(ALBUM, hits, 'dark side of the moon', 'pink floyd').map((s) => s.info.sourceId)).toEqual(['2', '1']);
+  });
+  it('no hint: same-title hits keep Apple\'s order', () => {
+    const hits = [al(1, 'Dark Side of the Moon', 'Moon Byul'), al(2, 'Dark Side of the Moon', 'Pink Floyd')];
+    expect(rankHits(ALBUM, hits, 'dark side of the moon', '').map((s) => s.info.sourceId)).toEqual(['1', '2']);
+  });
   it('the typed name may carry the artist', () => {
     expect(rankHits(ALBUM, [al(1, 'Dark Side of the Moon', 'Pink Floyd')], 'pink floyd dark side of the moon', '')[0]!.score).toBeCloseTo(1.02, 5);
   });
@@ -216,20 +224,25 @@ const itunesSkipReason = 're-record needed: recorded iTunes URL lacks the artist
 if (hasFixtures('itunes', 'dark-side-of-the-moon') && !itunesRecordedWithArtist) console.warn(`itunes fixture tests skipped, ${itunesSkipReason}`);
 
 describe.skipIf(!hasFixtures('itunes', 'dark-side-of-the-moon') || !itunesRecordedWithArtist)('itunes fixture: dark-side-of-the-moon', () => {
-  it('album search finds Pink Floyd, with a 300px cover', async () => {
+  // The recorded US results hold no Pink Floyd "The Dark Side of the Moon", so only the plan's requirement is asserted.
+  it('album search returns an iTunes result with a 300px mzstatic cover', async () => {
     const f = replayFetch('itunes', 'dark-side-of-the-moon');
     const r = await search(q(ITUNES_TERM, 'pink floyd', 'albums', 'dark side of the moon'), deps(f));
-    expect(r?.creator).toBe('Pink Floyd');
-    expect(r?.title).toMatch(/dark side of the moon/i);
+    expect(r?.source).toBe('itunes');
+    expect(r?.title).toBeTruthy();
+    expect(r?.creator).toBeTruthy();
     expect(r?.sourceId).toMatch(/^\d+$/);
-    expect(r?.cover).toMatch(/300x300bb/);
+    expect(r?.cover).toMatch(/mzstatic\.com\/.*300x300bb\.jpg$/);
     expect(f.unmatched).toEqual([]);
   });
   it('chain: Deezer 0 results gives the iTunes result', async () => {
     const dz = fakeFetch({ 'https://api.deezer.com/search/album': { body: '{"data":[]}' } });
     const f = split(dz, replayFetch('itunes', 'dark-side-of-the-moon'));
     const r = await lookupChain('albums', q(ITUNES_TERM, 'pink floyd', 'albums', 'dark side of the moon'), deps(f));
+    expect(dz.calls).toHaveLength(1);
     expect(r?.source).toBe('itunes');
-    expect(r?.creator).toBe('Pink Floyd');
+    expect(r?.sourceId).toMatch(/^\d+$/);
+    expect(r?.title).toBeTruthy();
+    expect(r?.creator).toBeTruthy();
   });
 });

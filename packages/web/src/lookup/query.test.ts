@@ -15,6 +15,20 @@ describe('buildLookupQuery', () => {
       category: 'anime', term: 'Frieren', typedTitle: 'Frieren', hint: '',
     });
   });
+  it('never exceeds the Worker\'s 500-character limit: the creator hint is clipped first, the title kept', () => {
+    const title = 'T'.repeat(300);
+    const q = buildLookupQuery('albums', title, 'C'.repeat(900));
+    expect(q.term.length).toBe(500);
+    expect(q.term.startsWith(`${title} C`)).toBe(true);
+    expect(q.typedTitle).toBe(title);
+    expect(q.hint.length).toBe(500);
+    // a title that leaves no room for the creator keeps the title alone
+    const long = buildLookupQuery('songs', 'T'.repeat(499), 'Someone');
+    expect(long.term).toBe('T'.repeat(499));
+    expect(buildLookupQuery('songs', 'T'.repeat(700), 'x').term.length).toBe(500);
+    // short input is untouched
+    expect(buildLookupQuery('albums', 'Abbey Road', 'The Beatles').term).toBe('Abbey Road The Beatles');
+  });
   it('uses just the title when a hint category has no creator', () => {
     expect(buildLookupQuery('books', 'Dune', '')).toEqual({ category: 'books', term: 'Dune', typedTitle: 'Dune', hint: '' });
   });

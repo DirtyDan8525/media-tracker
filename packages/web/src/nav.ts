@@ -36,3 +36,19 @@ export function homePath(settings: Pick<UserSettings, 'tabs'>): string {
   const first = enabledLists(settings)[0];
   return first ? `/list/${first}` : '/settings';
 }
+
+/** The Settings → Tabs switch that turns a category's seasons on and off (null: the category has no seasons). */
+export function seasonsTabKey(category: Category): 'animeSeasons' | 'tvSeasons' | null {
+  return category === 'anime' ? 'animeSeasons' : category === 'tv' ? 'tvSeasons' : null;
+}
+
+/** Seasons (the editor and the Season Avg column) show only for categories with seasons whose tab is on. */
+export function seasonsEnabled(settings: Pick<UserSettings, 'tabs'>, category: Category): boolean {
+  const key = seasonsTabKey(category);
+  return key !== null && settings.tabs[key] !== false;
+}
+
+/** "Add anime", "Add TV show": the singular used on the add button. */
+export const ADD_NOUN: Record<Category, string> = {
+  anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book',
+};

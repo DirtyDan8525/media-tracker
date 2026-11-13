@@ -3,12 +3,28 @@ import { vi } from 'vitest';
 import type { Me } from '../api/types';
 
 export interface MockResponse { status?: number; body?: unknown }
-type Handler = (body: unknown, url: URL) => MockResponse | Promise<MockResponse>;
+type Handler = (body: unknown, url: URL, params: Record<string, string>) => MockResponse | Promise<MockResponse>;
 
 export interface Call { method: string; path: string; body: unknown; init: RequestInit | undefined }
 
+function matchHandler(handlers: Record<string, Handler | MockResponse>, method: string, path: string): { h?: Handler | MockResponse; params: Record<string, string> } {
+  const exact = handlers[`${method} ${path}`];
+  if (exact !== undefined) return { h: exact, params: {} };
+  // "PATCH /api/entries/:id" style keys
+  for (const [key, h] of Object.entries(handlers)) {
+    if (!key.includes(':')) continue;
+    const [m, pattern] = key.split(' ') as [string, string];
+    if (m !== method) continue;
+    const names: string[] = [];
+    const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, n: string) => { names.push(n); return '([^/]+)'; }) + '$');
+    const hit = re.exec(path);
+    if (hit) return { h, params: Object.fromEntries(names.map((n, i) => [n, decodeURIComponent(hit[i + 1]!)])) };
+  }
+  return { params: {} };
+}
+
 /**
- * Stubs global fetch. `handlers` is keyed "METHOD /path" (no query string).
+ * Stubs global fetch. `handlers` is keyed "METHOD /path" (no query string; ":name" segments match any value).
  * Unknown routes answer 404 {error:'not_found'}. Returns the list of calls made.
  */
 export function mockFetch(handlers: Record<string, Handler | MockResponse>): Call[] {
@@ -18,10 +34,10 @@ export function mockFetch(handlers: Record<string, Handler | MockResponse>): Cal
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
     calls.push({ method, path: url.pathname + url.search, body, init });
-    const h = handlers[`${method} ${url.pathname}`];
-    const res = h === undefined ? { status: 404, body: { error: 'not_found' } } : typeof h === 'function' ? await h(body, url) : h;
+    const { h, params } = matchHandler(handlers, method, url.pathname);
+    const res = h === undefined ? { status: 404, body: { error: 'not_found' } } : typeof h === 'function' ? await h(body, url, params) : h;
     const status = res.status ?? 200;
-    return new Response(res.body === undefined ? null : JSON.stringify(res.body), {
+    return new Response(res.body === undefined || status === 204 ? null : JSON.stringify(res.body), {
       status, headers: { 'content-type': 'application/json' },
     });
   }));

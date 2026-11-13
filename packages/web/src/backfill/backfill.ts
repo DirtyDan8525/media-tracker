@@ -1,20 +1,9 @@
-import {
-  CATEGORY_CONFIG,
-  normTitle,
-  similarity,
-  type Details,
-  type Entry,
-  type LookupInfo,
-} from '@media-tracker/shared';
+import { normTitle, similarity, type Details, type Entry, type LookupInfo } from '@media-tracker/shared';
+import { buildLookupQuery, type LookupQuery } from '../lookup/query';
 
 export type BackfillResult = 'filled' | 'needs_review' | 'skipped';
 
-export interface LookupQuery {
-  category: Entry['category'];
-  term: string;
-  typedTitle: string;
-  hint: string;
-}
+export type { LookupQuery };
 
 /** The body of PATCH /api/entries/:id: the four detail fields and detailsState, nothing else. */
 export type BackfillPatch = Partial<Pick<Entry, 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin'>> & {
@@ -39,13 +28,7 @@ const CREATOR_MIN = 0.8;
  */
 export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<BackfillResult> {
   try {
-    const hint = CATEGORY_CONFIG[entry.category].creatorIsSearchHint;
-    const { info } = await deps.lookup({
-      category: entry.category,
-      term: entry.title + (hint && entry.creator ? ' ' + entry.creator : ''),
-      typedTitle: entry.title,
-      hint: hint ? entry.creator : '',
-    });
+    const { info } = await deps.lookup(buildLookupQuery(entry.category, entry.title, entry.creator));
     if (!info) return 'skipped';
 
     const titleOk = similarity(normTitle(entry.title), normTitle(info.title)) >= TITLE_MIN;

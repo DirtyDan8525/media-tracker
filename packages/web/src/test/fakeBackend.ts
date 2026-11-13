@@ -1,5 +1,5 @@
 import { findDuplicate, type Details, type Entry, type LookupInfo, type Season } from '@media-tracker/shared';
-import { makeMe, mockApi, type Call, type MockResponse } from './mockApi';
+import { makeMe, mockApi, type Call, type Handler, type MockResponse } from './mockApi';
 import type { Me } from '../api/types';
 
 let n = 0;
@@ -28,6 +28,8 @@ export interface BackendOptions {
   lookup?: (body: { category: string; term: string; typedTitle: string; hint: string }) => Reply;
   details?: (body: { source: string; sourceId: string }) => Reply;
   /** Return a response to fail a PATCH /api/entries/:id (id, body); undefined lets it through. */
+  /** More routes ("METHOD /path" keys), e.g. the import endpoints. */
+  extra?: Record<string, Handler | MockResponse>;
   patchFail?: (id: string, body: Record<string, unknown>) => MockResponse | undefined;
 }
 
@@ -90,6 +92,7 @@ export function fakeBackend(opts: BackendOptions = {}) {
     },
     'POST /api/lookup': (b) => (opts.lookup ? opts.lookup(b as never) : { body: { info: null } }),
     'POST /api/lookup/details': (b) => (opts.details ? opts.details(b as never) : { body: { details: null } }),
+    ...opts.extra,
   });
   return { calls, entries, seasons };
 }

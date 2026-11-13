@@ -4,10 +4,11 @@ import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
 import { TAB_SWITCHES } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
+import { FillDetailsRow } from './settings/FillDetailsRow';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 
-/** Settings (Phase 1–2): tab switches, username, and the current theme's name. */
+/** Settings (Phase 1–2): tab switches, "Fill in details", username, and the current theme's name. */
 export function SettingsScreen() {
   const me = useSessionMe();
   const save = useSaveSettings();
@@ -32,6 +33,13 @@ export function SettingsScreen() {
                 <span>{label}</span>
               </label>
             ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="set-data" className="group">
+          <h2 id="set-data" className="group__title">Your data</h2>
+          <div className="group__card">
+            <FillDetailsRow />
           </div>
         </section>
 

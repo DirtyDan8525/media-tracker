@@ -5,8 +5,8 @@ import { api } from '../api/client';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
 import { LIST_LABEL } from '../nav';
-import { fillDetails } from '../lookup/details';
-import { buildInfoPatch, buildLookupQuery } from '../lookup/query';
+import { applyLookupMatch } from '../lookup/apply';
+import { buildLookupQuery } from '../lookup/query';
 import { runLookup } from '../lookup/run';
 
 export interface AddInput {
@@ -68,19 +68,7 @@ export function useAddEntry(category: Category) {
 
   /** Applies a match to the entry, then fetches its details. */
   const apply = useCallback(async (entry: Entry, typed: string, info: LookupInfo) => {
-    const patch = buildInfoPatch(entry, typed, info, 'add');
-    patchLocal(qc, entry, patch);
-    lookupRunning.delete(entry.id);
-    let current: Entry;
-    try {
-      current = await api.patch<Entry>(`/api/entries/${entry.id}`, patch);
-      writeEntry(qc, current);
-    } catch {
-      toast.show("Couldn't save that match");
-      void qc.invalidateQueries({ queryKey: ['entries', entry.category] });
-      return;
-    }
-    await fillDetails(qc, current, info);
+    if (!(await applyLookupMatch(qc, entry, typed, info))) toast.show("Couldn't save that match");
   }, [qc, toast]);
 
   /** Looks up `entry` and either applies the match, queues the picker, or marks it not found. */

@@ -229,3 +229,59 @@ describe('missing entry', () => {
     expect(await screen.findByText("We couldn't find that entry")).toBeInTheDocument();
   });
 });
+
+describe('entry details: Pick the right match', () => {
+  const review = () => frieren({ id: 'r1', title: 'Frieren', creator: '', detailsState: 'needs_review', synopsis: '', releaseDate: '', lengthLabel: '', origin: '', source: null, sourceId: null });
+  const choices = [
+    makeInfo({ title: 'Frieren: Beyond Journey\'s End', sourceId: '1' }),
+    makeInfo({ title: 'Frieren Specials', sourceId: '2' }),
+  ];
+
+  it('is offered only for entries that need a pick', async () => {
+    fakeBackend({ entries: [frieren({ detailsState: 'filled' })] });
+    renderApp('/entry/f1');
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'Pick the right match' })).not.toBeInTheDocument();
+  });
+
+  it('opens the picker with a fresh lookup; choosing applies the match and the details, and the button goes away', async () => {
+    const { calls } = fakeBackend({
+      entries: [review()],
+      lookup: () => ({ body: { info: { ...choices[0]!, choices } } }),
+      details: () => ({ body: { details: DETAILS } }),
+    });
+    renderApp('/entry/r1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Pick the right match' }));
+    const picker = await screen.findByRole('dialog', { name: 'Which one did you mean?' });
+    expect(calls.filter((c) => c.path === '/api/lookup')).toHaveLength(1);
+    await userEvent.click(within(picker).getByRole('button', { name: 'Frieren Specials' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Pick the right match' })).not.toBeInTheDocument());
+    const bodies = patches(calls, 'r1');
+    expect(bodies[0]).toMatchObject({ lookupState: 'ok', source: 'anilist', sourceId: '2' });
+    expect(bodies.some((b) => b.detailsState === 'filled')).toBe(true);
+    expect(within(await screen.findByRole('region', { name: 'Synopsis' })).getByText('An elf outlives her party.')).toBeInTheDocument();
+  });
+
+  it('the match is saved as done even when the source has no details to add', async () => {
+    const { calls } = fakeBackend({
+      entries: [review()],
+      lookup: () => ({ body: { info: { ...choices[0]!, choices } } }),
+      details: () => ({ body: { details: null } }),
+    });
+    renderApp('/entry/r1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Pick the right match' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Frieren Specials' }));
+    await waitFor(() => expect(patches(calls, 'r1').some((b) => b.detailsState === 'filled')).toBe(true));
+  });
+
+  it('says so when nothing is found, and leaves the entry alone', async () => {
+    const { calls } = fakeBackend({ entries: [review()], lookup: () => ({ body: { info: null } }) });
+    renderApp('/entry/r1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Pick the right match' }));
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't find a match");
+    expect(patches(calls, 'r1')).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Pick the right match' })).toBeInTheDocument();
+  });
+});
+

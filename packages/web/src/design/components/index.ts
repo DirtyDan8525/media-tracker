@@ -10,3 +10,4 @@ export { SideNav } from './SideNav';
 export { Skeleton, SkeletonRow } from './Skeleton';
 export { StatusPill } from './StatusPill';
 export { ToastProvider, useToast } from './Toast';
+export { ProgressBar } from './ProgressBar';

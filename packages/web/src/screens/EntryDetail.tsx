@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, type Entry, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -10,10 +10,14 @@ import { Button } from '../design/components/Button';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
 import { Sheet } from '../design/components/Sheet';
+import { closestFirst } from '../hooks/useAddEntry';
+import { applyLookupMatch } from '../lookup/apply';
+import { runLookup } from '../lookup/run';
+import { PickerSheet } from './PickerSheet';
 import { Skeleton } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
 import { parseRating } from '../lists/validate';
-import { isHttpUrl } from '../lookup/query';
+import { buildLookupQuery, isHttpUrl } from '../lookup/query';
 import { refetchEntry } from '../lookup/refetch';
 import { LIST_LABEL, seasonsEnabled } from '../nav';
 import { BackButton } from '../shell/BackButton';
@@ -101,6 +105,8 @@ function DetailBody({ entry }: { entry: Entry }) {
           )}
         </div>
 
+        {entry.detailsState === 'needs_review' && <PickMatch entry={entry} />}
+
         {entry.synopsis && (
           <section className="detail__section" aria-label="Synopsis">
             <p className={`synopsis${trimmed && !expanded ? ' is-clamped' : ''}`}>{entry.synopsis}</p>
@@ -169,6 +175,57 @@ function DetailBody({ entry }: { entry: Entry }) {
         />
       )}
     </div>
+  );
+}
+
+/** "Pick the right match": for an imported title the backfill wasn't sure about. Looks it up fresh and shows the picker. */
+function PickMatch({ entry }: { entry: Entry }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [choices, setChoices] = useState<LookupInfo[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const find = async (term: string): Promise<LookupInfo[]> => {
+    const info = await runLookup(buildLookupQuery(entry.category, term, entry.creator));
+    if (!info) return [];
+    return closestFirst(term, info.choices?.length ? info.choices : [info]);
+  };
+
+  async function open() {
+    if (busy) return;
+    setBusy(true);
+    const found = await find(entry.title);
+    setBusy(false);
+    if (found.length === 0) { toast.show("Couldn't find a match"); return; }
+    setChoices(found);
+  }
+
+  async function choose(info: LookupInfo) {
+    setChoices(null);
+    setBusy(true);
+    const ok = await applyLookupMatch(qc, entry, entry.title, info, { settle: true });
+    setBusy(false);
+    if (!ok) toast.show("Couldn't save that match");
+  }
+
+  return (
+    <section className="detail__section" aria-label="Check the match">
+      <p className="field-hint">We weren't sure the details we found belong to this title.</p>
+      <Button variant="primary" disabled={busy} onClick={() => void open()}>Pick the right match</Button>
+      {choices && (
+        <PickerSheet
+          category={entry.category} typed={entry.title} choices={choices}
+          onChoose={(info) => void choose(info)}
+          onKeepTyped={() => setChoices(null)}
+          onSearch={async (term) => {
+            const found = await find(term.trim());
+            if (found.length === 0) return 'none';
+            setChoices(found);
+            return 'choices';
+          }}
+        />
+      )}
+    </section>
   );
 }
 

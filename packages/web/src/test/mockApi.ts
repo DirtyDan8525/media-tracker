@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 import type { Me } from '../api/types';
 
 export interface MockResponse { status?: number; body?: unknown }
-type Handler = (body: unknown, url: URL, params: Record<string, string>) => MockResponse | Promise<MockResponse>;
+export type Handler = (body: unknown, url: URL, params: Record<string, string>) => MockResponse | Promise<MockResponse>;
 
 export interface Call { method: string; path: string; body: unknown; init: RequestInit | undefined }
 

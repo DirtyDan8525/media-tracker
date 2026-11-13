@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { lookupChain } from '../src/lookup/chain';
-import { resetPacing } from '../src/lookup/http';
+import { chainCacheKey, lookupChain } from '../src/lookup/chain';
+import { getCached } from '../src/lookup/cache';
+import { SourceFailure, isDegraded, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
   EXCLUDED, applyYear, artUrl, details, formatDetails, parseSteamDate, pickItems, platformsLabel, rankItems, search, type Candidate, type Scored,
@@ -223,10 +224,36 @@ describe('steam details input and request', () => {
     expect(await details('620', deps(f))).toEqual({ releaseDate: '2011-04-19', synopsis: 'Hi.', lengthLabel: '', origin: 'Windows, Mac, Linux' });
     expect(f.calls).toEqual([`${APP}620`]);
   });
-  it('null on an error status, success:false, or a missing entry', async () => {
-    expect(await details('620', deps(fakeFetch({ [`${APP}620`]: 500 })))).toBeNull();
+  it('a failed request is a failure; success:false or a missing entry is a plain null', async () => {
+    await expect(details('620', deps(fakeFetch({ [`${APP}620`]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('620', deps(fakeFetch({ [`${APP}620`]: 429 })))).rejects.toBeInstanceOf(SourceFailure);
     expect(await details('620', deps(fakeFetch({ [`${APP}620`]: { body: JSON.stringify({ 620: { success: false } }) } })))).toBeNull();
     expect(await details('620', deps(fakeFetch({ [`${APP}620`]: { body: '{}' } })))).toBeNull();
+  });
+});
+
+describe('degraded results (appdetails failed)', () => {
+  const noIgdb = { ...(env as Env), IGDB_ID: undefined, IGDB_SECRET: undefined } as Env;
+  const mk = (appdetails: number | object) => deps(fakeFetch({
+    [SEARCH]: found({ id: 620, name: 'Portal 2' }),
+    [`${APP}620&`]: appdetails,
+    [`${ASSET}620/library_600x900.jpg`]: 404,
+  }), noIgdb);
+  const healthy = app(620, { developers: ['Valve'], release_date: { date: '19 Apr, 2011' } });
+
+  it('is flagged on a failed appdetails call, not when healthy', async () => {
+    expect(isDegraded(await search(q('portal 2'), mk(500)))).toBe(true);
+    expect(isDegraded(await search(q('portal 2'), mk(healthy)))).toBe(false);
+  });
+  it('the chain does not cache a degraded result but caches a healthy one', async () => {
+    const query = q('portal 2 degraded');
+    const withTitle = (appd: number | object) => deps(fakeFetch({
+      [SEARCH]: found({ id: 620, name: 'Portal 2 Degraded' }), [`${APP}620&`]: appd, [`${ASSET}620/library_600x900.jpg`]: 404,
+    }), noIgdb);
+    expect((await lookupChain('games', query, withTitle(500)))?.title).toBe('Portal 2 Degraded');
+    expect(await getCached(env.DB, 'chain:games', chainCacheKey(query))).toBeNull();
+    expect((await lookupChain('games', query, withTitle(healthy)))?.title).toBe('Portal 2 Degraded');
+    expect(await getCached(env.DB, 'chain:games', chainCacheKey(query))).not.toBeNull();
   });
 });
 

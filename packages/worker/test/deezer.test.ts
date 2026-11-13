@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { resetPacing } from '../src/lookup/http';
+import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { formatMmSs, trackCountLabel } from '../src/lookup/sources/format';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
@@ -322,10 +322,11 @@ describe('details input and requests', () => {
     const f2 = fakeFetch({ [`${API}/track/77`]: { body: JSON.stringify({ duration: 65, album: { id: 5 } }) }, [`${API}/album/5`]: 500 });
     expect(await details('track:77', deps(f2))).toEqual({ releaseDate: '', synopsis: '', lengthLabel: '1:05', origin: '' });
   });
-  it('null on an error status or an error body', async () => {
+  it('null on a 404 or an error body; a failed request (5xx, 429) is a failure, not a null', async () => {
     expect(await details('album:12', deps(fakeFetch({ [`${API}/album/12`]: 404 })))).toBeNull();
     expect(await details('album:12', deps(fakeFetch({ [`${API}/album/12`]: { body: '{"error":{"code":800}}' } })))).toBeNull();
-    expect(await details('track:7', deps(fakeFetch({ [`${API}/track/7`]: 500 })))).toBeNull();
+    await expect(details('track:7', deps(fakeFetch({ [`${API}/track/7`]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('album:7', deps(fakeFetch({ [`${API}/album/7`]: 429 })))).rejects.toBeInstanceOf(SourceFailure);
   });
 });
 

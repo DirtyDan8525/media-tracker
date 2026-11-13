@@ -1,7 +1,7 @@
 // The lookup chain: a port of the script's lookup_ (reference/MediaTrackerCovers.gs).
 import type { Category, LookupInfo, SourceId } from '@media-tracker/shared';
 import { getCached, putCached } from './cache';
-import { logLine } from './http';
+import { isDegraded, logLine } from './http';
 import { SOURCES, keysPresent, type LookupDeps, type LookupQuery } from './sources/index';
 
 /** Sources tried in order per tab, exactly as lookup_ does after the Spotify check. */
@@ -115,6 +115,7 @@ export async function lookupChain(category: Category, q: LookupQuery, d: LookupD
     // runSource already contains source errors; this guards the chain itself.
     logLine(d, `chain failed: ${String(err instanceof Error ? err.message : err).slice(0, 200)}`);
   }
-  if (result) await putCached(d.env.DB, source, key, result);
+  if (result && isDegraded(result)) logLine(d, 'degraded result, not cached');
+  else if (result) await putCached(d.env.DB, source, key, result);
   return result;
 }

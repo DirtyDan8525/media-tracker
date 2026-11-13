@@ -64,6 +64,38 @@ export function logLine(d: LookupDeps, line: string): void {
   d.log?.push(redactSecrets(redactParams(line), envSecrets(d.env)));
 }
 
+/**
+ * Thrown by a details adapter when its source could not answer (network error, timeout, bad JSON,
+ * 429, 5xx, auth failure). A source that answered "nothing here" returns null instead, so the
+ * endpoint can tell "failed, try again later" from "confirmed empty".
+ */
+export class SourceFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SourceFailure';
+  }
+}
+
+// Results that came back incomplete because an optional extra call failed. The chain skips its cache
+// write for them so a hiccup is not frozen in for 30 days. A WeakSet keeps the flag off the wire.
+const degraded = new WeakSet<object>();
+
+/** Marks a search result as degraded (never cached by the chain). Returns it. */
+export function markDegraded<T extends object>(info: T): T {
+  degraded.add(info);
+  return info;
+}
+
+export const isDegraded = (info: object | null | undefined): boolean => !!info && degraded.has(info);
+
+/** True for a status that is a real answer: 2xx, or "no such item" (404/410). Anything else (0, 429, 5xx, 401...) is a failure. */
+export const answeredStatus = (status: number): boolean => (status >= 200 && status < 300) || status === 404 || status === 410;
+
+/** Throws SourceFailure unless `status` is a real answer. */
+export function assertAnswered(status: number, what: string): void {
+  if (!answeredStatus(status)) throw new SourceFailure(`${what}: status ${status}`);
+}
+
 export interface FetchOpts {
   /** Abort the request (including reading the body) after this long. Default 8000. */
   timeoutMs?: number;

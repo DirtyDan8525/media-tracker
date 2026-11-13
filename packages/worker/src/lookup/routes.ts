@@ -102,13 +102,17 @@ lookup.post('/details', async (c) => {
   const cached = await getCached<Details>(c.env.DB, id, key);
   if (cached) return c.json({ details: cached });
 
+  // A throw (network, timeout, 429, 5xx, bad JSON) means the source could not answer: `failed`, never
+  // cached, so the client retries later. A null return is a confirmed "nothing here".
   let details: Details | null = null;
+  let failed = false;
   try {
     details = await detailsFn(sourceId, depsFor(c.env, []));
   } catch (err) {
+    failed = true;
     console.warn(`details ${id} failed`, redactSecrets(String(err instanceof Error ? err.message : err), envSecrets(c.env)));
   }
   if (isEmptyDetails(details)) details = null;
   if (details) await putCached(c.env.DB, id, key, details);
-  return c.json({ details });
+  return c.json(failed ? { details: null, failed: true } : { details });
 });

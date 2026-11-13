@@ -5,7 +5,7 @@
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
 import { getCached, putCached } from '../cache';
-import { fetchJson, logLine, paced } from '../http';
+import { assertAnswered, fetchJson, logLine, paced } from '../http';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
@@ -213,6 +213,7 @@ export function formatDetails(g: Game): Details {
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!SOURCE_ID_RE.test(sourceId)) return null;
   const res = await igdbFetch(`fields summary,first_release_date,platforms.abbreviation; where id = ${sourceId};`, d);
+  assertAnswered(res.status, 'igdb details');
   const g = res.status === 200 && Array.isArray(res.body) ? (res.body[0] as Game | undefined) : undefined;
   return g ? formatDetails(g) : null;
 };

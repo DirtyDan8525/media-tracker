@@ -4,7 +4,7 @@ import type { LookupInfo, SourceId } from '@media-tracker/shared';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
 import { isEmptyDetails } from '../src/lookup/routes';
-import { fetchJson } from '../src/lookup/http';
+import { assertAnswered, fetchJson } from '../src/lookup/http';
 import { CHAINS, chainCacheKey, lookupChain, parseSpotifyLink } from '../src/lookup/chain';
 import { KEY_CHECKS, SOURCES, type LookupDeps, type LookupQuery, type SourceEntry } from '../src/lookup/sources/index';
 import { fakeFetch } from './fakeFetch';
@@ -499,11 +499,32 @@ describe('POST /api/lookup/details', () => {
     expect(n!.n).toBe(0);
   });
 
-  it('a details function that throws gives null, not a 500', async () => {
-    register({ tmdb: { search: async () => null, details: async () => { throw new Error('x'); } } });
+  it('a details function that throws gives { details: null, failed: true } (not a 500) and is not cached', async () => {
+    const details = vi.fn(async () => { throw new Error('x'); });
+    register({ tmdb: { search: async () => null, details } });
     const res = await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ details: null });
+    expect(await res.json()).toEqual({ details: null, failed: true });
+    await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' });
+    expect(details).toHaveBeenCalledTimes(2);
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM lookup_cache').first<{ n: number }>();
+    expect(n!.n).toBe(0);
+  });
+
+  it('a source that is rate limited (429) or times out reports failed, a 404 does not', async () => {
+    const tmdb = tmdbWithDetails();
+    const strict: SourceEntry = {
+      ...tmdb,
+      details: async (id, d) => {
+        const r = await fetchJson<unknown>(`${TMDB_URL}movie/${id}`, {}, d);
+        assertAnswered(r.status, 'tmdb');
+        return null;
+      },
+    };
+    register({ tmdb: strict });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch({ [`${TMDB_URL}movie/1`]: 429, [`${TMDB_URL}movie/3`]: 404 }));
+    expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '1' })).json()).toEqual({ details: null, failed: true });
+    expect(await (await post(USER, '/api/lookup/details', { source: 'tmdb', sourceId: '3' })).json()).toEqual({ details: null });
   });
 
   it('a source without details (or unregistered) gives { details: null }', async () => {

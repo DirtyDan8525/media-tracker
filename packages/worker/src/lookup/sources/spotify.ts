@@ -5,7 +5,7 @@
 // missing title or cover. Details re-read the same page. Free, no key, not paced.
 // Worst case per lookup: 2 requests (page + oembed); details 1, or 2 when the page has no title.
 import type { Details, LookupInfo } from '@media-tracker/shared';
-import { fetchJson, fetchText, logLine } from '../http';
+import { assertAnswered, fetchJson, fetchText, logLine } from '../http';
 import { trackCountLabel } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -138,8 +138,9 @@ interface Oembed {
   thumbnail_url?: string | null;
 }
 
-async function readPage(kind: Kind, id: string, d: LookupDeps): Promise<SpotifyPage> {
+async function readPage(kind: Kind, id: string, d: LookupDeps, state?: { status: number }): Promise<SpotifyPage> {
   const r = await fetchText(`${PAGE}/${kind}/${id}`, {}, d);
+  if (state) state.status = r.status;
   if (r.status !== 200 || !r.body) {
     logLine(d, `spotify: page status ${r.status}`);
     return blank();
@@ -147,8 +148,9 @@ async function readPage(kind: Kind, id: string, d: LookupDeps): Promise<SpotifyP
   return kind === 'album' ? parseAlbumPage(r.body) : parseTrackPage(r.body);
 }
 
-async function readOembed(kind: Kind, id: string, d: LookupDeps): Promise<Oembed | null> {
+async function readOembed(kind: Kind, id: string, d: LookupDeps, state?: { status: number }): Promise<Oembed | null> {
   const r = await fetchJson<Oembed>(`${PAGE}/oembed?url=${encodeURIComponent(`${PAGE}/${kind}/${id}`)}`, {}, d);
+  if (state) state.status = r.status;
   return r.status === 200 && r.body ? r.body : null;
 }
 
@@ -172,9 +174,16 @@ export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promi
   const m = /^(album|track):([A-Za-z0-9]{1,64})$/.exec(sourceId);
   if (!m) return null;
   const kind = m[1] as Kind;
-  const p = await readPage(kind, m[2]!, d);
+  const page = { status: 0 };
+  const p = await readPage(kind, m[2]!, d, page);
   if (p.title) return spotifyDetails(kind, p);
-  // No usable page: oembed can only say the item exists.
-  const o = await readOembed(kind, m[2]!, d);
-  return o?.title ? spotifyDetails(kind, p) : null;
+  // No usable page: oembed can only say the item exists. A failure (not a 404) on either is not an answer.
+  const embed = { status: 0 };
+  const o = await readOembed(kind, m[2]!, d, embed);
+  if (o?.title) {
+    assertAnswered(page.status, 'spotify page');
+    return spotifyDetails(kind, p);
+  }
+  assertAnswered(embed.status, 'spotify oembed');
+  return null;
 };

@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
 import { getCached, putCached } from '../src/lookup/cache';
-import { resetPacing, setPacingClock } from '../src/lookup/http';
+import { SourceFailure, resetPacing, setPacingClock } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
   TOKEN_KEY, TOKEN_SOURCE, details, formatDetails, igdbToken, pickGames, platformsOf, rankGames, search, searchBody, searchText, toInfo, unixDate,
@@ -373,6 +373,8 @@ describe('igdb details input and request', () => {
   it('null on an error status or an empty list', async () => {
     await seedToken('t', Date.now() + 3_600_000);
     expect(await details('1', deps(fakeFetch({ [API]: 404 })))).toBeNull();
+    await expect(details('1', deps(fakeFetch({ [API]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('1', deps(fakeFetch({ [API]: 429 })))).rejects.toBeInstanceOf(SourceFailure);
     expect(await details('1', deps(fakeFetch({ [API]: { body: '[]' } })))).toBeNull();
   });
 });

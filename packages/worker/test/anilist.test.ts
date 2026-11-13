@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, describe as suite, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { resetPacing, setPacingClock } from '../src/lookup/http';
+import { SourceFailure, resetPacing, setPacingClock } from '../src/lookup/http';
 import {
   buildResult, describe, details, formatDetails, queryVariants, scoreInto, search, toInfo,
   type Candidate, type Media,
@@ -247,7 +247,7 @@ suite('AniList 429 retry', () => {
     const sleeps = clock();
     const f = flaky({ 'Retry-After': '61' });
     const d = deps(f);
-    expect(await search(q('frieren'), d)).toBeNull();
+    await expect(search(q('frieren'), d)).rejects.toBeInstanceOf(SourceFailure);
     expect(sleeps.every((s) => s < 20_000)).toBe(true);
     expect(sleeps).not.toContain(61_000);
     expect(f.calls.filter((u) => u.startsWith('https://graphql.anilist.co'))).toHaveLength(1);
@@ -257,9 +257,25 @@ suite('AniList 429 retry', () => {
   it('retries only once when the second answer is also 429', async () => {
     const sleeps = clock();
     const f = flaky({ 'Retry-After': '1' }, 5);
-    expect(await search(q('frieren'), deps(f))).toBeNull();
+    await expect(search(q('frieren'), deps(f))).rejects.toBeInstanceOf(SourceFailure);
     expect(f.calls.filter((u) => u.startsWith('https://graphql.anilist.co'))).toHaveLength(2);
     expect(sleeps).toEqual([1000]);
+  });
+
+  it('stops issuing further query variants after a 429 give-up, and never reaches Kitsu', async () => {
+    clock();
+    const f = flaky({ 'Retry-After': '61' });
+    await expect(search(q('the frieren beyond journeys end'), deps(f))).rejects.toBeInstanceOf(SourceFailure);
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it('details: a 429 give-up, a 5xx and a network error throw; a 404 is a plain null', async () => {
+    clock();
+    const status = (n: number) => (async () => new Response('{"errors":[]}', { status: n, headers: { 'Retry-After': '61' } })) as unknown as typeof fetch;
+    await expect(details('1', deps(status(429)))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('1', deps(status(500)))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('1', deps((async () => { throw new TypeError('down'); }) as unknown as typeof fetch))).rejects.toBeInstanceOf(SourceFailure);
+    expect(await details('1', deps(status(404)))).toBeNull();
   });
 });
 

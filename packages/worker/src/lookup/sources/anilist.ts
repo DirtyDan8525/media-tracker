@@ -4,7 +4,7 @@
 // search supplies the official title when nothing scores well.
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJsonMeta, logLine, paced, sleep } from '../http';
+import { SourceFailure, answeredStatus, fetchJsonMeta, logLine, paced, sleep } from '../http';
 import { kitsuTitle } from './kitsu';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -130,7 +130,9 @@ interface GraphqlReply<T> {
 
 // One GraphQL POST. A 429 is retried once, after Retry-After (default 2 s); a wait over
 // 20 s is not taken, so the chain's own per-source timeout is never reached by our sleeping.
-async function post<T>(query: string, variables: Record<string, unknown>, d: LookupDeps): Promise<T | null> {
+// A 429 we give up on throws SourceFailure, so search stops issuing further variants and the
+// details endpoint reports a failure. `answered` is false for other non-answers (network, 5xx).
+async function post<T>(query: string, variables: Record<string, unknown>, d: LookupDeps): Promise<{ data: T | null; answered: boolean }> {
   const init: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -138,15 +140,19 @@ async function post<T>(query: string, variables: Record<string, unknown>, d: Loo
   };
   for (let attempt = 0; ; attempt++) {
     const r = await fetchJsonMeta<GraphqlReply<T>>(ENDPOINT, init, d);
-    if (r.status === 200) return r.body?.data ?? null;
-    if (r.status !== 429 || attempt > 0) {
+    if (r.status === 200) return { data: r.body?.data ?? null, answered: true };
+    if (r.status !== 429) {
       logLine(d, `anilist: giving up after status ${r.status}`);
-      return null;
+      return { data: null, answered: answeredStatus(r.status) };
+    }
+    if (attempt > 0) {
+      logLine(d, 'anilist: giving up after a second 429');
+      throw new SourceFailure('anilist: rate limited');
     }
     const waitS = r.retryAfterSec ?? DEFAULT_RETRY_WAIT_S;
     if (waitS > MAX_RETRY_WAIT_S) {
       logLine(d, `anilist: 429 with Retry-After ${waitS} s, not waiting`);
-      return null;
+      throw new SourceFailure('anilist: rate limited');
     }
     logLine(d, `anilist: 429, retrying once after ${waitS} s`);
     await sleep(waitS * 1000);
@@ -156,7 +162,7 @@ async function post<T>(query: string, variables: Record<string, unknown>, d: Loo
 async function candidates(q: string, d: LookupDeps): Promise<Media[]> {
   const query = 'query ($s: String) { Page(perPage: 15) { media(search: $s, type: ANIME, '
     + `sort: [SEARCH_MATCH, POPULARITY_DESC]) { ${ANIME_FIELDS} } } }`;
-  const data = await post<{ Page?: { media?: Media[] } }>(query, { s: q }, d);
+  const { data } = await post<{ Page?: { media?: Media[] } }>(query, { s: q }, d);
   return data?.Page?.media || [];
 }
 
@@ -209,6 +215,7 @@ export function formatDetails(m: Media): Details {
 
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!/^\d{1,9}$/.test(sourceId)) return null;
-  const data = await paced('anilist', PACE_MS, () => post<{ Media?: Media }>(DETAILS_QUERY, { id: Number(sourceId) }, d));
+  const { data, answered } = await paced('anilist', PACE_MS, () => post<{ Media?: Media }>(DETAILS_QUERY, { id: Number(sourceId) }, d));
+  if (!answered) throw new SourceFailure('anilist: details request failed');
   return data?.Media ? formatDetails(data.Media) : null;
 };

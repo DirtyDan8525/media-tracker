@@ -3,7 +3,7 @@
 // Worst case per lookup: 1 request. Worst case per details call: 2 requests (run in parallel).
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, logLine } from '../http';
+import { assertAnswered, fetchJson, logLine } from '../http';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const BASE = 'https://openlibrary.org';
@@ -166,5 +166,11 @@ export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promi
   ]);
   const work = w.status === 200 && w.body && typeof w.body === 'object' ? w.body : null;
   const meta = m.status === 200 && Array.isArray(m.body?.docs) ? m.body!.docs![0] ?? null : null;
-  return formatDetails(work, meta);
+  const out = formatDetails(work, meta);
+  // Nothing came back and a request failed (rather than answering "none"): not a confirmed empty.
+  if (!out) {
+    assertAnswered(w.status, 'openlibrary work');
+    assertAnswered(m.status, 'openlibrary meta');
+  }
+  return out;
 };

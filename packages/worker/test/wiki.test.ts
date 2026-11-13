@@ -6,6 +6,9 @@ import {
   WIKI_HEADERS, WIKI_KINDS, details, earliestDate, formatDetails, keepPage, kindFor, parseWikidataDate, parseWikidataMinutes,
   pickPages, rankPages, search, wikidataFacts, type Claim, type ScoredPage, type WikiPage,
 } from '../src/lookup/sources/wiki';
+import { chainCacheKey, lookupChain } from '../src/lookup/chain';
+import { SourceFailure, isDegraded } from '../src/lookup/http';
+import { getCached } from '../src/lookup/cache';
 import { fakeFetch, hasFixtures, replayFetch } from './fakeFetch';
 
 const deps = (f: typeof fetch): LookupDeps & { log: string[] } => ({ fetch: f, env: env as Env, log: [] });
@@ -236,6 +239,36 @@ describe('wiki search flow', () => {
     return f;
   }
 
+  it('a failed Wikidata call degrades the result: not marked when healthy, and the chain does not cache it', async () => {
+    const pg = page({ pageid: 77, pageprops: { wikibase_item: 'Q5' } });
+    const healthy = await search(q('Alpha Quest'), deps(routed([pg])));
+    expect(healthy?.creator).toBe('Dee');
+    expect(isDegraded(healthy)).toBe(false);
+
+    const bad = (map: Record<string, number>) => fakeFetch({
+      [`${API}?action=query&format=json&formatversion=2&generator=search`]: { body: pagesBody(pg) }, ...map,
+    });
+    const claimsFail = await search(q('Alpha Quest'), deps(bad({ [`${WD}?format=json&action=wbgetentities&props=claims`]: 500 })));
+    expect(claimsFail).toMatchObject({ title: 'Alpha Quest', creator: '' });
+    expect(isDegraded(claimsFail)).toBe(true);
+
+    const term = 'degraded wiki q';
+    const query = { term, typedTitle: term, hint: '', category: 'movies' as const };
+    const mk = (claims: number | string) => ({
+      ...deps(fakeFetch({
+        [`${API}?action=query&format=json&formatversion=2&generator=search`]: { body: pagesBody(page({ title: 'Degraded Wiki Q', pageid: 5, pageprops: { wikibase_item: 'Q5' } })) },
+        [`${WD}?format=json&action=wbgetentities&props=claims`]: typeof claims === 'number' ? claims : { body: claims },
+        [`${WD}?format=json&action=wbgetentities&props=labels`]: { body: '{"entities":{}}' },
+      })),
+      env: { ...(env as Env), TMDB_KEY: undefined } as Env,
+    });
+    expect((await lookupChain('movies', query, mk(500)))?.title).toBe('Degraded Wiki Q');
+    expect(await getCached(env.DB, 'chain:movies', chainCacheKey(query))).toBeNull();
+    // the same lookup, healthy this time, is cached
+    expect((await lookupChain('movies', query, mk('{"entities":{}}')))?.title).toBe('Degraded Wiki Q');
+    expect(await getCached(env.DB, 'chain:movies', chainCacheKey(query))).not.toBeNull();
+  });
+
   it('sends the app user agent; sourceId is the Wikidata QID when the page has one', async () => {
     const seen: Headers[] = [];
     const inner = routed([page({ pageid: 77, pageprops: { wikibase_item: 'Q5' }, thumbnail: { source: 'https://upload.wikimedia.org/x.jpg' } })]);
@@ -341,9 +374,10 @@ describe('wiki details', () => {
     expect(await details('77', deps(f))).toEqual({ releaseDate: '', synopsis: 'Intro.', lengthLabel: '', origin: '' });
   });
 
-  it('null when nothing could be read', async () => {
-    expect(await details('Q5', deps(fakeFetch({ [WD]: 500 })))).toBeNull();
-    expect(await details('77', deps(fakeFetch({ [API]: 500 })))).toBeNull();
+  it('failed requests are failures; a missing entity is a plain null', async () => {
+    await expect(details('Q5', deps(fakeFetch({ [WD]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('77', deps(fakeFetch({ [API]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    expect(await details('Q5', deps(fakeFetch({ [WD]: 404 })))).toBeNull();
   });
 });
 

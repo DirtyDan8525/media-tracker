@@ -6,7 +6,7 @@
 // run in parallel); songs 1 + 4 = 5; details 1 (album) or 2 (track + its album).
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear } from '@media-tracker/shared';
-import { fetchJson, logLine } from '../http';
+import { assertAnswered, fetchJson, logLine } from '../http';
 import { cleanEditionGroups, formatMmSs, trackCountLabel } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -280,9 +280,11 @@ export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promi
   const id = m[2]!;
   if (m[1] === 'album') {
     const r = await fetchJson<AlbumPage>(`${BASE}/album/${id}`, {}, d);
+    assertAnswered(r.status, 'deezer album');
     return r.status === 200 && r.body && !r.body.error ? albumDetails(r.body) : null;
   }
   const r = await fetchJson<TrackPage>(`${BASE}/track/${id}`, {}, d);
+  assertAnswered(r.status, 'deezer track');
   if (r.status !== 200 || !r.body || r.body.error) return null;
   // The label always lives on the album page; it also supplies the date when the track has none.
   return trackDetails(r.body, await albumPage(r.body.album?.id, d));

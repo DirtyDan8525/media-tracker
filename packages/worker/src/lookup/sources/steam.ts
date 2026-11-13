@@ -4,7 +4,7 @@
 // per-candidate requests run in parallel. Details: 1 request.
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, fetchText, logLine } from '../http';
+import { assertAnswered, fetchJson, fetchText, logLine, markDegraded } from '../http';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const SEARCH_URL = 'https://store.steampowered.com/api/storesearch/';
@@ -32,6 +32,8 @@ export interface Candidate {
   info: LookupInfo;
   y: string;
   score: number;
+  /** The appdetails call failed: the result is incomplete and must not be cached. */
+  failed?: boolean;
 }
 export interface AppData {
   genres?: { description?: string | null }[] | null;
@@ -107,6 +109,7 @@ async function candidate(c: Scored, d: LookupDeps): Promise<Candidate> {
     fetchJson<Record<string, { data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${id}&filters=basic,genres,developers,release_date`, {}, d),
   ]);
   const data = res.status === 200 ? res.body?.[String(id)]?.data || {} : {}; // details are optional
+  const failed = res.status !== 200;
   const dev = (data.developers || []).slice(0, 3).join(', ');
   const dateText = data.release_date?.date || '';
   const y = dateText.match(/\d{4}/)?.[0] || '';
@@ -120,7 +123,7 @@ async function candidate(c: Scored, d: LookupDeps): Promise<Candidate> {
     source: 'steam',
     sourceId: String(id),
   };
-  return { info, y, score: c.score };
+  return { info, y, score: c.score, failed };
 }
 
 export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> => {
@@ -139,7 +142,8 @@ export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<L
   const cands = applyYear(await Promise.all(picks.map((c) => candidate(c, d))), year);
   const infos = cands.map((c) => c.info);
   const top = infos[0]!;
-  return infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  const out = infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  return cands.some((c) => c.failed) ? markDegraded(out) : out;
 };
 
 // ---- details ----------------------------------------------------------------
@@ -156,6 +160,7 @@ export function formatDetails(a: AppData): Details {
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!APP_ID_RE.test(sourceId)) return null;
   const r = await fetchJson<Record<string, { success?: boolean; data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${sourceId}`, {}, d);
+  assertAnswered(r.status, 'steam details');
   const entry = r.status === 200 ? r.body?.[sourceId] : undefined;
   return entry?.success !== false && entry?.data ? formatDetails(entry.data) : null;
 };

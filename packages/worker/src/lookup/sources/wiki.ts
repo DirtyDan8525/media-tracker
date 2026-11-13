@@ -6,7 +6,7 @@
 // Wikipedia article intro.
 import type { Category, Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, logLine } from '../http';
+import { assertAnswered, fetchJson, logLine, markDegraded } from '../http';
 import { formatMinutes } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -113,10 +113,11 @@ const refs = (e: Entity, prop: string): string[] =>
     .filter((id): id is string => !!id);
 
 /** Director (P57), developer (P178) and genres (P136) for a batch of Wikidata items, with readable English names. */
-export async function wikidataFacts(ids: string[], d: LookupDeps): Promise<Record<string, Facts>> {
+export async function wikidataFacts(ids: string[], d: LookupDeps, state?: { failed: boolean }): Promise<Record<string, Facts>> {
   if (!ids.length) return {};
   const get = async (query: string): Promise<Record<string, Entity> | null> => {
     const r = await fetchJson<{ entities?: Record<string, Entity> }>(`${WIKIDATA}&${query}`, { headers: WIKI_HEADERS }, d);
+    if (r.status !== 200 && state) state.failed = true;
     return r.status === 200 ? r.body?.entities ?? {} : null;
   };
   const ents = await get(`props=claims&ids=${ids.join('|')}`);
@@ -175,13 +176,16 @@ export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<L
     logLine(d, 'wiki: best match under the accept score');
     return null;
   }
+  const state = { failed: false };
   const facts = await wikidataFacts(
     picks.map((c) => c.pg.pageprops?.wikibase_item).filter((id): id is string => !!id),
     d,
+    state,
   );
   const infos = picks.map((c) => toInfo(c, kind, facts));
   const top = infos[0]!;
-  return infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  const out = infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  return state.failed ? markDegraded(out) : out;
 };
 
 // ---- details ----------------------------------------------------------------
@@ -228,6 +232,7 @@ async function entityOf(qid: string, d: LookupDeps): Promise<Entity | null> {
   const r = await fetchJson<{ entities?: Record<string, Entity> }>(
     `${WIKIDATA}&props=claims|sitelinks&sitefilter=enwiki&ids=${qid}`, { headers: WIKI_HEADERS }, d,
   );
+  assertAnswered(r.status, 'wikidata entity');
   return r.status === 200 ? r.body?.entities?.[qid] ?? null : null;
 }
 
@@ -236,6 +241,7 @@ async function introOf(by: 'titles' | 'pageids', value: string, d: LookupDeps): 
   const url = `${WIKIPEDIA}?action=query&format=json&formatversion=2&prop=extracts|pageprops&exintro=1&explaintext=1`
     + `&exsentences=3&redirects=1&ppprop=wikibase_item&${by}=${encodeURIComponent(value)}`;
   const r = await fetchJson<{ query?: { pages?: WikiPage[] } }>(url, { headers: WIKI_HEADERS }, d);
+  assertAnswered(r.status, 'wikipedia intro');
   return r.status === 200 ? r.body?.query?.pages?.[0] ?? {} as WikiPage : null;
 }
 

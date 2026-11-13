@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
 import { lookupChain } from '../src/lookup/chain';
-import { resetPacing } from '../src/lookup/http';
+import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
   details, ogMeta, oembedCover, parseAlbumPage, parseSpotifyRef, parseTrackPage, search, spotifyDetails, spotifyInfo, type SpotifyPage,
@@ -222,6 +222,13 @@ describe('details input and requests', () => {
     expect(await details('album:1', deps(ok))).toEqual({ releaseDate: '', synopsis: '', lengthLabel: '', origin: '' });
     expect(ok.calls).toHaveLength(2);
     expect(await details('album:1', deps(fakeFetch({ [`${PAGE}/album/1`]: 404, [OEMBED]: 404 })))).toBeNull();
+  });
+  it('a failed page or oembed request (5xx, 429, network) is a failure, not a null', async () => {
+    await expect(details('album:1', deps(fakeFetch({ [`${PAGE}/album/1`]: 500, [OEMBED]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('album:1', deps(fakeFetch({ [`${PAGE}/album/1`]: 404, [OEMBED]: 429 })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('album:1', deps(fakeFetch({})))).rejects.toBeInstanceOf(SourceFailure);
+    // oembed says it exists but the page itself failed: incomplete, so a failure too
+    await expect(details('album:1', deps(fakeFetch({ [`${PAGE}/album/1`]: 500, [OEMBED]: { body: JSON.stringify({ title: 'Abcd' }) } })))).rejects.toBeInstanceOf(SourceFailure);
   });
   it('a page with a title does not call oembed', async () => {
     const f = fakeFetch({ [`${PAGE}/album/1`]: html(meta('og:title', 'Abcd - Album by X | Spotify')) });

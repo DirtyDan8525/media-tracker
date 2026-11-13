@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
 import { lookupChain } from '../src/lookup/chain';
-import { resetPacing } from '../src/lookup/http';
+import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import { details, ITUNES_CFG, itunesDetails, itunesInfo, pickHits, rankHits, search, type ItunesHit, type ScoredHit } from '../src/lookup/sources/itunes';
 import { fakeFetch, hasFixtures, replayFetch, type FakeFetch } from './fakeFetch';
@@ -176,7 +176,8 @@ describe('details input and request', () => {
     expect(await details('111', deps(f))).toEqual({ releaseDate: '1973-03-01', synopsis: '', lengthLabel: '10 tracks', origin: '' });
     expect(f.calls).toEqual([`${API}/lookup?id=111`]);
     expect(await details('111', deps(fakeFetch({ [`${API}/lookup`]: results() })))).toBeNull();
-    expect(await details('111', deps(fakeFetch({ [`${API}/lookup`]: 500 })))).toBeNull();
+    await expect(details('111', deps(fakeFetch({ [`${API}/lookup`]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    expect(await details('111', deps(fakeFetch({ [`${API}/lookup`]: 404 })))).toBeNull();
   });
 });
 

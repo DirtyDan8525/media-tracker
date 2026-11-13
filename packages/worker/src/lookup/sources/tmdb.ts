@@ -5,7 +5,7 @@
 // redaction, and nothing here puts it into a returned value.
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, logLine } from '../http';
+import { assertAnswered, fetchJson, logLine, markDegraded } from '../http';
 import { formatMinutes } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -116,14 +116,17 @@ export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<L
     logLine(d, 'tmdb: best match under the accept score');
     return null;
   }
+  let degraded = false;
   const infos = await Promise.all(picks.map(async (c) => {
-    // Genres and director are optional extras: a failed call keeps the movie.
+    // Genres and director are optional extras: a failed call keeps the movie (but the result is not cached).
     const r = await get<MovieDetails>(`/movie/${c.m.id}?append_to_response=credits`, d);
     const body = r.status === 200 ? r.body : null;
+    if (!body) degraded = true;
     return toInfo(c.m, (body?.genres || []).map((g) => g.name).join(', '), directorOf(body?.credits));
   }));
   const top = infos[0]!;
-  return infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  const out = infos.length > 1 ? { ...top, choices: infos.map((i) => ({ ...i })) } : top;
+  return degraded ? markDegraded(out) : out;
 };
 
 // ---- details ----------------------------------------------------------------
@@ -140,5 +143,6 @@ export function formatDetails(m: MovieDetails): Details {
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!/^\d{1,9}$/.test(sourceId)) return null;
   const r = await get<MovieDetails>(`/movie/${sourceId}`, d);
+  assertAnswered(r.status, 'tmdb details');
   return r.status === 200 && r.body ? formatDetails(r.body) : null;
 };

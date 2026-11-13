@@ -12,7 +12,8 @@ export type BackfillPatch = Partial<Pick<Entry, 'releaseDate' | 'synopsis' | 'le
 
 export interface BackfillDeps {
   lookup(q: LookupQuery): Promise<{ info: LookupInfo | null }>;
-  details(q: { source: NonNullable<LookupInfo['source']>; sourceId: string }): Promise<{ details: Details | null }>;
+  /** `failed`: the source errored, timed out or was rate limited, so `details: null` is not a confirmed "nothing". */
+  details(q: { source: NonNullable<LookupInfo['source']>; sourceId: string }): Promise<{ details: Details | null; failed?: boolean }>;
   patch(id: string, body: BackfillPatch): Promise<unknown>;
 }
 
@@ -24,7 +25,7 @@ const CREATOR_MIN = 0.8;
  * Tries to fill the empty detail fields of one imported entry.
  *  - 'filled': the match was confirmed; any new detail fields were applied (possibly none) and detailsState is 'filled'.
  *  - 'needs_review': the best lookup result is not clearly the same title/creator; flagged for the picker.
- *  - 'skipped': nothing was written (error, nothing found, no sourceId, or a thrown/rejected call). detailsState stays 'none' so a later run retries.
+ *  - 'skipped': nothing was written (error, nothing found, no sourceId, a source failure, or a thrown/rejected call). detailsState stays 'none' so a later run retries.
  */
 export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<BackfillResult> {
   try {
@@ -40,14 +41,16 @@ export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<Bac
     }
 
     if (!info.sourceId) return 'skipped';
-    const { details } = await deps.details({ source: info.source, sourceId: info.sourceId });
+    const { details, failed } = await deps.details({ source: info.source, sourceId: info.sourceId });
+    // The source could not answer: write nothing, leave detailsState 'none' so a later run retries.
+    if (failed) return 'skipped';
 
     const body: BackfillPatch = { detailsState: 'filled' };
     for (const f of DETAIL_FIELDS) {
       const incoming = details?.[f];
       if (!entry[f] && incoming) body[f] = incoming;
     }
-    // A confirmed match with nothing (more) to add is still done: mark it filled so it isn't re-queried.
+    // A confirmed match whose source answered with nothing (more) to add is still done: mark it filled so it isn't re-queried.
 
     await deps.patch(entry.id, body);
     return 'filled';

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { resetPacing } from '../src/lookup/http';
+import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
   BOOK_GENRES, OL_HEADERS, descriptionOf, details, formatDetails, genresOf, pagesLabel, pickDocs, scoreDocs, search, toInfo, workId,
@@ -263,16 +263,17 @@ describe('details input and requests', () => {
     expect(await details('OL17618W', deps(fakeFetch({ [work]: workBody, [meta]: 500 }))))
       .toEqual({ releaseDate: '', synopsis: 'Bob wakes up.', lengthLabel: '', origin: '' });
   });
-  it('both failing gives null', async () => {
-    expect(await details('OL17618W', deps(fakeFetch({ [work]: 404, [meta]: 500 })))).toBeNull();
+  it('both failing: a 404 + 5xx is a failure; two 404s are a plain null', async () => {
+    await expect(details('OL17618W', deps(fakeFetch({ [work]: 404, [meta]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
+    expect(await details('OL17618W', deps(fakeFetch({ [work]: 404, [meta]: 404 })))).toBeNull();
   });
   it('an empty docs list counts as no facts', async () => {
     expect(await details('OL17618W', deps(fakeFetch({ [work]: workBody, [meta]: { body: '{"docs":[]}' } }))))
       .toEqual({ releaseDate: '', synopsis: 'Bob wakes up.', lengthLabel: '', origin: '' });
   });
-  it('work 500 + facts 200 with empty or missing docs gives null', async () => {
-    expect(await details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{"docs":[]}' } })))).toBeNull();
-    expect(await details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{}' } })))).toBeNull();
+  it('work 500 + facts 200 with empty or missing docs is a failure (the work page did not answer)', async () => {
+    await expect(details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{"docs":[]}' } })))).rejects.toBeInstanceOf(SourceFailure);
+    await expect(details('OL17618W', deps(fakeFetch({ [work]: 500, [meta]: { body: '{}' } })))).rejects.toBeInstanceOf(SourceFailure);
   });
   it('work 200 without a description + facts with no docs gives null', async () => {
     expect(await details('OL17618W', deps(fakeFetch({ [work]: { body: '{"title":"x"}' }, [meta]: { body: '{"docs":[]}' } })))).toBeNull();

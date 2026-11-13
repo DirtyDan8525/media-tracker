@@ -32,6 +32,7 @@ export interface LookupDeps {
 }
 
 export type SourceFn = (q: LookupQuery, d: LookupDeps) => Promise<LookupInfo | null>;
+/** Resolves to null when the source answered with nothing; throws SourceFailure (or anything) when it could not answer. */
 export type DetailsFn = (sourceId: string, d: LookupDeps) => Promise<Details | null>;
 
 export interface SourceEntry {

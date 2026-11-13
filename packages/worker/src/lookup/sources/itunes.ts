@@ -3,7 +3,7 @@
 // Free, no key, not paced (one request per lookup). Worst case per lookup: 1 request.
 import type { Category, Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, logLine } from '../http';
+import { assertAnswered, fetchJson, logLine } from '../http';
 import { cleanEditionGroups, trackCountLabel } from './format';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
@@ -145,6 +145,7 @@ export function itunesDetails(hit: ItunesHit): Details {
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!/^\d{1,15}$/.test(sourceId)) return null;
   const r = await fetchJson<{ results?: ItunesHit[] }>(`${BASE}/lookup?id=${sourceId}`, {}, d);
+  assertAnswered(r.status, 'itunes details');
   const hit = r.status === 200 && Array.isArray(r.body?.results) ? r.body!.results![0] : undefined;
   return hit ? itunesDetails(hit) : null;
 };

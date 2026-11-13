@@ -1,7 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { lookupChain } from '../src/lookup/chain';
+import { chainCacheKey, lookupChain } from '../src/lookup/chain';
+import { getCached } from '../src/lookup/cache';
+import { SourceFailure, isDegraded } from '../src/lookup/http';
 import { formatMinutes } from '../src/lookup/sources/format';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
@@ -199,6 +201,18 @@ describe('TMDB key handling in requests', () => {
     expect(r).toMatchObject({ title: 'Alpha Film', genres: '', creator: '', sub: '2008' });
   });
 
+  it('a failed per-movie detail call marks the result degraded and the chain does not cache it; a healthy one is cached', async () => {
+    const term = 'Alpha Film';
+    const query = { term, typedTitle: term, hint: '', category: 'movies' as const };
+    const mk = (movie: number | string) => deps(fakeFetch({ [`${TMDB}/search/movie`]: { body: searchBody }, [`${TMDB}/movie/1`]: typeof movie === 'number' ? movie : { body: movie } }));
+    expect(isDegraded(await search(q(term), mk(500)))).toBe(true);
+    expect(isDegraded(await search(q(term), mk(movieBody)))).toBe(false);
+    expect((await lookupChain('movies', query, mk(500)))?.title).toBe('Alpha Film');
+    expect(await getCached(env.DB, 'chain:movies', chainCacheKey(query))).toBeNull();
+    expect((await lookupChain('movies', query, mk(movieBody)))?.title).toBe('Alpha Film');
+    expect(await getCached(env.DB, 'chain:movies', chainCacheKey(query))).not.toBeNull();
+  });
+
   it('searches with the year stripped from the term, and scores the typed title', async () => {
     const f = fakeFetch({ [`${TMDB}/search/movie`]: { body: searchBody }, [`${TMDB}/movie/1`]: { body: movieBody } });
     await search(q('Alpha Film 2008', 'Alpha Film 2008'), deps(f));
@@ -259,8 +273,12 @@ describe('details input and request', () => {
     expect(f.calls[0]).not.toContain('append_to_response');
   });
 
-  it('null when TMDB answers an error', async () => {
+  it('null when TMDB says 404; a 401, 429, 5xx or network error is a failure', async () => {
     expect(await details('9', deps(fakeFetch({ [`${TMDB}/movie/9`]: 404 })))).toBeNull();
+    for (const status of [401, 429, 500]) {
+      await expect(details('9', deps(fakeFetch({ [`${TMDB}/movie/9`]: status })))).rejects.toBeInstanceOf(SourceFailure);
+    }
+    await expect(details('9', deps(fakeFetch({})))).rejects.toBeInstanceOf(SourceFailure);
   });
 });
 

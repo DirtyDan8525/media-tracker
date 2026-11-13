@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
-import { resetPacing } from '../src/lookup/http';
+import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import {
   details, formatDetails, lengthLabel, originOf, pickShows, rankShows, search, toInfo, type Show, type SearchHit, type Scored,
@@ -152,6 +152,7 @@ describe('details input and request', () => {
     const f = fakeFetch({ [`${API}/shows/15`]: { body: JSON.stringify({ id: 15, name: 'Chuck', premiered: '2007-09-24', summary: '<p>Hi.</p>', averageRuntime: 60, status: 'Ended', network: { name: 'NBC' } }) } });
     expect(await details('15', deps(f))).toEqual({ releaseDate: '2007-09-24', synopsis: 'Hi.', lengthLabel: '60 min episodes · Ended', origin: 'NBC' });
     expect(await details('15', deps(fakeFetch({ [`${API}/shows/15`]: 404 })))).toBeNull();
+    for (const status of [429, 500]) await expect(details('15', deps(fakeFetch({ [`${API}/shows/15`]: status })))).rejects.toBeInstanceOf(SourceFailure);
   });
 });
 

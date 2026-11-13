@@ -2,7 +2,7 @@
 // Free, no key. Every request is paced at 800 ms. Worst case per lookup: 1 request.
 import type { Details, LookupInfo } from '@media-tracker/shared';
 import { normTitle, similarity, splitYear, trimSynopsis } from '@media-tracker/shared';
-import { fetchJson, logLine, paced } from '../http';
+import { assertAnswered, fetchJson, logLine, paced } from '../http';
 import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const BASE = 'https://api.tvmaze.com';
@@ -117,5 +117,6 @@ export function formatDetails(s: Show): Details {
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!/^\d{1,9}$/.test(sourceId)) return null;
   const r = await paced('tvmaze', PACE_MS, () => fetchJson<Show>(`${BASE}/shows/${sourceId}`, {}, d));
+  assertAnswered(r.status, 'tvmaze details');
   return r.status === 200 && r.body ? formatDetails(r.body) : null;
 };

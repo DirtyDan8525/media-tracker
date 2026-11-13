@@ -69,7 +69,7 @@ export function BackfillProvider({ children }: { children: ReactNode }) {
         return rows.filter((e) => e.detailsState === 'none');
       },
       lookup: (q: LookupQuery) => api.post<{ info: LookupInfo | null }>('/api/lookup', q),
-      details: (q) => api.post<{ details: Details | null }>('/api/lookup/details', q),
+      details: (q) => api.post<{ details: Details | null; failed?: boolean }>('/api/lookup/details', q),
       patch: async (id, body) => {
         const saved = await api.patch<Entry>(`/api/entries/${id}`, body);
         writeEntry(qc, saved);

@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, formatRating, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
@@ -59,7 +59,7 @@ function ListBody({ category }: { category: Category }) {
   const rated = rows.filter((e) => e.rating !== null);
   const average = rated.length ? rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length : null;
   const sub = data
-    ? `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated${wide && average !== null ? ` · average ${average.toFixed(1)}` : ''}`
+    ? `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated${wide && average !== null ? ` · average ${formatRating(average)}` : ''}`
     : undefined;
   const label = `${LIST_LABEL[category]} list`;
   const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;

@@ -1,4 +1,4 @@
-import type { Season } from '@media-tracker/shared';
+import { formatRating, type Season } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { entriesKey, entryKey } from '../../data/entryCache';
@@ -17,8 +17,6 @@ export function averageOf(seasons: Season[]): number | null {
   const r = seasons.map((s) => s.rating).filter((x): x is number => x !== null);
   return r.length ? Math.round((r.reduce((a, b) => a + b, 0) / r.length) * 100) / 100 : null;
 }
-
-const fmtAvg = (n: number) => n.toFixed(2).replace(/0$/, '');
 
 /** Seasons for an anime or TV entry: add, rename, rate, note, remove. The entry's average updates as you go. */
 export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'> }) {
@@ -59,7 +57,7 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
     <section className="detail__section" aria-labelledby="seasons-h">
       <div className="detail__h-row">
         <h2 id="seasons-h" className="detail__h">
-          Seasons{avg !== null && <span className="detail__h-sub"> · avg {fmtAvg(avg)}</span>}
+          Seasons{avg !== null && <span className="detail__h-sub"> · avg {formatRating(avg)}</span>}
         </h2>
         <Button variant="ghost" compact disabled={add.isPending} onClick={() => add.mutate()}>Add season</Button>
       </div>

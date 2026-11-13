@@ -61,6 +61,14 @@ describe('design components: accessible names', () => {
     expect(screen.getByLabelText('Unrated')).toBeInTheDocument();
   });
 
+  it('RatingBadge shows up to two decimals without padding past one: 10.0, 9.5, 8.25', () => {
+    render(<><RatingBadge rating={10} /><RatingBadge rating={9.5} /><RatingBadge rating={8.25} /><RatingBadge rating={7} /></>);
+    expect(screen.getByLabelText('Rating 10.0')).toHaveTextContent(/^10\.0$/);
+    expect(screen.getByLabelText('Rating 9.5')).toHaveTextContent(/^9\.5$/);
+    expect(screen.getByLabelText('Rating 8.25')).toHaveTextContent(/^8\.25$/);
+    expect(screen.getByLabelText('Rating 7.0')).toHaveTextContent(/^7\.0$/);
+  });
+
   it('StatusPill shows the status', () => {
     render(<StatusPill status="On Hold" cf={CF_SETS.Midnight} />);
     const pill = screen.getByText('On Hold');

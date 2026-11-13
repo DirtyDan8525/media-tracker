@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, type Category, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, formatRating, type Category, type Status } from '@media-tracker/shared';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
@@ -67,11 +67,11 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
         <div className="field">
           <div className="field__row">
             <label className="field-label" htmlFor={ids.rating}>Rating</label>
-            <output className="rating-readout" htmlFor={ids.rating}>{rating === null ? 'Unrated' : rating.toFixed(1)}</output>
+            <output className="rating-readout" htmlFor={ids.rating}>{rating === null ? 'Unrated' : formatRating(rating)}</output>
           </div>
           <input
             id={ids.rating} type="range" className="slider" min={0} max={10} step={0.1} value={rating ?? 0}
-            aria-valuetext={rating === null ? 'Unrated' : rating.toFixed(1)}
+            aria-valuetext={rating === null ? 'Unrated' : formatRating(rating)}
             onPointerDown={() => setRating((r) => r ?? 0)}
             onChange={(e) => setRating(Math.round(Number(e.target.value) * 10) / 10)}
           />

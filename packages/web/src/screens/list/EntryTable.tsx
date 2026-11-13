@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, type Entry, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, formatRating, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
@@ -76,7 +76,7 @@ function TableRow({ entry: e, showSeasonAvg, ...actions }: { entry: Entry; showS
         {editable ? (
           <EditableCell
             col="rating" kind="number" label={`Rating for ${e.title}`}
-            viewLabel={`Rating for ${e.title}: ${e.rating === null ? 'unrated' : e.rating.toFixed(1)}`}
+            viewLabel={`Rating for ${e.title}: ${e.rating === null ? 'unrated' : formatRating(e.rating)}`}
             view={<RatingBadge rating={e.rating} size="sm" />}
             initial={e.rating === null ? '' : String(e.rating)}
             validate={parseRating} onSave={(rating) => save({ rating })}
@@ -106,7 +106,7 @@ function TableRow({ entry: e, showSeasonAvg, ...actions }: { entry: Entry; showS
       )}
       <td className="muted">{e.genres}</td>
       {cfg.creatorLabel && <td>{e.creator}</td>}
-      {showSeasonAvg && <td className="muted">{e.seasonAvg === null ? '' : e.seasonAvg.toFixed(2).replace(/0$/, '')}</td>}
+      {showSeasonAvg && <td className="muted">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
       <td>
         {editable ? (
           <EditableCell

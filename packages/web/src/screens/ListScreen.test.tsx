@@ -375,7 +375,7 @@ describe('PC table', () => {
     const input = screen.getByRole('spinbutton', { name: 'Rating for Mob Psycho' });
     await userEvent.clear(input);
     await userEvent.type(input, '8.25{Enter}');
-    expect(await screen.findByRole('button', { name: 'Rating for Mob Psycho: 8.3' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Rating for Mob Psycho: 8.25' })).toBeInTheDocument();
     expect(lastPatch(calls)?.body).toEqual({ rating: 8.25 });
   });
 

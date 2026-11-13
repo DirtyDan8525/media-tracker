@@ -133,6 +133,111 @@ describe('Access JWT', () => {
   });
 });
 
+describe('Access JWT hardening', () => {
+  const send = (token: string, overrides: Partial<Env> = prod) => call('/api/me', overrides, { 'Cf-Access-Jwt-Assertion': token });
+
+  it('rejects an HS256 token (algorithm pinned to RS256)', async () => {
+    const token = await new SignJWT({ email: 'dan@example.com' })
+      .setProtectedHeader({ alg: 'HS256', kid: KID })
+      .setIssuer(`https://${TEAM}`).setAudience(AUD).setIssuedAt().setExpirationTime('5m')
+      .sign(new TextEncoder().encode('a-shared-secret-of-sufficient-length-1234'));
+    expect((await send(token)).status).toBe(401);
+  });
+
+  it('rejects a correctly signed token that has no exp', async () => {
+    const token = await new SignJWT({ email: 'dan@example.com' })
+      .setProtectedHeader({ alg: 'RS256', kid: KID }).setIssuer(`https://${TEAM}`).setAudience(AUD).setIssuedAt()
+      .sign(goodKey.privateKey);
+    expect((await send(token)).status).toBe(401);
+  });
+
+  it('rejects an expired token', async () => {
+    const token = await new SignJWT({ email: 'dan@example.com' })
+      .setProtectedHeader({ alg: 'RS256', kid: KID }).setIssuer(`https://${TEAM}`).setAudience(AUD)
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 600).setExpirationTime(Math.floor(Date.now() / 1000) - 300)
+      .sign(goodKey.privateKey);
+    expect((await send(token)).status).toBe(401);
+  });
+
+  it('prod with an empty ACCESS_AUD or ACCESS_TEAM_DOMAIN refuses even a valid-looking token', async () => {
+    const token = await sign(goodKey.privateKey);
+    expect((await send(token, { ...prod, ACCESS_AUD: '' })).status).toBe(401);
+    expect((await send(token, { ...prod, ACCESS_TEAM_DOMAIN: '' })).status).toBe(401);
+    const users = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
+    expect(users?.n).toBe(0);
+  });
+
+  it('ENVIRONMENT unset plus DEV_EMAIL does not bypass auth', async () => {
+    const res = await call('/api/me', { ENVIRONMENT: undefined, DEV_EMAIL: 'dan@example.com', ACCESS_TEAM_DOMAIN: '', ACCESS_AUD: '' } as Partial<Env>);
+    expect(res.status).toBe(401);
+  });
+
+  it('unknown /api paths, a trailing slash, HEAD and OPTIONS are all 401 when unauthenticated', async () => {
+    expect((await call('/api/nope', prod)).status).toBe(401);
+    expect((await call('/api/me/', prod)).status).toBe(401);
+    for (const method of ['HEAD', 'OPTIONS']) {
+      const res = await app.fetch(new Request('https://app.test/api/me', { method }), { ...env, ...prod } as Env);
+      expect(res.status).toBe(401);
+    }
+  });
+});
+
+describe('CSRF hardening on mutations', () => {
+  const dev = { ENVIRONMENT: 'dev', DEV_EMAIL: 'dan@example.com' } as const;
+  const mutate = (method: string, path: string, headers: Record<string, string>, body?: string) =>
+    app.fetch(new Request(`https://app.test${path}`, { method, headers, body }), { ...env, ...dev } as Env);
+
+  it.each(['POST', 'PUT', 'PATCH'])('%s with a non-JSON content type is 415 (text/plain, form, none)', async (method) => {
+    for (const type of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
+      const res = await mutate(method, '/api/me/username', { 'Content-Type': type }, '{"username":"dan"}');
+      expect(res.status).toBe(415);
+      expect(await res.json()).toEqual({ error: 'unsupported_media_type' });
+    }
+    expect((await mutate(method, '/api/me/username', {})).status).toBe(415);
+  });
+
+  it('a DELETE with a non-JSON content type is 415', async () => {
+    const res = await mutate('DELETE', '/api/entries/x', { 'Content-Type': 'text/plain' }, 'x');
+    expect(res.status).toBe(415);
+  });
+
+  it('Sec-Fetch-Site: cross-site is 403, even with a JSON body and for a bodyless DELETE', async () => {
+    const json = { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site' };
+    for (const [method, path] of [['PUT', '/api/me/username'], ['POST', '/api/entries'], ['PATCH', '/api/entries/x'], ['DELETE', '/api/entries/x']] as const) {
+      const res = await mutate(method, path, json, method === 'DELETE' ? undefined : '{}');
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'forbidden' });
+    }
+    expect((await mutate('DELETE', '/api/entries/x', { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403);
+    const users = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
+    expect(users?.n).toBe(0);
+  });
+
+  it('a bodyless DELETE is allowed with no Sec-Fetch-Site, same-origin or none; same-site needs JSON', async () => {
+    for (const site of [undefined, 'same-origin', 'none']) {
+      const res = await mutate('DELETE', '/api/entries/nope', site ? { 'Sec-Fetch-Site': site } : {});
+      expect(res.status).toBe(404); // got past the guard to the handler
+    }
+    expect((await mutate('DELETE', '/api/entries/nope', { 'Sec-Fetch-Site': 'same-site' })).status).toBe(415);
+  });
+
+  it('the web client\'s calls (same-origin, JSON, with charset too) still pass', async () => {
+    const same = { 'Sec-Fetch-Site': 'same-origin' };
+    const put = await mutate('PUT', '/api/me/username', { ...same, 'Content-Type': 'application/json' }, '{"username":"dandan"}');
+    expect(put.status).toBe(200);
+    const patch = await mutate('PUT', '/api/me/settings', { ...same, 'Content-Type': 'application/json; charset=utf-8' }, '{"theme":"Sunset"}');
+    expect(patch.status).not.toBe(415);
+    expect(patch.status).not.toBe(403);
+    const del = await mutate('DELETE', '/api/entries/nope', { ...same, 'Content-Type': 'application/json' });
+    expect(del.status).toBe(404);
+  });
+
+  it('GET, HEAD and OPTIONS are never blocked by the guard', async () => {
+    const res = await app.fetch(new Request('https://app.test/api/me', { headers: { 'Sec-Fetch-Site': 'cross-site' } }), { ...env, ...dev } as Env);
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('routing', () => {
   it('falls back to assets for non-API paths', async () => {
     const res = await call('/anything', prod);

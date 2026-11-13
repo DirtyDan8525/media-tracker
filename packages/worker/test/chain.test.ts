@@ -432,7 +432,7 @@ describe('POST /api/lookup', () => {
 
   it('requires a user', async () => {
     const res = await app.fetch(
-      new Request('https://app.test/api/lookup', { method: 'POST', body: '{}' }),
+      new Request('https://app.test/api/lookup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
       { ...env, ENVIRONMENT: 'prod', DEV_EMAIL: '' } as Env,
     );
     expect(res.status).toBe(401);

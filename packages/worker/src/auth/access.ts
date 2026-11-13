@@ -35,6 +35,9 @@ export async function verifyAccess(req: Request, env: Env): Promise<{ email: str
     const { payload } = await jwtVerify(token, jwksFor(env.ACCESS_TEAM_DOMAIN), {
       issuer: `https://${env.ACCESS_TEAM_DOMAIN}`,
       audience: env.ACCESS_AUD,
+      // Access signs with RS256 and always sets exp: pin both, so an HS256 or never-expiring token is refused.
+      algorithms: ['RS256'],
+      requiredClaims: ['exp'],
     });
     const email = payload.email;
     if (typeof email !== 'string' || !email) return null;

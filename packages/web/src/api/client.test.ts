@@ -23,6 +23,20 @@ describe('api client', () => {
     expect(calls.every((c) => c.init?.credentials === 'include')).toBe(true);
   });
 
+  it('every mutation (including a bodyless DELETE) sends content-type: application/json; GET does not need to', async () => {
+    const calls = mockFetch({
+      'GET /api/x': { body: [1] }, 'POST /api/x': { body: {} }, 'PUT /api/x': { body: {} }, 'PATCH /api/x': { body: {} }, 'DELETE /api/x': { status: 204 },
+    });
+    await api.get('/api/x');
+    await api.post('/api/x');
+    await api.put('/api/x', {});
+    await api.patch('/api/x', {});
+    await api.del('/api/x');
+    const type = (i: number) => new Headers(calls[i]!.init?.headers).get('content-type');
+    expect([1, 2, 3, 4].map(type)).toEqual(Array(4).fill('application/json'));
+    expect(calls[4]!.init?.body).toBeUndefined();
+  });
+
   it('turns a JSON error into an ApiError', async () => {
     mockFetch({ 'PUT /api/me/username': { status: 409, body: { error: 'taken' } } });
     const err = await api.put('/api/me/username', { username: 'x' }).catch((e: unknown) => e);

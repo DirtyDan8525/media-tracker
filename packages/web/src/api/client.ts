@@ -20,7 +20,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     // Access answers an expired session with a redirect to its login domain. Followed, that is
     // a CORS TypeError indistinguishable from offline; unfollowed, it is an 'opaqueredirect'.
     redirect: 'manual',
-    headers: hasBody ? { 'content-type': 'application/json' } : undefined,
+    // Every mutation says it is JSON (a bodyless DELETE too): the Worker refuses anything else (CSRF hardening).
+    headers: hasBody || method !== 'GET' ? { 'content-type': 'application/json' } : undefined,
     body: hasBody ? JSON.stringify(body) : undefined,
   });
   if (res.type === 'opaqueredirect' || res.status === 401) {

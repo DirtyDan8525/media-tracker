@@ -111,7 +111,8 @@ export function ImportScreen() {
     while (r.next < r.chunks.length) {
       const rows = r.chunks[r.next]!;
       try {
-        await api.post('/api/import', { importId: r.importId, rows });
+        // The index makes a retry of a chunk that already landed (lost reply) a no-op on the server.
+        await api.post('/api/import', { importId: r.importId, chunk: r.next, rows });
       } catch {
         setStage({ k: 'failed' });
         return;

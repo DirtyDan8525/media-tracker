@@ -34,7 +34,7 @@ async function chooseMock(p: ImportPreview) {
   await choose(sheet());
 }
 const importPosts = (calls: { method: string; path: string; body: unknown }[]) =>
-  calls.filter((c) => c.method === 'POST' && c.path === '/api/import').map((c) => c.body as { importId: string; rows: ImportRow[] });
+  calls.filter((c) => c.method === 'POST' && c.path === '/api/import').map((c) => c.body as { importId: string; chunk?: number; rows: ImportRow[] });
 const idx = (calls: { method: string; path: string }[], method: string, path: string) =>
   calls.findIndex((c) => c.method === method && c.path === path);
 
@@ -200,6 +200,8 @@ describe('ImportScreen', () => {
     const posts = importPosts(calls);
     expect(posts.map((p) => p.rows.length)).toEqual([180, 180, 180, 40]);
     expect(posts[2]!.rows[0]!.title).toBe(posts[1]!.rows[0]!.title);
+    // every chunk carries its index, and the retry re-sends the failed chunk (1) with the same one
+    expect(posts.map((p) => p.chunk)).toEqual([0, 1, 1, 2]);
     expect(new Set(posts.map((p) => p.importId)).size).toBe(1);
     expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
   });

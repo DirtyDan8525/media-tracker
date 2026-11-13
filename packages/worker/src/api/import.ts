@@ -21,6 +21,8 @@ export { IMPORT_CHUNK_ROWS, IMPORT_CHUNK_SEASONS, importStatementCount };
 
 const invalid = { error: 'invalid' } as const;
 const notFound = { error: 'not_found' } as const;
+// A 6000-row sheet is a few dozen chunks; anything far past that is not our client.
+const MAX_CHUNK_INDEX = 10_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Chunk sizing (IMPORT_CHUNK_ROWS / IMPORT_CHUNK_SEASONS and how they follow from D1's limits)
@@ -85,6 +87,11 @@ importApi.post('/', async (c) => {
   if (!isPlainObject(body)) return c.json(invalid, 400);
   const { importId, rows } = body;
   if (typeof importId !== 'string' || !UUID_RE.test(importId)) return c.json(invalid, 400);
+  // Optional chunk index: a retry of a chunk that already landed (the reply was lost) must not insert twice.
+  const chunk = body.chunk;
+  if (chunk !== undefined && (typeof chunk !== 'number' || !Number.isInteger(chunk) || chunk < 0 || chunk > MAX_CHUNK_INDEX)) {
+    return c.json(invalid, 400);
+  }
   if (!Array.isArray(rows) || rows.length === 0) return c.json(invalid, 400);
 
   const seasonTotal = rows.reduce(
@@ -110,12 +117,19 @@ importApi.post('/', async (c) => {
     .first<{ user_id: string; counts_json: string | null }>();
   if (existing && existing.user_id !== userId) return c.json(notFound, 404);
 
-  // Running totals for the imports row.
+  // Running totals for the imports row, plus the chunk indices already applied (same JSON, same batch).
   let counts: Record<string, number> = {};
+  let applied: number[] = [];
   try {
     const parsed = existing?.counts_json ? JSON.parse(existing.counts_json) : {};
-    if (isPlainObject(parsed)) counts = parsed as Record<string, number>;
+    if (isPlainObject(parsed)) {
+      const { chunks, ...rest } = parsed as Record<string, unknown>;
+      counts = rest as Record<string, number>;
+      if (Array.isArray(chunks)) applied = chunks.filter((n): n is number => Number.isInteger(n));
+    }
   } catch { /* corrupt counts start over */ }
+  if (chunk !== undefined && applied.includes(chunk)) return c.json({ inserted: 0, duplicate: true });
+  if (chunk !== undefined) applied.push(chunk);
   counts.total = counts.total ?? 0;
   for (const r of clean) {
     counts[r.category] = (counts[r.category] ?? 0) + 1;
@@ -145,7 +159,7 @@ importApi.post('/', async (c) => {
         `INSERT INTO imports (id, user_id, created_at, counts_json) VALUES (?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET counts_json = excluded.counts_json WHERE imports.user_id = excluded.user_id`,
       )
-      .bind(importId, userId, now, JSON.stringify(counts)),
+      .bind(importId, userId, now, JSON.stringify(applied.length ? { ...counts, chunks: applied } : counts)),
   ];
   for (let i = 0; i < entryVals.length; i += ENTRIES_PER_STATEMENT) {
     const part = entryVals.slice(i, i + ENTRIES_PER_STATEMENT);

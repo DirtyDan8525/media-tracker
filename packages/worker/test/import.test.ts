@@ -38,6 +38,52 @@ describe('chunk limits', () => {
   });
 });
 
+describe('POST /api/import chunk idempotency', () => {
+  const postChunk = (importId: string, chunk: unknown, rows: unknown) => as(A, '/api/import', 'POST', { importId, chunk, rows });
+
+  it('a repeated chunk index inserts nothing, says duplicate, and leaves counts correct', async () => {
+    const id = crypto.randomUUID();
+    const first = await postChunk(id, 0, [row(1), row(2)]);
+    expect(await first.json()).toEqual({ inserted: 2 });
+    const again = await postChunk(id, 0, [row(1), row(2)]);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ inserted: 0, duplicate: true });
+    expect(await count(`SELECT COUNT(*) n FROM entries WHERE import_id = '${id}'`)).toBe(2);
+
+    // the next index is applied normally, and a repeat of either is still a no-op
+    expect(await (await postChunk(id, 1, [row(3)])).json()).toEqual({ inserted: 1 });
+    expect(await (await postChunk(id, 1, [row(3)])).json()).toEqual({ inserted: 0, duplicate: true });
+    expect(await (await postChunk(id, 0, [row(1), row(2)])).json()).toEqual({ inserted: 0, duplicate: true });
+    expect(await count(`SELECT COUNT(*) n FROM entries WHERE import_id = '${id}'`)).toBe(3);
+    const imp = await env.DB.prepare('SELECT counts_json FROM imports WHERE id = ?').bind(id).first<{ counts_json: string }>();
+    expect(JSON.parse(imp!.counts_json)).toEqual({ total: 3, movies: 3, chunks: [0, 1] });
+  });
+
+  it('a duplicate costs only the imports-row read (no writes) and undo still removes everything', async () => {
+    const id = crypto.randomUUID();
+    await postChunk(id, 0, [row(1)]);
+    const before = await count('SELECT COUNT(*) n FROM entries');
+    await postChunk(id, 0, [row(1)]);
+    expect(await count('SELECT COUNT(*) n FROM entries')).toBe(before);
+    const del = await as(A, `/api/import/${id}`, 'DELETE');
+    expect(await del.json()).toEqual({ deleted: 1 });
+  });
+
+  it('chunk is optional (older clients), but must be a non-negative integer when present', async () => {
+    const id = crypto.randomUUID();
+    expect((await post(A, id, [row(1)])).status).toBe(200);
+    expect((await post(A, id, [row(1)])).status).toBe(200); // no index: no dedup, as before
+    for (const bad of [-1, 1.5, '0', null, 1e9]) expect((await postChunk(id, bad, [row(9)])).status).toBe(400);
+  });
+
+  it('another user cannot replay or probe a chunk of someone else\'s import', async () => {
+    const id = crypto.randomUUID();
+    await postChunk(id, 0, [row(1)]);
+    const res = await as(B, '/api/import', 'POST', { importId: id, chunk: 0, rows: [row(1)] });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('POST /api/import', () => {
   it('imports 600 rows across chunks under one importId', async () => {
     const id = crypto.randomUUID();

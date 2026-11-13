@@ -9,6 +9,8 @@ import type { DetailsFn, LookupDeps, LookupQuery, SourceFn } from './index';
 
 const SEARCH_URL = 'https://store.steampowered.com/api/storesearch/';
 const APPDETAILS_URL = 'https://store.steampowered.com/api/appdetails';
+// appdetails answers in the language of the caller's IP unless told otherwise (Dan's first recording came back Polish).
+const APPDETAILS_LOCALE = '&l=english&cc=us';
 const ASSET_BASE = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps';
 const ACCEPT_SCORE = 0.6; // stricter than other tabs: Steam returns loosely related games
 const RANK_WEIGHT = 0.05;
@@ -106,7 +108,7 @@ async function candidate(c: Scored, d: LookupDeps): Promise<Candidate> {
   };
   const [cover, res] = await Promise.all([
     artCheck(),
-    fetchJson<Record<string, { data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${id}&filters=basic,genres,developers,release_date`, {}, d),
+    fetchJson<Record<string, { data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${id}&filters=basic,genres,developers,release_date${APPDETAILS_LOCALE}`, {}, d),
   ]);
   const data = res.status === 200 ? res.body?.[String(id)]?.data || {} : {}; // details are optional
   const failed = res.status !== 200;
@@ -159,7 +161,7 @@ export function formatDetails(a: AppData): Details {
 
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {
   if (!APP_ID_RE.test(sourceId)) return null;
-  const r = await fetchJson<Record<string, { success?: boolean; data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${sourceId}`, {}, d);
+  const r = await fetchJson<Record<string, { success?: boolean; data?: AppData } | undefined>>(`${APPDETAILS_URL}?appids=${sourceId}${APPDETAILS_LOCALE}`, {}, d);
   assertAnswered(r.status, 'steam details');
   const entry = r.status === 200 ? r.body?.[sourceId] : undefined;
   return entry?.success !== false && entry?.data ? formatDetails(entry.data) : null;

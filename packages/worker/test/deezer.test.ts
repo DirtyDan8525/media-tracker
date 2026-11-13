@@ -8,7 +8,7 @@ import {
   albumDetails, albumInfo, albumLengthLabel, cleanAlbumTitle, cleanTrackTitle, details, pickAlbums, pickTracks, reorderByYear, scoreAlbums,
   scoreTracks, search, trackDetails, trackInfo, trackLengthLabel, type DzAlbumHit, type DzTrackHit, type ScoredAlbum, type ScoredTrack,
 } from '../src/lookup/sources/deezer';
-import { fakeFetch, hasFixtures, replayFetch } from './fakeFetch';
+import { fakeFetch, hasFixtures, recordedUrls, replayFetch } from './fakeFetch';
 
 const deps = (f: typeof fetch): LookupDeps & { log: string[] } => ({ fetch: f, env: env as Env, log: [] });
 const q = (term: string, hint = '', category: LookupQuery['category'] = 'albums', typedTitle = term): LookupQuery => ({ term, typedTitle, hint, category });
@@ -276,6 +276,26 @@ describe('song search requests', () => {
     expect(f.calls[0]).toBe(`${API}/search/track?limit=40&q=${encodeURIComponent('artist:"pink floyd" track:"time"')}`);
     expect(r).toMatchObject({ title: 'Time', creator: 'Pink Floyd', album: 'The Dark Side of the Moon', genres: 'Rock', sub: 'Pink Floyd · The Dark Side of the Moon · 1973', sourceId: 'track:77', source: 'deezer' });
   });
+  it('falls back to a plain "<artist> <title>" query when the advanced one finds nothing (R53, not in the script)', async () => {
+    const adv = `${API}/search/track?limit=40&q=${encodeURIComponent('artist:"pink floyd" track:"time"')}`;
+    const plain = `${API}/search/track?limit=40&q=${encodeURIComponent('pink floyd time')}`;
+    const f = fakeFetch({
+      [adv]: { body: '{"data":[],"total":0}' },
+      [plain]: { body: JSON.stringify({ data: [trackHit(77, 'Time', 'Pink Floyd', 800000, 5, 'The Dark Side of the Moon')] }) },
+      [`${API}/album/5`]: { body: '{}' },
+    });
+    const r = await search(q('time', 'pink floyd', 'songs'), deps(f));
+    expect(f.calls.slice(0, 2)).toEqual([adv, plain]);
+    expect(r).toMatchObject({ title: 'Time', creator: 'Pink Floyd', sourceId: 'track:77' });
+  });
+  it('no fallback without a hint or when the advanced query errors', async () => {
+    const f = fakeFetch({ [`${API}/search/track`]: { body: '{"data":[]}' } });
+    await search(q('time', '', 'songs'), deps(f));
+    expect(f.calls).toHaveLength(1);
+    const g = fakeFetch({ [`${API}/search/track`]: 500 });
+    await search(q('time', 'pink floyd', 'songs'), deps(g));
+    expect(g.calls).toHaveLength(1);
+  });
   it('without a hint the query is the typed name; a weak match is a miss', async () => {
     const f = fakeFetch({ [`${API}/search/track`]: { body: JSON.stringify({ data: [trackHit(1, 'Zzzzzzzz', 'Q', 1, 0, '')] }) } });
     expect(await search(q('time', '', 'songs'), deps(f))).toBeNull();
@@ -358,7 +378,12 @@ describe.skipIf(!hasFixtures('deezer', 'details-dark-side'))('deezer fixture: de
   });
 });
 
-describe.skipIf(!hasFixtures('deezer', 'time-pink-floyd'))('deezer fixture: time-pink-floyd (songs)', () => {
+// Deezer's advanced artist:"" track:"" query found nothing for this song, so searchTracks falls back to a plain "<artist> <title>"
+// query (R53). The first recording predates the fallback.
+const dzTimeRecorded = recordedUrls('deezer', 'time-pink-floyd').some((u) => u.includes('q=pink%20floyd%20time'));
+if (hasFixtures('deezer', 'time-pink-floyd') && !dzTimeRecorded) console.warn('deezer time-pink-floyd fixture tests skipped, re-record needed: no plain "pink floyd time" query recorded');
+
+describe.skipIf(!hasFixtures('deezer', 'time-pink-floyd') || !dzTimeRecorded)('deezer fixture: time-pink-floyd (songs)', () => {
   it('finds the track with its album', async () => {
     const f = replayFetch('deezer', 'time-pink-floyd');
     const r = await search(q('time', 'pink floyd', 'songs'), deps(f));

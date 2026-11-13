@@ -125,6 +125,12 @@ export function hasFixtures(source: string, caseName: string): boolean {
   return RAW[`./fixtures/${source}/${caseName}/index.json`] !== undefined;
 }
 
+/** The request URLs recorded in test/fixtures/<source>/<caseName>/index.json ([] when the case isn't recorded). */
+export function recordedUrls(source: string, caseName: string): string[] {
+  const raw = RAW[`./fixtures/${source}/${caseName}/index.json`];
+  return raw === undefined ? [] : Object.keys(JSON.parse(raw) as FixtureIndex);
+}
+
 /** Serves test/fixtures/<source>/<caseName>/ as recorded by scripts/record-fixtures.ts. */
 export function replayFetch(source: string, caseName: string): FakeFetch {
   const dir = `${source}/${caseName}`;

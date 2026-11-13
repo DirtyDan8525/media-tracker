@@ -8,7 +8,7 @@ import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/source
 import {
   EXCLUDED, applyYear, artUrl, details, formatDetails, parseSteamDate, pickItems, platformsLabel, rankItems, search, type Candidate, type Scored,
 } from '../src/lookup/sources/steam';
-import { fakeFetch, hasFixtures, replayFetch } from './fakeFetch';
+import { fakeFetch, hasFixtures, recordedUrls, replayFetch } from './fakeFetch';
 
 const deps = (f: typeof fetch, e: Env = env as Env): LookupDeps & { log: string[] } => ({ fetch: f, env: e, log: [] });
 const q = (term: string, typedTitle = term): LookupQuery => ({ term, typedTitle, hint: '', category: 'games' });
@@ -162,6 +162,11 @@ describe('steam search requests', () => {
     });
     expect(f.unmatched).toEqual([]);
   });
+  it('the per-candidate appdetails call asks for English and US (l=english&cc=us)', async () => {
+    const f = fakeFetch({ ...portal, [`${ASSET}620/library_600x900.jpg`]: 404 });
+    await search(q('portal 2'), deps(f));
+    expect(f.calls).toContain(`${APP}620&filters=basic,genres,developers,release_date&l=english&cc=us`);
+  });
   it('uses the 600x900 art when a HEAD on it answers 200 (status only: the art is requested with HEAD)', async () => {
     const methods: string[] = [];
     const inner = fakeFetch({ ...portal, [`${ASSET}620/library_600x900.jpg`]: 200 });
@@ -222,7 +227,7 @@ describe('steam details input and request', () => {
   it('reads appdetails?appids=<id> and formats it', async () => {
     const f = fakeFetch({ [`${APP}620`]: app(620, { release_date: { date: '19 Apr, 2011' }, short_description: 'Hi.', platforms: { windows: true, mac: true, linux: true } }) });
     expect(await details('620', deps(f))).toEqual({ releaseDate: '2011-04-19', synopsis: 'Hi.', lengthLabel: '', origin: 'Windows, Mac, Linux' });
-    expect(f.calls).toEqual([`${APP}620`]);
+    expect(f.calls).toEqual([`${APP}620&l=english&cc=us`]);
   });
   it('a failed request is a failure; success:false or a missing entry is a plain null', async () => {
     await expect(details('620', deps(fakeFetch({ [`${APP}620`]: 500 })))).rejects.toBeInstanceOf(SourceFailure);
@@ -271,7 +276,12 @@ describe('games chain with IGDB off', () => {
 
 // ---- fixture tests: skipped until Dan records the cases ----
 
-describe.skipIf(!hasFixtures('steam', 'portal-2'))('steam fixture: portal-2', () => {
+// appdetails now sends l=english&cc=us (it answered in Polish on the first recording); older recordings lack it.
+const steamRecordedWithLocale = (c: string) => recordedUrls('steam', c).filter((u) => u.includes('/api/appdetails')).every((u) => u.includes('l=english') && u.includes('cc=us'));
+for (const c of ['portal-2', 'details-portal-2'])
+  if (hasFixtures('steam', c) && !steamRecordedWithLocale(c)) console.warn(`steam ${c} fixture tests skipped, re-record needed: appdetails URLs lack l=english&cc=us`);
+
+describe.skipIf(!hasFixtures('steam', 'portal-2') || !steamRecordedWithLocale('portal-2'))('steam fixture: portal-2', () => {
   it('finds Portal 2 by Valve with Steam art (header.jpg when the 600x900 art is missing)', async () => {
     const f = replayFetch('steam', 'portal-2');
     const r = await search(q('portal 2'), deps(f));
@@ -295,7 +305,7 @@ describe.skipIf(!hasFixtures('steam', 'portal-2'))('steam fixture: portal-2', ()
   });
 });
 
-describe.skipIf(!hasFixtures('steam', 'details-portal-2'))('steam fixture: details-portal-2', () => {
+describe.skipIf(!hasFixtures('steam', 'details-portal-2') || !steamRecordedWithLocale('details-portal-2'))('steam fixture: details-portal-2', () => {
   it('gives release date, synopsis and platforms; no length label', async () => {
     const f = replayFetch('steam', 'details-portal-2');
     const foundInfo = await search(q('portal 2'), deps(f));

@@ -5,7 +5,7 @@ import { lookupChain } from '../src/lookup/chain';
 import { SourceFailure, resetPacing } from '../src/lookup/http';
 import { SOURCES, type LookupDeps, type LookupQuery } from '../src/lookup/sources/index';
 import { details, ITUNES_CFG, itunesDetails, itunesInfo, pickHits, rankHits, search, type ItunesHit, type ScoredHit } from '../src/lookup/sources/itunes';
-import { fakeFetch, hasFixtures, replayFetch, type FakeFetch } from './fakeFetch';
+import { fakeFetch, hasFixtures, recordedUrls, replayFetch, type FakeFetch } from './fakeFetch';
 
 const deps = (f: typeof fetch): LookupDeps & { log: string[] } => ({ fetch: f, env: env as Env, log: [] });
 const q = (term: string, hint = '', category: LookupQuery['category'] = 'albums', typedTitle = term): LookupQuery => ({ term, typedTitle, hint, category });
@@ -208,10 +208,17 @@ describe('albums chain: Deezer finds nothing, iTunes answers', () => {
 
 // ---- fixture tests: skipped until Dan records the cases ----
 
-describe.skipIf(!hasFixtures('itunes', 'dark-side-of-the-moon'))('itunes fixture: dark-side-of-the-moon', () => {
+// Real album lookups send the artist too (buildLookupQuery: term "<title> <artist>", creatorIsSearchHint), so the case
+// must have requested term=dark side of the moon pink floyd. The first recording searched the title alone and got a trance album.
+const ITUNES_TERM = 'dark side of the moon pink floyd';
+const itunesRecordedWithArtist = recordedUrls('itunes', 'dark-side-of-the-moon').some((u) => u.includes(`term=${encodeURIComponent(ITUNES_TERM)}`));
+const itunesSkipReason = 're-record needed: recorded iTunes URL lacks the artist (cases.ts now searches term "dark side of the moon pink floyd")';
+if (hasFixtures('itunes', 'dark-side-of-the-moon') && !itunesRecordedWithArtist) console.warn(`itunes fixture tests skipped, ${itunesSkipReason}`);
+
+describe.skipIf(!hasFixtures('itunes', 'dark-side-of-the-moon') || !itunesRecordedWithArtist)('itunes fixture: dark-side-of-the-moon', () => {
   it('album search finds Pink Floyd, with a 300px cover', async () => {
     const f = replayFetch('itunes', 'dark-side-of-the-moon');
-    const r = await search(q('dark side of the moon', 'pink floyd'), deps(f));
+    const r = await search(q(ITUNES_TERM, 'pink floyd', 'albums', 'dark side of the moon'), deps(f));
     expect(r?.creator).toBe('Pink Floyd');
     expect(r?.title).toMatch(/dark side of the moon/i);
     expect(r?.sourceId).toMatch(/^\d+$/);
@@ -221,7 +228,7 @@ describe.skipIf(!hasFixtures('itunes', 'dark-side-of-the-moon'))('itunes fixture
   it('chain: Deezer 0 results gives the iTunes result', async () => {
     const dz = fakeFetch({ 'https://api.deezer.com/search/album': { body: '{"data":[]}' } });
     const f = split(dz, replayFetch('itunes', 'dark-side-of-the-moon'));
-    const r = await lookupChain('albums', q('dark side of the moon', 'pink floyd'), deps(f));
+    const r = await lookupChain('albums', q(ITUNES_TERM, 'pink floyd', 'albums', 'dark side of the moon'), deps(f));
     expect(r?.source).toBe('itunes');
     expect(r?.creator).toBe('Pink Floyd');
   });

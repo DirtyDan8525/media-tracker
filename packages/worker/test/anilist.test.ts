@@ -286,7 +286,7 @@ suite.skipIf(!hasFixtures('anilist', 'frieren'))('anilist fixture: frieren', () 
     const f = replayFetch('anilist', 'frieren');
     const r = await search(q('frieren'), deps(f));
     expect(r?.title).toContain('Frieren');
-    expect(r?.creator).toContain('Madhouse');
+    expect(r?.creator).toMatch(/madhouse/i); // AniList's studio name is upper-case ("MADHOUSE")
     expect(r?.cover.startsWith('https://s4.anilist.co/')).toBe(true);
     expect(r?.source).toBe('anilist');
     expect(r?.sourceId).toMatch(/^\d+$/);

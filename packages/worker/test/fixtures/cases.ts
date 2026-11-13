@@ -46,8 +46,9 @@ export const CASES: FixtureCase[] = [
   { source: 'deezer', case: 'details-time-pink-floyd', detailsFromSearch: true,
     query: { term: 'time', typedTitle: 'time', hint: 'pink floyd', category: 'songs' } },
   // Recorded directly: the "Deezer finds nothing, iTunes answers" chain test pairs it with an empty Deezer answer.
+  // Same query the app builds for an album with a creator (buildLookupQuery: term = "<title> <artist>").
   { source: 'itunes', case: 'dark-side-of-the-moon',
-    query: { term: 'dark side of the moon', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
+    query: { term: 'dark side of the moon pink floyd', typedTitle: 'dark side of the moon', hint: 'pink floyd', category: 'albums' } },
   // Open Library needs no key.
   { source: 'openlibrary', case: 'we-are-legion',
     query: { term: 'We Are Legion (We Are Bob)', typedTitle: 'We Are Legion (We Are Bob)', hint: 'Dennis E. Taylor', category: 'books' } },

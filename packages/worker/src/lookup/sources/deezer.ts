@@ -249,13 +249,24 @@ async function searchAlbums(q: LookupQuery, d: LookupDeps): Promise<LookupInfo |
 async function searchTracks(q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> {
   const { name: typedName } = splitYear(q.typedTitle || q.term);
   const query = q.hint ? `artist:"${q.hint}" track:"${typedName}"` : typedName;
-  const res = await fetchJson<{ data?: DzTrackHit[]; error?: unknown }>(`${BASE}/search/track?limit=40&q=${encodeURIComponent(query)}`, {}, d);
-  if (res.status !== 200 || !res.body || res.body.error) {
-    logLine(d, `deezer: song search failed with status ${res.status}`);
-    return null;
+  const trackSearch = async (text: string) => {
+    const res = await fetchJson<{ data?: DzTrackHit[]; error?: unknown }>(`${BASE}/search/track?limit=40&q=${encodeURIComponent(text)}`, {}, d);
+    if (res.status !== 200 || !res.body || res.body.error) {
+      logLine(d, `deezer: song search failed with status ${res.status}`);
+      return null;
+    }
+    const hits = Array.isArray(res.body.data) ? res.body.data.filter((t) => t && t.id) : [];
+    logLine(d, `deezer: song search "${text}": ${hits.length} results`);
+    return hits;
+  };
+  let results = await trackSearch(query);
+  if (!results) return null;
+  // Not in the script (R53): real Deezer answers the advanced artist:"" track:"" query with 0 results for some songs
+  // that a plain "<artist> <title>" query finds, so retry plainly when the advanced one is empty.
+  if (!results.length && q.hint) {
+    results = await trackSearch(`${q.hint} ${typedName}`);
+    if (!results) return null;
   }
-  const results = Array.isArray(res.body.data) ? res.body.data.filter((t) => t && t.id) : [];
-  logLine(d, `deezer: song search "${query}": ${results.length} results`);
   if (!results.length) return null;
 
   const picks = pickTracks(scoreTracks(results, typedName, q.hint));

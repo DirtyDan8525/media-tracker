@@ -83,9 +83,11 @@ function TableRow({ entry: e, showSeasonAvg, ...actions }: { entry: Entry; showS
           />
         ) : <RatingBadge rating={e.rating} size="sm" />}
       </td>
-      <td className="cell-title">
-        {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} data-nav="title" data-role="title">{e.title}</Link>}
-        <LookupNote entry={e} {...actions} />
+      <td>
+        <div className="cell-title">
+          {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} data-nav="title" data-role="title">{e.title}</Link>}
+          <LookupNote entry={e} {...actions} />
+        </div>
       </td>
       {cfg.hasStatus && (
         <td>

@@ -90,13 +90,13 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 }
 .picker-card.is-best { border-color: var(--highlight); }
 .picker-card__cover {
-  position: relative; display: flex; align-items: flex-start; justify-content: center; aspect-ratio: 2 / 3;
+  position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 2 / 3;
   border-radius: var(--radius-md); background: var(--panel); color: var(--muted-text); overflow: hidden;
 }
 .picker-card__cover--square { aspect-ratio: 1 / 1; }
 .picker-card__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .picker-card__badge {
-  position: relative; margin: var(--space-4) auto 0 var(--space-4); padding: 3px var(--space-4); border-radius: var(--radius-pill);
+  position: absolute; top: var(--space-4); left: var(--space-4); padding: 3px var(--space-4); border-radius: var(--radius-pill);
   background: var(--highlight); color: var(--on-highlight); font-size: 11px; font-weight: 700;
 }
 .picker-card__title { font-size: var(--fs-sm); font-weight: 600; color: var(--bright-text); line-height: 1.3; }
@@ -131,3 +131,4 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .detail__edit summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; font-weight: 700; color: var(--bright-text); }
 .detail-top { padding: var(--space-6) var(--space-6) 0; min-height: var(--space-6); }
 .center { text-align: center; }
+.frame--wide .screen__body.list { max-width: none; }

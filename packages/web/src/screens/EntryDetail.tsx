@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, sourceUrl, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -67,6 +67,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   const year = entry.releaseDate.slice(0, 4);
   const meta = [year, entry.lengthLabel].filter(Boolean).join(' · ');
   const trimmed = entry.synopsis.endsWith('…');
+  const moreUrl = sourceUrl(entry.source, entry.sourceId);
   const ratingCheck = (v: string) => { const p = parseRating(v); return p.ok ? null : p.error; };
 
   return (
@@ -109,8 +110,12 @@ function DetailBody({ entry }: { entry: Entry }) {
 
         {entry.synopsis && (
           <section className="detail__section" aria-label="Synopsis">
-            <p className={`synopsis${trimmed && !expanded ? ' is-clamped' : ''}`}>{entry.synopsis}</p>
-            {trimmed && (
+            <p className={`synopsis${trimmed && !moreUrl && !expanded ? ' is-clamped' : ''}`}>{entry.synopsis}</p>
+            {trimmed && moreUrl && (
+              // The synopsis was cut at the source's own limit: the full text lives on its page.
+              <a className="link-btn" href={moreUrl} target="_blank" rel="noopener noreferrer">More</a>
+            )}
+            {trimmed && !moreUrl && (
               <button type="button" className="link-btn" aria-expanded={expanded} onClick={() => setExpanded((x) => !x)}>
                 {expanded ? 'Less' : 'More'}
               </button>

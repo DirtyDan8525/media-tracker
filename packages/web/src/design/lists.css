@@ -120,7 +120,7 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .detail__h-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
 .synopsis { font-size: var(--fs-sm); line-height: 1.55; color: var(--text); }
 .synopsis.is-clamped { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.link-btn { align-self: flex-start; min-height: var(--tap); padding: 0; border: none; background: none; color: var(--highlight); font: 600 var(--fs-sm) var(--font); cursor: pointer; }
+.link-btn { display: inline-flex; align-items: center; text-decoration: none; align-self: flex-start; min-height: var(--tap); padding: 0; border: none; background: none; color: var(--highlight); font: 600 var(--fs-sm) var(--font); cursor: pointer; }
 .season-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-md); background: var(--alt-row); }
 .season-row .input { height: 40px; }
 .detail__actions { display: flex; gap: var(--space-5); margin-top: var(--space-4); }

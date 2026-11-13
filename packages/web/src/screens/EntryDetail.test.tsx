@@ -41,12 +41,37 @@ describe('entry details', () => {
   });
 
   it('offers More only when the synopsis was trimmed with an ellipsis', async () => {
-    fakeBackend({ entries: [frieren({ synopsis: 'A long story that goes on and on…' })] });
+    fakeBackend({ entries: [frieren({ synopsis: 'A long story that goes on and on…', source: null, sourceId: null })] });
     renderApp('/entry/f1');
     const more = await screen.findByRole('button', { name: 'More' });
     expect(more).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(more);
     expect(screen.getByRole('button', { name: 'Less' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('More is a link to the source page (new tab) when the synopsis was trimmed and the match has a page', async () => {
+    fakeBackend({ entries: [frieren({ synopsis: 'A long story that goes on and on…', source: 'anilist', sourceId: '154587' })] });
+    renderApp('/entry/f1');
+    const more = await within(await screen.findByRole('region', { name: 'Synopsis' })).findByRole('link', { name: 'More' });
+    expect(more).toHaveAttribute('href', 'https://anilist.co/anime/154587');
+    expect(more).toHaveAttribute('target', '_blank');
+    expect(more).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(screen.getByRole('region', { name: 'Synopsis' })).queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the expand toggle when the source has no page (igdb) and no link when complete', async () => {
+    fakeBackend({ entries: [frieren({ synopsis: 'A long story that goes on and on…', source: 'igdb', sourceId: '7346' })] });
+    renderApp('/entry/f1');
+    const region = await screen.findByRole('region', { name: 'Synopsis' });
+    expect(within(region).getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(within(region).queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
+  });
+
+  it('a complete synopsis has no More link even with a source page', async () => {
+    fakeBackend({ entries: [frieren({ synopsis: 'Short.', source: 'anilist', sourceId: '154587' })] });
+    renderApp('/entry/f1');
+    expect(await within(await screen.findByRole('region', { name: 'Synopsis' })).findByText('Short.')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Synopsis' })).queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
   });
 
   it('has no More for a synopsis that is complete', async () => {

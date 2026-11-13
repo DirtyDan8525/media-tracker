@@ -27,27 +27,30 @@ Commands go in **PowerShell**: press the Windows key, type `PowerShell`, press E
 ## 3. Get the code and install it
 
 ```
-git clone <the repository address> media-tracker
+git clone https://github.com/DirtyDan8525/media-tracker
 cd media-tracker
+git checkout phase1-2
 npm ci
 ```
+
+The `git checkout phase1-2` line is needed only until this work is merged to `main`; once it is, skip it.
 
 **Success:** `npm ci` finishes with no red `ERR!` lines (yellow warnings are fine).
 
 ## 4. Log in to Cloudflare
 
 ```
-npx wrangler login
+npm exec -w packages/worker -- wrangler login
 ```
 
 A browser tab opens. Click **Allow**.
 
-**Success:** PowerShell says `Successfully logged in`. Check with `npx wrangler whoami`.
+**Success:** PowerShell says `Successfully logged in`. Check with `npm exec -w packages/worker -- wrangler whoami`.
 
 ## 5. Create the database
 
 ```
-npx wrangler d1 create media-tracker
+npm exec -w packages/worker -- wrangler d1 create media-tracker
 ```
 
 It prints a `database_id` (letters, numbers and dashes). Open `packages/worker/wrangler.toml` in Notepad and find the `[env.production]` part near the bottom. Replace `REPLACE_ME_D1_DATABASE_ID` with that id, keeping the quotes. Save.
@@ -64,7 +67,17 @@ Type `y` when asked.
 
 **Success:** it lists `0001_init.sql` with a green check.
 
-## 7. Add the lookup keys (secrets)
+## 7. Deploy the app
+
+```
+npm run deploy
+```
+
+**Success:** it ends with a line like `https://media-tracker.<your-subdomain>.workers.dev`. Copy that address. Don't treat the app as ready yet: until step 9 is done, the app's pages load but every `/api` request is refused (that is intended).
+
+Production uses `ENVIRONMENT = "prod"` (already set in `wrangler.toml`). **Never add `DEV_EMAIL` (or `LOOKUP_FAKE`) to the production settings.** `DEV_EMAIL` is a sign-in shortcut for testing on your own PC and would let anyone in. A test fails if it ever appears there.
+
+## 8. Add the lookup keys (secrets)
 
 Get free keys first: TMDB (movies and TV) from <https://www.themoviedb.org/settings/api>, and IGDB (games) by registering an app at <https://dev.twitch.tv/console> (the Client ID is `IGDB_ID`, the Client Secret is `IGDB_SECRET`). Then run each line and paste the value when asked:
 
@@ -74,34 +87,24 @@ npm exec -w packages/worker -- wrangler secret put IGDB_ID --env production
 npm exec -w packages/worker -- wrangler secret put IGDB_SECRET --env production
 ```
 
-If it says the Worker doesn't exist yet and asks to create it, answer `y`.
+The Worker exists now (step 7), so these attach to it. Secrets take effect right away; the redeploy in step 9 picks up everything else.
 
 **Success:** each command prints `Success! Uploaded secret ...`.
 
-## 8. Deploy
-
-```
-npm run deploy
-```
-
-**Success:** it ends with a line like `https://media-tracker.<your-subdomain>.workers.dev`. Copy that address. Don't use it yet, since the lock comes next. Until step 9 is done the app will refuse every request (that is intended).
-
-Production uses `ENVIRONMENT = "prod"` (already set in `wrangler.toml`). **Never add `DEV_EMAIL` (or `LOOKUP_FAKE`) to the production settings.** `DEV_EMAIL` is a sign-in shortcut for testing on your own PC and would let anyone in. A test fails if it ever appears there.
-
 ## 9. Lock it with Cloudflare Access
 
-1. In the Cloudflare dashboard open **Zero Trust** (left menu). If asked, pick a team name (this becomes your team domain, `<team>.cloudflareaccess.com`) and choose the **Free** plan.
-2. Go to **Access controls** > **Applications** > **Add an application** > **Self-hosted**.
-3. Name: `Media Tracker`. Under **Public hostname** enter your whole workers.dev host, for example `media-tracker.dan-media.workers.dev`, leaving the path empty. One application covering the whole host is what you want: it protects the pages, `/api/*`, `/api/auth/reauth` and `/cdn-cgi/*` together.
-4. Add a policy: name `Dan only`, action **Allow**, rule **Emails** = your email address. Add nothing else.
-5. Save. Open the application again and copy two things:
-   - **Application Audience (AUD) Tag** (a long string).
-   - Your **team domain**, from Zero Trust > **Settings** > **Custom Pages** (or the top of Settings): `<team>.cloudflareaccess.com`.
+Menu names in the dashboard can differ slightly from what is written here; look for the words in bold.
+
+1. In the Cloudflare dashboard open **Zero Trust**. If asked, pick a team name (this becomes your team domain) and choose the **Free** plan.
+2. Find **Access** > **Applications** and add an application of type **Self-hosted**.
+3. For the application domain enter your whole workers.dev host, `media-tracker.<your-subdomain>.workers.dev`, with no path. One application covering the whole host is what you want: it protects the pages, `/api/*`, `/api/auth/reauth` and `/cdn-cgi/*` together.
+4. Add a policy: name `Dan only`, action **Allow**, under **Include** choose **Emails** and enter your email address. Add nothing else.
+5. Save, then open the application's overview or settings and copy the **Application Audience (AUD) tag** (a long string). The **team domain**, `<team>.cloudflareaccess.com`, is shown in the Zero Trust settings.
 6. In `packages/worker/wrangler.toml`, under `[env.production.vars]`, set:
    - `ACCESS_AUD` = the AUD tag
-   - `ACCESS_TEAM_DOMAIN` = the team domain
+   - `ACCESS_TEAM_DOMAIN` = the team domain (no `https://`)
    - `ADMIN_EMAIL` = your email (the one in the policy)
-7. Deploy again: `npm run deploy`
+7. Deploy again: `npm run deploy`. (`wrangler.toml` already turns off Preview URLs for the Worker with `preview_urls = false`, so no second address bypasses the lock.)
 
 **Success:** opening your workers.dev address in a private window first shows a Cloudflare sign-in page asking for your email. Only a code sent to your allowed email gets through.
 
@@ -127,8 +130,8 @@ Choose a username when the app asks.
 ## The three most likely problems
 
 1. **`npm ci` fails or crashes, or says the engine is not supported.** You have an old Node. Run `node -v`; if it is not 24, reinstall Node.js 24 LTS (step 2), reopen PowerShell, and run `npm ci` again.
-2. **Wrangler says "Authentication error" or `No such database` / a database id error.** Run `npx wrangler login` again, and re-check that the `database_id` in the `[env.production]` section matches the one `d1 create` printed (`npx wrangler d1 list` shows it).
-3. **After deploy you see a blank "Signed out" page or sign-in loops.** `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match Access exactly (no `https://`, no spaces), or the Access application doesn't cover the whole workers.dev host. Fix `wrangler.toml` or the application's hostname and run `npm run deploy` again.
+2. **Wrangler says "Authentication error" or `No such database` / a database id error.** Run `npm exec -w packages/worker -- wrangler login` again, and re-check that the `database_id` in the `[env.production]` section matches the one `d1 create` printed (`npm exec -w packages/worker -- wrangler d1 list` shows it).
+3. **After deploy you see a blank "Signed out" page or sign-in loops.** `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match Access exactly (no `https://`, no spaces), or the Access application doesn't cover the whole workers.dev host. Fix `wrangler.toml` or the application's hostname and run `npm run deploy` again. Check that the application's host is exactly your workers.dev host.
 
 ## Good to know
 

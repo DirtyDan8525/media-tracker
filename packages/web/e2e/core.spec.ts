@@ -35,7 +35,8 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
   // The card/row appears with the (fake) cover.
   const item = page.getByRole('link', { name: /Frieren/ }).first();
   await expect(item).toBeVisible();
-  await expect(page.locator('img[src$="/icon-192.png"]').first()).toBeVisible();
+  const row = page.locator('li.entry-card, tr').filter({ hasText: 'Frieren' }).first();
+  await expect(row.locator('img[src$="/icon-192.png"]')).toBeVisible();
 
   // Open the entry and set the rating.
   await item.click();

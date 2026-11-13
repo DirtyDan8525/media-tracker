@@ -31,6 +31,8 @@ ADMIN_EMAIL = ""
 # ---------------------------------------------------------------------------
 [env.production]
 name = "media-tracker"
+workers_dev = true
+preview_urls = false # preview URLs would bypass the Access application
 
 [env.production.assets]
 directory = "../web/dist"

@@ -10,8 +10,9 @@ if (!/^\d+$/.test(port ?? '')) throw new Error('usage: node e2e/serve.mjs <port>
 
 const worker = resolve(fileURLToPath(new URL('..', import.meta.url)), 'packages/worker');
 const state = resolve(worker, `.wrangler/e2e-state-${port}`);
+// shell: true on Windows so `npx` (a .cmd file there) can be started.
 const wrangler = (args, opts = {}) =>
-  [process.platform === 'win32' ? 'npx.cmd' : 'npx', ['wrangler', ...args], { cwd: worker, stdio: 'inherit', ...opts }];
+  ['npx', ['wrangler', ...args], { cwd: worker, stdio: 'inherit', shell: process.platform === 'win32', ...opts }];
 
 rmSync(state, { recursive: true, force: true });
 const [cmd, args, opts] = wrangler(['d1', 'migrations', 'apply', 'media-tracker', '--local', '--persist-to', state]);

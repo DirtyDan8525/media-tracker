@@ -33,6 +33,17 @@ describe('wrangler.toml production vars', () => {
     expect(toml).toMatch(/\[env\.production\.assets\]/);
   });
 
+  it('has no DEV_EMAIL or LOOKUP_FAKE anywhere in the production block', () => {
+    const lines = toml.split('\n').map((l) => l.replace(/#.*$/, ''));
+    const start = lines.findIndex((l) => /^\s*\[+env\.production/.test(l));
+    expect(start).toBeGreaterThan(-1);
+    expect(lines.slice(start).join('\n')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
+  });
+
+  it('turns off preview URLs in production', () => {
+    expect(section('env.production')).toMatch(/preview_urls\s*=\s*false/);
+  });
+
   it('keeps DEV_EMAIL and LOOKUP_FAKE out of the top-level vars too', () => {
     expect(section('vars')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
   });

@@ -1,48 +1,30 @@
 import { Hono } from 'hono';
-import { CATEGORY_CONFIG, type Category, type ImportRow } from '@media-tracker/shared';
+import {
+  CATEGORY_CONFIG,
+  ENTRIES_PER_STATEMENT,
+  IMPORT_CHUNK_ROWS,
+  IMPORT_CHUNK_SEASONS,
+  IMPORT_ENTRY_PARAMS,
+  IMPORT_SEASON_PARAMS,
+  SEASONS_PER_STATEMENT,
+  importStatementCount,
+  type Category,
+  type ImportRow,
+} from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
-import { D1_MAX_PARAMS, D1_MAX_QUERIES } from '../env';
 import { CATEGORIES, validateEntryInput, validateSeasonInput } from './entryValidation';
 
 export const importApi = new Hono<AppEnv>();
+
+// Re-exported for the Worker's tests.
+export { IMPORT_CHUNK_ROWS, IMPORT_CHUNK_SEASONS, importStatementCount };
 
 const invalid = { error: 'invalid' } as const;
 const notFound = { error: 'not_found' } as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// ---- Chunk sizing -----------------------------------------------------------
-// One POST = one Worker invocation, so everything it runs counts toward
-// D1_MAX_QUERIES (every statement in a db.batch() counts):
-//   requireUser: up to 3 (select, insert on first sign-in, select)
-//   import lookup: 1
-//   batch: 1 imports upsert + N entry inserts + M season inserts
-// and every statement is a multi-row INSERT whose bound params must be <= D1_MAX_PARAMS.
-const AUTH_QUERIES = 3;
-const LOOKUP_QUERIES = 1;
-const UPSERT_STATEMENTS = 1;
-const INSERT_BUDGET = D1_MAX_QUERIES - AUTH_QUERIES - LOOKUP_QUERIES - UPSERT_STATEMENTS; // 45
-
-// Bound params per row: id, user_id, category, title, typed_title, status, rating, genres,
-// creator, album, cover_url, notes, lookup_state, import_id, created_at, updated_at.
-// (details_state is the literal 'none'.)
-const ENTRY_PARAMS = 16;
-// id, entry_id, label, rating, notes, created_at.
-const SEASON_PARAMS = 6;
-const ENTRIES_PER_STATEMENT = Math.floor(D1_MAX_PARAMS / ENTRY_PARAMS); // 6
-const SEASONS_PER_STATEMENT = Math.floor(D1_MAX_PARAMS / SEASON_PARAMS); // 16
-
-// Two thirds of the insert budget goes to entry statements, the rest to season statements.
-const ENTRY_STATEMENTS = Math.floor((INSERT_BUDGET * 2) / 3); // 30
-const SEASON_STATEMENTS = INSERT_BUDGET - ENTRY_STATEMENTS; // 15
-
-/** Max rows in one POST /api/import (180). */
-export const IMPORT_CHUNK_ROWS = ENTRY_STATEMENTS * ENTRIES_PER_STATEMENT;
-/** Max seasons, summed over all rows in one POST /api/import (240). */
-export const IMPORT_CHUNK_SEASONS = SEASON_STATEMENTS * SEASONS_PER_STATEMENT;
-
-/** Statements one chunk runs in its batch (imports upsert + inserts). */
-export const importStatementCount = (rows: number, seasons: number) =>
-  UPSERT_STATEMENTS + Math.ceil(rows / ENTRIES_PER_STATEMENT) + Math.ceil(seasons / SEASONS_PER_STATEMENT);
+// Chunk sizing (IMPORT_CHUNK_ROWS / IMPORT_CHUNK_SEASONS and how they follow from D1's limits)
+// lives in @media-tracker/shared, so the web client splits imports with the numbers enforced here.
 
 // ---- Validation -------------------------------------------------------------
 interface CleanSeason { label: string; rating: number | null; notes: string }
@@ -167,7 +149,7 @@ importApi.post('/', async (c) => {
   ];
   for (let i = 0; i < entryVals.length; i += ENTRIES_PER_STATEMENT) {
     const part = entryVals.slice(i, i + ENTRIES_PER_STATEMENT);
-    const tuples = placeholders(ENTRY_PARAMS, part.length, ", 'none'"); // 'none' is details_state
+    const tuples = placeholders(IMPORT_ENTRY_PARAMS, part.length, ", 'none'"); // 'none' is details_state
     stmts.push(
       db
         .prepare(`INSERT INTO entries (${ENTRY_COLS}, details_state) VALUES ${tuples}`)
@@ -178,7 +160,7 @@ importApi.post('/', async (c) => {
     const part = seasonVals.slice(i, i + SEASONS_PER_STATEMENT);
     stmts.push(
       db
-        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at) VALUES ${placeholders(SEASON_PARAMS, part.length)}`)
+        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
         .bind(...(part.flat() as never[])),
     );
   }

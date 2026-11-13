@@ -1,10 +1,5 @@
-// D1 limits, verified 2026-11-10 on Cloudflare's D1 limits page
-// (https://developers.cloudflare.com/d1/platform/limits/):
-// max 100 bound parameters per query; max 50 queries per Worker invocation
-// (free plan). We count every statement inside a db.batch() toward the 50
-// (conservative).
-export const D1_MAX_PARAMS = 100;
-export const D1_MAX_QUERIES = 50;
+// D1 limits live in @media-tracker/shared (the web client needs them for import chunking).
+export { D1_MAX_PARAMS, D1_MAX_QUERIES } from '@media-tracker/shared';
 
 export interface Env {
   DB: D1Database;

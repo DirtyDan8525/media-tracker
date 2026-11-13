@@ -1,5 +1,5 @@
 import type { Category, Entry } from '@media-tracker/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { localDb } from '../db/local';
 import { LIST_ORDER } from '../nav';
@@ -78,4 +78,24 @@ export function useListCounts() {
     },
     staleTime: Infinity,
   });
+}
+
+/**
+ * Reloads some lists after a bulk change (an import or its undo): fetches each, replaces the query
+ * cache and the on-device copy, and refreshes everything derived from them. A list that can't be
+ * fetched is left for the next visit to refresh.
+ */
+export async function refreshCategories(qc: QueryClient, categories: Category[]): Promise<void> {
+  await Promise.all(categories.map(async (c) => {
+    try {
+      const rows = await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(c)}`);
+      await storeEntries(c, rows);
+      qc.setQueryData(['entries', c], rows);
+    } catch {
+      void qc.invalidateQueries({ queryKey: ['entries', c] });
+    }
+  }));
+  void qc.invalidateQueries({ queryKey: ['entries-cache'] });
+  void qc.invalidateQueries({ queryKey: ['backfill-entries'] });
+  void qc.invalidateQueries({ queryKey: COUNTS_KEY });
 }

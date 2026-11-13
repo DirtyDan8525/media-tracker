@@ -1,5 +1,5 @@
 {
-  "https://itunes.apple.com/search?country=US&limit=50&media=music&entity=album&term=dark%20side%20of%20the%20moon": {
+  "https://itunes.apple.com/search?country=US&limit=50&media=music&entity=album&term=dark%20side%20of%20the%20moon%20pink%20floyd": {
     "file": "1.txt",
     "status": 200,
     "contentType": "text/javascript; charset=utf-8"

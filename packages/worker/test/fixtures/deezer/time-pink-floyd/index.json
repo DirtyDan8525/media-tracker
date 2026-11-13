@@ -3,5 +3,15 @@
     "file": "1.json",
     "status": 200,
     "contentType": "application/json; charset=utf-8"
+  },
+  "https://api.deezer.com/search/track?limit=40&q=pink%20floyd%20time": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://api.deezer.com/album/12114240": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
   }
 }

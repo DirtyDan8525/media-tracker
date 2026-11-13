@@ -9,12 +9,12 @@
     "status": 200,
     "contentType": "image/jpeg"
   },
-  "https://store.steampowered.com/api/appdetails?appids=620&filters=basic,genres,developers,release_date": {
+  "https://store.steampowered.com/api/appdetails?appids=620&filters=basic,genres,developers,release_date&l=english&cc=us": {
     "file": "3.json",
     "status": 200,
     "contentType": "application/json; charset=utf-8"
   },
-  "https://store.steampowered.com/api/appdetails?appids=620": {
+  "https://store.steampowered.com/api/appdetails?appids=620&l=english&cc=us": {
     "file": "4.json",
     "status": 200,
     "contentType": "application/json; charset=utf-8"

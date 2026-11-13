@@ -1,6 +1,6 @@
 // POST /api/lookup and POST /api/lookup/details (mounted on the authed api router).
 import { Hono } from 'hono';
-import type { Category, Details, SourceId } from '@media-tracker/shared';
+import type { Category, Details, LookupInfo, SourceId } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 import type { Env } from '../env';
 import { CATEGORIES } from '../api/entryValidation';
@@ -37,6 +37,11 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 const optString = (v: unknown, max: number): string | null =>
   v === undefined ? '' : typeof v === 'string' && v.length <= max ? v : null;
 
+/** E2E switch: canned lookups, only ever in dev. */
+const fakeLookup = (env: Env) => env.ENVIRONMENT === 'dev' && env.LOOKUP_FAKE === '1';
+
+const titleCase = (s: string) => s.trim().replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
 function depsFor(env: Env, log: string[]): LookupDeps {
   // Late-bound so tests can spy on globalThis.fetch.
   return { fetch: (input, init) => globalThis.fetch(input, init), env, log };
@@ -51,6 +56,19 @@ lookup.post('/', async (c) => {
   const typedTitle = optString(body.typedTitle, MAX_TERM);
   const hint = optString(body.hint, MAX_TERM);
   if (typedTitle === null || hint === null) return c.json(invalid, 400);
+
+  if (fakeLookup(c.env)) {
+    const info: LookupInfo = {
+      title: titleCase(term),
+      trusted: true,
+      cover: `${new URL(c.req.url).origin}/icon-192.png`,
+      genres: 'Test',
+      creator: 'Test Studio',
+      source: 'anilist',
+      sourceId: '1',
+    };
+    return c.json({ info });
+  }
 
   const log: string[] = [];
   const cat = category as Category;
@@ -68,6 +86,11 @@ lookup.post('/details', async (c) => {
   const { source, sourceId } = body;
   if (typeof source !== 'string' || !(SOURCE_IDS as string[]).includes(source)) return c.json(invalid, 400);
   if (typeof sourceId !== 'string' || !SOURCE_ID_RE.test(sourceId)) return c.json(invalid, 400);
+
+  if (fakeLookup(c.env)) {
+    const details: Details = { releaseDate: '2023-09-29', synopsis: 'Test synopsis.', lengthLabel: '24 min', origin: 'TV' };
+    return c.json({ details });
+  }
 
   const id = source as SourceId;
   const entry = SOURCES[id];

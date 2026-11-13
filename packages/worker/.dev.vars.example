@@ -1,5 +1,6 @@
 # Copy to .dev.vars (gitignored). Only honored when ENVIRONMENT = "dev".
 DEV_EMAIL=dan@example.com
+# LOOKUP_FAKE=1   # canned lookups, no network (dev only; used by the e2e tests)
 # TMDB_KEY=
 # IGDB_ID=
 # IGDB_SECRET=

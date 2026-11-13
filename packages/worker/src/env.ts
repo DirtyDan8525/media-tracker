@@ -6,6 +6,8 @@ export interface Env {
   ASSETS: Fetcher;
   ENVIRONMENT: 'dev' | 'prod';
   DEV_EMAIL?: string;
+  /** '1' makes /api/lookup return canned results; honored only when ENVIRONMENT is 'dev' (e2e tests). */
+  LOOKUP_FAKE?: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
   ADMIN_EMAIL: string;

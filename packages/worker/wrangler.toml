@@ -13,7 +13,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "media-tracker"
-database_id = "REPLACE_ME_WITH_REAL_D1_DATABASE_ID" # placeholder: filled in during setup (Task 16)
+database_id = "00000000-0000-0000-0000-000000000000" # local dev only; the real id goes in [env.production] below
 migrations_dir = "migrations"
 
 [vars]
@@ -21,4 +21,31 @@ ENVIRONMENT = "dev"
 ACCESS_TEAM_DOMAIN = ""
 ACCESS_AUD = ""
 ADMIN_EMAIL = ""
-# DEV_EMAIL lives in .dev.vars (gitignored); see .dev.vars.example.
+# DEV_EMAIL and LOOKUP_FAKE live in .dev.vars (gitignored); see .dev.vars.example.
+
+# ---------------------------------------------------------------------------
+# PRODUCTION  (deployed with `npm run deploy`, i.e. `wrangler deploy --env production`)
+# Fill in the three REPLACE_ME values following docs/SETUP.md.
+# NEVER add DEV_EMAIL or LOOKUP_FAKE here: they switch off sign-in checks / real lookups.
+# (A test fails if they appear.)
+# ---------------------------------------------------------------------------
+[env.production]
+name = "media-tracker"
+
+[env.production.assets]
+directory = "../web/dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+not_found_handling = "single-page-application"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "media-tracker"
+database_id = "REPLACE_ME_D1_DATABASE_ID" # from `wrangler d1 create media-tracker`
+migrations_dir = "migrations"
+
+[env.production.vars]
+ENVIRONMENT = "prod"
+ACCESS_TEAM_DOMAIN = "REPLACE_ME_TEAM_DOMAIN" # e.g. yourteam.cloudflareaccess.com
+ACCESS_AUD = "REPLACE_ME_ACCESS_AUD"          # the Access application's Audience (AUD) tag
+ADMIN_EMAIL = "REPLACE_ME_YOUR_EMAIL"         # your sign-in email

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stats (PC, v2)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+.t-midnight{--bg:#1b1b25;--alt:#1f1f2c;--hdr:#13131c;--card:#232339;--panel:#2a2a3b;--text:#e6e6ed;--bright:#ffffff;--muted:#a6a6bb;--grid:#2e2e3e;--hl:#ffd166;--cf-low:#6b2a35;--cf-mid:#6b5a22;--cf-high:#1f6b45;--cf-done:#1f3d2c;--cf-active:#1e3350;--cf-hold:#4a3f1c;--cf-dropped:#4a2026;--hl-ink:var(--hl);--on-hl:var(--hdr);--muted-ink:var(--muted);--shade:var(--hdr);--scheme:dark;}
+.t-sakura{--bg:#fff7f9;--alt:#fdeef2;--hdr:#f8dde5;--card:#fff0f4;--panel:#f6e1e8;--text:#3a2730;--bright:#2a1a22;--muted:#8b6a77;--grid:#efd3dc;--hl:#d6457a;--cf-low:#f6c6cf;--cf-mid:#fbe6bf;--cf-high:#cfe8d2;--cf-done:#e2f3e5;--cf-active:#e3ebfa;--cf-hold:#fbf0d6;--cf-dropped:#f9dbe1;--hl-ink:color-mix(in srgb,var(--hl) 70%,var(--bright));--on-hl:var(--bg);--muted-ink:color-mix(in srgb,var(--muted) 75%,var(--bright));--shade:color-mix(in srgb,var(--bright) 40%,transparent);--scheme:light;}
+
+*{box-sizing:border-box}
+body{margin:0}
+.mt{
+  --fill:var(--hl-ink);
+  --lift:0 6px 18px color-mix(in srgb,var(--shade) 45%,transparent);
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --spring:cubic-bezier(.34,1.3,.64,1);
+  background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;position:relative;overflow:hidden;
+  color-scheme:var(--scheme);
+}
+:where(.mt) a{color:var(--hl-ink)}
+.ph{width:390px;height:844px;display:flex;flex-direction:column}
+.pcf{width:1440px;min-height:900px;display:flex}
+.d{font-family:Inter,system-ui,sans-serif}
+.n{font-family:Inter,system-ui,sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;padding:0}
+.mt :focus-visible{outline:2px solid var(--hl-ink);outline-offset:2px}
+.ttl{margin:0;font:700 26px/1.2 Inter,system-ui,sans-serif;color:var(--bright)}
+h2.sec{margin:0 4px;font:600 13px/1.3 Inter,sans-serif;color:var(--muted-ink);text-transform:uppercase;letter-spacing:.06em}
+.sub{font-size:13px;color:var(--muted-ink)}
+.field{height:50px;border-radius:12px;border:1px solid var(--grid);background:var(--bg);color:var(--bright);font:400 15px Inter,sans-serif;padding:0 14px;width:100%}
+.field::placeholder{color:var(--muted-ink);opacity:1}
+.ibtn{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--text);border:1px solid transparent;background:transparent;flex-shrink:0;text-decoration:none}
+.ibtn.box{border-color:var(--grid);background:var(--card)}
+.ibtn.on{background:var(--panel);color:var(--hl-ink)}
+.btn{min-height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--grid);background:var(--card);color:var(--text);
+  font:500 15px Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;cursor:pointer;
+  transition:transform .15s var(--ease),background .2s}
+.btn:hover{background:var(--panel)}
+.btn:active{transform:scale(.98)}
+.btn.pri{border:none;background:var(--fill);color:var(--on-hl);font-weight:700}
+.btn.pri:hover{background:var(--fill)}
+.btn.big{min-height:56px;font-size:17px;border-radius:14px}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:44px;font-size:14px;padding:0 14px;border-radius:10px}
+.btn[disabled]{border-style:dashed;background:transparent;color:var(--muted-ink)}
+.chip{height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--grid);background:var(--card);color:var(--text);
+  font:500 13px Inter,sans-serif;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .2s}
+.chip.on{border-color:var(--hl);background:var(--panel);color:var(--hl-ink);font-weight:600}
+/* rating badge: background is ratingColor() done with color-mix over the theme's CF set */
+.rb{min-width:50px;height:36px;padding:0 9px;border-radius:10px;background:var(--rc);color:var(--bright);
+  font:700 16px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.rb.s{min-width:46px;height:32px;font-size:15px;border-radius:10px}
+.rb.xs{min-width:40px;height:28px;font-size:14px;border-radius:8px}
+.rb.none{background:var(--panel);color:var(--muted-ink);border:1px dashed var(--grid)}
+.st{align-self:flex-start;font-size:12px;font-weight:500;padding:3px 8px;border-radius:6px;color:var(--text);display:inline-flex;align-items:center}
+.st.done{background:var(--cf-done)}.st.hold{background:var(--cf-hold)}.st.active{background:var(--cf-active)}.st.dropped{background:var(--cf-dropped)}
+/* covers: plain image, hairline edge */
+.cv{position:relative;flex-shrink:0;display:block}
+.cv img{position:relative;display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:1}
+.cv ~ *{position:relative;z-index:1}
+.cv::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:2;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bright) 8%,transparent);pointer-events:none}
+/* cover-tinted backdrop: blurred, scaled cover + a role-coloured scrim. Text over it uses Text / Bright text only. */
+.bd{position:absolute;overflow:hidden;z-index:0;pointer-events:none}
+.bd img{position:absolute;inset:-20%;width:140%;height:140%;object-fit:cover;filter:blur(38px) saturate(1.2);opacity:.55;transform:scale(1.1)}
+.bd::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 50%,transparent) 0%,color-mix(in srgb,var(--bg) 72%,transparent) 55%,var(--bg) 100%)}
+.bd.soft-l{-webkit-mask-image:linear-gradient(90deg,#000 45%,transparent 95%);mask-image:linear-gradient(90deg,#000 45%,transparent 95%)}
+.bd.soft-r{-webkit-mask-image:linear-gradient(270deg,#000 45%,transparent 95%);mask-image:linear-gradient(270deg,#000 45%,transparent 95%)}
+.bd.card::after{background:linear-gradient(180deg,color-mix(in srgb,var(--card) 50%,transparent) 0%,color-mix(in srgb,var(--card) 80%,transparent) 60%,var(--card) 100%)}
+.z{position:relative;z-index:1}
+/* phone bottom bar (v1: Highlight text on the current tab, nothing else) */
+.bn{height:76px;flex-shrink:0;background:var(--hdr);border-top:1px solid var(--grid);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding-bottom:8px;position:relative;z-index:3}
+.bn a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted-ink);text-decoration:none;font-size:11px;font-weight:500}
+.bn a .ic{display:flex;align-items:center;justify-content:center}
+.bn a[aria-current]{color:var(--hl-ink);font-weight:600}
+/* PC side nav */
+.sn{flex:0 0 248px;background:var(--hdr);border-right:1px solid var(--grid);padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:relative;z-index:2}
+.brand{font:800 18px/1 Inter,sans-serif;color:var(--hl-ink);padding:0 10px 18px}
+.sn a{min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-radius:10px;color:var(--text);text-decoration:none;font-size:15px;font-weight:500;position:relative;transition:background .2s}
+.sn a:hover{background:var(--alt)}
+.sn a .c{font-size:13px;color:var(--muted-ink);font-variant-numeric:tabular-nums}
+.sn a[aria-current]{background:var(--panel);color:var(--hl-ink);font-weight:700}
+.sn .grp{margin-top:auto;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--grid);padding-top:12px}
+.sn .grp a{font-size:14px;font-weight:400;justify-content:flex-start;gap:12px}
+.sn .grp a .sp{flex:1}
+.sn .grp a svg{color:var(--muted-ink)}
+.sn .grp a[aria-current] svg{color:var(--hl-ink)}
+.sn .div{height:1px;background:var(--grid);margin:6px 0}
+.cnt{min-width:24px;height:24px;padding:0 7px;border-radius:12px;background:var(--fill);color:var(--on-hl);font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+/* grouped list rows */
+.grpbox{border-radius:14px;background:var(--card);overflow:hidden}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:48px;padding:0 14px;color:var(--text);text-decoration:none;border-bottom:1px solid var(--grid);font-size:15px;transition:background .2s}
+.row:last-child{border-bottom:none}
+.row:hover{background:var(--alt)}
+.row .v{font-size:14px;color:var(--muted-ink)}
+.tile-ic{width:32px;height:32px;border-radius:9px;background:var(--panel);color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* count-up numbers: --to is the value x10; the real value sits in .sr for screen readers */
+@property --n{syntax:'<integer>';inherits:false;initial-value:0}
+@property --ci{syntax:'<integer>';inherits:false;initial-value:0}
+@property --cd{syntax:'<integer>';inherits:false;initial-value:0}
+.cu{--n:var(--to);--ci:calc(var(--n) / 10 - .5);--cd:calc(var(--n) - var(--ci) * 10);counter-reset:ci var(--ci) cd var(--cd)}
+.cu::after{content:counter(ci) "." counter(cd)}
+.cn{--n:var(--to);counter-reset:k var(--n)}
+.cn::after{content:counter(k)}
+@media (prefers-reduced-motion: no-preference){
+  .cu,.cn{animation:countup 1.1s cubic-bezier(.15,.75,.25,1) both;animation-delay:var(--cdl,.25s)}
+  @keyframes countup{from{--n:var(--from,0)}}
+  .rise{animation:rise .5s var(--ease) both;animation-delay:calc(var(--i,0) * 50ms + 60ms)}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}}
+  .pop{animation:pop .4s var(--ease) both;animation-delay:calc(var(--i,0) * 50ms + 240ms)}
+  @keyframes pop{from{opacity:0;transform:scale(.8)}}
+  .fade{animation:fade .8s ease both}
+  @keyframes fade{from{opacity:0}}
+  .bd img{animation:bdin 1.2s var(--ease) both}
+  @keyframes bdin{from{opacity:0;transform:scale(1.25)}}
+  .growx{animation:growx .9s var(--ease) both;transform-origin:left center;animation-delay:calc(var(--i,0) * 70ms + 200ms)}
+  @keyframes growx{from{transform:scaleX(0)}}
+  .growy{animation:growy .8s var(--ease) both;transform-origin:center bottom;animation-delay:calc(var(--i,0) * 45ms + 250ms)}
+  @keyframes growy{from{transform:scaleY(0)}}
+  .shimmer{background:linear-gradient(100deg,var(--panel) 30%,color-mix(in srgb,var(--panel) 80%,var(--bright)) 50%,var(--panel) 70%) 0 0/250% 100%;animation:shim 1.6s linear infinite}
+  @keyframes shim{from{background-position:120% 0}to{background-position:-130% 0}}
+  .sheet-up{animation:sheet .5s var(--ease) both}
+  @keyframes sheet{from{transform:translateY(100%)}}
+}
+
+
+.pmain{flex:1;min-width:0;padding:30px 36px;display:flex;flex-direction:column;gap:20px;position:relative}
+.pmain>.bd{left:0;right:0;top:0;height:260px}
+.pmain>.bd img{opacity:.42}
+.phead{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;position:relative;z-index:1}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.inp{height:44px;border-radius:12px;border:1px solid var(--grid);background:var(--card);color:var(--bright);font:400 14px Inter,sans-serif;padding:0 12px}
+.inp::placeholder{color:var(--muted-ink);opacity:1}
+.tbl{border-radius:14px;border:1px solid var(--grid);overflow:hidden;position:relative;z-index:1;background:var(--bg)}
+.tbl table{width:100%;border-collapse:collapse;font-size:14px}
+.tbl thead tr{background:var(--hdr);text-align:left;color:var(--muted-ink)}
+.tbl th[scope=col]{padding:13px 14px;font-weight:600;font-size:13px}
+.tbl tbody tr{border-top:1px solid var(--grid);transition:background .15s}
+.tbl tbody tr:nth-child(odd){background:var(--bg)}
+.tbl tbody tr:nth-child(even){background:var(--alt)}
+.tbl tbody tr:hover{background:var(--panel)}
+.tbl td{padding:5px 14px}
+.tbl .tt a{color:var(--bright);text-decoration:none;font-weight:600;font-size:15px;min-height:44px;min-width:44px;display:inline-flex;align-items:center}
+.tbl .mu{color:var(--muted-ink)}
+.kbd{min-width:22px;height:24px;padding:0 6px;border-radius:6px;border:1px solid var(--grid);border-bottom-width:2px;background:var(--panel);color:var(--text);font:600 12px Inter,sans-serif;display:inline-flex;align-items:center;justify-content:center}
+
+.card2{border-radius:14px;background:var(--card);padding:10px 14px}
+.mini .rb.xs{height:24px;font-size:14px;min-width:38px}
+.ring{position:relative;flex-shrink:0}
+.ring svg{display:block;transform:rotate(-90deg)}
+.ring .trk{stroke:var(--grid)}
+.ring .val{stroke:var(--hl)}
+.ring .lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.hist{display:flex;align-items:flex-end;gap:5px}
+.hist .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.hist .bar{width:100%;border-radius:4px 4px 2px 2px;background:var(--rc);min-height:3px}
+.hist .x{font-size:11px;color:var(--muted-ink);font-variant-numeric:tabular-nums}
+.gbar{height:8px;border-radius:4px;background:var(--grid);overflow:hidden}
+.gbar>span{display:block;height:100%;border-radius:4px;background:color-mix(in srgb,var(--hl) 65%,transparent)}
+dl.kv{margin:0}
+dl.kv dt{font-size:11px;color:var(--muted-ink)}
+dl.kv dd{margin:0}
+@media (prefers-reduced-motion: no-preference){
+  .ring .val{animation:ring 1.3s var(--ease) both .3s}
+  @keyframes ring{from{stroke-dashoffset:var(--c)}}
+}
+
+</style>
+</helmet>
+<div class="mt t-midnight pcf">
+<nav aria-label="Lists" class="sn">
+<span class="brand">Media Tracker</span>
+<a href="ListPCNav.v2.dc.html"><span>Anime</span><span class="c">48</span></a>
+<a href="ListPCNav.v2.dc.html"><span>Movies</span><span class="c">52</span></a>
+<a href="ListPCNav.v2.dc.html"><span>TV Shows</span><span class="c">31</span></a>
+<a href="ListPCNav.v2.dc.html"><span>Albums</span><span class="c">40</span></a>
+<a href="ListPCNav.v2.dc.html"><span>Games</span><span class="c">27</span></a>
+<a href="ListPCNav.v2.dc.html"><span>Books</span><span class="c">14</span></a>
+<div class="grp">
+<a href="ComparePC.v2.dc.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"></path></svg><span class="sp">Compare</span><span aria-label="3 waiting" class="cnt">3</span></a>
+<a href="Top5.v2.dc.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"></path><path d="M8 6H4v1a3 3 0 0 0 4 3M16 6h4v1a3 3 0 0 1-4 3M12 13v4M8 20h8"></path></svg><span class="sp">Top 5</span></a>
+<a href="StatsPC.v2.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span class="sp">Stats</span></a>
+<div class="div" aria-hidden="true"></div>
+<a href="Import.v2.dc.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"></path></svg><span class="sp">Import</span></a>
+<a href="SettingsMore.v2.dc.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg><span class="sp">Settings</span></a>
+<a href="About.v2.dc.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5v.5"></path></svg><span class="sp">About</span></a>
+</div></nav>
+<main class="pmain" style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px 24px;align-content:start;padding:28px 32px">
+  <div style="grid-column:1 / -1;display:flex;flex-direction:column;gap:6px"><h1 class="ttl" style="font-size:28px">Stats</h1>
+    <span style="font-size:14px;color:var(--muted-ink)">Your lists that are turned on. Completed shows “—” for lists without a Status.</span></div>
+  <section aria-label="All media" class="card2" style="grid-column:1 / -1;padding:20px 28px">
+    <dl class="kv" style="display:flex;justify-content:space-between;align-items:center;gap:20px">
+    <div style="display:flex;flex-direction:column;gap:6px"><dt>Entries</dt><dd class="n" style="font-size:32px;line-height:1;color:var(--bright)"><span class="sr">212</span><span class="cn" aria-hidden="true" style="--to:212"></span></dd></div>
+    <div style="display:flex;align-items:center;gap:14px"><div style="display:flex;flex-direction:column;gap:6px"><dt>Rated</dt><dd class="sr">197</dd></div><div class="ring" style="width:104px;height:104px" role="img" aria-label="197 of 212 rated"><svg width="104" height="104" aria-hidden="true"><circle class="trk" cx="52.0" cy="52.0" r="46.5" fill="none" stroke-width="11"/><circle class="val" cx="52.0" cy="52.0" r="46.5" fill="none" stroke-width="11" stroke-linecap="round" stroke-dasharray="292.2" stroke-dashoffset="20.7" style="--c:292.2"/></svg><span class="lbl" aria-hidden="true"><span class="n" style="font-size:26px;color:var(--bright)"><span class="sr">197</span><span class="cn" aria-hidden="true" style="--to:197"></span></span><span style="font-size:10px;color:var(--muted-ink);margin-top:3px">of 212</span></span></div></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><dt>Average</dt><dd class="n" style="font-size:40px;line-height:1;color:var(--bright)"><span class="sr">8.4</span><span class="cu" aria-hidden="true" style="--to:84"></span></dd></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><dt>Completed</dt><dd class="n" style="font-size:32px;line-height:1;color:var(--bright)"><span class="sr">96</span><span class="cn" aria-hidden="true" style="--to:96"></span></dd></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><dt>Highest</dt><dd><span class="rb " style="height:44px;min-width:64px;font-size:22px;border-radius:12px;--rc:color-mix(in srgb,var(--cf-high) 100.0%,var(--cf-mid))"><span class="sr">10.0</span><span class="cu" aria-hidden="true" style="--to:100;"></span></span></dd></div></dl>
+  </section>
+  <section aria-labelledby="pc-lists" style="display:flex;flex-direction:column;gap:10px;min-width:0">
+    <h2 id="pc-lists" class="ttl" style="font-size:18px">By list</h2>
+    <div class="tbl"><table style="font-size:15px">
+      <thead><tr><th scope="col">List</th><th scope="col" style="text-align:right">Entries</th><th scope="col" style="text-align:right">Rated</th><th scope="col" style="text-align:right">Average</th><th scope="col" style="text-align:right">Completed</th><th scope="col" style="text-align:right">Highest</th></tr></thead>
+      <tbody><tr class="rise" style="--i:0"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">Anime</th><td style="padding:10px 12px;text-align:right">48</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:0;width:92%"></span></span><span style="min-width:22px;text-align:right">44</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:0;width:86%;background:color-mix(in srgb,var(--cf-high) 65.0%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 65.0%,var(--cf-mid))">8.6</span></span></td><td style="padding:10px 12px;text-align:right">41</td><td style="padding:10px 16px;text-align:right">10.0</td></tr><tr class="rise" style="--i:1"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">Movies</th><td style="padding:10px 12px;text-align:right">52</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:1;width:94%"></span></span><span style="min-width:22px;text-align:right">49</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:1;width:81%;background:color-mix(in srgb,var(--cf-high) 52.5%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 52.5%,var(--cf-mid))">8.1</span></span></td><td style="padding:10px 12px;text-align:right">—</td><td style="padding:10px 16px;text-align:right">10.0</td></tr><tr class="rise" style="--i:2"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">TV Shows</th><td style="padding:10px 12px;text-align:right">31</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:2;width:94%"></span></span><span style="min-width:22px;text-align:right">29</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:2;width:83%;background:color-mix(in srgb,var(--cf-high) 57.5%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 57.5%,var(--cf-mid))">8.3</span></span></td><td style="padding:10px 12px;text-align:right">24</td><td style="padding:10px 16px;text-align:right">9.8</td></tr><tr class="rise" style="--i:3"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">Albums</th><td style="padding:10px 12px;text-align:right">40</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:3;width:95%"></span></span><span style="min-width:22px;text-align:right">38</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:3;width:84%;background:color-mix(in srgb,var(--cf-high) 60.0%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 60.0%,var(--cf-mid))">8.4</span></span></td><td style="padding:10px 12px;text-align:right">—</td><td style="padding:10px 16px;text-align:right">9.9</td></tr><tr class="rise" style="--i:4"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">Games</th><td style="padding:10px 12px;text-align:right">27</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:4;width:93%"></span></span><span style="min-width:22px;text-align:right">25</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:4;width:87%;background:color-mix(in srgb,var(--cf-high) 67.5%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 67.5%,var(--cf-mid))">8.7</span></span></td><td style="padding:10px 12px;text-align:right">21</td><td style="padding:10px 16px;text-align:right">10.0</td></tr><tr class="rise" style="--i:5"><th scope="row" style="padding:10px 14px;text-align:left;color:var(--bright);font-weight:700;white-space:nowrap">Books</th><td style="padding:10px 12px;text-align:right">14</td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:56px;height:6px"><span class="growx" style="--i:5;width:86%"></span></span><span style="min-width:22px;text-align:right">12</span></span></td><td style="padding:10px 12px"><span style="display:flex;align-items:center;gap:10px;justify-content:flex-end"><span class="gbar" aria-hidden="true" style="width:70px;height:6px"><span class="growx" style="--i:5;width:80%;background:color-mix(in srgb,var(--cf-high) 50.0%,var(--cf-mid))"></span></span><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 50.0%,var(--cf-mid))">8.0</span></span></td><td style="padding:10px 12px;text-align:right">10</td><td style="padding:10px 16px;text-align:right">9.6</td></tr><tr style="background:var(--card)!important"><th scope="row" style="padding:12px 14px;text-align:left;color:var(--hl-ink);font-weight:700;white-space:nowrap">All media</th><td style="padding:12px 16px;text-align:right;color:var(--bright);font-weight:700">212</td><td style="padding:12px 16px;text-align:right;color:var(--bright);font-weight:700">197</td><td style="padding:12px 16px;text-align:right"><span style="display:inline-flex"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 60.0%,var(--cf-mid))">8.4</span></span></td><td style="padding:12px 16px;text-align:right;color:var(--bright);font-weight:700">96</td><td style="padding:12px 16px;text-align:right;color:var(--bright);font-weight:700">10.0</td></tr></tbody></table></div>
+  </section>
+  <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+    <section aria-labelledby="pc-dist" class="card2" style="display:flex;flex-direction:column;gap:10px;padding:14px 18px">
+      <h2 id="pc-dist" class="ttl" style="font-size:18px">Rating distribution <span style="font:400 13px Inter,sans-serif;color:var(--muted-ink)">all 197 rated</span></h2>
+      <div class="hist" role="img" aria-label="Ratings by score, 1: 1, 2: 1, 3: 2, 4: 3, 5: 6, 6: 12, 7: 28, 8: 52, 9: 68, 10: 24" style="height:120px"><div class="b"><span class="bar growy" style="--i:0;--rc:color-mix(in srgb,var(--cf-mid) 0.0%,var(--cf-low));height:3px"></span><span class="x" style="font-size:12px">1</span></div><div class="b"><span class="bar growy" style="--i:1;--rc:color-mix(in srgb,var(--cf-mid) 20.0%,var(--cf-low));height:3px"></span><span class="x" style="font-size:12px">2</span></div><div class="b"><span class="bar growy" style="--i:2;--rc:color-mix(in srgb,var(--cf-mid) 40.0%,var(--cf-low));height:3px"></span><span class="x" style="font-size:12px">3</span></div><div class="b"><span class="bar growy" style="--i:3;--rc:color-mix(in srgb,var(--cf-mid) 60.0%,var(--cf-low));height:4px"></span><span class="x" style="font-size:12px">4</span></div><div class="b"><span class="bar growy" style="--i:4;--rc:color-mix(in srgb,var(--cf-mid) 80.0%,var(--cf-low));height:9px"></span><span class="x" style="font-size:12px">5</span></div><div class="b"><span class="bar growy" style="--i:5;--rc:color-mix(in srgb,var(--cf-mid) 100.0%,var(--cf-low));height:18px"></span><span class="x" style="font-size:12px">6</span></div><div class="b"><span class="bar growy" style="--i:6;--rc:color-mix(in srgb,var(--cf-high) 25.0%,var(--cf-mid));height:42px"></span><span class="x" style="font-size:12px">7</span></div><div class="b"><span class="bar growy" style="--i:7;--rc:color-mix(in srgb,var(--cf-high) 50.0%,var(--cf-mid));height:78px"></span><span class="x" style="font-size:12px">8</span></div><div class="b"><span class="bar growy" style="--i:8;--rc:color-mix(in srgb,var(--cf-high) 75.0%,var(--cf-mid));height:102px"></span><span class="x" style="font-size:12px">9</span></div><div class="b"><span class="bar growy" style="--i:9;--rc:color-mix(in srgb,var(--cf-high) 100.0%,var(--cf-mid));height:36px"></span><span class="x" style="font-size:12px">10</span></div></div>
+    </section>
+    <section aria-labelledby="pc-genre" style="display:flex;flex-direction:column;gap:10px">
+      <h2 id="pc-genre" class="ttl" style="font-size:18px">Anime by genre</h2>
+      <div class="tbl"><table style="font-size:14px">
+        <thead><tr><th scope="col">Genre</th><th scope="col"><span class="sr">Share</span></th><th scope="col" style="text-align:right">Titles</th><th scope="col" style="text-align:right">Average</th></tr></thead>
+        <tbody><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Action</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:0;width:100%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">31</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 70.0%,var(--cf-mid))">8.8</span></td></tr><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Adventure</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:1;width:58%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">18</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 72.5%,var(--cf-mid))">8.9</span></td></tr><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Comedy</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:2;width:55%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">17</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 65.0%,var(--cf-mid))">8.6</span></td></tr><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Drama</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:3;width:52%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">16</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 67.5%,var(--cf-mid))">8.7</span></td></tr><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Sci-Fi</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:4;width:39%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">12</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 67.5%,var(--cf-mid))">8.7</span></td></tr><tr><th scope="row" style="padding:7px 16px;text-align:left;font-weight:500;color:var(--text)">Fantasy</th><td style="padding:7px 16px;width:190px"><span class="gbar" aria-hidden="true" style="display:block"><span class="growx" style="--i:5;width:29%"></span></span></td><td style="padding:7px 16px;text-align:right" class="n"><span style="color:var(--bright)">9</span></td><td style="padding:7px 16px;text-align:right"><span class="rb xs" style="--rc:color-mix(in srgb,var(--cf-high) 62.5%,var(--cf-mid))">8.5</span></td></tr></tbody></table></div>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

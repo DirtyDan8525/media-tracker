@@ -484,6 +484,26 @@ UI (approved `Main.dc.html` / `ListPC.dc.html`): phone header has the 44 px "Sea
 
 ---
 
+### Task 14: Style refresh to the approved v2 boards (Phase 1–2 screens + shared pieces)
+
+Runs right after Task 4, before Tasks 5–11 and 13, so the new screens build on the shared pieces.
+
+**Reference:** the approved `docs/design/mockups/*.v2.dc.html` boards and `docs/design-notes.md` "Phase 3 mockups". Inter stays the only font; no glows, accent gradients or coloured outlines.
+
+**Files:** `packages/web/src/design/` (`tokens.css`, `components.css`, `lists.css`, `global.css`), `components/CoverImage.tsx`, `components/RatingBadge.tsx`; create `components/CoverBackdrop.tsx`, `components/CountUp.tsx`; list screens, entry detail, add/picker, import, settings, about as the v2 boards show.
+
+**Interfaces (Produces):**
+- `CoverBackdrop({ src, className? })`: decorative (`aria-hidden`), blurred scaled cover under a Background/Cards scrim; renders nothing without `src`. Only Text / Bright text sit on top.
+- `RatingBadge` gains rating-scale colouring: background from the theme's rating colours (`ratingColor` low→mid→high), label colour chosen to keep ≥ 4.5:1.
+- `CountUp({ value, from? })`: shows `formatRating(value)` immediately under reduced motion; otherwise animates from `from` (default 0) — final text is always the real value for screen readers (`aria-label`/visually-hidden).
+- CSS motion utilities (`.rise-in`, `.settle`) only inside `@media (prefers-reduced-motion: no-preference)`.
+
+- [ ] **Step 1: Failing tests:** `CoverBackdrop` renders nothing with no src and is `aria-hidden`; `RatingBadge` 10 uses the high rating colour and 1 the low one, and its label passes 4.5:1 for every theme at 1, 5.5 and 10; `CountUp` under `matchMedia('(prefers-reduced-motion: reduce)')` shows "9.5" at once; list header uses the list's highest-rated title's cover (none rated → no backdrop); covers on the phone list are the v2 size.
+- [ ] **Step 2: Run** `npx -y npm@11 test -w packages/web`. Expected: new tests FAIL.
+- [ ] **Step 3: Implement** to match the v2 boards; keep every existing test green (update only assertions about sizes/classes the refresh changes).
+- [ ] **Step 4: Run** the full suite + typecheck + web build. Expected: PASS.
+- [ ] **Step 5: Commit** `feat(web): v2 style refresh: bigger covers, cover backdrops, coloured rating badges, calm motion`.
+
 ### Task 13: Settings: "Export my data"
 
 **Files:** Modify `packages/web/src/screens/SettingsScreen.tsx`; Test `packages/web/src/screens/SettingsScreen.test.tsx`.
@@ -503,3 +523,4 @@ A "Your data" row "Export my data" (as in the approved Settings mockup) that fet
 1. "Export my data" goes into Phase 3 (Task 13). The offline write queue and the admin source-health/diagnose pages stay deferred.
 2. Darken the Highlight colour on Light and Sakura (Ruling P15, added to Task 9): pick the smallest HLS-lightness darkening of each that gives ≥ 4.5:1 for Highlight on Background **and** on Cards (same method as P10); Task 9's shared theme test asserts Highlight ≥ 4.5 on Background and Cards for Light and Sakura and pins the new hex values; record them in `docs/decisions-phase3.md`. Other themes' Highlight values unchanged (check them in the same test only if they already pass; report any that don't instead of changing them).
 3. Backend tasks (1–4) start now; UI tasks (5–11, 13) wait for Task 0 mockup approval.
+4. (2026-11-14) Mockups approved: the calm v2 boards (`*.v2.dc.html`) are the reference for every UI task (they supersede the first Phase 3 boards). Order: Task 14 → 5–11, 13 → 12.

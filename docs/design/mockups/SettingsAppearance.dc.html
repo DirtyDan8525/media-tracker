@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — Appearance and Comparing (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+input::placeholder{color:#a6a6bb;opacity:1}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <header style="padding: 12px 12px 4px; display: flex; align-items: center; gap: 4px">
+    <a href="SettingsMore.dc.html" aria-label="Back to More" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #e6e6ed">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #ffffff">Settings</h1>
+  </header>
+  <div style="flex: 1; overflow: hidden; padding: 4px 16px 0; display: flex; flex-direction: column; gap: 22px">
+    <section aria-labelledby="h-app" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-app" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Appearance</h2>
+      <div role="radiogroup" aria-label="Theme" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 2px solid #ffd166; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Midnight" checked style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #1b1b25; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #232339; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #e6e6ed"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #ffd166"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 700; color: #ffd166; display: flex; align-items: center; gap: 4px; white-space: nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Midnight</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Ember" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #1c1917; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #28221e; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #ede6e1"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #ff9f43"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Ember</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Twilight" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #1a1726; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #262140; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #e8e4f4"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #c4a7ff"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Twilight</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Crimson" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #161214; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #231b1e; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #ece4e6"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #ff5c6c"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Crimson</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="OLED Black" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #000000; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #121212; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #e8e8e8"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #ffd166"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">OLED Black</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Ocean" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #0f1c2b; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #16283d; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #e3eef8"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #5fd4ff"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Ocean</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Forest" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #141d17; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #1c2b21; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #e4efe6"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #c8e06b"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Forest</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Light" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #ffffff; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #f7f7fb; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #2a2b33"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #b7791f"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Light</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Sakura" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #fff7f9; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #fff0f4; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #3a2730"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #d6457a"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Sakura</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Matcha" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #fbfaf3; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #f6f6ec; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #2a2e24"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #4f7a28"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Matcha</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Arctic" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #f7f9fc; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #f4f7fb; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #26303d"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #2563c9"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Arctic</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Sand" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; background: #fbf7f0; padding: 7px; box-sizing: border-box; display: flex"><span style="flex: 1; border-radius: 5px; background: #f8f2e8; padding: 6px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between"><span style="width: 70%; height: 4px; border-radius: 2px; background: #3a3026"></span><span style="width: 18px; height: 6px; border-radius: 3px; background: #8a5a2b"></span></span></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px; white-space: nowrap">Sand</span>
+        </label>
+        <label style="display: flex; flex-direction: column; border-radius: 12px; border: 1px dashed #2e2e3e; overflow: hidden; background: #232339; cursor: pointer; min-height: 76px">
+          <input type="radio" name="theme" value="Custom" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0">
+          <span aria-hidden="true" style="height: 44px; display: flex; align-items: center; justify-content: center; color: #a6a6bb"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.3-1.7-.4-1 .2-2.3 1.4-2.3H17a4 4 0 004-4c0-5-4-10-9-10z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7" r="1"></circle><circle cx="15" cy="7.5" r="1"></circle></svg></span>
+          <span style="padding: 7px 6px; font-size: 12px; font-weight: 500; color: #e6e6ed; display: flex; align-items: center; gap: 4px">Custom</span>
+        </label>
+      </div>
+    </section>
+    <section aria-labelledby="h-cmp" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-cmp" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Comparing</h2>
+      <div style="border-radius: 14px; background: #232339; overflow: hidden">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 12px; border-bottom: 1px solid #2e2e3e">
+          <label for="c-ask" style="font-size: 15px">Ask to compare</label>
+          <select id="c-ask" style="appearance: none; -webkit-appearance: none; width: 100%; min-height: 44px; padding: 0 30px 0 12px; border-radius: 10px; border: 1px solid #2e2e3e; background: #1b1b25 url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2712%27%20height=%2712%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%23a6a6bb%27%20stroke-width=%273%27%3E%3Cpath%20d=%27M6%209l6%206%206-6%27/%3E%3C/svg%3E) no-repeat right 10px center; color: #ffd166; font: 600 15px Inter, sans-serif; text-align: left"><option selected>Both</option><option>Only when I start it</option><option>Only for new ratings</option><option>Off</option></select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 12px; border-bottom: 1px solid #2e2e3e">
+          <label for="c-style" style="font-size: 15px">Re-rating style</label>
+          <select id="c-style" style="appearance: none; -webkit-appearance: none; width: 100%; min-height: 44px; padding: 0 30px 0 12px; border-radius: 10px; border: 1px solid #2e2e3e; background: #1b1b25 url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2712%27%20height=%2712%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%23a6a6bb%27%20stroke-width=%273%27%3E%3Cpath%20d=%27M6%209l6%206%206-6%27/%3E%3C/svg%3E) no-repeat right 10px center; color: #ffd166; font: 600 15px Inter, sans-serif; text-align: left"><option selected>Meet in the middle</option><option>Swap the numbers</option></select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 12px; border-bottom: 1px solid #2e2e3e">
+          <label for="c-room" style="font-size: 15px">When there’s no room</label>
+          <select id="c-room" style="appearance: none; -webkit-appearance: none; width: 100%; min-height: 44px; padding: 0 30px 0 12px; border-radius: 10px; border: 1px solid #2e2e3e; background: #1b1b25 url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2712%27%20height=%2712%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%23a6a6bb%27%20stroke-width=%273%27%3E%3Cpath%20d=%27M6%209l6%206%206-6%27/%3E%3C/svg%3E) no-repeat right 10px center; color: #ffd166; font: 600 15px Inter, sans-serif; text-align: left"><option selected>Use in-between scores</option><option>Give the same score</option><option>Push others down</option></select>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 58px; padding: 0 14px">
+          <label for="c-win" style="font-size: 15px">Compare within</label>
+          <input id="c-win" inputmode="decimal" value="1" style="width: 72px; height: 44px; box-sizing: border-box; border-radius: 10px; border: 1px solid #2e2e3e; background: #1b1b25; color: #ffd166; font: 600 15px Inter, sans-serif; text-align: center">
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

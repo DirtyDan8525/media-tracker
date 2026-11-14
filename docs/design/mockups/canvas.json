@@ -1,18 +1,627 @@
-{"v":3,"createdOnFiles":{"v":1,"at":"2026-11-11T02:55:00Z"},"title":"Media Tracker App — Screen Mockups","launch":{"view":"canvas"},"pages":[],
-"boards":{
-"Main.dc.html":{"x":0,"y":0,"w":390,"h":844,"title":"Home · Anime list (phone)"},
-"AddEntry.dc.html":{"x":470,"y":0,"w":390,"h":844,"title":"Add entry"},
-"Picker.dc.html":{"x":940,"y":0,"w":390,"h":844,"title":"Which one did you mean?"},
-"EntryDetail.dc.html":{"x":1410,"y":0,"w":390,"h":844,"title":"Entry details"},
-"Import.dc.html":{"x":1880,"y":0,"w":390,"h":844,"title":"Import preview"},
-"Settings.dc.html":{"x":2350,"y":0,"w":390,"h":844,"title":"Settings"},
-"About.dc.html":{"x":2820,"y":0,"w":390,"h":844,"title":"About / Start Here"},
-"ListPC.dc.html":{"x":0,"y":1190,"w":1440,"h":900,"title":"Anime list (PC table)","expand":"fill"}
-},
-"order":["Main.dc.html","AddEntry.dc.html","Picker.dc.html","EntryDetail.dc.html","Import.dc.html","Settings.dc.html","About.dc.html","ListPC.dc.html"],
-"notes":{
-"t1":{"x":0,"y":-300,"text":"Phone screens · Midnight theme","kind":"title1","maxW":3210},
-"t2":{"x":0,"y":890,"text":"PC","kind":"title1","maxW":1440},
-"n1":{"x":3290,"y":0,"w":320,"text":"Assumptions to confirm:\n• Bottom bar shows your first 4 enabled tabs + More (Songs, Games, Books, Import, Settings, About live under More).\n• Covers are placeholders here; the app shows real cover art.\n• + Add opens a sheet over the list; the entry saves instantly and fills in while you keep going.\n• The import counts are examples, not your real numbers.","fill":"orange"}
-},
-"designSystems":[]}
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-11T02:55:00Z"
+  },
+  "title": "Media Tracker App — Screen Mockups",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Home · Anime list (phone)"
+    },
+    "AddEntry.dc.html": {
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Add entry"
+    },
+    "Picker.dc.html": {
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Which one did you mean?"
+    },
+    "EntryDetail.dc.html": {
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Entry details"
+    },
+    "Import.dc.html": {
+      "x": 1880,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Import preview"
+    },
+    "Settings.dc.html": {
+      "x": 2350,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "Settings"
+    },
+    "About.dc.html": {
+      "x": 2820,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "About / Start Here"
+    },
+    "ListPC.dc.html": {
+      "x": 0,
+      "y": 1190,
+      "w": 1440,
+      "h": 900,
+      "title": "Anime list (PC table)",
+      "expand": "fill"
+    },
+    "Compare.dc.html": {
+      "x": 0,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Compare · question (phone)"
+    },
+    "CompareReview.dc.html": {
+      "x": 470,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Compare · New ratings review"
+    },
+    "CompareHome.dc.html": {
+      "x": 940,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Compare ratings · home"
+    },
+    "Top5.dc.html": {
+      "x": 1410,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Top 5"
+    },
+    "Stats.dc.html": {
+      "x": 1880,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Stats (phone)"
+    },
+    "SettingsMore.dc.html": {
+      "x": 2350,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "More · Ratings + Export my data"
+    },
+    "SettingsAppearance.dc.html": {
+      "x": 2820,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Settings · Appearance + Comparing"
+    },
+    "SettingsCustom.dc.html": {
+      "x": 3290,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Settings · Custom colours (contrast warning)"
+    },
+    "ListQueueBanner.dc.html": {
+      "x": 3760,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Anime list · compare banner"
+    },
+    "ListSearch.dc.html": {
+      "x": 4230,
+      "y": 2500,
+      "w": 390,
+      "h": 844,
+      "title": "Anime list · search + Status filter"
+    },
+    "ComparePC.dc.html": {
+      "x": 0,
+      "y": 3740,
+      "w": 1440,
+      "h": 900,
+      "title": "Compare · question (PC, keyboard hint)",
+      "expand": "fill"
+    },
+    "StatsPC.dc.html": {
+      "x": 1520,
+      "y": 3740,
+      "w": 1440,
+      "h": 900,
+      "title": "Stats (PC table)",
+      "expand": "fill"
+    },
+    "ListPCNav.dc.html": {
+      "x": 3040,
+      "y": 3740,
+      "w": 1440,
+      "h": 900,
+      "title": "Anime list (PC) · side nav with Compare, Top 5, Stats",
+      "expand": "fill"
+    },
+    "Main.v2.dc.html": {
+      "x": 0,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Home · Anime list (phone) · v2"
+    },
+    "Main.v2.sakura.dc.html": {
+      "x": 470,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Home · Anime list · v2 in Sakura (light)"
+    },
+    "AddEntry.v2.dc.html": {
+      "x": 940,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Add entry · v2"
+    },
+    "Picker.v2.dc.html": {
+      "x": 1410,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Which one did you mean? · v2"
+    },
+    "EntryDetail.v2.dc.html": {
+      "x": 1880,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Entry details · v2"
+    },
+    "Import.v2.dc.html": {
+      "x": 2350,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Import preview · v2"
+    },
+    "Settings.v2.dc.html": {
+      "x": 2820,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "Settings · v2"
+    },
+    "About.v2.dc.html": {
+      "x": 3290,
+      "y": 5200,
+      "w": 390,
+      "h": 844,
+      "title": "About / Start Here · v2"
+    },
+    "ListPC.v2.dc.html": {
+      "x": 0,
+      "y": 6500,
+      "w": 1440,
+      "h": 900,
+      "title": "Anime list (PC table) · v2",
+      "expand": "fill"
+    },
+    "Compare.v2.dc.html": {
+      "x": 0,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Compare · question (phone) · v2"
+    },
+    "CompareReview.v2.dc.html": {
+      "x": 470,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Compare · New ratings review · v2"
+    },
+    "CompareHome.v2.dc.html": {
+      "x": 940,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Compare ratings · home · v2"
+    },
+    "Top5.v2.dc.html": {
+      "x": 1410,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Top 5 · v2"
+    },
+    "Stats.v2.dc.html": {
+      "x": 1880,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Stats (phone) · v2"
+    },
+    "SettingsMore.v2.dc.html": {
+      "x": 2350,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "More · Ratings + Export my data · v2"
+    },
+    "SettingsAppearance.v2.dc.html": {
+      "x": 2820,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Settings · Appearance + Comparing · v2"
+    },
+    "SettingsCustom.v2.dc.html": {
+      "x": 3290,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Settings · Custom colours (contrast warning) · v2"
+    },
+    "ListQueueBanner.v2.dc.html": {
+      "x": 3760,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Anime list · compare banner · v2"
+    },
+    "ListSearch.v2.dc.html": {
+      "x": 4230,
+      "y": 7800,
+      "w": 390,
+      "h": 844,
+      "title": "Anime list · search + Status filter · v2"
+    },
+    "ComparePC.v2.dc.html": {
+      "x": 0,
+      "y": 9100,
+      "w": 1440,
+      "h": 900,
+      "title": "Compare · question (PC,keyboard hint) · v2",
+      "expand": "fill"
+    },
+    "StatsPC.v2.dc.html": {
+      "x": 1520,
+      "y": 9100,
+      "w": 1440,
+      "h": 900,
+      "title": "Stats (PC) · v2",
+      "expand": "fill"
+    },
+    "ListPCNav.v2.dc.html": {
+      "x": 3040,
+      "y": 9100,
+      "w": 1440,
+      "h": 900,
+      "title": "Anime list (PC) · side nav · v2",
+      "expand": "fill"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "AddEntry.dc.html",
+    "Picker.dc.html",
+    "EntryDetail.dc.html",
+    "Import.dc.html",
+    "Settings.dc.html",
+    "About.dc.html",
+    "ListPC.dc.html",
+    "Compare.dc.html",
+    "CompareReview.dc.html",
+    "CompareHome.dc.html",
+    "Top5.dc.html",
+    "Stats.dc.html",
+    "SettingsMore.dc.html",
+    "SettingsAppearance.dc.html",
+    "SettingsCustom.dc.html",
+    "ListQueueBanner.dc.html",
+    "ListSearch.dc.html",
+    "ComparePC.dc.html",
+    "StatsPC.dc.html",
+    "ListPCNav.dc.html",
+    "Main.v2.dc.html",
+    "Main.v2.sakura.dc.html",
+    "AddEntry.v2.dc.html",
+    "Picker.v2.dc.html",
+    "EntryDetail.v2.dc.html",
+    "Import.v2.dc.html",
+    "Settings.v2.dc.html",
+    "About.v2.dc.html",
+    "ListPC.v2.dc.html",
+    "Compare.v2.dc.html",
+    "CompareReview.v2.dc.html",
+    "CompareHome.v2.dc.html",
+    "Top5.v2.dc.html",
+    "Stats.v2.dc.html",
+    "SettingsMore.v2.dc.html",
+    "SettingsAppearance.v2.dc.html",
+    "SettingsCustom.v2.dc.html",
+    "ListQueueBanner.v2.dc.html",
+    "ListSearch.v2.dc.html",
+    "ComparePC.v2.dc.html",
+    "StatsPC.v2.dc.html",
+    "ListPCNav.v2.dc.html"
+  ],
+  "notes": {
+    "t1": {
+      "x": 0,
+      "y": -300,
+      "text": "Phone screens · Midnight theme",
+      "kind": "title1",
+      "maxW": 3210,
+      "w": 240
+    },
+    "t2": {
+      "x": 0,
+      "y": 890,
+      "text": "PC",
+      "kind": "title1",
+      "maxW": 1440,
+      "w": 240
+    },
+    "n1": {
+      "x": 3290,
+      "y": 0,
+      "w": 320,
+      "text": "Assumptions to confirm:\n• Bottom bar shows your first 4 enabled tabs + More (Songs, Games, Books, Import, Settings, About live under More).\n• Covers are placeholders here; the app shows real cover art.\n• + Add opens a sheet over the list; the entry saves instantly and fills in while you keep going.\n• The import counts are examples, not your real numbers.",
+      "fill": "orange"
+    },
+    "t3": {
+      "x": 0,
+      "y": 2200,
+      "text": "Phase 3 · Ratings · phone screens · Midnight theme",
+      "kind": "title1",
+      "maxW": 4620,
+      "w": 240
+    },
+    "t4": {
+      "x": 0,
+      "y": 3440,
+      "text": "Phase 3 · PC",
+      "kind": "title1",
+      "maxW": 4480,
+      "w": 240
+    },
+    "n2": {
+      "x": 4700,
+      "y": 2500,
+      "w": 340,
+      "fill": "orange",
+      "text": "Assumptions to confirm (Phase 3):\n• Compare, Top 5 and Stats open from More → Ratings on phones (More tab stays lit) and from the side nav on PC.\n• Card sides are random per question; swipe toward a card to pick it.\n• Review colours: green ▲ for up, red ▼ for down, so it isn't colour alone.\n• Theme picker: each swatch shows Background, Cards, Text and Highlight. Custom starts from the theme on screen.\n• The Custom board keeps Midnight's text colours so it stays readable; in the app the screen re-colours as you type.\n• More is shown scrolled: Tabs and Account sit where they are today.\n• PC list gets Status and Genre buttons next to Sort, matching the phone chips.\n• Phase 3 controls are 44 px tall, so the list chips are 8 px taller than on the Phase 1–2 boards.\n• Covers and numbers are placeholders."
+    },
+    "t5": {
+      "x": 0,
+      "y": 4760,
+      "text": "v2 — livelier style (for Dan's review)",
+      "kind": "title1",
+      "maxW": 4620
+    },
+    "t6": {
+      "x": 0,
+      "y": 4960,
+      "text": "v2 · Phone screens · Midnight (2nd board: Sakura)",
+      "kind": "title1",
+      "maxW": 3680
+    },
+    "t7": {
+      "x": 0,
+      "y": 6300,
+      "text": "v2 · PC",
+      "kind": "title1",
+      "maxW": 1440
+    },
+    "t8": {
+      "x": 0,
+      "y": 7560,
+      "text": "v2 · Phase 3 · phone screens",
+      "kind": "title1",
+      "maxW": 4620
+    },
+    "t9": {
+      "x": 0,
+      "y": 8860,
+      "text": "v2 · Phase 3 · PC",
+      "kind": "title1",
+      "maxW": 4480
+    },
+    "n3": {
+      "x": 3760,
+      "y": 5200,
+      "w": 380,
+      "text": "v2 design decisions:\n• Headings and every number use Bricolage Grotesque (Google Fonts) in its condensed heavy cut, so ratings read like poster numbers. Body text stays Inter. Section labels are sentence case now instead of small caps.\n• Every colour is a theme role or a color-mix() of roles (e.g. Highlight 14% into Cards for tints, Highlight → Highlight+Bright text for gradients). Rating badges and bars use the theme's own rating scale from theme.ts (ratingColor: low → mid → high), so each theme recolours itself.\n• Light themes: Highlight and Muted text get mixed toward Bright text until they pass 4.5:1, and labels on Highlight use whichever role passes (Header row on Midnight, Background on Sakura).\n• Covers lead: bigger covers everywhere, a soft glow made from a blurred copy of the cover, and blurred-cover backdrops (details, Compare cards, Top 5 #1, list headers) under a Background/Cards scrim. Only Text and Bright text sit on them.\n• Top 5 #1 is a poster card. Stats gets a rated ring, a 1–10 rating distribution coloured by the rating scale, rated/entries bars, average badges per list and genre bars.\n• Motion is one moment per screen (count-ups, cards flying in, bars growing, the Save stamp), all inside prefers-reduced-motion: no-preference. With reduced motion every number and bar shows its final value.\n• All controls are at least 44 px, so a few Phase 1–2 buttons (chips, Retry, Pause, Change, Add season) grew to match.\n• Covers, counts and the distribution are placeholders."
+    },
+    "m1": {
+      "x": 0,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: rows rise in one after another and each rating badge pops in after its row. The \"Looking it up…\" cover shimmers until details arrive; Add pops in last. Switching tabs slides the lit pill in the bottom bar."
+    },
+    "m2": {
+      "x": 470,
+      "y": 6068,
+      "w": 390,
+      "text": "Same board in Sakura: only the 10 role values change. Highlight and Muted text are mixed toward Bright text (70% / 75%) so they pass 4.5:1 here. Motion as on the Midnight board."
+    },
+    "m3": {
+      "x": 940,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: the sheet springs up over the dimmed list; the rating badge pops and counts up to 9.5. Dragging the slider recolours the badge along the rating scale live."
+    },
+    "m4": {
+      "x": 1410,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: cover cards rise in one by one. Picking one lifts it with a Highlight ring before the sheet closes."
+    },
+    "m5": {
+      "x": 1880,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: the blurred cover backdrop fades in while the cover springs up; the rating counts up from 0 to 9.5; season rows rise in."
+    },
+    "m6": {
+      "x": 2350,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: count bars grow left to right one after another while the numbers count up; the button total counts to 212."
+    },
+    "m7": {
+      "x": 2820,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: the Fill in details bar has moving stripes while it runs (still when paused). Ticked boxes fill with Highlight."
+    },
+    "m8": {
+      "x": 3290,
+      "y": 6068,
+      "w": 390,
+      "text": "Motion: the cover fan deals in one card at a time the first time the page opens."
+    },
+    "m9": {
+      "x": 0,
+      "y": 7424,
+      "w": 640,
+      "text": "Motion: rows rise in on load and the average counts up; hovering a row tints it with Highlight."
+    },
+    "m10": {
+      "x": 0,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: the two cards fly in from the sides with a slight 3D turn. Tapping (or swiping toward) one lifts it with a Highlight glow, the other slides away and the next pair flips in. The progress bar fills as you go."
+    },
+    "m11": {
+      "x": 470,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: rows rise in and each new rating counts from the old number to the new one. Save moment: a light sweep crosses the button, it pulses, and the new badges stamp one after another (click Save on the board)."
+    },
+    "m12": {
+      "x": 940,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: list tiles rise in; a tile lifts on hover and presses in on tap."
+    },
+    "m13": {
+      "x": 1410,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: the #1 poster scales in, its cover drops in and the outlined 1 slides into place; ranks 2–5 rise in after it."
+    },
+    "m14": {
+      "x": 1880,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: the rated ring draws round, the average glows and counts up, distribution bars grow up one by one, list and genre bars grow from the left."
+    },
+    "m15": {
+      "x": 2350,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: nothing on load. The 3 on Compare glows; rows tint on hover."
+    },
+    "m16": {
+      "x": 2820,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: swatches rise in quickly and the chosen theme's Highlight chip pulses twice. Picking a theme cross-fades the whole screen to it."
+    },
+    "m17": {
+      "x": 3290,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: nothing on load. The warning box appears as soon as a colour drops below 4.5:1 and the failing hex field gets a Highlight ring."
+    },
+    "m18": {
+      "x": 3760,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: the banner drops in with a spring and one light sweep crosses it; rows then rise in as on the main list."
+    },
+    "m19": {
+      "x": 4230,
+      "y": 8668,
+      "w": 390,
+      "text": "Motion: matches get a Highlight mark; results re-sort with a quick rise as you type."
+    },
+    "m20": {
+      "x": 0,
+      "y": 10024,
+      "w": 640,
+      "text": "Motion: as on phone. Cards fly in; clicking one (or ← / →) lifts it and the next pair flips in. Both covers blur into the backdrop."
+    },
+    "m21": {
+      "x": 1520,
+      "y": 10024,
+      "w": 640,
+      "text": "Motion: as on phone. The ring draws, numbers count up, the distribution and all bars grow."
+    },
+    "m22": {
+      "x": 3040,
+      "y": 10024,
+      "w": 640,
+      "text": "Motion: the banner drops in with one sweep; the side-nav Highlight bar slides to the clicked item; rows rise in."
+    }
+  },
+  "designSystems": [],
+  "attachments": {},
+  "noteOrder": [
+    "t1",
+    "t2",
+    "n1",
+    "t3",
+    "t4",
+    "n2",
+    "t5",
+    "t6",
+    "t7",
+    "t8",
+    "t9",
+    "n3",
+    "m1",
+    "m2",
+    "m3",
+    "m4",
+    "m5",
+    "m6",
+    "m7",
+    "m8",
+    "m9",
+    "m10",
+    "m11",
+    "m12",
+    "m13",
+    "m14",
+    "m15",
+    "m16",
+    "m17",
+    "m18",
+    "m19",
+    "m20",
+    "m21",
+    "m22"
+  ]
+}

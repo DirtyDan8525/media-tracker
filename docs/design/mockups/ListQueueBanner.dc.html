@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Anime list with compare banner (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+input::placeholder{color:#a6a6bb;opacity:1}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <header style="padding: 20px 20px 12px; display: flex; flex-direction: column; gap: 12px; background: #1b1b25; border-bottom: 1px solid #2e2e3e">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #ffffff">Anime</h1>
+        <span style="font-size: 13px; color: #a6a6bb">48 titles · 44 rated</span>
+      </div>
+      <button aria-label="Search" aria-expanded="false" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #2e2e3e; background: #232339; color: #e6e6ed; display: flex; align-items: center; justify-content: center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <button aria-pressed="true" style="height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid #ffd166; background: #2a2a3b; color: #ffd166; font: 600 13px Inter, sans-serif; white-space: nowrap">Sort: Rating</button>
+      <button style="height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid #2e2e3e; background: #232339; color: #e6e6ed; font: 500 13px Inter, sans-serif; white-space: nowrap">Status: All</button>
+      <button style="height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid #2e2e3e; background: #232339; color: #e6e6ed; font: 500 13px Inter, sans-serif; white-space: nowrap">Genre</button>
+    </div>
+  </header>
+
+  <main style="flex: 1; overflow: hidden; padding: 12px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <div role="status" style="display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: #232339; border: 1px solid #ffd166; flex-shrink: 0">
+      
+      <span style="flex: 1; font-size: 14px; font-weight: 600; color: #ffffff">3 new ratings to double-check</span>
+      <a href="Compare.dc.html" style="min-height: 44px; padding: 0 16px; border-radius: 10px; background: #ffd166; color: #13131c; text-decoration: none; font-size: 14px; font-weight: 700; display: flex; align-items: center">Compare</a>
+    </div>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #5b2b4a; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">CE</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Cyberpunk: Edgerunners</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">TRIGGER · Action, Drama, Sci-Fi</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #1f6b45; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">10.0</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #5a3b22; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">FA</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Fullmetal Alchemist: Brotherhood</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">bones · Action, Adventure, Fantasy</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #1f6b45; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">10.0</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #5e4520; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">NS</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Naruto: Shippuden</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Studio Pierrot · Action, Adventure, Comedy</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #216b44; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">9.9</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #24456b; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">MH</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">My Hero Academia</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">bones · Action, Adventure, Comedy</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #236a43; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">9.8</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #6b2a2a; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">GL</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Gurren Lagann</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">GAINAX · Action, Mecha, Sci-Fi</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #256a42; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">9.7</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #4a3a2a; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">AT</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Attack on Titan</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">WIT STUDIO, MAPPA · Action, Drama, Mystery</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #1f3d2c; color: #e6e6ed">Completed</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #286941; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">9.5</div>
+    </a>
+    <a href="EntryDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: #232339; text-decoration: none; color: inherit">
+      <div aria-hidden="true" style="width: 52px; height: 78px; border-radius: 8px; background: #2a5a5a; flex-shrink: 0; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; font-size: 10px; font-weight: 700; color: #ffffff">MP</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Mob Psycho 100</span>
+        <span style="font-size: 13px; color: #a6a6bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">bones · Action, Comedy, Psychological</span>
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: #4a3f1c; color: #e6e6ed">On Hold</span>
+      </div>
+      <div style="min-width: 48px; height: 36px; border-radius: 10px; background: #2a6840; color: #ffffff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">9.4</div>
+    </a>
+  </main>
+
+  <a href="AddEntry.dc.html" aria-label="Add anime" style="position: absolute; right: 18px; bottom: 96px; height: 56px; padding: 0 22px; border-radius: 28px; background: #ffd166; color: #13131c; font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 6px 20px rgba(0,0,0,0.45)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+    Add
+  </a>
+
+  <nav aria-label="Lists" style="height: 76px; flex-shrink: 0; background: #13131c; border-top: 1px solid #2e2e3e; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: 8px; box-sizing: border-box">
+    <a href="ListQueueBanner.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #ffd166; text-decoration: none; font-size: 11px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"></path></svg>Anime</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 9h18M7 5v4M12 5v4M17 5v4"></path></svg>Movies</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M8 21h8M9 3l3 3 3-3"></path></svg>TV</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg>Albums</a>
+    <a href="SettingsMore.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>More</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

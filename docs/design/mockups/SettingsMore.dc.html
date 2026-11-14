@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>More — Ratings and Export (phone)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+input::placeholder{color:#a6a6bb;opacity:1}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <header style="padding: 20px 20px 8px">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #ffffff">More</h1>
+  </header>
+  <div style="flex: 1; overflow: hidden; padding: 4px 16px 0; display: flex; flex-direction: column; gap: 18px">
+    <section aria-labelledby="h-lists" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-lists" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Other lists</h2>
+      <div style="border-radius: 14px; background: #232339; overflow: hidden">
+        <a href="ListQueueBanner.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Games</span><span style="font-size: 14px; color: #a6a6bb">27</span></a>
+        <a href="ListQueueBanner.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Books</span><span style="font-size: 14px; color: #a6a6bb">14</span></a>
+        <a href="Main.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #a6a6bb; text-decoration: none"><span style="font-size: 15px">Songs</span><span style="font-size: 13px">Hidden</span></a>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-ratings" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-ratings" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Ratings</h2>
+      <div style="border-radius: 14px; background: #232339; overflow: hidden">
+        <a href="CompareHome.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Compare</span><span aria-label="3 waiting" style="min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 12px; background: #ffd166; color: #13131c; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center">3</span></a>
+        <a href="Top5.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Top 5</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a6a6bb" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+        <a href="Stats.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none"><span style="font-size: 15px">Stats</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a6a6bb" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-data" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-data" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Your data</h2>
+      <div style="border-radius: 14px; background: #232339; overflow: hidden">
+        <a href="Import.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Import from Google Sheets</span></a>
+        <button style="width: 100%; display: flex; justify-content: space-between; align-items: center; text-align: left; min-height: 50px; padding: 0 14px; border: none; background: transparent; color: #e6e6ed; font: 400 15px Inter, sans-serif"><span>Export my data</span><span style="font-size: 13px; color: #a6a6bb">.json file</span></button>
+      </div>
+      <span style="margin: 0 4px; font-size: 13px; color: #a6a6bb">Downloads media-tracker-export-2026-11-13.json. While it runs the row reads “Exporting…”.</span>
+    </section>
+
+    <section aria-labelledby="h-settings" style="display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-settings" style="margin: 0 4px; font-size: 13px; font-weight: 600; color: #a6a6bb; text-transform: uppercase; letter-spacing: 0.06em">Settings</h2>
+      <div style="border-radius: 14px; background: #232339; overflow: hidden">
+        <a href="SettingsAppearance.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none; border-bottom: 1px solid #2e2e3e"><span style="font-size: 15px">Appearance</span><span style="font-size: 14px; color: #a6a6bb">Midnight</span></a>
+        <a href="SettingsAppearance.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 14px; color: #e6e6ed; text-decoration: none"><span style="font-size: 15px">Comparing</span><span style="font-size: 14px; color: #a6a6bb">Ask: Both</span></a>
+      </div>
+    </section>
+  </div>
+  <nav aria-label="Lists" style="height: 76px; flex-shrink: 0; background: #13131c; border-top: 1px solid #2e2e3e; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: 8px; box-sizing: border-box">
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"></path></svg>Anime</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 9h18M7 5v4M12 5v4M17 5v4"></path></svg>Movies</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M8 21h8M9 3l3 3 3-3"></path></svg>TV</a>
+    <a href="ListQueueBanner.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a6a6bb; text-decoration: none; font-size: 11px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg>Albums</a>
+    <a href="SettingsMore.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #ffd166; text-decoration: none; font-size: 11px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>More</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

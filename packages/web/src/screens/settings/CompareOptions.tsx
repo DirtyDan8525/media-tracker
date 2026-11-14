@@ -1,8 +1,7 @@
 import { COMPARE_ASK, COMPARE_ROOM, COMPARE_STYLE, type UserSettings } from '@media-tracker/shared';
 import { useEffect, useId, useState } from 'react';
-import { useSaveSettings } from '../../data/useMe';
+import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
 import { Icon } from '../../design/components/Icon';
-import { useToast } from '../../design/components/Toast';
 import { useSessionMe } from '../../shell/SessionGate';
 
 const NUMBER_RE = /^(\d+([.,]\d*)?|[.,]\d+)$/;
@@ -25,8 +24,7 @@ const SELECTS: { key: EnumKey; label: string; options: readonly string[] }[] = [
 /** Settings → Comparing: the Sheet's three compare dropdowns and "Compare within" (SettingsAppearance.v2). */
 export function CompareOptions() {
   const me = useSessionMe();
-  const save = useSaveSettings();
-  const toast = useToast();
+  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const id = useId();
   const saved = me.settings.compareWindow;
   const [text, setText] = useState(String(saved));
@@ -36,7 +34,7 @@ export function CompareOptions() {
   useEffect(() => { setText(String(saved)); setInvalid(false); }, [saved]);
 
   const persist = (partial: Partial<UserSettings>, onError?: () => void) =>
-    save.mutate(partial, { onError: () => { onError?.(); toast.show("Couldn't save your settings. Try again."); } });
+    save.mutate(partial, { onError });
 
   function commitWindow() {
     const n = parseWindow(text);

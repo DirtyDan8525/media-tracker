@@ -1,8 +1,7 @@
 import { THEMES, type UserSettings } from '@media-tracker/shared';
 import type { CSSProperties } from 'react';
-import { useSaveSettings } from '../../data/useMe';
+import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
 import { Icon } from '../../design/components/Icon';
-import { useToast } from '../../design/components/Toast';
 import { themeColors } from '../../design/theme';
 import { useSessionMe } from '../../shell/SessionGate';
 
@@ -14,8 +13,7 @@ const NAMES = [...Object.keys(THEMES), 'Custom'];
  */
 export function ThemePicker() {
   const me = useSessionMe();
-  const save = useSaveSettings();
-  const toast = useToast();
+  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const current = me.settings.theme;
 
   function pick(theme: string) {
@@ -24,7 +22,7 @@ export function ThemePicker() {
     const partial: Partial<UserSettings> = theme === 'Custom' && Object.keys(me.settings.colors).length === 0
       ? { theme, colors: { ...themeColors(me.settings) } }
       : { theme };
-    save.mutate(partial, { onError: () => toast.show("Couldn't save your settings. Try again.") });
+    save.mutate(partial);
   }
 
   return (

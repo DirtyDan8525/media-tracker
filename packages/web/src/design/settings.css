@@ -11,7 +11,11 @@
 .theme-swatch:hover { background: var(--panel); }
 .theme-swatch.is-on { border-color: var(--highlight); }
 .theme-swatch--custom:not(.is-on) { border-style: dashed; border-color: var(--grid-line); }
-.theme-swatch:has(input:focus-visible) { outline: 2px solid var(--highlight); outline-offset: 2px; }
+/* Focus ring: :focus-within everywhere; where :has() works, only for keyboard focus (not a tap). */
+.theme-swatch:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
+@supports selector(:has(*)) {
+  .theme-swatch:focus-within:not(:has(input:focus-visible)) { outline: none; }
+}
 .theme-swatch input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0; }
 .theme-swatch__pv { height: 44px; padding: 7px; display: flex; }
 .theme-swatch__pv > span {
@@ -50,6 +54,8 @@
 }
 .color-row__hex:focus-visible { outline: none; border-color: var(--highlight); }
 .color-row__hex[aria-invalid='true'] { border-color: var(--cf-low); }
+/* Focused and invalid: the border stays red, so focus shows as a ring outside it. */
+.color-row__hex[aria-invalid='true']:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .color-row__err { flex-basis: 100%; margin: 0 0 var(--space-4); }
 
 .color-warnings {
@@ -81,6 +87,7 @@
 }
 .window-input:focus-visible { outline: none; border-color: var(--highlight); }
 .window-input[aria-invalid='true'] { border-color: var(--cf-low); }
+.window-input[aria-invalid='true']:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 
 /* ---------- Your data: Export my data ---------- */
 .export-row { width: 100%; border: none; background: transparent; font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; }
@@ -88,3 +95,7 @@
 .export-row:hover:not(:disabled) { background: var(--alt-row); }
 .export-row:focus-visible { outline-offset: -2px; }
 .export-row:disabled { cursor: progress; }
+
+/* ---------- Appearance row: the current theme's Background, Cards and Highlight (SettingsMore.v2) ---------- */
+.theme-dots { display: inline-flex; gap: 3px; margin-right: var(--space-4); vertical-align: middle; }
+.theme-dots i { width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--grid-line); }

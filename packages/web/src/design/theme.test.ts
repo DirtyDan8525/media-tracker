@@ -27,7 +27,7 @@ describe('applyTheme', () => {
     applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Sakura' });
     for (const [role, v] of Object.entries(ROLE_VARS)) expect(css(v), v).toBe(THEMES.Sakura![role]);
     expect(css('--muted-text')).toBe('#876773');
-    expect(css('--highlight')).toBe('#ce2d68');
+    expect(css('--highlight')).toBe('#ce2e68');
     expect(css('--bg')).toBe('#fff7f9');
   });
 

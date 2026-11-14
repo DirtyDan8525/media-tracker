@@ -4,6 +4,7 @@ import { AboutScreen } from './screens/AboutScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { AppearanceScreen } from './screens/AppearanceScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
 import { UsernameSetup } from './screens/UsernameSetup';
@@ -77,6 +78,7 @@ export const routes: RouteObject[] = [
           { path: 'top5', element: <Top5Screen /> },
           { path: 'stats', element: <StatsScreen /> },
           { path: 'settings', element: <SettingsScreen /> },
+          { path: 'settings/appearance', element: <AppearanceScreen /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'more', element: <MoreScreen /> },
           { path: '*', element: <Navigate to="/" replace /> },

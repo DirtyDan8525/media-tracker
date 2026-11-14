@@ -35,7 +35,7 @@ describe('parseWindow', () => {
 describe('Settings: Comparing', () => {
   it('shows the three options with their current values and every choice', async () => {
     mockApi(withSettings({ compareAsk: 'Off', compareStyle: 'Swap the numbers', compareRoom: 'Push others down', compareWindow: 0.5 }));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const section = await screen.findByRole('region', { name: 'Comparing' });
     const ask = within(section).getByRole('combobox', { name: 'Ask to compare' });
     expect(ask).toHaveValue('Off');
@@ -57,7 +57,7 @@ describe('Settings: Comparing', () => {
     ["When there's no room", 'Give the same score', 'compareRoom'],
   ])('choosing %s → %s saves it', async (label, value, key) => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const select = await screen.findByRole('combobox', { name: label });
     await userEvent.selectOptions(select, value);
     await waitFor(() => expect(puts(calls)).toEqual([{ settings: { [key]: value } }]));
@@ -66,7 +66,7 @@ describe('Settings: Comparing', () => {
 
   it('a failed save shows the toast and the old value comes back', async () => {
     mockApi(makeMe(), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const select = await screen.findByRole('combobox', { name: 'Re-rating style' });
     await userEvent.selectOptions(select, 'Swap the numbers');
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
@@ -75,7 +75,7 @@ describe('Settings: Comparing', () => {
 
   it('Compare within saves on blur, reading a comma as a decimal point', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const win = await screen.findByRole('textbox', { name: 'Compare within' });
     await userEvent.clear(win);
     await userEvent.type(win, '1,5');
@@ -87,7 +87,7 @@ describe('Settings: Comparing', () => {
 
   it('Compare within saves on Enter', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const win = await screen.findByRole('textbox', { name: 'Compare within' });
     await userEvent.clear(win);
     await userEvent.type(win, '2{Enter}');
@@ -96,7 +96,7 @@ describe('Settings: Comparing', () => {
 
   it('an unchanged Compare within is not saved again', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const win = await screen.findByRole('textbox', { name: 'Compare within' });
     await userEvent.click(win);
     await userEvent.tab();
@@ -105,7 +105,7 @@ describe('Settings: Comparing', () => {
 
   it('typing 0 and tabbing away shows the error and saves nothing; a good value clears it', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const win = await screen.findByRole('textbox', { name: 'Compare within' });
     await userEvent.clear(win);
     await userEvent.type(win, '0');
@@ -122,7 +122,7 @@ describe('Settings: Comparing', () => {
 
   it('a failed Compare within save shows the toast and the old value comes back', async () => {
     mockApi(makeMe(), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const win = await screen.findByRole('textbox', { name: 'Compare within' });
     await userEvent.clear(win);
     await userEvent.type(win, '4{Enter}');

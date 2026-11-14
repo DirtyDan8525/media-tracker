@@ -272,6 +272,8 @@ a.group__row:focus-visible { outline-offset: -2px; }
 }
 .text-field:focus-within { border-color: var(--highlight); }
 .text-field.has-error { border-color: var(--cf-low); }
+/* Focused and in error: the border stays red, so focus shows as a ring outside it. */
+.text-field.has-error:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .text-field__prefix { color: var(--muted-text); margin-right: var(--space-1); }
 .text-field input { flex: 1; min-width: 0; height: 100%; border: none; background: transparent; color: var(--bright-text); font-size: var(--fs-lg); }
 .text-field input:focus-visible { outline: none; }

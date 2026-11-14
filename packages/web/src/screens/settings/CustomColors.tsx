@@ -1,8 +1,7 @@
 import type { ThemeColors } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import { useSaveSettings } from '../../data/useMe';
+import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
 import { Icon } from '../../design/components/Icon';
-import { useToast } from '../../design/components/Toast';
 import { applyTheme, contrastWarnings, ROLE_VARS, themeColors, type ContrastWarning } from '../../design/theme';
 import { useSessionMe } from '../../shell/SessionGate';
 
@@ -22,8 +21,7 @@ export const warningText = (w: ContrastWarning) =>
  */
 export function CustomColors() {
   const me = useSessionMe();
-  const save = useSaveSettings();
-  const toast = useToast();
+  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const baseId = useId();
   const saved = themeColors(me.settings);
   const savedKey = JSON.stringify(saved);
@@ -57,7 +55,6 @@ export function CustomColors() {
     const before = savedKey; // what the server has; edits live only in the draft until now
     save.mutate({ colors }, {
       onError: () => {
-        toast.show("Couldn't save your settings. Try again.");
         // The rollback can land in the same render as the optimistic value, so the effect above may not
         // see a change: put the saved colours back here, unless newer edits are waiting.
         if (Object.keys(pending.current).length > 0) return;

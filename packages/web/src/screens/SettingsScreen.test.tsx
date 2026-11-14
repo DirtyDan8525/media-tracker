@@ -37,12 +37,18 @@ describe('SettingsScreen', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings");
   });
 
-  it('shows the username and the current theme picked', async () => {
+  it('shows the username, and links to Appearance (the theme) and Comparing', async () => {
     mockApi(makeMe());
-    renderApp('/settings');
+    const { router } = renderApp('/settings');
     expect(await screen.findByText('@dan')).toBeInTheDocument();
-    expect(screen.queryByText('Theme: Midnight')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('radiogroup', { name: 'Theme' })).getByRole('radio', { name: 'Midnight' })).toBeChecked();
+    expect(screen.queryByRole('radiogroup', { name: 'Theme' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Appearance Midnight' })).toHaveAttribute('href', '/settings/appearance');
+    expect(screen.getByRole('link', { name: 'Comparing Ask: Both' })).toHaveAttribute('href', '/settings/appearance');
+    await userEvent.click(screen.getByRole('link', { name: 'Appearance Midnight' }));
+    expect(router.state.location.pathname).toBe('/settings/appearance');
+    expect(await screen.findByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Comparing' })).toBeInTheDocument();
   });
 
   it('changes the username, showing a taken error inline', async () => {
@@ -72,6 +78,7 @@ describe('Settings: Export my data', () => {
   let created: Blob[];
   const revoke = vi.fn();
   beforeEach(() => {
+    revoke.mockClear();
     anchors = [];
     created = [];
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (b: Blob) => { created.push(b); return 'blob:export'; } });
@@ -89,7 +96,7 @@ describe('Settings: Export my data', () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  it('fetches /api/export with credentials and downloads it as a dated .json file', async () => {
+  it('fetches /api/export with credentials and downloads it as a dated .json file, then frees the blob', async () => {
     let finish: (r: { body: unknown }) => void = () => {};
     const calls = mockApi(makeMe(), { 'GET /api/export': () => new Promise((r) => { finish = r; }) });
     renderApp('/settings');
@@ -112,6 +119,7 @@ describe('Settings: Export my data', () => {
     expect(JSON.parse(await created[0]!.text())).toEqual(exported);
     expect(a.isConnected).toBe(false);
     expect(await screen.findByRole('button', { name: 'Export my data' })).toBeEnabled();
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:export'), { timeout: 2000 });
   });
 
   it('a failed export shows the toast and lets you try again', async () => {

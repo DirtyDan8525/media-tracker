@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { localDb } from '../db/local';
+import { useToast } from '../design/components/Toast';
 import { isOffline } from './useEntries';
 
 export const ME_KEY = ['me'] as const;
@@ -60,8 +61,16 @@ export function useMe() {
 }
 
 /** Saves a partial settings change; the UI updates at once and rolls back if the save fails. */
-export function useSaveSettings() {
+export const SETTINGS_SAVE_ERROR = "Couldn't save your settings. Try again.";
+
+/**
+ * Saves a partial settings update optimistically; a failure rolls back. With `errorToast`, a failure
+ * also shows that toast. It runs from the hook-level onError, which TanStack still calls after the
+ * calling screen has unmounted (a Custom colour edit saved as you leave), unlike mutate()'s callbacks.
+ */
+export function useSaveSettings(opts: { errorToast?: string } = {}) {
   const qc = useQueryClient();
+  const toast = useToast();
   return useMutation({
     mutationKey: SETTINGS_MUTATION,
     mutationFn: (partial: Partial<UserSettings>) =>
@@ -84,6 +93,7 @@ export function useSaveSettings() {
     },
     onError: (_err, _partial, ctx) => {
       if (ctx?.prev) qc.setQueryData(ME_KEY, ctx.prev);
+      if (opts.errorToast) toast.show(opts.errorToast);
     },
     onSuccess: async ({ settings }) => {
       const cur = qc.getQueryData<Me>(ME_KEY);

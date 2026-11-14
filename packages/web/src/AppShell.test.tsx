@@ -59,12 +59,12 @@ describe('app shell', () => {
     expect(await screen.findByText('No games yet')).toBeInTheDocument();
   });
 
-  it('More lists the other enabled lists, then Import, Settings and About', async () => {
+  it('More lists the other enabled lists, then Import, Appearance, Comparing, Settings and About', async () => {
     mockApi(makeMe({}, { books: false }));
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'Settings', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'Appearance Midnight', 'Comparing Ask: Both', 'Settings', 'About Media Tracker']);
     expect(within(main).getByRole('heading', { name: 'Ratings' })).toBeInTheDocument();
     const tabs = screen.getByRole('navigation', { name: 'Lists' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');

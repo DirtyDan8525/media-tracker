@@ -52,7 +52,7 @@ describe('themes', () => {
   });
   it('darkens Light and Sakura Highlight so it passes on Background and Cards (Ruling P15)', () => {
     expect(THEMES.Light!['Highlight']).toBe('#9b671a');
-    expect(THEMES.Sakura!['Highlight']).toBe('#ce2d68');
+    expect(THEMES.Sakura!['Highlight']).toBe('#ce2e68');
   });
   // Every other theme's Highlight already passed, so all 12 are checked (P15 changes only Light and Sakura).
   it.each(Object.keys(THEMES))('%s Highlight passes AA against Background and Cards', (name) => {

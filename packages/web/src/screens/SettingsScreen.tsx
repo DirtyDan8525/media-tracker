@@ -1,27 +1,28 @@
 import { useState } from 'react';
-import { useSaveSettings } from '../data/useMe';
+import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
 import { TAB_SWITCHES } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
-import { CompareOptions } from './settings/CompareOptions';
-import { CustomColors } from './settings/CustomColors';
 import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
-import { ThemePicker } from './settings/ThemePicker';
+import { SettingsLinks } from './settings/SettingsLinks';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 import '../design/settings.css';
 
-/** Settings: tab switches, "Fill in details", "Export my data", username, the theme picker with the Custom colour editor, and the compare options. */
+/**
+ * Settings: tab switches, "Fill in details", "Export my data", username, and links to the Appearance page
+ * (theme, Custom colours, compare options), which More links to as well (SettingsMore.v2).
+ */
 export function SettingsScreen() {
   const me = useSessionMe();
-  const save = useSaveSettings();
+  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const toast = useToast();
   const [editingName, setEditingName] = useState(false);
 
   function toggle(key: string, on: boolean) {
-    save.mutate({ tabs: { [key]: on } }, { onError: () => toast.show("Couldn't save your settings. Try again.") });
+    save.mutate({ tabs: { [key]: on } });
   }
 
   return (
@@ -74,20 +75,10 @@ export function SettingsScreen() {
         </section>
 
         <section aria-labelledby="set-look" className="group">
-          <h2 id="set-look" className="group__title">Appearance</h2>
-          <ThemePicker />
-        </section>
-
-        {me.settings.theme === 'Custom' && (
-          <section aria-labelledby="set-custom" className="group">
-            <h2 id="set-custom" className="group__title">Custom colours</h2>
-            <CustomColors />
-          </section>
-        )}
-
-        <section aria-labelledby="set-compare" className="group">
-          <h2 id="set-compare" className="group__title">Comparing</h2>
-          <CompareOptions />
+          <h2 id="set-look" className="group__title">Appearance and comparing</h2>
+          <div className="group__card">
+            <SettingsLinks />
+          </div>
         </section>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { contrast } from '../../design/theme';
 import { makeMe, mockApi, type Call } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
+import { warningText } from './CustomColors';
 
 const css = (name: string) => document.documentElement.style.getPropertyValue(name);
 const puts = (calls: Call[]) => calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings').map((c) => c.body);
@@ -12,12 +13,13 @@ const themeName = (theme: string, colors: Record<string, string> = {}) => {
   const me = makeMe();
   return makeMe({ settings: { ...me.settings, theme, colors } });
 };
-const ratio = (a: string, b: string) => (Math.floor(contrast(a, b) * 10) / 10).toFixed(1);
+const warning = (role: 'Text', surface: 'Background' | 'Cards', fg: string, bg: string) =>
+  warningText({ role, surface, ratio: contrast(fg, bg) });
 
 describe('Settings: theme picker', () => {
   it('offers the 12 themes in order, then Custom, with the current one checked', async () => {
     mockApi(themeName('Sakura'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const group = await screen.findByRole('radiogroup', { name: 'Theme' });
     const radios = within(group).getAllByRole('radio');
     expect(radios.map((r) => r.getAttribute('value'))).toEqual([...Object.keys(THEMES), 'Custom']);
@@ -28,7 +30,7 @@ describe('Settings: theme picker', () => {
 
   it('picking Ocean saves it and applies its colours', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Ocean' }));
     await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Ocean' } }]));
     await waitFor(() => expect(css('--bg')).toBe('#0f1c2b'));
@@ -37,7 +39,7 @@ describe('Settings: theme picker', () => {
 
   it('picking Custom with no saved colours starts from the theme on screen', async () => {
     const calls = mockApi(themeName('Sakura'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Custom' }));
     await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Custom', colors: THEMES.Sakura } }]));
     expect(await screen.findByRole('heading', { name: 'Custom colours' })).toBeInTheDocument();
@@ -47,7 +49,7 @@ describe('Settings: theme picker', () => {
 
   it('picking Custom again keeps the colours saved before', async () => {
     const calls = mockApi(themeName('Ocean', { Background: '#101010' }));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Custom' }));
     await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Custom' } }]));
     expect(await screen.findByRole('textbox', { name: 'Background hex' })).toHaveValue('#101010');
@@ -55,7 +57,7 @@ describe('Settings: theme picker', () => {
 
   it('a failed theme save shows the toast and the old theme comes back', async () => {
     mockApi(makeMe(), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Forest' }));
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
     await waitFor(() => expect(screen.getByRole('radio', { name: 'Midnight' })).toBeChecked());
@@ -71,7 +73,7 @@ describe('Settings: Custom colours', () => {
 
   it('has a colour input and a hex box for each of the 10 roles', async () => {
     mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await screen.findByRole('heading', { name: 'Custom colours' });
     for (const [role, hex] of Object.entries(THEMES.Midnight!)) {
       expect(screen.getByLabelText(role, { selector: 'input[type="color"]' })).toHaveValue(hex);
@@ -81,7 +83,7 @@ describe('Settings: Custom colours', () => {
 
   it('an invalid hex shows the error and is not saved', async () => {
     const calls = mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Text hex' });
     const u = user();
     await u.clear(box);
@@ -95,14 +97,15 @@ describe('Settings: Custom colours', () => {
 
   it('editing Text to #333333 applies at once, warns, and saves 500 ms after the last edit', async () => {
     const calls = mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Text hex' });
     const u = user();
     await u.clear(box);
     await u.type(box, '#333333');
     expect(css('--text')).toBe('#333333');
-    expect(screen.getByText(`Text is hard to read on Background (${ratio('#333333', '#1b1b25')}:1; aim for 4.5:1).`)).toBeInTheDocument();
-    expect(screen.getByText(`Text is hard to read on Cards (${ratio('#333333', '#232339')}:1; aim for 4.5:1).`)).toBeInTheDocument();
+    expect(screen.getByText(warning('Text', 'Background', '#333333', '#1b1b25'))).toBeInTheDocument();
+    expect(screen.getByText(warning('Text', 'Cards', '#333333', '#232339'))).toBeInTheDocument();
+    expect(screen.getByText(/^Text is hard to read on Background \(\d\.\d:1; aim for 4\.5:1\)\.$/)).toBeInTheDocument();
     await tick(400);
     expect(puts(calls)).toEqual([]);
     await tick(200);
@@ -112,7 +115,7 @@ describe('Settings: Custom colours', () => {
 
   it('the colour input saves the role too, and edits to two roles go in one save', async () => {
     const calls = mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const bg = await screen.findByLabelText('Background', { selector: 'input[type="color"]' });
     fireEvent.input(bg, { target: { value: '#000000' } });
     fireEvent.input(screen.getByLabelText('Highlight', { selector: 'input[type="color"]' }), { target: { value: '#00ff00' } });
@@ -124,7 +127,7 @@ describe('Settings: Custom colours', () => {
 
   it('a saved edit is kept when you leave before 500 ms', async () => {
     const calls = mockApi(themeName('Custom'));
-    const { router } = renderApp('/settings');
+    const { router } = renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Muted text hex' });
     const u = user();
     await u.clear(box);
@@ -135,7 +138,7 @@ describe('Settings: Custom colours', () => {
 
   it('a half-typed hex in one row survives another row being saved', async () => {
     const calls = mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const text = await screen.findByRole('textbox', { name: 'Text hex' });
     const muted = screen.getByRole('textbox', { name: 'Muted text hex' });
     const u = user();
@@ -153,7 +156,7 @@ describe('Settings: Custom colours', () => {
 
   it('a failed colour save shows the toast and the saved colour comes back', async () => {
     mockApi(themeName('Custom'), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Text hex' });
     const u = user();
     await u.clear(box);
@@ -164,9 +167,21 @@ describe('Settings: Custom colours', () => {
     expect(css('--text')).toBe('#e6e6ed');
   });
 
+  it('a save that fails after you have left still shows the toast', async () => {
+    mockApi(themeName('Custom'), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
+    const { router } = renderApp('/settings/appearance');
+    const box = await screen.findByRole('textbox', { name: 'Muted text hex' });
+    const u = user();
+    await u.clear(box);
+    await u.type(box, '#55556a');
+    await act(async () => { await router.navigate('/more'); });
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
+    await waitFor(() => expect(css('--muted-text')).toBe('#a6a6bb'));
+  });
+
   it('shows no warnings for a readable palette', async () => {
     mockApi(themeName('Custom'));
-    renderApp('/settings');
+    renderApp('/settings/appearance');
     await screen.findByRole('heading', { name: 'Custom colours' });
     expect(screen.queryByText(/is hard to read on/)).not.toBeInTheDocument();
   });

@@ -16,6 +16,21 @@ const EntryDetail = lazy(() => import('./screens/EntryDetail').then((m) => ({ de
 // Import pulls in the spreadsheet reader, which the rest of the app never needs.
 const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ default: m.ImportScreen })));
 
+// Compare (and the shared engine it runs) only loads when opened.
+const CompareScreen = lazy(() => import('./screens/CompareScreen').then((m) => ({ default: m.CompareScreen })));
+
+function CompareRoute() {
+  return (
+    <Suspense fallback={
+      <div className="screen" aria-busy="true" aria-label="Loading">
+        <div className="screen__body"><Skeleton height={80} /></div>
+      </div>
+    }>
+      <CompareScreen />
+    </Suspense>
+  );
+}
+
 function ImportRoute() {
   return (
     <Suspense fallback={
@@ -56,6 +71,7 @@ export const routes: RouteObject[] = [
           { path: 'list/:category', element: <ListScreen /> },
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
+          { path: 'compare', element: <CompareRoute /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'more', element: <MoreScreen /> },

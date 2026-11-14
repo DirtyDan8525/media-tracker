@@ -2,8 +2,8 @@ import type { Category } from '@media-tracker/shared';
 import { NavLink } from 'react-router';
 import { LIST_LABEL } from '../../nav';
 
-/** PC side nav: brand, every enabled list (with its cached count), then Import / Settings / About. */
-export function SideNav({ lists, counts }: { lists: Category[]; counts: Partial<Record<Category, number>> }) {
+/** PC side nav: brand, every enabled list (with its cached count), then Compare (with its waiting count) / Top 5 / Stats / Import / Settings / About. */
+export function SideNav({ lists, counts, compareCount = 0 }: { lists: Category[]; counts: Partial<Record<Category, number>>; compareCount?: number }) {
   return (
     <nav aria-label="Lists" className="side-nav">
       <span className="side-nav__brand">Media Tracker</span>
@@ -14,6 +14,12 @@ export function SideNav({ lists, counts }: { lists: Category[]; counts: Partial<
         </NavLink>
       ))}
       <div className="side-nav__footer">
+        <NavLink to="/compare" className="side-nav__link side-nav__link--split" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
+          <span>Compare</span>
+          {compareCount > 0 && <span className="side-nav__count">{compareCount}</span>}
+        </NavLink>
+        <NavLink to="/top5" className="side-nav__link">Top 5</NavLink>
+        <NavLink to="/stats" className="side-nav__link">Stats</NavLink>
         <NavLink to="/import" className="side-nav__link">Import</NavLink>
         <NavLink to="/settings" className="side-nav__link">Settings</NavLink>
         <NavLink to="/about" className="side-nav__link">About</NavLink>

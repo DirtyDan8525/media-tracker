@@ -187,6 +187,7 @@
   display: flex; align-items: center; min-height: var(--tap); padding: 0 var(--space-6);
   border-radius: var(--radius-md); color: var(--text); text-decoration: none; font-size: var(--fs-sm);
 }
+.side-nav__link--split { justify-content: space-between; }
 .side-nav__link:hover { background: var(--card); }
 .side-nav__link.active { color: var(--highlight); font-weight: 600; }
 

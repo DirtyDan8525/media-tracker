@@ -17,6 +17,7 @@ import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort'
 import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
+import { CompareBanner } from './CompareBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
 
@@ -121,7 +122,7 @@ function ListBody({ category }: { category: Category }) {
           </div>
         )}
       </PageHeader>
-      <div className="screen__body list">{body}</div>
+      <div className="screen__body list"><CompareBanner />{body}</div>
       {!wide && addButton}
 
       {addOpen && (

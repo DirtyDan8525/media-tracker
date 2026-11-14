@@ -5,7 +5,7 @@ import { renderApp } from './test/renderApp';
 import { setViewportWidth } from './test/viewport';
 
 // Side-nav links end with a cached title count; strip it to compare labels.
-const linkNames = (nav: HTMLElement) => within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+$/, '').trim());
+const linkNames = (nav: HTMLElement) => within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/(?<=[^\s\d])\d+$/, '').trim());
 
 describe('app shell', () => {
   it('phone shows the first 4 enabled lists + More', async () => {
@@ -21,8 +21,16 @@ describe('app shell', () => {
     mockApi(makeMe({}, { songs: false }));
     renderApp('/list/anime');
     const nav = await screen.findByRole('navigation', { name: 'Lists' });
-    expect(linkNames(nav)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'Settings', 'About']);
+    expect(linkNames(nav)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Compare', 'Top 5', 'Stats', 'Import', 'Settings', 'About']);
     expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
+  });
+
+  it('PC side nav shows the waiting count beside Compare', async () => {
+    setViewportWidth(1280);
+    mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
+    renderApp('/list/anime');
+    const nav = await screen.findByRole('navigation', { name: 'Lists' });
+    expect(await within(nav).findByRole('link', { name: 'Compare, 2 waiting' })).toHaveAttribute('href', '/compare');
   });
 
   it('season tabs never appear as list tabs', async () => {
@@ -31,7 +39,7 @@ describe('app shell', () => {
     renderApp('/list/anime');
     const nav = await screen.findByRole('navigation', { name: 'Lists' });
     expect(linkNames(nav)).not.toContain('Anime Seasons');
-    expect(linkNames(nav)).toHaveLength(10);
+    expect(linkNames(nav)).toHaveLength(13);
   });
 
   it('/ redirects to the first enabled list', async () => {
@@ -53,8 +61,22 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Import from Google Sheets', 'Settings', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'Settings', 'About Media Tracker']);
+    expect(within(main).getByRole('heading', { name: 'Ratings' })).toBeInTheDocument();
     const tabs = screen.getByRole('navigation', { name: 'Lists' });
+    expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('More shows the waiting count on Compare', async () => {
+    mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }] } } });
+    renderApp('/more');
+    expect(await screen.findByRole('link', { name: 'Compare, 1 waiting' })).toHaveAttribute('href', '/compare');
+  });
+
+  it.each(['/compare', '/top5', '/stats'])('on %s the phone More tab is current', async (path) => {
+    mockApi(makeMe());
+    renderApp(path);
+    const tabs = await screen.findByRole('navigation', { name: 'Lists' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
   });
 

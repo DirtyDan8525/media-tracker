@@ -171,3 +171,16 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .detail-top { padding: var(--space-6) var(--space-6) 0; min-height: var(--space-6); }
 .center { text-align: center; }
 .frame--wide .screen__body.list { max-width: none; }
+
+/* ---------- Compare queue banner (top of every list) ---------- */
+.compare-banner {
+  display: flex; align-items: center; gap: var(--space-6);
+  margin-bottom: var(--space-6); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
+  border-radius: var(--radius-lg); background: var(--card); border: 1px solid var(--grid-line);
+}
+.compare-banner__text { flex: 1; font-size: var(--fs-sm); font-weight: 600; color: var(--bright-text); line-height: 1.3; }
+.compare-banner__btn { text-decoration: none; min-height: var(--tap); gap: var(--space-3); }
+@media (prefers-reduced-motion: no-preference) {
+  .compare-banner { animation: compare-banner-in 0.3s var(--ease) both; }
+  @keyframes compare-banner-in { from { opacity: 0; transform: translateY(-8px); } }
+}

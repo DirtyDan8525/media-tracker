@@ -1,14 +1,17 @@
 import { Link } from 'react-router';
+import { useCompareQueue } from '../data/compare';
 import { useListCounts } from '../data/useEntries';
 import { Icon } from '../design/components/Icon';
 import { enabledLists, LIST_LABEL, splitForPhone } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
+import { waitingCount } from './CompareBanner';
 
-/** Phone "More": the enabled lists that don't fit the bottom bar, then Import, Settings and About. */
+/** Phone "More": the enabled lists that don't fit the bottom bar, then Ratings (Compare, Top 5, Stats), Import, Settings and About. */
 export function MoreScreen() {
   const me = useSessionMe();
   const counts = useListCounts().data ?? {};
+  const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);
   const { more } = splitForPhone(enabledLists(me.settings));
   return (
     <div className="screen">
@@ -27,6 +30,21 @@ export function MoreScreen() {
             </div>
           </section>
         )}
+        <section aria-labelledby="more-ratings" className="group">
+          <h2 id="more-ratings" className="group__title">Ratings</h2>
+          <div className="group__card">
+            <Link to="/compare" className="group__row" aria-label={waiting > 0 ? `Compare, ${waiting} waiting` : undefined}>
+              <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Compare</span>
+              {waiting > 0 && <span className="group__value">{waiting}</span>}
+            </Link>
+            <Link to="/top5" className="group__row">
+              <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>Top 5</span>
+            </Link>
+            <Link to="/stats" className="group__row">
+              <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Stats</span>
+            </Link>
+          </div>
+        </section>
         <section aria-labelledby="more-data" className="group">
           <h2 id="more-data" className="group__title">Your data</h2>
           <div className="group__card">

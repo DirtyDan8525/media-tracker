@@ -39,10 +39,26 @@ describe('themes', () => {
     expect(THEMES.Ember!['Highlight']).toBe('#ff9f43');
     expect(THEMES.Sand!['Grid lines']).toBe('#e2d7c4');
   });
-  it.each(Object.keys(THEMES))('%s text colors pass AA against Background', (name) => {
+  it.each(Object.keys(THEMES))('%s text colors pass AA against Background and Cards', (name) => {
     const t = THEMES[name]!;
     for (const role of ['Text', 'Bright text', 'Muted text']) {
-      expect(contrast(t[role]!, t['Background']!), `${name} ${role}`).toBeGreaterThanOrEqual(4.5);
+      for (const surface of ['Background', 'Cards']) {
+        expect(contrast(t[role]!, t[surface]!), `${name} ${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+  it('darkens Sakura Muted text so it passes on Cards (Ruling P10)', () => {
+    expect(THEMES.Sakura!['Muted text']).toBe('#876773');
+  });
+  it('darkens Light and Sakura Highlight so it passes on Background and Cards (Ruling P15)', () => {
+    expect(THEMES.Light!['Highlight']).toBe('#9b671a');
+    expect(THEMES.Sakura!['Highlight']).toBe('#ce2d68');
+  });
+  // Every other theme's Highlight already passed, so all 12 are checked (P15 changes only Light and Sakura).
+  it.each(Object.keys(THEMES))('%s Highlight passes AA against Background and Cards', (name) => {
+    const t = THEMES[name]!;
+    for (const surface of ['Background', 'Cards']) {
+      expect(contrast(t['Highlight']!, t[surface]!), `${name} Highlight on ${surface}`).toBeGreaterThanOrEqual(4.5);
     }
   });
   it('picks a CF set per theme', () => {

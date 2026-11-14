@@ -37,11 +37,12 @@ describe('SettingsScreen', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings");
   });
 
-  it('shows the username and the current theme name', async () => {
+  it('shows the username and the current theme picked', async () => {
     mockApi(makeMe());
     renderApp('/settings');
     expect(await screen.findByText('@dan')).toBeInTheDocument();
-    expect(screen.getByText('Theme: Midnight')).toBeInTheDocument();
+    expect(screen.queryByText('Theme: Midnight')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('radiogroup', { name: 'Theme' })).getByRole('radio', { name: 'Midnight' })).toBeChecked();
   });
 
   it('changes the username, showing a taken error inline', async () => {

@@ -44,6 +44,28 @@ export function contrast(a: string, b: string): number {
   return (x! + 0.05) / (y! + 0.05);
 }
 
+export type TextRole = 'Text' | 'Bright text' | 'Muted text';
+export type TextSurface = 'Background' | 'Cards';
+export interface ContrastWarning { role: TextRole; surface: TextSurface; ratio: number }
+
+const TEXT_ROLES: readonly TextRole[] = ['Text', 'Bright text', 'Muted text'];
+const TEXT_SURFACES: readonly TextSurface[] = ['Background', 'Cards'];
+
+/**
+ * Text roles that read below 4.5:1 on the surfaces body text sits on (Background, Cards), in role
+ * order then surface order. A Custom theme still saves with these (Ruling P11); the editor warns.
+ */
+export function contrastWarnings(colors: ThemeColors): ContrastWarning[] {
+  const out: ContrastWarning[] = [];
+  for (const role of TEXT_ROLES) {
+    for (const surface of TEXT_SURFACES) {
+      const ratio = contrast(colors[role] ?? MIDNIGHT[role]!, colors[surface] ?? MIDNIGHT[surface]!);
+      if (ratio < 4.5) out.push({ role, surface, ratio });
+    }
+  }
+  return out;
+}
+
 /** Roles a label on a coloured fill may use, in order of preference. */
 const LABEL_ROLES = ['Bright text', 'Text', 'Background', 'Header row'] as const;
 
@@ -77,7 +99,8 @@ export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTML
   const candidates = [colors['Header row']!, colors.Background!, colors['Bright text']!];
   const onHl = candidates.reduce((best, c) => (contrast(c, hl) > contrast(best, hl) ? c : best));
   root.style.setProperty('--on-highlight', onHl);
-  // Small text on a Highlight fill (the waiting-count pill) must reach 4.5:1; Sakura's roles can't, so fall back to black or white.
+  // Small text on a Highlight fill (the waiting-count pill) must reach 4.5:1. Every built-in theme's roles do since
+  // P15 (so this equals --on-highlight there); a Custom Highlight may not, so fall back to black or white.
   const small = [onHl, '#000000', '#ffffff'].find((c) => contrast(c, hl) >= 4.5)
     ?? [onHl, '#000000', '#ffffff'].reduce((b, c) => (contrast(c, hl) > contrast(b, hl) ? c : b));
   root.style.setProperty('--on-highlight-small', small);

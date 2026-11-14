@@ -54,7 +54,7 @@ export function makeMe(over: Partial<Me> = {}, tabs: Partial<Record<string, bool
   return { id: 'u1', email: 'dan@example.com', username: 'dan', isAdmin: true, settings, ...over };
 }
 
-/** A standard API: /api/me answers `me`, entries are empty, settings/username PUTs echo back. */
+/** A standard API: /api/me answers `me`, entries are empty, settings PUTs merge like the Worker (tabs, colors per key) and echo back. */
 export function mockApi(me: Me, extra: Record<string, Handler | MockResponse> = {}): Call[] {
   let current = me;
   return mockFetch({
@@ -62,7 +62,7 @@ export function mockApi(me: Me, extra: Record<string, Handler | MockResponse> = 
     'GET /api/entries': { body: [] },
     'PUT /api/me/settings': (b) => {
       const partial = (b as { settings: Partial<UserSettings> }).settings;
-      current = { ...current, settings: { ...current.settings, ...partial, tabs: { ...current.settings.tabs, ...partial.tabs } } };
+      current = { ...current, settings: { ...current.settings, ...partial, tabs: { ...current.settings.tabs, ...partial.tabs }, colors: { ...current.settings.colors, ...partial.colors } } };
       return { body: { settings: current.settings } };
     },
     ...extra,

@@ -1,6 +1,6 @@
 import { DEFAULT_USER_SETTINGS, THEMES } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
-import { applyTheme, CF_VARS, ROLE_VARS } from './theme';
+import { applyTheme, CF_VARS, contrast, contrastWarnings, ROLE_VARS } from './theme';
 
 const css = (name: string) => document.documentElement.style.getPropertyValue(name);
 
@@ -23,10 +23,11 @@ describe('applyTheme', () => {
     });
   });
 
-  it('sets all 10 role variables for Sakura, including the darkened muted text', () => {
+  it('sets all 10 role variables for Sakura, including the darkened muted text and Highlight', () => {
     applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Sakura' });
     for (const [role, v] of Object.entries(ROLE_VARS)) expect(css(v), v).toBe(THEMES.Sakura![role]);
-    expect(css('--muted-text')).toBe('#8b6a77');
+    expect(css('--muted-text')).toBe('#876773');
+    expect(css('--highlight')).toBe('#ce2d68');
     expect(css('--bg')).toBe('#fff7f9');
   });
 
@@ -55,6 +56,35 @@ describe('applyTheme', () => {
     applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Midnight' });
     expect(css('--on-highlight')).toBe('#13131c');
     applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Light' });
-    expect(css('--on-highlight')).toBe('#111216');
+    expect(css('--on-highlight')).toBe('#ffffff'); // Light's darkened Highlight (P15) reads best with its white Background
+  });
+
+  it.each(Object.keys(THEMES))('%s: the primary-button label reaches 4.5:1 on Highlight', (theme) => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme });
+    expect(contrast(css('--on-highlight'), css('--highlight'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(css('--on-highlight-small'), css('--highlight'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the black/white fallback for small labels on a Custom Highlight none of the roles can read on', () => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Custom', colors: { Background: '#7a7a7a', 'Header row': '#808080', 'Bright text': '#858585', Highlight: '#ffffff' } });
+    expect(css('--on-highlight-small')).toBe('#000000');
+  });
+});
+
+describe('contrastWarnings', () => {
+  it('is empty for every built-in theme', () => {
+    for (const [name, colors] of Object.entries(THEMES)) expect(contrastWarnings(colors), name).toEqual([]);
+  });
+
+  it('flags a muted text that is hard to read on Background', () => {
+    const w = contrastWarnings({ ...THEMES.Midnight!, 'Muted text': '#55556a' });
+    expect(w).toContainEqual(expect.objectContaining({ role: 'Muted text', surface: 'Background' }));
+    expect(w.every((x) => x.ratio < 4.5)).toBe(true);
+  });
+
+  it('lists roles in order, Background before Cards, with the ratio', () => {
+    const w = contrastWarnings({ ...THEMES.Midnight!, Text: '#333333' });
+    expect(w.map((x) => [x.role, x.surface])).toEqual([['Text', 'Background'], ['Text', 'Cards']]);
+    expect(w[0]!.ratio).toBeCloseTo(contrast('#333333', '#1b1b25'), 5);
   });
 });

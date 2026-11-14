@@ -22,10 +22,12 @@ export const THEMES: Record<string, ThemeColors> = {
   Forest:   { 'Background': '#141d17', 'Alternate rows': '#18241c', 'Header row': '#0e1510', 'Cards': '#1c2b21', 'Panels': '#223327',
               'Text': '#e4efe6', 'Bright text': '#ffffff', 'Muted text': '#9bb3a1', 'Grid lines': '#2a3d30', 'Highlight': '#c8e06b' },
   Light:    { 'Background': '#ffffff', 'Alternate rows': '#f4f5f8', 'Header row': '#e6e8ef', 'Cards': '#f7f7fb', 'Panels': '#e9e9f2',
-              'Text': '#2a2b33', 'Bright text': '#111216', 'Muted text': '#6b6e7b', 'Grid lines': '#d9dbe3', 'Highlight': '#b7791f' },
-  // Muted text darkened from the script's #8d6b78 (4.42:1) so it passes AA (4.5:1) on this Background.
+              'Text': '#2a2b33', 'Bright text': '#111216', 'Muted text': '#6b6e7b', 'Grid lines': '#d9dbe3', 'Highlight': '#9b671a' },
+  // Light and Sakura Highlight, and Sakura Muted text, are the script's values darkened (smallest HLS-lightness
+  // step) so they pass AA (4.5:1) on Background and on Cards: Rulings P10 and P15, docs/decisions-phase3.md.
+  // Script values: Light Highlight #b7791f, Sakura Highlight #d6457a, Sakura Muted text #8d6b78.
   Sakura:   { 'Background': '#fff7f9', 'Alternate rows': '#fdeef2', 'Header row': '#f8dde5', 'Cards': '#fff0f4', 'Panels': '#f6e1e8',
-              'Text': '#3a2730', 'Bright text': '#2a1a22', 'Muted text': '#8b6a77', 'Grid lines': '#efd3dc', 'Highlight': '#d6457a' },
+              'Text': '#3a2730', 'Bright text': '#2a1a22', 'Muted text': '#876773', 'Grid lines': '#efd3dc', 'Highlight': '#ce2d68' },
   Matcha: theme('#fbfaf3 #f3f2e8 #e7ead8 #f6f6ec #e8ecd9 #2a2e24 #14170f #6a705c #dde2cc #4f7a28'),
   Arctic: theme('#f7f9fc #eef2f7 #e1e7f0 #f4f7fb #e4eaf3 #26303d #0f1620 #5f6b7a #d5dde8 #2563c9'),
   Sand: theme('#fbf7f0 #f4eee3 #ebe2d2 #f8f2e8 #ece3d3 #3a3026 #1f1810 #77695a #e2d7c4 #8a5a2b'),

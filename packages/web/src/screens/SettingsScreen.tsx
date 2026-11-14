@@ -4,11 +4,14 @@ import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
 import { TAB_SWITCHES } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
+import { CustomColors } from './settings/CustomColors';
 import { FillDetailsRow } from './settings/FillDetailsRow';
+import { ThemePicker } from './settings/ThemePicker';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
+import '../design/settings.css';
 
-/** Settings (Phase 1–2): tab switches, "Fill in details", username, and the current theme's name. */
+/** Settings: tab switches, "Fill in details", username, and the theme picker with the Custom colour editor. */
 export function SettingsScreen() {
   const me = useSessionMe();
   const save = useSaveSettings();
@@ -69,10 +72,15 @@ export function SettingsScreen() {
 
         <section aria-labelledby="set-look" className="group">
           <h2 id="set-look" className="group__title">Appearance</h2>
-          <div className="group__card">
-            <div className="group__row"><span>Theme: {me.settings.theme}</span></div>
-          </div>
+          <ThemePicker />
         </section>
+
+        {me.settings.theme === 'Custom' && (
+          <section aria-labelledby="set-custom" className="group">
+            <h2 id="set-custom" className="group__title">Custom colours</h2>
+            <CustomColors />
+          </section>
+        )}
       </div>
     </div>
   );

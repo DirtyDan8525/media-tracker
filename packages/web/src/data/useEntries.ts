@@ -96,6 +96,16 @@ export function useAllEntries(categories: Category[]): {
   };
 }
 
+/**
+ * Several lists from the device only, never the network: the in-memory `['entries', c]` data when a
+ * screen has loaded it this session, else the on-device cache. For decoration (About's cover fan).
+ */
+export function useDeviceEntries(categories: Category[]): Entry[] {
+  const qc = useQueryClient();
+  const cached = useQueries({ queries: categories.map(cacheQueryOptions) });
+  return categories.flatMap((c, i) => qc.getQueryData<Entry[]>(['entries', c]) ?? cached[i]?.data ?? []);
+}
+
 export const COUNTS_KEY = ['list-counts'] as const;
 
 /** Titles per list, from the on-device cache (shown beside nav items; unknown lists are absent). */

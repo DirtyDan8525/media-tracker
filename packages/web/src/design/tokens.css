@@ -78,9 +78,6 @@
   /* sizes */
   --tap: 44px;           /* minimum tap target */
   --btn-h: 48px;         /* standard button */
-  --cover-list: 56px;    /* phone list cover width (56 × 84 poster) */
-  --cover-table: 40px;   /* PC table cover width (40 × 60) */
-  --cover-hero: 132px;   /* entry-details cover width (132 × 198) */
   --bottom-tabs-h: 76px;
   --side-nav-w: 240px;
   --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
@@ -90,7 +87,6 @@
   --backdrop-opacity: 0.55;
   --backdrop-opacity-wide: 0.42;
   --backdrop-h: 420px;   /* entry details */
-  --backdrop-h-wide: 260px;
 
   /* motion (only ever used inside prefers-reduced-motion: no-preference) */
   --ease: cubic-bezier(0.2, 0, 0, 1);
@@ -99,6 +95,5 @@
   --dur: 200ms;
   --dur-rise: 500ms;     /* rows / cards rising in */
   --dur-settle: 400ms;   /* rating badges settling after their row */
-  --dur-count: 900ms;    /* CountUp (kept in sync with CountUp.tsx) */
   --stagger: 50ms;       /* per-item delay, set with --i */
 }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useAllEntries } from '../data/useEntries';
+import { useDeviceEntries } from '../data/useEntries';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { enabledLists } from '../nav';
 import { BackButton } from '../shell/BackButton';
@@ -12,15 +12,17 @@ const FAN = ['about__fan-card--1', 'about__fan-card--2', 'about__fan-card--3', '
 export function AboutScreen() {
   const me = useSessionMe();
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
-  const { data } = useAllEntries(lists);
+  // Device cache only (no fetches for a credits page).
+  const entries = useDeviceEntries(lists);
   // The person's top-rated covers across their lists: #1 is the backdrop and the front of the fan.
   const top = useMemo(
-    () => Object.values(data).flat()
+    () => entries
       .filter((e) => e.rating !== null && e.coverUrl)
       .sort((a, b) => (b.rating as number) - (a.rating as number) || a.title.localeCompare(b.title))
-      .slice(0, 4)
-      .map((e) => e.coverUrl),
-    [data],
+      .map((e) => e.coverUrl)
+      .filter((src, i, all) => all.indexOf(src) === i) // one card per cover, so cards can be keyed by src
+      .slice(0, 4),
+    [entries],
   );
   // Back to front: 4th, 3rd, 2nd, then #1 on top.
   const fan = [...top].reverse();
@@ -33,7 +35,7 @@ export function AboutScreen() {
         {fan.length > 0 && (
           <div className="about__fan" aria-hidden="true">
             {fan.map((src, i) => (
-              <img key={`${src}-${i}`} className={`about__fan-card ${FAN[i + 4 - fan.length]}`} src={src} alt="" decoding="async" referrerPolicy="no-referrer" />
+              <img key={src} className={`about__fan-card ${FAN[i + 4 - fan.length]}`} src={src} alt="" decoding="async" referrerPolicy="no-referrer" />
             ))}
           </div>
         )}

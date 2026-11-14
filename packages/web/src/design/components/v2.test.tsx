@@ -1,6 +1,6 @@
 import { cfSetFor, CF_SETS, ratingColor, THEMES } from '@media-tracker/shared';
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CfSetContext, ThemeColorsContext } from '../ThemeContext';
 import { contrast } from '../theme';
 import { CountUp } from './CountUp';
@@ -23,6 +23,8 @@ function stubMotion(pref: 'reduce' | 'no-preference') {
     dispatchEvent: () => true,
   }));
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('CoverBackdrop', () => {
   it('renders nothing without a src', () => {
@@ -89,6 +91,19 @@ describe('CountUp', () => {
     expect(sr).toHaveTextContent('9.5');
     expect(visible).toHaveTextContent('2.0');
     await waitFor(() => expect(visible).toHaveTextContent(/^9\.5$/), { timeout: 3000 });
+  });
+
+  it('on a change, counts from the value it last showed (not from 0 again)', async () => {
+    stubMotion('no-preference');
+    const { container, rerender } = render(<CountUp value={8} />);
+    const visible = () => container.querySelector('[aria-hidden="true"]')!;
+    await waitFor(() => expect(visible()).toHaveTextContent(/^8\.0$/), { timeout: 3000 });
+    rerender(<CountUp value={9} />);
+    expect(container.querySelector('.sr-only')).toHaveTextContent('9.0');
+    expect(visible()).toHaveTextContent(/^8\.0$/);
+    const seen: string[] = [];
+    await waitFor(() => { seen.push(visible().textContent!); expect(visible()).toHaveTextContent(/^9\.0$/); }, { timeout: 3000, interval: 20 });
+    for (const t of seen) expect(Number(t)).toBeGreaterThanOrEqual(8);
   });
 
   it('keeps two decimals for a hundredths rating', () => {

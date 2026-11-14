@@ -22,7 +22,8 @@
   border: 1px solid var(--highlight); background: var(--panel); color: var(--highlight);
   font: 600 var(--fs-meta) var(--font); cursor: pointer;
 }
-.frame--wide .select-chip { border-radius: var(--radius-lg); }
+/* PC: Text on Panels (Highlight on Panels is under 4.5:1 on light themes); the Highlight border stays as the cue */
+.frame--wide .select-chip { border-radius: var(--radius-lg); color: var(--text); }
 
 /* add button: floating on phones, in the header on PC */
 .fab {

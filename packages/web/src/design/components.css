@@ -66,6 +66,8 @@
 /* pinned to the top of a long page (entry details, About) */
 .backdrop--top { bottom: auto; height: var(--backdrop-h); }
 .frame--wide .backdrop img { opacity: var(--backdrop-opacity-wide); }
+/* the scrim needs color-mix(); without it text would sit on the raw cover, so show no backdrop */
+@supports not (background: color-mix(in srgb, red, blue)) { .backdrop { display: none; } }
 
 /* ---------- Rating + status ---------- */
 /* fill = ratingColor() on the theme's rating scale; label colour = the role that keeps 4.5:1 (RatingBadge.tsx) */
@@ -248,7 +250,7 @@ a.group__row:focus-visible { outline-offset: -2px; }
 .switch-row { display: flex; align-items: center; gap: var(--space-5); min-height: var(--tap); font-size: var(--fs-body); cursor: pointer; }
 .switch-row input {
   appearance: none; -webkit-appearance: none; width: 22px; height: 22px; margin: 0; flex-shrink: 0; cursor: pointer;
-  display: grid; place-content: center; border-radius: 7px; border: 1.5px solid var(--grid-line); background: var(--bg);
+  display: grid; place-content: center; border-radius: 7px; border: 1.5px solid var(--muted-text); background: var(--bg);
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .switch-row input:checked { background: var(--highlight); border-color: var(--highlight); }

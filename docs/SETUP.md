@@ -29,11 +29,10 @@ Commands go in **PowerShell**: press the Windows key, type `PowerShell`, press E
 ```
 git clone https://github.com/DirtyDan8525/media-tracker
 cd media-tracker
-git checkout phase1-2
 npm ci
 ```
 
-The `git checkout phase1-2` line is needed only until this work is merged to `main`; once it is, skip it.
+This installs the version on `main`. To try a new version before it is merged, run `git checkout phase3` (the branch name I give you; for now `phase3`) before `npm ci`; the "Updating to a new version" section below covers moving between versions.
 
 **Success:** `npm ci` finishes with no red `ERR!` lines (yellow warnings are fine).
 
@@ -135,7 +134,7 @@ Do this each time there is new code (for example, Phase 3: Compare, Top 5, Stats
    ```
    git pull
    ```
-   If this work is not merged to `main` yet, run `git checkout phase3` first.
+   If the new version is not merged to `main` yet, run `git checkout phase3` first (use the branch name I give you).
 2. Install anything new:
    ```
    npx -y npm@11 ci

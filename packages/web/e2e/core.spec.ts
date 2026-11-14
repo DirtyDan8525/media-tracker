@@ -71,8 +71,9 @@ const banner = (page: Page) => page.getByTestId('compare-banner-status');
 test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t save changes nothing', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
 
-  // The first test rated Frieren 9.5 by hand, so one rating is already waiting (the tests run in order).
-  const waiting = 1;
+  // Count what is already waiting (earlier tests may have left some), then check the exact increase.
+  const queued = async () => ((await (await page.request.get('/api/compare/queue')).json()) as { items: unknown[] }).items.length;
+  const waiting = await queued();
 
   await addRatedAnime(page, 'bleach', '9');
   await addRatedAnime(page, 'naruto', '8.8');

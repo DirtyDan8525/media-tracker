@@ -133,6 +133,37 @@ describe('Settings: Custom colours', () => {
     await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { 'Muted text': '#55556a' } } }]));
   });
 
+  it('a half-typed hex in one row survives another row being saved', async () => {
+    const calls = mockApi(themeName('Custom'));
+    renderApp('/settings');
+    const text = await screen.findByRole('textbox', { name: 'Text hex' });
+    const muted = screen.getByRole('textbox', { name: 'Muted text hex' });
+    const u = user();
+    await u.clear(text);
+    await u.type(text, '#cccccc');
+    await u.clear(muted);
+    await u.type(muted, '#zz');
+    await u.tab();
+    expect(screen.getByText('Use a colour like #1b1b25.')).toBeInTheDocument();
+    await tick(600);
+    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { Text: '#cccccc' } } }]));
+    expect(muted).toHaveValue('#zz');
+    expect(screen.getByText('Use a colour like #1b1b25.')).toBeInTheDocument();
+  });
+
+  it('a failed colour save shows the toast and the saved colour comes back', async () => {
+    mockApi(themeName('Custom'), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
+    renderApp('/settings');
+    const box = await screen.findByRole('textbox', { name: 'Text hex' });
+    const u = user();
+    await u.clear(box);
+    await u.type(box, '#333333');
+    await tick(600);
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
+    await waitFor(() => expect(box).toHaveValue('#e6e6ed'));
+    expect(css('--text')).toBe('#e6e6ed');
+  });
+
   it('shows no warnings for a readable palette', async () => {
     mockApi(themeName('Custom'));
     renderApp('/settings');

@@ -36,9 +36,11 @@ export function CustomColors() {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // The saved colours changed under us (a failed save rolled back, or another device): show them,
-  // unless an edit is still waiting to be saved.
+  // unless an edit is still waiting to be saved. Our own save landing (saved == draft) changes nothing,
+  // so a half-typed hex in another row stays as typed.
   useEffect(() => {
     if (Object.keys(pending.current).length > 0) return;
+    if (JSON.stringify(draftRef.current) === savedKey) return;
     const next = JSON.parse(savedKey) as ThemeColors;
     draftRef.current = next;
     setDraft(next);
@@ -52,7 +54,21 @@ export function CustomColors() {
     const colors = pending.current;
     if (Object.keys(colors).length === 0) return;
     pending.current = {};
-    save.mutate({ colors }, { onError: () => toast.show("Couldn't save your settings. Try again.") });
+    const before = savedKey; // what the server has; edits live only in the draft until now
+    save.mutate({ colors }, {
+      onError: () => {
+        toast.show("Couldn't save your settings. Try again.");
+        // The rollback can land in the same render as the optimistic value, so the effect above may not
+        // see a change: put the saved colours back here, unless newer edits are waiting.
+        if (Object.keys(pending.current).length > 0) return;
+        const prev = JSON.parse(before) as ThemeColors;
+        draftRef.current = prev;
+        setDraft(prev);
+        setText(prev);
+        setBad({});
+        applyTheme({ theme: 'Custom', colors: prev });
+      },
+    });
   };
   useEffect(() => () => flush.current(), []);
 

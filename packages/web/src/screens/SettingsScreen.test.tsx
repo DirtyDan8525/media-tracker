@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeMe, mockApi } from '../test/mockApi';
+import { setCompareEnabled } from '../test/flags';
 import { renderApp } from '../test/renderApp';
 
 describe('SettingsScreen', () => {
@@ -37,7 +38,21 @@ describe('SettingsScreen', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings");
   });
 
+  it('with Compare hidden: links to Appearance (the theme) only, and the Appearance page has no Comparing section', async () => {
+    mockApi(makeMe());
+    const { router } = renderApp('/settings');
+    expect(await screen.findByText('@dan')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Appearance Midnight' })).toHaveAttribute('href', '/settings/appearance');
+    expect(screen.queryByRole('link', { name: /Comparing/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ask:/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Appearance Midnight' }));
+    expect(router.state.location.pathname).toBe('/settings/appearance');
+    expect(await screen.findByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Comparing' })).not.toBeInTheDocument();
+  });
+
   it('shows the username, and links to Appearance (the theme) and Comparing', async () => {
+    setCompareEnabled(true);
     mockApi(makeMe());
     const { router } = renderApp('/settings');
     expect(await screen.findByText('@dan')).toBeInTheDocument();

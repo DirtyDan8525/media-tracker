@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { setCompareEnabled } from '../test/flags';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
@@ -13,7 +14,23 @@ describe('More (SettingsMore.v2)', () => {
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 
+  it('with Compare hidden: Ratings has Top 5 and Stats only, Settings has Appearance without the Ask subtitle, and no queue is fetched', async () => {
+    const me = makeMe();
+    const calls = mockApi(makeMe({ settings: { ...me.settings, theme: 'Sakura', compareAsk: 'Only for new ratings' } }));
+    const { router } = renderApp('/more');
+    const ratings = await screen.findByRole('region', { name: 'Ratings' });
+    expect(within(ratings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Top 5', 'Stats']);
+    const settings = screen.getByRole('region', { name: 'Settings' });
+    expect(within(settings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Appearance Sakura']);
+    expect(screen.queryByText(/Ask:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
+    await userEvent.click(within(settings).getByRole('link', { name: 'Appearance Sakura' }));
+    expect(router.state.location.pathname).toBe('/settings/appearance');
+    expect(calls.some((c) => c.path.includes('/api/compare/queue'))).toBe(false);
+  });
+
   it('has Appearance and Comparing rows under Settings that open the Appearance page', async () => {
+    setCompareEnabled(true);
     const me = makeMe();
     mockApi(makeMe({ settings: { ...me.settings, theme: 'Sakura', compareAsk: 'Only for new ratings' } }));
     const { router } = renderApp('/more');

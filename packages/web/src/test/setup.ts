@@ -5,9 +5,16 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { resetAuthState } from '../api/auth';
 import { localDb } from '../db/local';
+import { flags } from './flags';
 import { setViewportWidth } from './viewport';
 
+// features.ts holds build-time constants; tests read them through live getters so a test can flip them.
+vi.mock('../features', () => ({
+  get COMPARE_ENABLED() { return flags.compare; },
+}));
+
 beforeEach(async () => {
+  flags.compare = false;
   setViewportWidth(390);
   sessionStorage.clear();
   resetAuthState();

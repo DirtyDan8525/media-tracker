@@ -3,12 +3,15 @@ import { COMPARE_SAVE_MAX_CHANGES } from '@media-tracker/shared';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
 import { COMPARE_QUEUE_KEY, dropFromQueue, saveCompareChanges, useCompareQueue } from './compare';
 import { entriesKey } from './entryCache';
 import { saveEntryChange } from './entryMutations';
+import { setCompareEnabled } from '../test/flags';
+
+beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {

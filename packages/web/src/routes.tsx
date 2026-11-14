@@ -11,6 +11,7 @@ import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
 import { HomeRedirect } from './shell/HomeRedirect';
+import { COMPARE_ENABLED } from './features';
 import { SessionGate, SETUP_PATH } from './shell/SessionGate';
 
 // Entry details load on demand: the list screen is what most visits need.
@@ -23,6 +24,7 @@ const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ 
 const CompareScreen = lazy(() => import('./screens/CompareScreen').then((m) => ({ default: m.CompareScreen })));
 
 function CompareRoute() {
+  if (!COMPARE_ENABLED) return <Navigate to="/" replace />;
   return (
     <Suspense fallback={
       <div className="screen" aria-busy="true" aria-label="Loading">

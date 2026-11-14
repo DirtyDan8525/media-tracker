@@ -1,11 +1,14 @@
 import { screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { THEMES } from '@media-tracker/shared';
 import { applyTheme, contrast } from '../design/theme';
 import { fakeBackend, makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 import { waitingCount } from './CompareBanner';
+import { setCompareEnabled } from '../test/flags';
+
+beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 const queue = (n: number) => ({ items: Array.from({ length: n }, (_, i) => ({ entryId: `e${i}`, category: 'anime' })) });
 
@@ -110,5 +113,17 @@ describe('waiting pill', () => {
       const root = document.documentElement.style;
       expect(contrast(root.getPropertyValue('--on-highlight-small'), root.getPropertyValue('--highlight')), name).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+
+describe('with Compare hidden', () => {
+  it('shows no banner and never requests the queue', async () => {
+    setCompareEnabled(false);
+    const calls = mockApi(makeMe(), { 'GET /api/compare/queue': { body: queue(3) } });
+    renderApp('/list/anime');
+    await screen.findByText('No anime yet');
+    expect(screen.queryByText(/to double-check/)).not.toBeInTheDocument();
+    expect(calls.some((c) => c.path.includes('/api/compare/queue'))).toBe(false);
   });
 });

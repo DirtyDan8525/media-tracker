@@ -4,6 +4,7 @@ import { useCompareQueue, type QueueItem } from '../data/compare';
 import { useDeviceEntries } from '../data/useEntries';
 import { CoverImage } from '../design/components/CoverImage';
 import { Icon } from '../design/components/Icon';
+import { COMPARE_ENABLED } from '../features';
 import { enabledLists } from '../nav';
 import { useSessionMe } from '../shell/SessionGate';
 
@@ -31,8 +32,8 @@ function useStackCovers(queue: QueueItem[]) {
  */
 export function CompareBanner() {
   const me = useSessionMe();
-  const data = useCompareQueue().data ?? [];
-  const n = waitingCount(data, me.settings);
+  const data = useCompareQueue().data ?? []; // not fetched (so empty) while Compare is hidden
+  const n = COMPARE_ENABLED ? waitingCount(data, me.settings) : 0;
   const enabled = new Set(enabledLists(me.settings));
   const covers = useStackCovers(data.filter((q) => enabled.has(q.category)));
   return (

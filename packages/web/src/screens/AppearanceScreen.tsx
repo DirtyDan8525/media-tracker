@@ -1,3 +1,4 @@
+import { COMPARE_ENABLED } from '../features';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CompareOptions } from './settings/CompareOptions';
@@ -25,10 +26,12 @@ export function AppearanceScreen() {
           </section>
         )}
 
-        <section aria-labelledby="set-compare" className="group">
-          <h2 id="set-compare" className="group__title">Comparing</h2>
-          <CompareOptions />
-        </section>
+        {COMPARE_ENABLED && (
+          <section aria-labelledby="set-compare" className="group">
+            <h2 id="set-compare" className="group__title">Comparing</h2>
+            <CompareOptions />
+          </section>
+        )}
       </div>
     </div>
   );

@@ -1,16 +1,18 @@
 import { COMPARE_SAVE_MAX_CHANGES, type Category, type Entry, type RatingChange } from '@media-tracker/shared';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { COMPARE_ENABLED } from '../features';
 import { writeEntry } from './entryCache';
 
 export const COMPARE_QUEUE_KEY = ['compare-queue'] as const;
 
 export interface QueueItem { entryId: string; category: Category }
 
-/** Entries rated since they were last compared, oldest first. */
+/** Entries rated since they were last compared, oldest first. Never fetched while Compare is hidden. */
 export function useCompareQueue() {
   return useQuery({
     queryKey: COMPARE_QUEUE_KEY,
+    enabled: COMPARE_ENABLED,
     queryFn: async () => (await api.get<{ items: QueueItem[] }>('/api/compare/queue')).items,
   });
 }

@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi, type Handler, type MockResponse } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
+import { setCompareEnabled } from '../test/flags';
+
+beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 interface Setup {
   entries: Entry[];

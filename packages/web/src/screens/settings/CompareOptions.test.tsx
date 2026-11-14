@@ -1,10 +1,13 @@
 import { COMPARE_ASK, COMPARE_ROOM, COMPARE_STYLE } from '@media-tracker/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { makeMe, mockApi, type Call } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 import { parseWindow } from './CompareOptions';
+import { setCompareEnabled } from '../../test/flags';
+
+beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 const puts = (calls: Call[]) => calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings').map((c) => c.body);
 const withSettings = (over: Partial<ReturnType<typeof makeMe>['settings']>) => {

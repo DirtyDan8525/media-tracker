@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
+import { COMPARE_ENABLED } from '../src/features';
 
 const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', import.meta.url));
 
@@ -78,7 +79,30 @@ async function ensureAnime(page: Page, title: string) {
 
 const banner = (page: Page) => page.getByTestId('compare-banner-status');
 
+// The Compare flow is hidden in this build (src/features.ts); its flow test runs when the flag is on.
+test('Compare is hidden: no banner, nav link or Comparing section; /compare goes home', async ({ page }) => {
+  test.skip(COMPARE_ENABLED, 'Compare is enabled');
+  await signInAndSetUsername(page, 'e2e_user');
+  const queueRequests: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/api/compare/')) queueRequests.push(r.url()); });
+  await addRatedAnime(page, 'bleach', '9'); // a hand-typed rating would have joined the queue
+  await page.goto('/list/anime');
+  await expect(page.getByRole('link', { name: /Bleach/i }).first()).toBeVisible();
+  await expect(page.getByText(/to double-check/)).toBeHidden();
+  await expect(page.getByRole('link', { name: /^Compare/ })).toHaveCount(0);
+  await page.goto('/more');
+  await expect(page.getByRole('heading', { level: 1, name: 'More' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Compare/ })).toHaveCount(0);
+  await page.getByRole('link', { name: /^Appearance/ }).click();
+  await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Comparing' })).toHaveCount(0);
+  await page.goto('/compare');
+  await expect(page).toHaveURL(/\/list\/anime$/);
+  expect(queueRequests).toEqual([]);
+});
+
 test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t save changes nothing', async ({ page }) => {
+  test.skip(!COMPARE_ENABLED, 'Compare is hidden until the tier system lands');
   await signInAndSetUsername(page, 'e2e_user');
 
   await ensureAnime(page, 'Frieren'); // the list checks below look for it

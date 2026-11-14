@@ -1,5 +1,7 @@
 # Media Tracker App: Design Spec
 
+> **Out of date (2026-11-14):** the approved spec is v1.2 in the claude.ai Project "Media Tracker App" (`specs/media-tracker-app-spec.md`). v1.2 replaces §5.2 with tiers plus a Bradley-Terry comparison model. Phase 3 was planned from this older copy by mistake, so its Compare is hidden until the tier system is built. Sync this file from the Project before planning any more work.
+
 *Version 1.1, 2026-11-10. Status: approved by Dan. v1.1 adds looked-up details (release date, synopsis, length, origin) and 7 more themes.*
 
 ## 1. Goal

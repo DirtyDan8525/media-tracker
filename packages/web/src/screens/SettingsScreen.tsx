@@ -6,13 +6,14 @@ import { TAB_SWITCHES } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { CompareOptions } from './settings/CompareOptions';
 import { CustomColors } from './settings/CustomColors';
+import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
 import { ThemePicker } from './settings/ThemePicker';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 import '../design/settings.css';
 
-/** Settings: tab switches, "Fill in details", username, the theme picker with the Custom colour editor, and the compare options. */
+/** Settings: tab switches, "Fill in details", "Export my data", username, the theme picker with the Custom colour editor, and the compare options. */
 export function SettingsScreen() {
   const me = useSessionMe();
   const save = useSaveSettings();
@@ -44,6 +45,7 @@ export function SettingsScreen() {
           <h2 id="set-data" className="group__title">Your data</h2>
           <div className="group__card">
             <FillDetailsRow />
+            <ExportRow />
           </div>
         </section>
 

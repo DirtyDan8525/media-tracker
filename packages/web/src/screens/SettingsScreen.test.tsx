@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
@@ -64,5 +64,62 @@ describe('SettingsScreen', () => {
     await userEvent.type(input, 'dan2');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('@dan2')).toBeInTheDocument();
+  });
+});
+
+describe('Settings: Export my data', () => {
+  let anchors: HTMLAnchorElement[];
+  let created: Blob[];
+  const revoke = vi.fn();
+  beforeEach(() => {
+    anchors = [];
+    created = [];
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (b: Blob) => { created.push(b); return 'blob:export'; } });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { anchors.push(this); });
+  });
+  afterEach(() => {
+    delete (URL as { createObjectURL?: unknown }).createObjectURL;
+    delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
+  });
+
+  const exported = { entries: [{ id: 'e1', title: 'Frieren' }], seasons: [], settings: { theme: 'Midnight' } };
+  const today = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  it('fetches /api/export with credentials and downloads it as a dated .json file', async () => {
+    let finish: (r: { body: unknown }) => void = () => {};
+    const calls = mockApi(makeMe(), { 'GET /api/export': () => new Promise((r) => { finish = r; }) });
+    renderApp('/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Export my data' }));
+
+    const busy = await screen.findByRole('button', { name: 'Exporting…' });
+    expect(busy).toBeDisabled();
+    const call = calls.find((c) => c.path === '/api/export');
+    expect(call?.method).toBe('GET');
+    expect(call?.init?.credentials).toBe('include');
+
+    finish({ body: exported });
+    await waitFor(() => expect(anchors).toHaveLength(1));
+    const a = anchors[0]!;
+    expect(a.download).toMatch(/^media-tracker-export-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(a.download).toBe(`media-tracker-export-${today()}.json`);
+    expect(a.getAttribute('href')).toBe('blob:export');
+    expect(created).toHaveLength(1);
+    expect(created[0]!.type).toBe('application/json');
+    expect(JSON.parse(await created[0]!.text())).toEqual(exported);
+    expect(a.isConnected).toBe(false);
+    expect(await screen.findByRole('button', { name: 'Export my data' })).toBeEnabled();
+  });
+
+  it('a failed export shows the toast and lets you try again', async () => {
+    mockApi(makeMe(), { 'GET /api/export': { status: 500, body: { error: 'boom' } } });
+    renderApp('/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Export my data' }));
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't export your data. Try again.");
+    expect(await screen.findByRole('button', { name: 'Export my data' })).toBeEnabled();
+    expect(anchors).toHaveLength(0);
   });
 });

@@ -81,3 +81,10 @@
 }
 .window-input:focus-visible { outline: none; border-color: var(--highlight); }
 .window-input[aria-invalid='true'] { border-color: var(--cf-low); }
+
+/* ---------- Your data: Export my data ---------- */
+.export-row { width: 100%; border: none; background: transparent; font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; }
+.group__card > * + .export-row { border-top: 1px solid var(--grid-line); }
+.export-row:hover:not(:disabled) { background: var(--alt-row); }
+.export-row:focus-visible { outline-offset: -2px; }
+.export-row:disabled { cursor: progress; }

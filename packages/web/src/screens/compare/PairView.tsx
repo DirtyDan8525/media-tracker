@@ -87,7 +87,7 @@ export function PairView({ question, left, right, canBack, onAnswer, onBack, wid
       aria-label={`${x.title}, ${ratingLine(x)}`} onClick={() => tap(s)}>
       <CoverBackdrop src={x.cover} className="backdrop--card" />
       <span className="pick__cover" aria-hidden="true">
-        <CoverImage src={x.cover} alt={`${x.title} cover`} square={x.square} width={wide ? 246 : 160} />
+        <CoverImage src={x.cover} alt={`${x.title} cover`} square={x.square} width={wide ? 246 : 160} fluid />
       </span>
       <span className="pick__name">{x.title}</span>
       <span className="pick__now">

@@ -1,9 +1,11 @@
 import { CATEGORY_CONFIG } from '@media-tracker/shared';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
+import { EmptyState } from '../design/components/EmptyState';
 import { IconButton } from '../design/components/IconButton';
 import { Skeleton } from '../design/components/Skeleton';
 import { useIsWide } from '../hooks';
@@ -25,7 +27,11 @@ export function CompareScreen() {
 
   // Covers for the review rows (RatingChange carries none); the same queries the flow reads.
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
-  const { data } = useAllEntries(lists);
+  const { data, isError } = useAllEntries(lists);
+  const qc = useQueryClient();
+  // Once a run has been on screen, coming home moves focus to the home heading.
+  const ranRun = useRef(false);
+  if (view.kind !== 'loading' && view.kind !== 'off' && view.kind !== 'home') ranRun.current = true;
   const byId = useMemo(() => new Map(Object.values(data).flat().map((e) => [e.id, e])), [data]);
   const coverOf = useCallback((id: string) => {
     const e = byId.get(id);
@@ -48,9 +54,21 @@ export function CompareScreen() {
         </div>
       );
     case 'home':
+      if (isError) {
+        return (
+          <div className="screen">
+            <PageHeader title="Compare ratings" backTo="/more" />
+            <div className="screen__body">
+              <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
+                actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
+            </div>
+          </div>
+        );
+      }
       return (
         <CompareHome afterQueue={view.afterQueue} lists={view.lists} unrated={view.unrated} onlyNew={view.onlyNew}
-          window={me.settings.compareWindow} onList={flow.startList} onUnrated={flow.startUnrated} />
+          window={me.settings.compareWindow} onList={flow.startList} onUnrated={flow.startUnrated}
+          focusHeading={ranRun.current} />
       );
     case 'ask':
       return (
@@ -69,7 +87,7 @@ export function CompareScreen() {
       );
     case 'saving':
       return (
-        <RunFrame wide={wide} onHome={flow.toHome}>
+        <RunFrame wide={wide}>
           <div className="compare__head" aria-busy="true"><span className="compare__sub" role="status">Saving…</span></div>
         </RunFrame>
       );
@@ -90,7 +108,8 @@ export function CompareScreen() {
 }
 
 /** A run's screen: the way back to the Compare home (phone: arrow; PC: link-style), blurred covers behind on PC. */
-function RunFrame({ wide, onHome, covers, children }: { wide: boolean; onHome(): void; covers?: string[]; children: ReactNode }) {
+/** Without `onHome` (while saving) the way home is shown but off, so a save can't land on a run that was left. */
+function RunFrame({ wide, onHome, covers, children }: { wide: boolean; onHome?: () => void; covers?: string[]; children: ReactNode }) {
   return (
     <div className={wide ? 'screen compare compare--wide has-backdrop' : 'screen compare'}>
       {wide && covers && (
@@ -100,8 +119,8 @@ function RunFrame({ wide, onHome, covers, children }: { wide: boolean; onHome():
       )}
       <div className="compare__top">
         {wide
-          ? <button type="button" className="compare__home-link" onClick={onHome}>← Compare ratings</button>
-          : <IconButton label="Back to Compare ratings" icon="back" look="plain" onClick={onHome} />}
+          ? <button type="button" className="compare__home-link" onClick={onHome} disabled={!onHome}>← Compare ratings</button>
+          : <IconButton label="Back to Compare ratings" icon="back" look="plain" onClick={onHome} disabled={!onHome} />}
       </div>
       <div className="compare__body">{children}</div>
     </div>

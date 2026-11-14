@@ -69,11 +69,12 @@ export function ReviewView({ changes, asked, canBack, hasNext, style, coverOf, o
               <span className="rev__title" data-role="title">{c.title}</span>
               <span className="rev__old" data-role="old">{c.old === null ? '—' : formatRating(c.old)}</span>
               <span className="rev__arrow" aria-hidden="true">→</span>
-              <span className="rev__new" data-role="new" aria-label={`${formatRating(c.rating)}, ${up ? 'up' : 'down'}`}>
+              <span className="rev__new" data-role="new">
                 <span className={up ? 'rev__dir rev__dir--up' : 'rev__dir rev__dir--down'} aria-hidden="true">{up ? '▲' : '▼'}</span>
                 <RatingBadge rating={c.rating} size="sm">
                   <CountUp value={c.rating} from={c.old ?? c.rating} />
                 </RatingBadge>
+                <span className="sr-only">{up ? ' up' : ' down'}</span>
               </span>
             </li>
           );

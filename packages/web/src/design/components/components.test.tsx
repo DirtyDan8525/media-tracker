@@ -111,3 +111,13 @@ describe('design components: accessible names', () => {
     expect(within(nav).getByRole('link', { name: 'Movies' })).toHaveAttribute('aria-current', 'page');
   });
 });
+
+describe('CoverImage fluid', () => {
+  it('fills its container: no inline width, the fluid class', () => {
+    render(<><CoverImage src="https://img.example/a.jpg" alt="A cover" width={160} fluid /><CoverImage src={null} alt="B cover" fluid /></>);
+    for (const el of [screen.getByRole('img', { name: 'A cover' }), screen.getByRole('img', { name: 'B cover' })]) {
+      expect(el).toHaveClass('cover--fluid');
+      expect(el.style.width).toBe('');
+    }
+  });
+});

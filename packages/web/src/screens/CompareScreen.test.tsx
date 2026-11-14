@@ -11,14 +11,19 @@ interface Setup {
   queue?: string[];
   ask?: string;
   save?: Handler | MockResponse;
+  tabs?: Record<string, boolean>;
+  /** Mutable: while true, GET /api/entries answers 500. */
+  fail?: { entries: boolean };
 }
 
-function setup({ entries, queue = [], ask = 'Both', save }: Setup) {
-  const me = makeMe();
+function setup({ entries, queue = [], ask = 'Both', save, tabs = {}, fail }: Setup) {
+  const me = makeMe({}, tabs);
   me.settings = { ...me.settings, compareAsk: ask };
   const rows = entries.map((e) => ({ ...e }));
   const calls = mockApi(me, {
-    'GET /api/entries': (_b, url) => ({ body: rows.filter((e) => e.category === url.searchParams.get('category')) }),
+    'GET /api/entries': (_b, url) => (fail?.entries
+      ? { status: 500, body: { error: 'boom' } }
+      : { body: rows.filter((e) => e.category === url.searchParams.get('category')) }),
     'GET /api/compare/queue': () => ({
       body: { items: queue.map((id) => ({ entryId: id, category: rows.find((e) => e.id === id)?.category ?? 'anime' })) },
     }),
@@ -47,6 +52,24 @@ const pair = () => screen.getByRole('group', { name: 'Pick the better one' });
 const cardNames = () => within(pair()).getAllByRole('button').map((b) => b.getAttribute('aria-label'));
 const progress = (text: string) => screen.findByText(text);
 
+/** A review row as read aloud: title, old rating, new rating badge, direction. */
+const readRow = (li: HTMLElement) => [
+  li.querySelector('[data-role="title"]')!.textContent,
+  li.querySelector('[data-role="old"]')!.textContent,
+  within(li.querySelector<HTMLElement>('[data-role="new"]')!).getByLabelText(/^Rating /).getAttribute('aria-label'),
+  within(li).queryByText('up') ? 'up' : within(li).queryByText('down') ? 'down' : null,
+];
+const reviewRows = () => within(screen.getByRole('list', { name: 'Rating changes' })).getAllByRole('listitem').map(readRow);
+const FULL_PASS_ROWS = [['B', '8.8', 'Rating 8.9', 'up'], ['C', '8.5', 'Rating 8.8', 'up'], ['A', '9.0', 'Rating 8.7', 'down']];
+
+async function fullPassToReview() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
+  for (const name of ['B, now 8.8', 'C, now 8.5', 'B, now 8.8']) {
+    await userEvent.click(await within(pair()).findByRole('button', { name }));
+  }
+  await screen.findByRole('heading', { name: 'New ratings' });
+}
+
 beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0.99); // never flip: the question's first item is on the left
 });
@@ -74,6 +97,16 @@ describe('Compare home', () => {
     expect(screen.getByText(/You only compare things rated within 1 of each other/)).toBeInTheDocument();
   });
 
+  it('lists that fail to load: an error with Retry, not "nothing to compare"', async () => {
+    const fail = { entries: true };
+    setup({ entries: anime(), fail });
+    expect(await screen.findByRole('heading', { name: 'Couldn\'t load your lists' })).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing to compare yet/)).not.toBeInTheDocument();
+    fail.entries = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('button', { name: 'Anime (3)' })).toBeInTheDocument();
+  });
+
   it('Only for new ratings: no list buttons, the only-new text', async () => {
     setup({ entries: anime(), ask: 'Only for new ratings' });
     expect(await screen.findByText('Nothing is waiting. Settings → “Ask to compare” is set to only check new ratings.')).toBeInTheDocument();
@@ -97,13 +130,7 @@ describe('full pass', () => {
 
     expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
     expect(screen.getByText('Based on your picks (meet in the middle). Nothing is saved until you press Save.')).toBeInTheDocument();
-    const rows = within(screen.getByRole('list', { name: 'Rating changes' })).getAllByRole('listitem');
-    const read = (li: HTMLElement) => [
-      li.querySelector('[data-role="title"]')!.textContent,
-      li.querySelector('[data-role="old"]')!.textContent,
-      li.querySelector('[data-role="new"]')!.getAttribute('aria-label'),
-    ];
-    expect(rows.map(read)).toEqual([['B', '8.8', '8.9, up'], ['C', '8.5', '8.8, up'], ['A', '9.0', '8.7, down']]);
+    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
 
     await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
     expect(await screen.findByRole('heading', { name: 'Saved' })).toBeInTheDocument();
@@ -168,16 +195,63 @@ describe('full pass', () => {
     expect(cardNames()).toEqual(['C, now 8.5', 'B, now 8.8']); // right = A
   });
 
-  it('a failed save shows the toast and keeps the review', async () => {
-    setup({ entries: anime(), save: { status: 500, body: { error: 'boom' } } });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    for (const name of ['B, now 8.8', 'C, now 8.5', 'B, now 8.8']) {
-      await userEvent.click(await within(pair()).findByRole('button', { name }));
-    }
-    await userEvent.click(await screen.findByRole('button', { name: 'Save new ratings' }));
+  it('a failed save shows the toast, keeps the review intact, and Save again saves the same changes', async () => {
+    let failSave = true;
+    const { calls } = setup({ entries: anime(), save: (b) => {
+      if (failSave) return { status: 500, body: { error: 'boom' } };
+      const { changes } = b as { changes: { id: string; rating: number }[] };
+      return { body: { updated: changes.length, entries: changes.map((c) => ({ ...anime().find((e) => e.id === c.id)!, rating: c.rating })) } };
+    } });
+    await fullPassToReview();
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
     expect(await screen.findByText('Couldn\'t save your new ratings. Try again.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save new ratings' })).toBeEnabled();
+    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
+
+    failSave = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    expect(await screen.findByRole('heading', { name: 'Saved' })).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/compare/save').map((c) => c.body);
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(posts[1]).toEqual({ changes: [{ id: 'B', rating: 8.9 }, { id: 'C', rating: 8.8 }, { id: 'A', rating: 8.7 }] });
+  });
+
+  it('the way home is off while saving; a failed save still lands on the intact review', async () => {
+    let answer: (r: { status: number; body: unknown }) => void = () => {};
+    setup({ entries: anime(), save: () => new Promise((r) => { answer = r; }) });
+    await fullPassToReview();
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    expect(await screen.findByText('Saving…')).toBeInTheDocument();
+    const home = screen.getByRole('button', { name: 'Back to Compare ratings' });
+    expect(home).toBeDisabled();
+    await userEvent.click(home);
+    answer({ status: 500, body: { error: 'boom' } });
+    expect(await screen.findByText('Couldn\'t save your new ratings. Try again.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
+  });
+
+  it('Don’t save after a full pass saves nothing and goes home, with focus on its heading', async () => {
+    const { calls } = setup({ entries: anime() });
+    await fullPassToReview();
+    await userEvent.click(screen.getByRole('button', { name: 'Don\'t save' }));
+    const heading = await screen.findByRole('heading', { name: 'Compare ratings' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
+  });
+
+  it('Back to Compare ratings mid-run discards the run', async () => {
+    const { calls } = setup({ entries: anime() });
+    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
+    await userEvent.click(await within(pair()).findByRole('button', { name: 'B, now 8.8' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Compare ratings' }));
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
+    // starting again begins a fresh pass, not the old one
+    await userEvent.click(screen.getByRole('button', { name: 'Anime (3)' }));
+    expect(await screen.findByText('Going through 1 of 2 · 0 picks so far')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '← Back' })).toBeDisabled();
   });
 });
 
@@ -232,8 +306,8 @@ describe('the queue', () => {
     expect(await screen.findByRole('heading', { name: 'Placing Q1 (Anime)' })).toBeInTheDocument();
     expect(screen.getByText('New rating · 2 waiting')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
-    const close = await screen.findByRole('button', { name: /^(Close|Don't save)$/ });
-    await userEvent.click(close);
+    expect(await screen.findByRole('heading', { name: 'All good' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(await screen.findByText(/^New ratings are placed\./)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^Placing Q[23]/ })).not.toBeInTheDocument();
   });
@@ -251,6 +325,31 @@ describe('the queue', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
     await userEvent.click(await screen.findByRole('button', { name: '← Back to last pick' }));
     expect(await screen.findByText('New rating · 0 waiting')).toBeInTheDocument();
+  });
+
+  it('leaves a queued title in a turned-off list queued and does not ask about it (Ruling P4)', async () => {
+    const { calls } = setup({ entries: [
+      ...anime(),
+      makeEntry({ id: 'm1', category: 'movies', title: 'M1', rating: 8 }),
+      makeEntry({ id: 'm2', category: 'movies', title: 'M2', rating: 7.5 }),
+    ], queue: ['m2'], tabs: { movies: false } });
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(screen.getByText(/^Pick a list to go through\./)).toBeInTheDocument(); // not "New ratings are placed."
+    expect(screen.queryByRole('heading', { name: /^Placing/ })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('Back to Compare ratings while placing drops the rest of the queue for this visit', async () => {
+    const { calls } = setup({ entries: [
+      makeEntry({ id: 'A', title: 'A', rating: 9 }),
+      makeEntry({ id: 'q1', title: 'Q1', rating: 8.8 }),
+      makeEntry({ id: 'q2', title: 'Q2', rating: 8.6 }),
+    ], queue: ['q1', 'q2'] });
+    await screen.findByRole('heading', { name: 'Placing Q1 (Anime)' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Compare ratings' }));
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Placing/ })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
   });
 
   it('skips a queued id missing from the loaded lists', async () => {

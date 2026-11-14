@@ -39,6 +39,7 @@
 .cover--fallback { display: flex; align-items: center; justify-content: center; color: var(--muted-text); border: 1px dashed var(--grid-line); }
 .cover--sm { border-radius: 7px; }
 .cover--hero { border-radius: var(--radius-xl); }
+.cover--fluid { width: 100%; }
 
 /* ---------- Cover backdrop (v2) ----------
  * A blurred, scaled cover with a role-coloured scrim that ends in solid Background (or Cards).

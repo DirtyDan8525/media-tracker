@@ -1,5 +1,5 @@
 import type { Category } from '@media-tracker/shared';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { Icon } from '../../design/components/Icon';
 import { LIST_LABEL } from '../../nav';
@@ -15,12 +15,16 @@ export interface CompareHomeProps {
   window: number;
   onList(c: Category): void;
   onUnrated(c: Category): void;
+  /** Back from a run: focus goes to the heading so screen readers announce the home. */
+  focusHeading?: boolean;
 }
 
 const ONLY_NEW = ' Settings → “Ask to compare” is set to only check new ratings.';
 
 /** The Compare home: a full pass per list (2+ rated), and the finished titles with no rating, by list. */
-export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onList, onUnrated }: CompareHomeProps) {
+export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onList, onUnrated, focusHeading }: CompareHomeProps) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (focusHeading) heading.current?.focus(); }, [focusHeading]);
   const sub = onlyNew
     ? (afterQueue ? 'All new ratings are placed.' : 'Nothing is waiting.') + ONLY_NEW
     : (afterQueue ? 'New ratings are placed. ' : '')
@@ -29,7 +33,7 @@ export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onLis
 
   return (
     <div className="screen compare-home">
-      <PageHeader title="Compare ratings" sub={sub} backTo="/more" />
+      <PageHeader title="Compare ratings" sub={sub} backTo="/more" titleRef={heading} />
       <div className="screen__body stack-18">
         {!onlyNew && lists.length > 0 && (
           <div role="group" aria-label="Lists" className="cmp-tiles">

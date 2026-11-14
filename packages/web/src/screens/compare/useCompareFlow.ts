@@ -199,6 +199,11 @@ export function useCompareFlow(opts: { random?: () => number } = {}): CompareFlo
         const ok = run.doneEntryId === undefined
           ? await saveCompareChanges(ctx.current.qc, body)
           : await saveCompareChanges(ctx.current.qc, body, run.doneEntryId);
+        // The person can't leave while saving (the home control is off), but never apply a result to another run.
+        if (st.run !== run || st.mode.kind !== 'saving') {
+          if (!ok) ctx.current.toast.show(SAVE_FAILED);
+          return;
+        }
         if (!ok) {
           ctx.current.toast.show(SAVE_FAILED);
           st.mode = { kind: 'run' };

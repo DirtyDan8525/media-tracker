@@ -1,0 +1,17 @@
+{
+  "https://store.steampowered.com/api/storesearch/?cc=us&l=en&term=portal%202": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  },
+  "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/620/library_600x900.jpg": {
+    "file": "2.txt",
+    "status": 200,
+    "contentType": "image/jpeg"
+  },
+  "https://store.steampowered.com/api/appdetails?appids=620&filters=basic,genres,developers,release_date&l=english&cc=us": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json; charset=utf-8"
+  }
+}

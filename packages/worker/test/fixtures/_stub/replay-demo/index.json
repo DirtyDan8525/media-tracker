@@ -1,0 +1,8 @@
+{
+  "https://api.example.test/search?q=frieren": { "file": "1.json", "status": 200, "contentType": "application/json" },
+  "https://api.example.test/rate": [
+    { "file": "2.json", "status": 429, "contentType": "application/json" },
+    { "file": "3.json", "status": 200, "contentType": "application/json" }
+  ],
+  "https://page.example.test/album/abc": { "file": "4.html", "status": 200, "contentType": "text/html; charset=utf-8" }
+}

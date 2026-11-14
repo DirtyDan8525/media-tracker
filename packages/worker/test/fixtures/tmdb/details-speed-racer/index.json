@@ -1,0 +1,17 @@
+{
+  "https://api.themoviedb.org/3/search/movie?include_adult=false&query=Speed%20Racer": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json;charset=utf-8"
+  },
+  "https://api.themoviedb.org/3/movie/7459?append_to_response=credits": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json;charset=utf-8"
+  },
+  "https://api.themoviedb.org/3/movie/7459": {
+    "file": "3.json",
+    "status": 200,
+    "contentType": "application/json;charset=utf-8"
+  }
+}

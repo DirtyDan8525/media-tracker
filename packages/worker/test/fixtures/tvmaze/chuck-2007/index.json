@@ -1,0 +1,7 @@
+{
+  "https://api.tvmaze.com/search/shows?q=Chuck": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=UTF-8"
+  }
+}

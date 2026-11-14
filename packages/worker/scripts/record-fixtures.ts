@@ -1,0 +1,159 @@
+// Records real API responses as test fixtures. Needs network access and the
+// keys in packages/worker/.dev.vars. See test/fixtures/README.md.
+//
+//   npm run record -w packages/worker                               every case in test/fixtures/cases.ts
+//   npm run record -w packages/worker -- <source> <case> <url...>   save these URLs as one case
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Env } from '../src/env';
+import { lookupChain } from '../src/lookup/chain';
+import { SOURCES, type LookupDeps } from '../src/lookup/sources/index';
+import { CASES, type FixtureCase } from '../test/fixtures/cases';
+import {
+  buildFixtureFiles, caseMode, createRecorder, detailsTarget, memoryD1, parseDevVars, resolveCaseTerm, secretsFromVars, shouldReplaceFixtures, summarize,
+  type CaseResult,
+} from './recordLib';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const FIXTURES = join(ROOT, 'test', 'fixtures');
+const NAME = /^[a-z0-9][a-z0-9_-]*$/i; // source and case names become directory names
+const AD_HOC_UA = 'media-tracker-fixture-recorder (personal project)';
+
+async function loadVars(): Promise<Record<string, string>> {
+  const path = join(ROOT, '.dev.vars');
+  if (!existsSync(path)) {
+    console.warn('No packages/worker/.dev.vars: recording without API keys.');
+    return {};
+  }
+  return parseDevVars(await readFile(path, 'utf8'));
+}
+
+function envFrom(vars: Record<string, string>): Env {
+  return {
+    DB: memoryD1(),
+    ENVIRONMENT: 'dev',
+    ACCESS_TEAM_DOMAIN: '',
+    ACCESS_AUD: '',
+    ADMIN_EMAIL: '',
+    TMDB_KEY: vars.TMDB_KEY || undefined,
+    IGDB_ID: vars.IGDB_ID || undefined,
+    IGDB_SECRET: vars.IGDB_SECRET || undefined,
+  } as unknown as Env; // ASSETS isn't used by lookups
+}
+
+// Writes the case into a temp directory beside the target, then swaps it in only
+// when the case succeeded (shouldReplaceFixtures); a failed or empty recording
+// never touches the committed fixtures.
+async function writeCase(source: string, caseName: string, result: CaseResult): Promise<void> {
+  const parent = join(FIXTURES, source);
+  const dir = join(parent, caseName);
+  if (!shouldReplaceFixtures(result)) return;
+  await mkdir(parent, { recursive: true });
+  const tmp = await mkdtemp(join(parent, `.${caseName}.tmp-`));
+  try {
+    const { files } = buildFixtureFiles(result.records);
+    for (const f of files) await writeFile(join(tmp, f.name), f.content);
+    await rm(dir, { recursive: true, force: true });
+    await rename(tmp, dir);
+  } finally {
+    await rm(tmp, { recursive: true, force: true }); // no-op after a successful rename
+  }
+}
+
+const message = (err: unknown) => String(err instanceof Error ? err.message : err);
+
+async function runCase(c: FixtureCase, vars: Record<string, string>, secrets: string[]): Promise<CaseResult> {
+  const label = `${c.source}/${c.case}`;
+  const resolved = 'query' in c ? resolveCaseTerm(c, vars, process.env) : null;
+  if (resolved && 'skip' in resolved) {
+    console.log(`${label}: skipped: ${resolved.skip}`);
+    return { label, records: [], skipped: resolved.skip };
+  }
+  const query = resolved && 'query' in resolved ? resolved.query : undefined; // the case's query, with an env-sourced term filled in
+  const rec = createRecorder(globalThis.fetch, secrets);
+  const d: LookupDeps = { fetch: rec.fetch, env: envFrom(vars), log: [] };
+  let error: string | undefined;
+  try {
+    const mode = caseMode(c);
+    if ('details' in c) {
+      const fn = SOURCES[c.source]?.details;
+      if (!fn) throw new Error(`${c.source} has no registered details function`);
+      console.log(`${label}:`, JSON.stringify(await fn(c.details, d)));
+    } else if (mode === 'search-then-details') {
+      // One case holds both: the search, then details of its first result (no ids to guess).
+      const entry = SOURCES[c.source];
+      if (!entry?.details) throw new Error(`${c.source} has no registered details function`);
+      const found = await entry.search(query!, d);
+      console.log(`${label}:`, JSON.stringify(found));
+      console.log(`${label} details:`, JSON.stringify(await entry.details(detailsTarget(found), d)));
+    } else if ('chain' in c && c.chain) {
+      console.log(`${label}:`, JSON.stringify(await lookupChain(query!.category, query!, d)));
+    } else {
+      const entry = SOURCES[c.source];
+      if (!entry) throw new Error(`${c.source} is not registered in SOURCES`);
+      console.log(`${label}:`, JSON.stringify(await entry.search(query!, d)));
+    }
+  } catch (err) {
+    error = message(err);
+  }
+  for (const line of d.log ?? []) console.log(`  · ${line}`);
+  return { label, records: rec.records, error };
+}
+
+async function recordCases(): Promise<CaseResult[]> {
+  if (CASES.length === 0) {
+    console.log('No cases in test/fixtures/cases.ts.');
+    return [];
+  }
+  const vars = await loadVars();
+  const secrets = secretsFromVars(vars);
+  const results: CaseResult[] = [];
+  for (const c of CASES) {
+    if (!NAME.test(c.source) || !NAME.test(c.case)) throw new Error(`bad case name ${c.source}/${c.case}`);
+    // Sequential, through the adapters' own paced() calls: paced exactly as production.
+    const r = await runCase(c, vars, secrets);
+    await writeCase(c.source, c.case, r);
+    results.push(r);
+  }
+  return results;
+}
+
+async function recordUrls(source: string, caseName: string, urls: string[]): Promise<CaseResult[]> {
+  if (!NAME.test(source) || !NAME.test(caseName)) throw new Error('source and case must match [a-z0-9_-]');
+  const vars = await loadVars();
+  const rec = createRecorder(globalThis.fetch, secretsFromVars(vars));
+  let error: string | undefined;
+  for (const url of urls) {
+    try {
+      await rec.fetch(url, { headers: { 'User-Agent': AD_HOC_UA } });
+    } catch (err) {
+      error = message(err);
+    }
+  }
+  const result: CaseResult = { label: `${source}/${caseName}`, records: rec.records, error };
+  await writeCase(source, caseName, result);
+  return [result];
+}
+
+async function main(): Promise<number> {
+  const args = process.argv.slice(2);
+  if (args.length > 0 && args.length < 3) {
+    console.error('usage: record-fixtures.ts                      (all cases in test/fixtures/cases.ts)');
+    console.error('       record-fixtures.ts <source> <case> <url...>');
+    return 2;
+  }
+  const results = args.length === 0 ? await recordCases() : await recordUrls(args[0]!, args[1]!, args.slice(2));
+  const { lines, exitCode } = summarize(results);
+  if (lines.length) console.log(`\nSummary (test/fixtures/<source>/<case>/):\n${lines.join('\n')}`);
+  return exitCode;
+}
+
+main().then(
+  (code) => process.exit(code),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);

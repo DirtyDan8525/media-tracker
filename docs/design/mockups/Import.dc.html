@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Import preview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd166}a:hover{color:#ffe29a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #1b1b25; color: #e6e6ed; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="display: flex; align-items: center; gap: 4px; padding: 12px 12px 4px">
+    <a href="Settings.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #e6e6ed">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff">Import your Sheet</h1>
+  </div>
+
+  <div style="flex: 1; padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow: hidden">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #232339">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5"></path></svg>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0">
+        <span style="font-size: 15px; font-weight: 600; color: #ffffff">Dan's Media Tracker.xlsx</span>
+        <span style="font-size: 13px; color: #a6a6bb">Nothing is saved until you press Import</span>
+      </div>
+      <button style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #2e2e3e; background: transparent; color: #e6e6ed; font: 500 13px Inter, sans-serif">Change</button>
+    </div>
+
+    <section aria-label="What will be imported" style="border-radius: 14px; background: #232339; overflow: hidden">
+      <sc-for list="{{counts}}" as="c" hint-placeholder-count="7">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid #2e2e3e">
+          <span style="font-size: 15px">{{c.tab}}</span>
+          <span style="font-size: 15px; font-weight: 700; color: #ffffff">{{c.n}}</span>
+        </div>
+      </sc-for>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #2a2a3b">
+        <span style="font-size: 15px; font-weight: 600">Settings</span>
+        <span style="font-size: 14px; color: #e6e6ed">Midnight theme · tabs · compare options</span>
+      </div>
+    </section>
+
+    <details open style="border-radius: 14px; background: #232339; padding: 12px 14px">
+      <summary style="font-size: 15px; font-weight: 600; color: #ffd166; cursor: pointer">2 warnings</summary>
+      <ul style="margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #e6e6ed">
+        <li>Movies, row 14: rating "11" isn't 0–10, imported as unrated</li>
+        <li>Albums, row 31: rating "eight" isn't a number, imported as unrated</li>
+      </ul>
+    </details>
+    <details style="border-radius: 14px; background: #232339; padding: 12px 14px">
+      <summary style="font-size: 15px; font-weight: 600; color: #e6e6ed; cursor: pointer">1 row skipped</summary>
+    </details>
+
+    <a href="Main.dc.html" style="margin-top: auto; height: 54px; border-radius: 14px; background: #ffd166; color: #13131c; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center; text-decoration: none">Import 212 titles</a>
+    <span style="text-align: center; font-size: 13px; color: #a6a6bb">You can undo the whole import afterwards.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { counts: [
+      { tab: 'Anime', n: 48 }, { tab: 'Movies', n: 52 }, { tab: 'TV Shows', n: 31 },
+      { tab: 'Albums', n: 40 }, { tab: 'Games', n: 27 }, { tab: 'Books', n: 14 }, { tab: 'Anime + TV seasons', n: 0 }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

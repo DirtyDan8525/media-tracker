@@ -1,0 +1,19 @@
+{
+  "https://id.twitch.tv/oauth2/token?grant_type=client_credentials": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  },
+  "https://api.igdb.com/v4/games": [
+    {
+      "file": "2.json",
+      "status": 200,
+      "contentType": "application/json"
+    },
+    {
+      "file": "3.json",
+      "status": 200,
+      "contentType": "application/json"
+    }
+  ]
+}

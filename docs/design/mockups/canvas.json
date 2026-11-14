@@ -1,0 +1,18 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-11-11T02:55:00Z"},"title":"Media Tracker App — Screen Mockups","launch":{"view":"canvas"},"pages":[],
+"boards":{
+"Main.dc.html":{"x":0,"y":0,"w":390,"h":844,"title":"Home · Anime list (phone)"},
+"AddEntry.dc.html":{"x":470,"y":0,"w":390,"h":844,"title":"Add entry"},
+"Picker.dc.html":{"x":940,"y":0,"w":390,"h":844,"title":"Which one did you mean?"},
+"EntryDetail.dc.html":{"x":1410,"y":0,"w":390,"h":844,"title":"Entry details"},
+"Import.dc.html":{"x":1880,"y":0,"w":390,"h":844,"title":"Import preview"},
+"Settings.dc.html":{"x":2350,"y":0,"w":390,"h":844,"title":"Settings"},
+"About.dc.html":{"x":2820,"y":0,"w":390,"h":844,"title":"About / Start Here"},
+"ListPC.dc.html":{"x":0,"y":1190,"w":1440,"h":900,"title":"Anime list (PC table)","expand":"fill"}
+},
+"order":["Main.dc.html","AddEntry.dc.html","Picker.dc.html","EntryDetail.dc.html","Import.dc.html","Settings.dc.html","About.dc.html","ListPC.dc.html"],
+"notes":{
+"t1":{"x":0,"y":-300,"text":"Phone screens · Midnight theme","kind":"title1","maxW":3210},
+"t2":{"x":0,"y":890,"text":"PC","kind":"title1","maxW":1440},
+"n1":{"x":3290,"y":0,"w":320,"text":"Assumptions to confirm:\n• Bottom bar shows your first 4 enabled tabs + More (Songs, Games, Books, Import, Settings, About live under More).\n• Covers are placeholders here; the app shows real cover art.\n• + Add opens a sheet over the list; the entry saves instantly and fills in while you keep going.\n• The import counts are examples, not your real numbers.","fill":"orange"}
+},
+"designSystems":[]}

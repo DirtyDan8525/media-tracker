@@ -1,0 +1,12 @@
+{
+  "https://api.tvmaze.com/search/shows?q=Chuck": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json; charset=UTF-8"
+  },
+  "https://api.tvmaze.com/shows/168": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json; charset=UTF-8"
+  }
+}

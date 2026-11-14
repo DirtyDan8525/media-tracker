@@ -212,3 +212,6 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .search--wide { margin-top: 0; width: 280px; }
 .search--wide .search__input { height: var(--tap); }
 .page-header__actions { display: flex; align-items: center; gap: var(--space-6); }
+.search__input::-webkit-search-cancel-button,
+.search__input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.search__input { -webkit-appearance: none; appearance: none; }

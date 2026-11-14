@@ -521,7 +521,7 @@ describe('search and filters', () => {
     await screen.findByText('Frieren');
     await userEvent.type(await openSearch(), 'fri');
     expect(titles()).toEqual(['Frieren']);
-    expect(router.state.location.search).toBe('?q=fri');
+    await waitFor(() => expect(router.state.location.search).toBe('?q=fri'));
     expect(router.state.historyAction).toBe('REPLACE');
     expect(screen.getByText('1 of 3 titles')).toBeInTheDocument();
   });
@@ -553,9 +553,89 @@ describe('search and filters', () => {
     renderApp('/list/anime');
     await screen.findByText('Frieren');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Genre' }), 'Adventure (2)');
-    expect(titles()).toEqual(['Frieren', 'Pokémon']);
+    expect(titles()).toEqual(['Frieren', 'Pokémon']); // rating order: 9, 7
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
     expect(titles()).toEqual(['Frieren', 'Pokémon']);
+  });
+
+  it('sorting applies to the filtered rows (Title order differs from Rating order)', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ title: 'Zeta', rating: 9, genres: 'Drama' }), makeEntry({ title: 'Alpha', rating: 5, genres: 'Drama' }),
+      makeEntry({ title: 'Mid', rating: 7, genres: 'Other' }),
+    ] });
+    renderApp('/list/anime?genre=Drama');
+    await screen.findByText('Zeta');
+    expect(titles()).toEqual(['Zeta', 'Alpha']);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
+    expect(titles()).toEqual(['Alpha', 'Zeta']);
+  });
+
+  it('fast typing keeps every character and the URL follows', async () => {
+    three();
+    const { router } = renderApp('/list/anime');
+    const box = await openSearch();
+    await userEvent.type(box, 'frieren', { delay: null });
+    expect(box).toHaveValue('frieren');
+    await waitFor(() => expect(router.state.location.search).toBe('?q=frieren'));
+    expect(box).toHaveValue('frieren');
+  });
+
+  it('combines q, status and genre', async () => {
+    three();
+    renderApp('/list/anime?q=a&status=Completed&genre=Adventure');
+    await screen.findByText('Frieren');
+    expect(titles()).toEqual(['Frieren']);
+    expect(screen.getByText('1 of 3 titles')).toBeInTheDocument();
+  });
+
+  it('ignores a genre nobody has and drops it from the URL; the select follows the filter', async () => {
+    three();
+    const { router } = renderApp('/list/anime?genre=Nope&status=Dropped&keep=1');
+    await screen.findByText('Bleach');
+    await waitFor(() => expect(router.state.location.search).toBe('?keep=1&status=Dropped'));
+    expect(titles()).toEqual(['Bleach']);
+    expect(screen.getByRole('combobox', { name: 'Genre' })).toHaveValue('');
+  });
+
+  it('a lower-case genre in the URL selects the list\'s own spelling', async () => {
+    three();
+    renderApp('/list/anime?genre=action');
+    await screen.findByText('Bleach');
+    expect(titles()).toEqual(['Bleach']);
+    expect(screen.getByRole('combobox', { name: 'Genre' })).toHaveValue('Action');
+  });
+
+  it('ignores a status on a list without a Status column', async () => {
+    fakeBackend({ entries: [makeEntry({ category: 'movies', title: 'Heat', genres: 'Crime' })] });
+    const { router } = renderApp('/list/movies?status=Dropped');
+    await screen.findByText('Heat');
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(titles()).toEqual(['Heat']);
+  });
+
+  it('no Genre chip when no entry has genres', async () => {
+    fakeBackend({ entries: [makeEntry({ title: 'A' }), makeEntry({ title: 'B' })] });
+    renderApp('/list/anime');
+    await screen.findByText('A');
+    expect(screen.queryByRole('combobox', { name: 'Genre' })).not.toBeInTheDocument();
+  });
+
+  it('Back restores the previous filter', async () => {
+    three();
+    const { router } = renderApp('/list/anime?q=bleach');
+    await screen.findByText('Bleach');
+    await router.navigate('/list/anime?q=pokemon');
+    await waitFor(() => expect(titles()).toEqual(['Pokémon']));
+    await router.navigate(-1);
+    await waitFor(() => expect(titles()).toEqual(['Bleach']));
+    expect(screen.getByRole('searchbox', { name: 'Search Anime' })).toHaveValue('bleach');
+  });
+
+  it('keeps unrelated query params', async () => {
+    three();
+    const { router } = renderApp('/list/anime?keep=1');
+    await userEvent.type(await openSearch(), 'a', { delay: null });
+    await waitFor(() => expect(router.state.location.search).toBe('?keep=1&q=a'));
   });
 
   it('no matches: friendly state, and Clear search and filters restores every row', async () => {
@@ -574,6 +654,7 @@ describe('search and filters', () => {
     const box = await openSearch();
     await userEvent.type(box, 'bl{Escape}');
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search' })).toHaveFocus();
     expect(titles()).toHaveLength(3);
   });
 
@@ -588,6 +669,10 @@ describe('search and filters', () => {
     expect(box).toHaveFocus();
     await userEvent.keyboard('/');
     expect(box).toHaveValue('/');
+    expect(box).toHaveAttribute('aria-keyshortcuts', '/');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await userEvent.keyboard('/');
+    expect(box).not.toHaveFocus();
     setViewportWidth(390);
   });
 });

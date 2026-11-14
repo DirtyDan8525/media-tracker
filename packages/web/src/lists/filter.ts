@@ -2,9 +2,13 @@ import { STATUSES, type Entry, type Status } from '@media-tracker/shared';
 
 export interface ListFilter { q: string; status: Status | ''; genre: string }
 
+const LETTER_FOLD: Record<string, string> = { 'ß': 'ss', 'ø': 'o', 'ł': 'l', 'æ': 'ae' };
+
 /** Case-, accent- and spacing-insensitive form of a string, for matching. */
 export function foldText(s: string): string {
-  return s.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Only Latin combining marks go, so Japanese dakuten/handakuten (U+3099/U+309A) keep が and か apart.
+  return s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[ßøłæ]/g, (c) => LETTER_FOLD[c]!).normalize('NFC').replace(/\s+/g, ' ').trim();
 }
 
 const splitGenres = (g: string): string[] => g.split(',').map((x) => x.trim()).filter(Boolean);
@@ -53,10 +57,20 @@ export function readFilter(p: URLSearchParams): ListFilter {
   };
 }
 
-export function writeFilter(f: ListFilter): URLSearchParams {
-  const p = new URLSearchParams();
+/** The query string for `f`; params that aren't filter fields are kept from `base`. */
+export function writeFilter(f: ListFilter, base?: URLSearchParams): URLSearchParams {
+  const p = new URLSearchParams(base);
+  for (const k of ['q', 'status', 'genre']) p.delete(k);
   if (f.q) p.set('q', f.q);
   if (f.status) p.set('status', f.status);
   if (f.genre) p.set('genre', f.genre);
   return p;
+}
+
+/** Drops what this list can't apply: a status on a list without a Status column, a genre no entry has.
+ *  A genre is returned in the list's own spelling, so the select can show it. */
+export function normalizeFilter(f: ListFilter, hasStatus: boolean, genres: { genre: string }[]): ListFilter {
+  const want = foldText(f.genre);
+  const hit = want ? genres.find((g) => foldText(g.genre) === want) : undefined;
+  return { q: f.q, status: hasStatus ? f.status : '', genre: hit ? hit.genre : '' };
 }

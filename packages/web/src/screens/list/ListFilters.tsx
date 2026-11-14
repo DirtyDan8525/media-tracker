@@ -51,7 +51,7 @@ export function SearchBox({ category, filter, onChange, wide, open, onClose }: P
       <label htmlFor={id} className="sr-only">{wide ? `Filter ${list}` : `Search ${list}`}</label>
       <span className="search__icon" aria-hidden="true"><Icon name="search" size={20} /></span>
       <input
-        id={id} ref={ref} type="search" className="search__input" autoComplete="off" spellCheck={false}
+        id={id} ref={ref} type="search" aria-keyshortcuts={wide ? '/' : undefined} className="search__input" autoComplete="off" spellCheck={false}
         value={filter.q} placeholder={wide ? placeholder(category).replace('Search', 'Filter') : placeholder(category)}
         onChange={(e) => onChange({ q: e.target.value })}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); clear(); } }}

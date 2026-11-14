@@ -1,6 +1,6 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntries } from '../data/useEntries';
@@ -13,7 +13,7 @@ import { Skeleton, SkeletonRow } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
 import { useAddEntry } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
-import { genreOptions, isFiltering, matchesFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
+import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
 import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
@@ -60,11 +60,48 @@ function ListBody({ category }: { category: Category }) {
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
 
   const [params, setParams] = useSearchParams();
-  const filter = useMemo(() => readFilter(params), [params]);
-  const [searchOpen, setSearchOpen] = useSearchOpen(filter.q);
+  const urlFilter = useMemo(() => readFilter(params), [params]);
   const genres = useMemo(() => genreOptions(data ?? []), [data]);
-  // Filters live in the URL; `replace` so typing doesn't push a history entry per keystroke.
-  const changeFilter = (next: Partial<ListFilter>) => setParams(writeFilter({ ...filter, ...next }), { replace: true });
+  // Until the rows load nothing can be judged invalid, so the URL's values stand.
+  const clean = useMemo(
+    () => (data ? normalizeFilter(urlFilter, CATEGORY_CONFIG[category].hasStatus, genres) : urlFilter),
+    [data, urlFilter, category, genres],
+  );
+  // The box keeps its own text (no dropped characters or caret jumps); the URL follows ~150 ms later, by `replace`.
+  const [qText, setQText] = useState(urlFilter.q);
+  const lastWritten = useRef(urlFilter.q);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (urlFilter.q !== lastWritten.current) { lastWritten.current = urlFilter.q; setQText(urlFilter.q); } // Back / reload
+  }, [urlFilter.q]);
+  useEffect(() => {
+    if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre)) return;
+    setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre }, prev), { replace: true });
+  }, [data, clean, urlFilter.status, urlFilter.genre, setParams]);
+  const filter: ListFilter = { ...clean, q: qText };
+  const [searchOpen, setSearchOpen] = useSearchOpen(qText);
+  const toggleWrap = useRef<HTMLSpanElement>(null);
+  const writeQ = (q: string) => {
+    lastWritten.current = q;
+    setParams((prev) => writeFilter({ ...readFilter(prev), q }, prev), { replace: true });
+  };
+  const changeFilter = (next: Partial<ListFilter>) => {
+    const { q, ...rest } = next;
+    if (q !== undefined) {
+      setQText(q);
+      clearTimeout(timer.current);
+      if (q === '') writeQ('');
+      else timer.current = setTimeout(() => writeQ(q), 150);
+    }
+    if (Object.keys(rest).length) setParams((prev) => writeFilter({ ...readFilter(prev), ...rest }, prev), { replace: true });
+  };
+  const clearAll = () => {
+    clearTimeout(timer.current);
+    lastWritten.current = '';
+    setQText('');
+    setParams((prev) => writeFilter({ q: '', status: '', genre: '' }, prev), { replace: true });
+  };
   const filtering = isFiltering(filter);
   const total = data?.length ?? 0;
   const rows = useMemo(
@@ -115,7 +152,7 @@ function ListBody({ category }: { category: Category }) {
     body = (
       <EmptyState
         icon="search" title="No matches" body={`Nothing in ${LIST_LABEL[category]} matches your search.`}
-        actionLabel="Clear search and filters" onAction={() => setParams(new URLSearchParams(), { replace: true })}
+        actionLabel="Clear search and filters" onAction={clearAll}
       />
     );
   } else if (rows.length === 0) {
@@ -138,10 +175,10 @@ function ListBody({ category }: { category: Category }) {
         title={LIST_LABEL[category]} sub={sub} backdrop={backdrop}
         actions={wide
           ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} wide open onClose={() => {}} />}{addButton}</>
-          : total > 0 ? <SearchToggle open={searchOpen} onClick={() => setSearchOpen(!searchOpen)} /> : undefined}
+          : total > 0 ? <span ref={toggleWrap}><SearchToggle open={searchOpen} onClick={() => setSearchOpen(!searchOpen)} /></span> : undefined}
       >
         {total > 0 && !wide && (
-          <SearchBox category={category} filter={filter} onChange={changeFilter} wide={false} open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <SearchBox category={category} filter={filter} onChange={changeFilter} wide={false} open={searchOpen} onClose={() => { setSearchOpen(false); toggleWrap.current?.querySelector('button')?.focus(); }} />
         )}
         {total > 0 && (
           <FilterChips

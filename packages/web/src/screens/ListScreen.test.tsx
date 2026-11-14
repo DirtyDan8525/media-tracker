@@ -326,7 +326,7 @@ describe('the picker', () => {
     expect(await screen.findByRole('img', { name: 'Frieren Movie cover' })).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 50));
     expect(entries[0]).toMatchObject({ title: 'Frieren Movie', coverUrl: 'https://img.example/cover.jpg', lookupState: 'ok', detailsState: 'none', releaseDate: '' });
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(document.querySelector('.toast-region')!).toBeEmptyDOMElement();
   });
 
   it('also fills details after an automatic single match', async () => {

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import type { Category } from '@media-tracker/shared';
 
-export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats';
+export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -22,6 +22,7 @@ const PATHS: Record<IconName, ReactElement> = {
   settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1" /></>,
   compare: <path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />,
   top5: <><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H4v1a3 3 0 0 0 4 3M16 6h4v1a3 3 0 0 1-4 3M12 13v4M8 20h8" /></>,
+  chevron: <path d="M9 5l7 7-7 7" />,
   stats: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></>,
 };

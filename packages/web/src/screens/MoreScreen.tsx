@@ -35,13 +35,15 @@ export function MoreScreen() {
           <div className="group__card">
             <Link to="/compare" className="group__row" aria-label={waiting > 0 ? `Compare, ${waiting} waiting` : undefined}>
               <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Compare</span>
-              {waiting > 0 && <span className="group__value">{waiting}</span>}
+              {waiting > 0 && <span className="count-pill">{waiting}</span>}
             </Link>
             <Link to="/top5" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>Top 5</span>
+              <span className="group__chev"><Icon name="chevron" size={18} /></span>
             </Link>
             <Link to="/stats" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Stats</span>
+              <span className="group__chev"><Icon name="chevron" size={18} /></span>
             </Link>
           </div>
         </section>

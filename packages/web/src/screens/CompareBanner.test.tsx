@@ -1,5 +1,8 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { THEMES } from '@media-tracker/shared';
+import { applyTheme, contrast } from '../design/theme';
+import { fakeBackend, makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 import { waitingCount } from './CompareBanner';
@@ -55,5 +58,57 @@ describe('queue banner on a list', () => {
     renderApp('/list/anime');
     await screen.findByText('No anime yet');
     expect(screen.queryByText(/to double-check/)).not.toBeInTheDocument();
+  });
+});
+
+describe('banner details', () => {
+  it('shows up to 3 covers of the queued entries, decoratively', async () => {
+    const es = [1, 2, 3, 4].map((i) => makeEntry({ id: `c${i}`, title: `T${i}`, coverUrl: `https://img.example/${i}.jpg` }));
+    es.push(makeEntry({ id: 'nocover', title: 'NC', coverUrl: '' }));
+    fakeBackend({ entries: es, extra: { 'GET /api/compare/queue': { body: { items: ['nocover', 'c1', 'c2', 'c3', 'c4'].map((entryId) => ({ entryId, category: 'anime' })) } } } });
+    renderApp('/list/anime');
+    const text = await screen.findByText('5 new ratings to double-check');
+    await waitFor(() => expect(text.parentElement!.querySelector('.compare-banner__stack')).not.toBeNull());
+    const stack = text.parentElement!.querySelector('.compare-banner__stack')!;
+    expect(stack).toHaveAttribute('aria-hidden', 'true');
+    expect([...stack.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual([
+      'https://img.example/1.jpg', 'https://img.example/2.jpg', 'https://img.example/3.jpg',
+    ]);
+  });
+  it('has no stack when no queued entry is cached with a cover', async () => {
+    mockApi(makeMe(), { 'GET /api/compare/queue': { body: queue(2) } });
+    renderApp('/list/anime');
+    const text = await screen.findByText('2 new ratings to double-check');
+    expect(text.parentElement!.querySelector('.compare-banner__stack')).toBeNull();
+  });
+  it('keeps its live region mounted, empty at 0, and fills it when ratings arrive', async () => {
+    let items = queue(0).items;
+    mockApi(makeMe(), { 'GET /api/compare/queue': () => ({ body: { items } }) });
+    const { queryClient } = renderApp('/list/anime');
+    await screen.findByText('No anime yet');
+    const region = document.querySelector('[data-testid="compare-banner-status"]')!;
+    expect(region).toHaveAttribute('role', 'status');
+    expect(region).toBeEmptyDOMElement();
+    items = queue(1).items;
+    await queryClient.invalidateQueries({ queryKey: ['compare-queue'] });
+    expect(await screen.findByText('1 new rating to double-check')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid="compare-banner-status"]')).toBe(region);
+  });
+});
+
+describe('waiting pill', () => {
+  it('renders the count in a filled Highlight pill in More', async () => {
+    mockApi(makeMe(), { 'GET /api/compare/queue': { body: queue(3) } });
+    renderApp('/more');
+    const link = await screen.findByRole('link', { name: 'Compare, 3 waiting' });
+    const pill = link.querySelector('.count-pill')!;
+    expect(pill).toHaveTextContent('3');
+  });
+  it('pill label is the primary-button colour, or black/white where that fails: at least 4.5:1 on Highlight in every theme', () => {
+    for (const name of Object.keys(THEMES)) {
+      applyTheme({ theme: name, colors: {} } as never);
+      const root = document.documentElement.style;
+      expect(contrast(root.getPropertyValue('--on-highlight-small'), root.getPropertyValue('--highlight')), name).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

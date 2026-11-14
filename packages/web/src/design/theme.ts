@@ -77,6 +77,10 @@ export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTML
   const candidates = [colors['Header row']!, colors.Background!, colors['Bright text']!];
   const onHl = candidates.reduce((best, c) => (contrast(c, hl) > contrast(best, hl) ? c : best));
   root.style.setProperty('--on-highlight', onHl);
+  // Small text on a Highlight fill (the waiting-count pill) must reach 4.5:1; Sakura's roles can't, so fall back to black or white.
+  const small = [onHl, '#000000', '#ffffff'].find((c) => contrast(c, hl) >= 4.5)
+    ?? [onHl, '#000000', '#ffffff'].reduce((b, c) => (contrast(c, hl) > contrast(b, hl) ? c : b));
+  root.style.setProperty('--on-highlight-small', small);
 
   const bgLight = luminance(colors.Background!) > 0.5;
   root.style.colorScheme = bgLight ? 'light' : 'dark';

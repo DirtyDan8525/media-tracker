@@ -30,7 +30,10 @@ describe('app shell', () => {
     mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
     renderApp('/list/anime');
     const nav = await screen.findByRole('navigation', { name: 'Lists' });
-    expect(await within(nav).findByRole('link', { name: 'Compare, 2 waiting' })).toHaveAttribute('href', '/compare');
+    const link = await within(nav).findByRole('link', { name: 'Compare, 2 waiting' });
+    expect(link).toHaveAttribute('href', '/compare');
+    expect(link.querySelector('.count-pill')).toHaveTextContent('2');
+    for (const n of ['Compare', 'Top 5', 'Stats']) expect(within(nav).getByRole('link', { name: new RegExp(`^${n}`) }).querySelector('svg')).not.toBeNull();
   });
 
   it('season tabs never appear as list tabs', async () => {

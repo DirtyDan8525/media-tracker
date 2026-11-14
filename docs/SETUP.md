@@ -127,6 +127,38 @@ Choose a username when the app asks.
 
 ---
 
+## Updating to a new version
+
+Do this each time there is new code (for example, Phase 3: Compare, Top 5, Stats, themes, Export and search). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
+
+1. Get the new code:
+   ```
+   git pull
+   ```
+   If this work is not merged to `main` yet, run `git checkout phase3` first.
+2. Install anything new:
+   ```
+   npx -y npm@11 ci
+   ```
+3. Log in to Cloudflare again **only if the terminal was restarted** (a new Codespace session forgets it). Paste your Cloudflare API token in place of `PASTE_TOKEN_HERE`:
+   ```
+   export CLOUDFLARE_API_TOKEN=PASTE_TOKEN_HERE
+   ```
+   (In PowerShell on your PC use `$env:CLOUDFLARE_API_TOKEN="PASTE_TOKEN_HERE"`, or just run `npm exec -w packages/worker -- wrangler login`.)
+4. Update the database tables. This is the same command as step 6:
+   ```
+   npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
+   ```
+   Type `y` when asked. Phase 3 adds one table, `compare_queue` (the list of new ratings waiting to be double-checked). **Success:** it lists `0002_compare_queue.sql` with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 5, so the new app never runs against missing tables.
+5. Put the new app online:
+   ```
+   npm run deploy
+   ```
+   **Success:** it ends with a `Deployed` message and your workers.dev address.
+6. Close the installed app completely and open it again (on Android, swipe it away from recent apps). The app updates itself in the background, so it can take one more close and reopen before the new screens appear.
+
+Do not copy `DEV_EMAIL` or `LOOKUP_FAKE` into `wrangler.toml` for production. They exist only for local development and the end-to-end test, and the Worker ignores them unless `ENVIRONMENT` is `dev`.
+
 ## The three most likely problems
 
 1. **`npm ci` fails or crashes, or says the engine is not supported.** You have an old Node. Run `node -v`; if it is not 24, reinstall Node.js 24 LTS (step 2), reopen PowerShell, and run `npm ci` again.

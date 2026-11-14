@@ -50,6 +50,104 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
   await expect(page.getByLabel('Rating 9.5').first()).toBeVisible();
 });
 
+// Adds an anime through the Add sheet and gives it a rating on its page (a hand-typed rating joins
+// the compare queue).
+async function addRatedAnime(page: Page, title: string, rating: string) {
+  await page.goto('/list/anime');
+  await page.getByRole('button', { name: 'Add anime' }).click();
+  await page.getByLabel('Title').fill(title);
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('link', { name: new RegExp(title, 'i') }).first().click();
+  const field = page.getByRole('spinbutton', { name: 'Rating' });
+  await field.fill(rating);
+  await field.press('Enter');
+  await expect(page.getByRole('heading', { level: 1, name: new RegExp(title, 'i') })).toBeVisible();
+  // Let the save land before leaving the page.
+  await expect(field).toHaveValue(rating);
+}
+
+const banner = (page: Page) => page.getByTestId('compare-banner-status');
+
+test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t save changes nothing', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+
+  // The first test rated Frieren 9.5 by hand, so one rating is already waiting (the tests run in order).
+  const waiting = 1;
+
+  await addRatedAnime(page, 'bleach', '9');
+  await addRatedAnime(page, 'naruto', '8.8');
+  await addRatedAnime(page, 'trigun', '8.5');
+
+  await page.goto('/list/anime');
+  await expect(banner(page)).toContainText(`${waiting + 3} new ratings to double-check`);
+
+  // Compare the waiting ratings: answer "About the same" to every question.
+  await banner(page).getByRole('link', { name: 'Compare' }).click();
+  const same = page.getByRole('button', { name: 'About the same' });
+  const save = page.getByRole('button', { name: 'Save new ratings' });
+  const onward = page.getByRole('button', { name: /^(Close|Next)$/ });
+  const home = page.getByRole('heading', { level: 1, name: 'Compare ratings' });
+  // Each waiting rating is one run: answer "About the same" to every question, save the review when
+  // it has changes (or Close/Next when it says "All good"), until the Compare home shows again.
+  await expect(same).toBeVisible(); // the first run has started (the loading screen has the home's heading too)
+  for (let i = 0; i < 300; i++) {
+    await expect(same.or(save).or(onward).or(home).first()).toBeVisible();
+    if (await home.isVisible()) break;
+    if (await same.isVisible()) await same.click();
+    else if (await save.isVisible()) await save.click();
+    else await onward.click();
+  }
+  await expect(home).toBeVisible();
+
+  // Back on the list the banner is gone.
+  await page.goto('/list/anime');
+  await expect(page.getByRole('link', { name: /Frieren/ }).first()).toBeVisible();
+  await expect(banner(page).getByText(/new rating/)).toBeHidden();
+
+  // Compare → Anime → one answer → Stop and review → Don't save: nothing changes.
+  const ratingsOf = async () => {
+    await page.goto('/list/anime');
+    await expect(page.getByRole('link', { name: /Frieren/ }).first()).toBeVisible();
+    return page.getByLabel(/^Rating \d/).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).sort());
+  };
+  const listBefore = await ratingsOf();
+
+  await page.goto('/compare');
+  await page.getByRole('button', { name: /^Anime \(\d+\)$/ }).click();
+  await expect(same).toBeVisible();
+  // Call the lower-rated one better, so the review has a change to throw away.
+  const picks = page.getByRole('group', { name: 'Pick the better one' }).getByRole('button');
+  const nows = (await picks.evaluateAll((els) => els.map((e) => Number(/now ([\d.]+)/.exec(e.getAttribute('aria-label') ?? '')?.[1]))));
+  await picks.nth(nows[0] <= nows[1] ? 0 : 1).click();
+  await page.getByRole('button', { name: 'Stop and review' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'New ratings' })).toBeVisible();
+  await page.getByRole('button', { name: "Don't save" }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Compare ratings' })).toBeVisible();
+
+  expect(await ratingsOf()).toEqual(listBefore);
+});
+
+test('search narrows the list to Frieren', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/list/anime');
+  await expect(page.getByRole('link', { name: /Bleach/i }).first()).toBeVisible();
+
+  // Phone: the header's Search button opens the box; PC: the filter box is always there.
+  const toggle = page.getByRole('button', { name: 'Search', exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  await page.locator('input[type=search]').fill('fri');
+
+  await expect(page.getByRole('link', { name: /Frieren/ }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Bleach|Naruto|Trigun/i })).toHaveCount(0);
+});
+
+test('Settings → Appearance → Sakura sets the page background', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/settings/appearance');
+  await page.getByRole('radiogroup', { name: 'Theme' }).getByText('Sakura', { exact: true }).click();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 247, 249)');
+});
+
 test('import the sample workbook: counts match the preview', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_import');
 

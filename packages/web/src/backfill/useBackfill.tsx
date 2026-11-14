@@ -1,8 +1,10 @@
-import type { Category, Details, Entry, LookupInfo } from '@media-tracker/shared';
+import type { Category, Entry, LookupInfo } from '@media-tracker/shared';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
 import { writeEntry } from '../data/entryCache';
+import { searchOnDevice } from '../lookup/device';
+import { lookupDetails } from '../lookup/details';
 import type { LookupQuery } from '../lookup/query';
 import { enabledLists } from '../nav';
 import { useSessionMe } from '../shell/SessionGate';
@@ -68,8 +70,11 @@ export function BackfillProvider({ children }: { children: ReactNode }) {
         qc.setQueryData(summaryKey(catsRef.current), rows);
         return rows.filter((e) => e.detailsState === 'none');
       },
-      lookup: (q: LookupQuery) => api.post<{ info: LookupInfo | null }>('/api/lookup', q),
-      details: (q) => api.post<{ details: Details | null; failed?: boolean }>('/api/lookup/details', q),
+      lookup: async (q: LookupQuery) => {
+        const local = await searchOnDevice(q);
+        return local ? { info: local } : api.post<{ info: LookupInfo | null }>('/api/lookup', q);
+      },
+      details: lookupDetails,
       patch: async (id, body) => {
         const saved = await api.patch<Entry>(`/api/entries/${id}`, body);
         writeEntry(qc, saved);

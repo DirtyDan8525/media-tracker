@@ -192,7 +192,7 @@ describe('Re-fetch', () => {
     await waitFor(() => expect(entries[0]).toMatchObject({ ...DETAILS, detailsState: 'filled' }));
     expect(entries[0]).toMatchObject({
       title: "Frieren: Beyond Journey's End", creator: 'Madhouse', genres: 'Fantasy', album: 'Alb', coverUrl: 'https://img.example/new.jpg',
-      source: 'anilist', sourceId: '999', lookupState: 'ok',
+      source: 'kitsu', sourceId: '999', lookupState: 'ok',
     });
     expect(entries[0]).toMatchObject({ rating: 9.5, status: 'Completed', notes: 'so good' });
     for (const p of patches(calls)) {
@@ -283,7 +283,7 @@ describe('entry details: Pick the right match', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Pick the right match' })).not.toBeInTheDocument());
     const bodies = patches(calls, 'r1');
-    expect(bodies[0]).toMatchObject({ lookupState: 'ok', source: 'anilist', sourceId: '2' });
+    expect(bodies[0]).toMatchObject({ lookupState: 'ok', source: 'kitsu', sourceId: '2' });
     expect(bodies.some((b) => b.detailsState === 'filled')).toBe(true);
     expect(within(await screen.findByRole('region', { name: 'Synopsis' })).getByText('An elf outlives her party.')).toBeInTheDocument();
   });

@@ -319,6 +319,15 @@ suite.skipIf(!hasFixtures('anilist', 'details-154587'))('anilist fixture: detail
   });
 });
 
+suite('AniList unreachable', () => {
+  it('a 403 (blocked) or a network error stops after the first request and throws, so the caller can fall back', async () => {
+    for (const f of [fakeFetch({ 'https://graphql.anilist.co': 403 }), fakeFetch({})]) {
+      await expect(search(q('the frieren beyond journeys end'), deps(f))).rejects.toBeInstanceOf(SourceFailure);
+      expect(f.calls).toHaveLength(1);
+    }
+  });
+});
+
 suite('details input', () => {
   it('rejects a non-numeric id without a request', async () => {
     const f = fakeFetch({});

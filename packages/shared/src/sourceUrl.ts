@@ -20,6 +20,8 @@ export function sourceUrl(source: SourceId | null | undefined, sourceId: string 
   switch (source) {
     case 'anilist':
       return /^\d{1,9}$/.test(sourceId) ? `https://anilist.co/anime/${sourceId}` : null;
+    case 'kitsu':
+      return /^\d{1,9}$/.test(sourceId) ? `https://kitsu.io/anime/${sourceId}` : null;
     case 'tmdb':
       return /^\d{1,9}$/.test(sourceId) ? `https://www.themoviedb.org/movie/${sourceId}` : null;
     case 'wiki':

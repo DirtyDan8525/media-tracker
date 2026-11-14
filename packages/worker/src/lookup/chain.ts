@@ -6,7 +6,7 @@ import { SOURCES, keysPresent, type LookupDeps, type LookupQuery } from './sourc
 
 /** Sources tried in order per tab, exactly as lookup_ does after the Spotify check. */
 export const CHAINS: Record<Category, SourceId[]> = {
-  anime: ['anilist'], // Kitsu spelling correction happens inside the anilist adapter
+  anime: ['anilist', 'kitsu'], // the device normally searches AniList itself; Cloudflare's IPs are blocked by AniList, so kitsu is the server's backup
   songs: ['deezer'], // the deezer adapter searches tracks when q.category === 'songs'
   games: ['igdb', 'steam', 'wiki'],
   movies: ['tmdb', 'wiki'],

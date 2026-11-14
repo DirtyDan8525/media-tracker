@@ -1,6 +1,6 @@
 // HTTP helpers for lookup sources: fetch with a timeout that never throws,
 // per-source pacing, and the URL/secret scrubbing every log line goes through.
-import type { SourceId } from '@media-tracker/shared';
+import { SourceFailure, answeredStatus } from '@media-tracker/shared';
 import type { Env } from '../env';
 import type { LookupDeps } from './sources/index';
 
@@ -64,18 +64,6 @@ export function logLine(d: LookupDeps, line: string): void {
   d.log?.push(redactSecrets(redactParams(line), envSecrets(d.env)));
 }
 
-/**
- * Thrown by a details adapter when its source could not answer (network error, timeout, bad JSON,
- * 429, 5xx, auth failure). A source that answered "nothing here" returns null instead, so the
- * endpoint can tell "failed, try again later" from "confirmed empty".
- */
-export class SourceFailure extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SourceFailure';
-  }
-}
-
 // Results that came back incomplete because an optional extra call failed. The chain skips its cache
 // write for them so a hiccup is not frozen in for 30 days. A WeakSet keeps the flag off the wire.
 const degraded = new WeakSet<object>();
@@ -87,9 +75,6 @@ export function markDegraded<T extends object>(info: T): T {
 }
 
 export const isDegraded = (info: object | null | undefined): boolean => !!info && degraded.has(info);
-
-/** True for a status that is a real answer: 2xx, or "no such item" (404/410). Anything else (0, 429, 5xx, 401...) is a failure. */
-export const answeredStatus = (status: number): boolean => (status >= 200 && status < 300) || status === 404 || status === 410;
 
 /** Throws SourceFailure unless `status` is a real answer. */
 export function assertAnswered(status: number, what: string): void {
@@ -112,6 +97,19 @@ function withDefaultHeaders(init: RequestInit, accept: string): RequestInit {
   if (!headers.has('User-Agent')) headers.set('User-Agent', DEFAULT_USER_AGENT);
   if (!headers.has('Accept')) headers.set('Accept', accept);
   return { ...init, headers };
+}
+
+/**
+ * `f` with the default User-Agent added to requests that set none. For handing the Worker's fetch
+ * to the runtime-neutral code in @media-tracker/shared (browsers cannot set a User-Agent, so that
+ * code does not).
+ */
+export function withUserAgent(f: typeof fetch): typeof fetch {
+  return ((input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    if (!headers.has('User-Agent')) headers.set('User-Agent', DEFAULT_USER_AGENT);
+    return f(input, { ...init, headers });
+  }) as typeof fetch;
 }
 
 type Outcome = { ok: true; status: number; text: string; retryAfter: string | null } | { ok: false };
@@ -190,44 +188,6 @@ export async function fetchText(
 }
 
 // ---- pacing ---------------------------------------------------------------
-
-export interface PacingClock {
-  now(): number;
-  sleep(ms: number): Promise<void>;
-}
-
-const realClock: PacingClock = {
-  now: () => Date.now(),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};
-let clock: PacingClock = realClock;
-// Next allowed start time per source, for this isolate.
-const nextStart = new Map<SourceId, number>();
-
-/** Swap the clock (tests). `null` restores the real one. */
-export function setPacingClock(c: PacingClock | null): void {
-  clock = c ?? realClock;
-}
-
-/** Forget all pacing state (tests). */
-export function resetPacing(): void {
-  nextStart.clear();
-}
-
-/** Waits `ms` on the pacing clock (so tests can replace it). */
-export function sleep(ms: number): Promise<void> {
-  return clock.sleep(ms);
-}
-
-/**
- * Runs `fn` no sooner than `minGapMs` after the previous paced start for the
- * same source in this isolate. Concurrent callers are spaced one gap apart:
- * each reserves its slot before waiting.
- */
-export async function paced<T>(source: SourceId, minGapMs: number, fn: () => Promise<T>): Promise<T> {
-  const now = clock.now();
-  const slot = Math.max(now, nextStart.get(source) ?? now);
-  nextStart.set(source, slot + minGapMs);
-  if (slot > now) await clock.sleep(slot - now);
-  return fn();
-}
+// SourceFailure, answeredStatus and the pacing helpers live in @media-tracker/shared (the browser
+// uses them too); re-exported so adapters keep importing them from here.
+export { SourceFailure, answeredStatus, paced, resetPacing, setPacingClock, sleep, type PacingClock } from '@media-tracker/shared';

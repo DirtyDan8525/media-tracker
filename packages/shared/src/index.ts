@@ -4,3 +4,6 @@ export * from './theme';
 export * from './importLimits';
 export * from './sourceUrl';
 export * from './rating';
+export { SourceFailure, answeredStatus, paced, resetPacing, setPacingClock, sleep, type FetchDeps, type PacingClock } from './lookup/http';
+export { kitsuTitle } from './lookup/kitsu';
+export * as anilist from './lookup/anilist';

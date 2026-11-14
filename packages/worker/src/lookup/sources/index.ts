@@ -7,6 +7,7 @@ import * as anilist from './anilist';
 import * as deezer from './deezer';
 import * as igdb from './igdb';
 import * as itunes from './itunes';
+import * as kitsu from './kitsu';
 import * as openlibrary from './openlibrary';
 import * as spotify from './spotify';
 import * as steam from './steam';
@@ -44,7 +45,7 @@ export interface SourceEntry {
 }
 
 export const SOURCE_IDS: readonly SourceId[] = [
-  'anilist', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb',
+  'anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb',
 ];
 
 export const hasTmdbKey = (env: Env): boolean => !!env.TMDB_KEY;
@@ -59,6 +60,7 @@ export const KEY_CHECKS: Partial<Record<SourceId, (env: Env) => boolean>> = {
 /** Registered adapters (Tasks 6-11 add theirs here). */
 export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
   anilist: { search: anilist.search, details: anilist.details },
+  kitsu: { search: kitsu.search, details: kitsu.details },
   tmdb: { search: tmdb.search, details: tmdb.details },
   wiki: { search: wiki.search, details: wiki.details },
   tvmaze: { search: tvmaze.search, details: tvmaze.details },

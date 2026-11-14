@@ -315,7 +315,7 @@ describe('the picker', () => {
     await addTitle('frieren');
     await userEvent.click(await screen.findByRole('button', { name: 'Frieren Movie' }));
     await waitFor(() => expect(entries[0]).toMatchObject({ ...DETAILS, detailsState: 'filled' }));
-    expect(calls.find((c) => c.path === '/api/lookup/details')?.body).toEqual({ source: 'anilist', sourceId: 'Frieren Movie' });
+    expect(calls.find((c) => c.path === '/api/lookup/details')?.body).toEqual({ source: 'kitsu', sourceId: 'Frieren Movie' });
   });
 
   it('if the details call fails, the entry keeps its cover and title and no error shows', async () => {

@@ -13,8 +13,9 @@ export function makeEntry(over: Partial<Entry> = {}): Entry {
   };
 }
 
+// 'kitsu', not 'anilist': AniList lookups and details run on the device, so a server-answered match is Kitsu's.
 export function makeInfo(over: Partial<LookupInfo> = {}): LookupInfo {
-  return { title: 'Official', trusted: true, cover: 'https://img.example/cover.jpg', genres: 'Adventure, Fantasy', creator: 'Madhouse', source: 'anilist', sourceId: '154587', ...over };
+  return { title: 'Official', trusted: true, cover: 'https://img.example/cover.jpg', genres: 'Adventure, Fantasy', creator: 'Madhouse', source: 'kitsu', sourceId: '154587', ...over };
 }
 
 export const DETAILS: Details = { releaseDate: '2023-09-29', synopsis: 'An elf outlives her party.', lengthLabel: '28 ep · 24 min', origin: 'TV' };

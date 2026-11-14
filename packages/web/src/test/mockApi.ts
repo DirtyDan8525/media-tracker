@@ -32,9 +32,11 @@ export function mockFetch(handlers: Record<string, Handler | MockResponse>): Cal
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input), 'http://localhost');
     const method = (init?.method ?? 'GET').toUpperCase();
+    // Other hosts (AniList, called from the device) are unreachable unless a handler is keyed "METHOD https://host/path".
+    if (url.origin !== 'http://localhost' && handlers[`${method} ${url.origin}${url.pathname}`] === undefined) throw new TypeError('Failed to fetch');
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
     calls.push({ method, path: url.pathname + url.search, body, init });
-    const { h, params } = matchHandler(handlers, method, url.pathname);
+    const { h, params } = matchHandler(handlers, method, url.origin === 'http://localhost' ? url.pathname : `${url.origin}${url.pathname}`);
     const res = h === undefined ? { status: 404, body: { error: 'not_found' } } : typeof h === 'function' ? await h(body, url, params) : h;
     const status = res.status ?? 200;
     return new Response(res.body === undefined || status === 204 ? null : JSON.stringify(res.body), {

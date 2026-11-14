@@ -1,7 +1,7 @@
 export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books';
 
 export type SourceId =
-  | 'anilist' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb';
+  | 'anilist' | 'kitsu' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb';
 
 export const STATUSES = [
   'Completed',

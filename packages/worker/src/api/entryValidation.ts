@@ -1,6 +1,6 @@
 import { CATEGORY_CONFIG, STATUSES, type Category, type Entry } from '@media-tracker/shared';
 
-const SOURCES = ['anilist', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb'];
+const SOURCES = ['anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb'];
 const LOOKUP_STATES = ['ok', 'not_found', 'pending'];
 const DETAILS_STATES = ['none', 'filled', 'needs_review'];
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;

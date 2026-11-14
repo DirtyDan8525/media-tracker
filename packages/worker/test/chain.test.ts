@@ -78,7 +78,7 @@ afterEach(async () => {
 describe('CHAINS', () => {
   it('encodes the script lookup_ chains', () => {
     expect(CHAINS).toEqual({
-      anime: ['anilist'],
+      anime: ['anilist', 'kitsu'],
       songs: ['deezer'],
       games: ['igdb', 'steam', 'wiki'],
       movies: ['tmdb', 'wiki'],

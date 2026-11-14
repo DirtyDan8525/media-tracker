@@ -103,10 +103,21 @@ export interface FetchOpts {
 
 export const DEFAULT_TIMEOUT_MS = 8000;
 
+export const DEFAULT_USER_AGENT = 'MediaTrackerApp/1.0 (+https://github.com/DirtyDan8525/media-tracker)';
+
+// Workers' fetch sends no User-Agent and some APIs (AniList) answer 403 without one. Fills in
+// User-Agent and Accept only when the caller did not set them. Carries no secrets.
+function withDefaultHeaders(init: RequestInit, accept: string): RequestInit {
+  const headers = new Headers(init.headers);
+  if (!headers.has('User-Agent')) headers.set('User-Agent', DEFAULT_USER_AGENT);
+  if (!headers.has('Accept')) headers.set('Accept', accept);
+  return { ...init, headers };
+}
+
 type Outcome = { ok: true; status: number; text: string; retryAfter: string | null } | { ok: false };
 
 // One request with a timeout; reads the whole body as text. Never throws.
-async function fetchRaw(url: string, init: RequestInit, d: LookupDeps, opts: FetchOpts | undefined): Promise<Outcome> {
+async function fetchRaw(url: string, init: RequestInit, d: LookupDeps, opts: FetchOpts | undefined, accept: string): Promise<Outcome> {
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const ctrl = new AbortController();
   const onOuterAbort = () => ctrl.abort();
@@ -115,7 +126,7 @@ async function fetchRaw(url: string, init: RequestInit, d: LookupDeps, opts: Fet
   const method = (init.method ?? 'GET').toUpperCase();
   const shown = `${method} ${stripUrl(url)}`;
   try {
-    const res = await d.fetch(url, { ...init, signal: ctrl.signal });
+    const res = await d.fetch(url, { ...withDefaultHeaders(init, accept), signal: ctrl.signal });
     const text = await res.text();
     logLine(d, `${shown} → ${res.status}`);
     return { ok: true, status: res.status, text, retryAfter: res.headers.get('retry-after') };
@@ -152,7 +163,7 @@ export async function fetchJsonMeta<T>(
   d: LookupDeps,
   opts?: FetchOpts,
 ): Promise<{ status: number; body: T | null; retryAfterSec: number | null }> {
-  const r = await fetchRaw(url, init, d, opts);
+  const r = await fetchRaw(url, init, d, opts, 'application/json');
   if (!r.ok) return { status: 0, body: null, retryAfterSec: null };
   const ra = r.retryAfter?.trim() ?? '';
   const retryAfterSec = /^\d{1,6}$/.test(ra) ? Number(ra) : null;
@@ -174,7 +185,7 @@ export async function fetchText(
   d: LookupDeps,
   opts?: FetchOpts,
 ): Promise<{ status: number; body: string | null }> {
-  const r = await fetchRaw(url, init, d, opts);
+  const r = await fetchRaw(url, init, d, opts, 'text/html');
   return r.ok ? { status: r.status, body: r.text } : { status: 0, body: null };
 }
 

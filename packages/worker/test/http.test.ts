@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Env } from '../src/env';
 import {
-  envSecrets, fetchJson, fetchJsonMeta, fetchText, paced, redactSecrets, resetPacing, setPacingClock, stripUrl,
+  DEFAULT_USER_AGENT, envSecrets, fetchJson, fetchJsonMeta, fetchText, paced, redactSecrets, resetPacing, setPacingClock, stripUrl,
 } from '../src/lookup/http';
 import { CACHE_TTL_MS, getCached, putCached } from '../src/lookup/cache';
 import type { LookupDeps } from '../src/lookup/sources/index';
@@ -14,6 +14,34 @@ afterEach(async () => {
   setPacingClock(null);
   resetPacing();
   await env.DB.exec('DELETE FROM lookup_cache');
+});
+
+describe('default request headers', () => {
+  const spy = () => {
+    const calls: Headers[] = [];
+    const f = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new Headers(init?.headers));
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    return { f, calls };
+  };
+
+  it('sends the default User-Agent and Accept on a plain call', async () => {
+    const { f, calls } = spy();
+    await fetchJson('https://a.test/x', {}, deps(f));
+    await fetchText('https://a.test/y', { method: 'GET' }, deps(f));
+    expect(calls[0]!.get('user-agent')).toBe(DEFAULT_USER_AGENT);
+    expect(calls[0]!.get('accept')).toBe('application/json');
+    expect(calls[1]!.get('user-agent')).toBe(DEFAULT_USER_AGENT);
+    expect(calls[1]!.get('accept')).toBe('text/html');
+  });
+
+  it('does not override a caller-provided User-Agent or Accept', async () => {
+    const { f, calls } = spy();
+    await fetchJsonMeta('https://a.test/x', { headers: { 'User-Agent': 'Custom/1', Accept: 'application/vnd.api+json' } }, deps(f));
+    expect(calls[0]!.get('user-agent')).toBe('Custom/1');
+    expect(calls[0]!.get('accept')).toBe('application/vnd.api+json');
+  });
 });
 
 describe('stripUrl / redactSecrets', () => {

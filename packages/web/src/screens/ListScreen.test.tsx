@@ -506,3 +506,88 @@ describe('v2 look', () => {
     expect(screen.getByRole('img', { name: 'Blank cover' }).style.width).toBe('56px');
   });
 });
+
+describe('search and filters', () => {
+  const three = () => fakeBackend({ entries: [
+    makeEntry({ title: 'Frieren', rating: 9, status: 'Completed', genres: 'Fantasy, Adventure', creator: 'Madhouse' }),
+    makeEntry({ title: 'Pokémon', rating: 7, status: 'On Hold', genres: 'Adventure' }),
+    makeEntry({ title: 'Bleach', rating: 8, status: 'Dropped', genres: 'Action' }),
+  ] });
+  const openSearch = async () => { await userEvent.click(await screen.findByRole('button', { name: 'Search' })); return screen.findByRole('searchbox', { name: 'Search Anime' }); };
+
+  it('typing filters, updates the URL with replace, and shows "1 of 3 titles"', async () => {
+    three();
+    const { router } = renderApp('/list/anime');
+    await screen.findByText('Frieren');
+    await userEvent.type(await openSearch(), 'fri');
+    expect(titles()).toEqual(['Frieren']);
+    expect(router.state.location.search).toBe('?q=fri');
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(screen.getByText('1 of 3 titles')).toBeInTheDocument();
+  });
+
+  it('ignores accents and case, and starts from the URL', async () => {
+    three();
+    renderApp('/list/anime?q=POKEMON');
+    await screen.findByText('Pokémon');
+    expect(titles()).toEqual(['Pokémon']);
+    expect(screen.getByRole('searchbox', { name: 'Search Anime' })).toHaveValue('POKEMON');
+  });
+
+  it('Status filter narrows, and is absent on Movies', async () => {
+    three();
+    const { unmount } = renderApp('/list/anime');
+    await screen.findByText('Frieren');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'Status: On Hold');
+    expect(titles()).toEqual(['Pokémon']);
+    unmount();
+    fakeBackend({ entries: [makeEntry({ category: 'movies', title: 'Heat', genres: 'Crime' })] });
+    renderApp('/list/movies');
+    await screen.findByText('Heat');
+    expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Genre' })).toBeInTheDocument();
+  });
+
+  it('Genre filter narrows; sorting applies after filtering', async () => {
+    three();
+    renderApp('/list/anime');
+    await screen.findByText('Frieren');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Genre' }), 'Adventure (2)');
+    expect(titles()).toEqual(['Frieren', 'Pokémon']);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
+    expect(titles()).toEqual(['Frieren', 'Pokémon']);
+  });
+
+  it('no matches: friendly state, and Clear search and filters restores every row', async () => {
+    three();
+    const { router } = renderApp('/list/anime?q=zzz&status=Dropped');
+    expect(await screen.findByText('No matches')).toBeInTheDocument();
+    expect(screen.getByText('Nothing in Anime matches your search.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search and filters' }));
+    expect(titles()).toHaveLength(3);
+    expect(router.state.location.search).toBe('');
+  });
+
+  it('Escape clears and closes the phone search', async () => {
+    three();
+    renderApp('/list/anime');
+    const box = await openSearch();
+    await userEvent.type(box, 'bl{Escape}');
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(titles()).toHaveLength(3);
+  });
+
+  it('PC: the filter box is always there and "/" focuses it', async () => {
+    setViewportWidth(1200);
+    three();
+    renderApp('/list/anime');
+    await screen.findByText('Frieren');
+    const box = screen.getByRole('searchbox', { name: 'Filter Anime' });
+    expect(box).toHaveAttribute('placeholder', 'Filter titles, studios, genres…');
+    await userEvent.keyboard('/');
+    expect(box).toHaveFocus();
+    await userEvent.keyboard('/');
+    expect(box).toHaveValue('/');
+    setViewportWidth(390);
+  });
+});

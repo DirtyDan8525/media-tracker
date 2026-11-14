@@ -187,3 +187,28 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
   .compare-banner { animation: compare-banner-in 0.3s var(--ease) both; }
   @keyframes compare-banner-in { from { opacity: 0; transform: translateY(-8px); } }
 }
+
+/* search + Status/Genre filters (Task 11) */
+.chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
+.select-chip.is-on { background: var(--card); border-width: 2px; }
+.icon-btn.is-on { border-color: var(--highlight); }
+.search { position: relative; display: flex; align-items: center; margin-top: var(--space-5); }
+.search__icon { position: absolute; left: 13px; display: flex; color: var(--muted-text); pointer-events: none; }
+.search__input {
+  flex: 1; min-width: 0; height: 48px; padding: 0 48px 0 44px; border-radius: var(--radius-md);
+  border: 1px solid var(--highlight); background: var(--card); color: var(--bright-text);
+  font: 400 15px var(--font); outline: none;
+}
+.search__input:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.search__clear {
+  position: absolute; right: 0; width: var(--tap); height: var(--tap); display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--muted-text); cursor: pointer;
+}
+.search__kbd {
+  position: absolute; right: 12px; min-width: 22px; height: 24px; padding: 0 6px; border-radius: 6px;
+  border: 1px solid var(--grid-line); border-bottom-width: 2px; background: var(--panel); color: var(--text);
+  font: 600 12px var(--font); display: inline-flex; align-items: center; justify-content: center;
+}
+.search--wide { margin-top: 0; width: 280px; }
+.search--wide .search__input { height: var(--tap); }
+.page-header__actions { display: flex; align-items: center; gap: var(--space-6); }

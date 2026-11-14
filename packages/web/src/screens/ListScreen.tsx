@@ -1,7 +1,7 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
@@ -13,6 +13,7 @@ import { Skeleton, SkeletonRow } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
 import { useAddEntry } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
+import { genreOptions, isFiltering, matchesFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
 import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
@@ -20,6 +21,7 @@ import { useSessionMe } from '../shell/SessionGate';
 import { CompareBanner } from './CompareBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
+import { FilterChips, SearchBox, SearchToggle, useSearchOpen } from './list/ListFilters';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));
@@ -57,14 +59,27 @@ function ListBody({ category }: { category: Category }) {
   const [addOpen, setAddOpen] = useState(false);
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
 
-  const rows = useMemo(() => sortEntries(data ?? [], sort), [data, sort]);
+  const [params, setParams] = useSearchParams();
+  const filter = useMemo(() => readFilter(params), [params]);
+  const [searchOpen, setSearchOpen] = useSearchOpen(filter.q);
+  const genres = useMemo(() => genreOptions(data ?? []), [data]);
+  // Filters live in the URL; `replace` so typing doesn't push a history entry per keystroke.
+  const changeFilter = (next: Partial<ListFilter>) => setParams(writeFilter({ ...filter, ...next }), { replace: true });
+  const filtering = isFiltering(filter);
+  const total = data?.length ?? 0;
+  const rows = useMemo(
+    () => sortEntries((data ?? []).filter((e) => matchesFilter(e, filter)), sort),
+    [data, filter, sort],
+  );
   const rated = rows.filter((e) => e.rating !== null);
   const average = rated.length ? rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length : null;
   const sub = data
     ? (
       <>
-        {`${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated`}
-        {wide && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
+        {filtering
+          ? `${rows.length} of ${total} ${total === 1 ? 'title' : 'titles'}`
+          : `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated`}
+        {wide && !filtering && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
       </>
     )
     : undefined;
@@ -96,6 +111,13 @@ function ListBody({ category }: { category: Category }) {
     );
   } else if (isError && !data) {
     body = <EmptyState icon="info" title="Couldn't load this list" body="Check your connection and try again." />;
+  } else if (total > 0 && rows.length === 0) {
+    body = (
+      <EmptyState
+        icon="search" title="No matches" body={`Nothing in ${LIST_LABEL[category]} matches your search.`}
+        actionLabel="Clear search and filters" onAction={() => setParams(new URLSearchParams(), { replace: true })}
+      />
+    );
   } else if (rows.length === 0) {
     body = (
       <EmptyState
@@ -112,14 +134,27 @@ function ListBody({ category }: { category: Category }) {
 
   return (
     <div className="screen">
-      <PageHeader title={LIST_LABEL[category]} sub={sub} backdrop={backdrop} actions={wide ? addButton : undefined}>
-        {rows.length > 1 && (
-          <div className="sort">
-            <label className="sort__label" htmlFor="list-sort">Sort</label>
-            <select id="list-sort" className="select-chip" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              {SORT_KEYS.map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
-            </select>
-          </div>
+      <PageHeader
+        title={LIST_LABEL[category]} sub={sub} backdrop={backdrop}
+        actions={wide
+          ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} wide open onClose={() => {}} />}{addButton}</>
+          : total > 0 ? <SearchToggle open={searchOpen} onClick={() => setSearchOpen(!searchOpen)} /> : undefined}
+      >
+        {total > 0 && !wide && (
+          <SearchBox category={category} filter={filter} onChange={changeFilter} wide={false} open={searchOpen} onClose={() => setSearchOpen(false)} />
+        )}
+        {total > 0 && (
+          <FilterChips
+            category={category} filter={filter} onChange={changeFilter} genres={genres}
+            sort={total > 1 ? (
+              <div className="sort">
+                <label className="sort__label" htmlFor="list-sort">Sort</label>
+                <select id="list-sort" className="select-chip" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+                  {SORT_KEYS.map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+                </select>
+              </div>
+            ) : undefined}
+          />
         )}
       </PageHeader>
       <div className="screen__body list"><CompareBanner />{body}</div>

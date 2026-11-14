@@ -130,21 +130,26 @@ Choose a username when the app asks.
 
 Do this each time there is new code (for example, Phase 3: Compare, Top 5, Stats, themes, Export and search). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
 
-1. Get the new code:
+1. Get the new code. Your copy may be on an older branch (for example `phase1-2`) and may never have heard of newer ones, so do these four commands in order:
    ```
+   git fetch origin
+   git checkout main
    git pull
+   git branch --show-current
    ```
-   If the new version is not merged to `main` yet, run `git checkout phase3` first (use the branch name I give you).
+   Use `main` once the new version is merged. If I give you a branch name to try before it is merged, put that name in place of `main` in the second command (for example `git checkout phase3`). **Success:** the last command prints the branch you meant (`main`, or the branch name I gave you). If it prints anything else, stop and tell me before going on; otherwise you would redeploy the old app and everything would look fine.
 2. Install anything new:
    ```
    npx -y npm@11 ci
    ```
-3. Log in to Cloudflare again **only if the terminal was restarted** (a new Codespace session forgets it). Paste your Cloudflare API token in place of `PASTE_TOKEN_HERE`:
-   ```
-   export CLOUDFLARE_API_TOKEN=PASTE_TOKEN_HERE
-   ```
-   (In PowerShell on your PC use `$env:CLOUDFLARE_API_TOKEN="PASTE_TOKEN_HERE"`, or just run `npm exec -w packages/worker -- wrangler login`.)
-4. Update the database tables. This is the same command as step 6:
+3. Log in to Cloudflare. Every new terminal forgets the login, so do this at the start of each update. The simplest way, if a browser can open, is `npm exec -w packages/worker -- wrangler login` and **Allow**. In a Codespace (where that browser step is awkward) use an API token instead:
+   - Create it once: Cloudflare dashboard > your profile icon > **My Profile** > **API Tokens** > **Create Token**, use the **Edit Cloudflare Workers** template, and pick your account. This update runs `wrangler deploy` and `wrangler d1 migrations apply`, so the token needs Workers Scripts **Edit** and D1 **Edit**; if D1 is not in the template's list, add **D1 > Edit** under account permissions. Copy the token when it is shown (it is shown only once; keep it somewhere private, not in the repo).
+   - Use it: paste the token in place of `PASTE_TOKEN_HERE`. The token only lasts for the terminal where you ran this, so repeat it in any new terminal:
+     ```
+     export CLOUDFLARE_API_TOKEN=PASTE_TOKEN_HERE
+     ```
+     (In PowerShell on your PC use `$env:CLOUDFLARE_API_TOKEN="PASTE_TOKEN_HERE"`.)
+4. Update the database tables. This is the same command as in section 6, "Create the tables":
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```

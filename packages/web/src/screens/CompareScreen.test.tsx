@@ -78,7 +78,7 @@ describe('Compare home', () => {
   it('says comparing is off when Ask is Off', async () => {
     setup({ entries: anime(), ask: 'Off' });
     expect(await screen.findByRole('heading', { name: 'Comparing is off' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/appearance');
   });
 
   it('offers lists with 2+ rated titles and the unrated finished titles by list', async () => {

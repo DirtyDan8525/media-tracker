@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError } from '../api/client';
+import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { removeEntryFromCache } from '../data/entryCache';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntry } from '../data/useEntry';
@@ -78,7 +79,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/list/${entry.category}`} /></div>
+      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory /></div>
       <div className="screen__body detail">
         <div className="detail__top">
           <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />
@@ -189,6 +190,8 @@ function DetailBody({ entry }: { entry: Entry }) {
           onDeleted={() => {
             navigate(`/list/${entry.category}`);
             removeEntryFromCache(qc, entry);
+            // A deleted entry leaves the compare queue on the server; refresh the banner and nav counts now.
+            void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
             toast.show(`Deleted ${entry.title}`);
           }}
         />

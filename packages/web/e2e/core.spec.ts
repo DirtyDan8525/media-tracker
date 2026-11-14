@@ -66,11 +66,22 @@ async function addRatedAnime(page: Page, title: string, rating: string) {
   await expect(field).toHaveValue(rating);
 }
 
+// Makes sure an (unrated) anime with this title exists, through the API, so a test does not depend on what
+// an earlier test left behind. Unrated, so it never joins the compare queue.
+async function ensureAnime(page: Page, title: string) {
+  const res = await page.request.get('/api/entries?category=anime');
+  const rows = (await res.json()) as { title: string }[];
+  if (rows.some((r) => r.title.toLowerCase().includes(title.toLowerCase()))) return;
+  const made = await page.request.post('/api/entries', { data: { category: 'anime', title } });
+  expect(made.ok()).toBeTruthy();
+}
+
 const banner = (page: Page) => page.getByTestId('compare-banner-status');
 
 test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t save changes nothing', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
 
+  await ensureAnime(page, 'Frieren'); // the list checks below look for it
   // Count what is already waiting (earlier tests may have left some), then check the exact increase.
   const queued = async () => ((await (await page.request.get('/api/compare/queue')).json()) as { items: unknown[] }).items.length;
   const waiting = await queued();
@@ -130,6 +141,8 @@ test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t 
 
 test('search narrows the list to Frieren', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
+  await ensureAnime(page, 'Frieren');
+  await ensureAnime(page, 'Bleach');
   await page.goto('/list/anime');
   await expect(page.getByRole('link', { name: /Bleach/i }).first()).toBeVisible();
 

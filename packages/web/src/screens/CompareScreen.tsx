@@ -50,7 +50,7 @@ export function CompareScreen() {
       return (
         <div className="screen">
           <PageHeader title="Comparing is off" backTo="/more"
-            sub={<>Turn it on in <Link to="/settings">Settings</Link>: “Ask to compare”.</>} />
+            sub={<>Turn it on in <Link to="/settings/appearance">Settings</Link>: “Ask to compare”.</>} />
         </div>
       );
     case 'home':

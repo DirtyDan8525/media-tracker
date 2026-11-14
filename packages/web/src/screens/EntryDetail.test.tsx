@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Entry, Season } from '@media-tracker/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
@@ -192,6 +193,34 @@ describe('seasons', () => {
     renderApp('/entry/f1');
     await screen.findByRole('heading', { level: 1 });
     expect(screen.queryByRole('heading', { name: /^Seasons/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Back and delete', () => {
+  it('Back returns to the list with its search kept when there is in-app history', async () => {
+    fakeBackend({ entries: [frieren()] });
+    const { router } = renderApp('/list/anime?q=fri');
+    await router.navigate('/entry/f1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(router.state.location.search).toBe('?q=fri');
+  });
+
+  it('Back goes to the category list when the entry page is the first screen', async () => {
+    fakeBackend({ entries: [frieren()] });
+    const { router } = renderApp('/entry/f1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+  });
+
+  it('deleting an entry refreshes the compare queue', async () => {
+    fakeBackend({ entries: [frieren()] });
+    const { queryClient } = renderApp('/entry/f1');
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const d = await screen.findByRole('dialog', { name: 'Delete this entry?' });
+    await userEvent.click(within(d).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: COMPARE_QUEUE_KEY }));
   });
 });
 

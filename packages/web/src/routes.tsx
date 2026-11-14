@@ -4,6 +4,7 @@ import { AboutScreen } from './screens/AboutScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { Top5Screen } from './screens/Top5Screen';
 import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
@@ -72,6 +73,7 @@ export const routes: RouteObject[] = [
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
           { path: 'compare', element: <CompareRoute /> },
+          { path: 'top5', element: <Top5Screen /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'more', element: <MoreScreen /> },

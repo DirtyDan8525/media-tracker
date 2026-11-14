@@ -10,6 +10,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeManifestIcons: false, // the glob below already precaches them (no duplicates)
+      // Cloudflare Access gates the whole origin: the browser must send the Access cookie when
+      // fetching manifest.webmanifest, or it gets the login redirect and the PWA is not installable.
+      useCredentials: true,
       injectRegister: false, // registered in src/main.tsx via virtual:pwa-register
       manifest: {
         name: 'Media Tracker',
@@ -17,6 +20,7 @@ export default defineConfig({
         description: 'Track and rate the anime, movies, TV, music, games and books you love.',
         theme_color: MIDNIGHT_BG,
         background_color: MIDNIGHT_BG,
+        id: '/',
         display: 'standalone',
         start_url: '/',
         scope: '/',

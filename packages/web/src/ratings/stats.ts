@@ -69,11 +69,11 @@ export function computeStats(byCategory: Partial<Record<Category, Entry[]>>, ena
   return { lists, all, animeGenres: enabled.includes('anime') ? genreStats(byCategory.anime ?? []) : [] };
 }
 
-/** How many rated entries fall on each score 1..10 (index 0 is score 1): the rating rounded to the nearest whole score. */
+/** How many rated entries fall on each score 1..10 (index 0 is score 1): the rating's whole part (9.0 to 9.9 is score 9; 10.0 is 10), clamped to 1..10 so 0.x counts as 1. */
 export function ratingDistribution(byCategory: Partial<Record<Category, Entry[]>>, enabled: Category[]): number[] {
   const out = new Array<number>(10).fill(0);
   for (const r of ratingsOf(enabled.flatMap((c) => byCategory[c] ?? []))) {
-    out[Math.min(10, Math.max(1, Math.round(r))) - 1]!++;
+    out[Math.min(10, Math.max(1, Math.floor(r))) - 1]!++;
   }
   return out;
 }

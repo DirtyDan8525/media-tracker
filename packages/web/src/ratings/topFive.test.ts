@@ -17,6 +17,13 @@ describe('topFive', () => {
     expect(top.map((e) => e.title)).toEqual(['Alpha', 'Zeta', 'D', 'C', 'E']);
   });
 
+  it('breaks equal rating and title by id, whatever order the rows arrive in', () => {
+    const a = makeEntry({ id: 'a', title: 'Same', rating: 8 });
+    const b = makeEntry({ id: 'b', title: 'Same', rating: 8 });
+    expect(topFive([b, a]).map((e) => e.id)).toEqual(['a', 'b']);
+    expect(topFive([a, b]).map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
   it('returns fewer than five when fewer are rated, and nothing for no ratings', () => {
     expect(topFive([makeEntry({ rating: 3 }), makeEntry({ rating: null })])).toHaveLength(1);
     expect(topFive([makeEntry({ rating: null })])).toEqual([]);

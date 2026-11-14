@@ -1,12 +1,14 @@
 import { formatRating, ratingColor, type Category } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useAllEntries } from '../data/useEntries';
+import { Button } from '../design/components/Button';
 import { CountUp } from '../design/components/CountUp';
 import { EmptyState } from '../design/components/EmptyState';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet } from '../design/ThemeContext';
+import { useIsWide } from '../hooks';
 import { enabledLists, LIST_LABEL } from '../nav';
 import { computeStats, ratingDistribution, type ListStats } from '../ratings/stats';
 import { PageHeader } from '../shell/PageHeader';
@@ -24,10 +26,14 @@ export function StatsScreen() {
   const cf = useCfSet();
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
   const { data, isPending, isError } = useAllEntries(lists);
-  const stats = useMemo(() => computeStats(data, lists), [data, lists]);
-  const dist = useMemo(() => ratingDistribution(data, lists), [data, lists]);
+  const wide = useIsWide();
+  const [allGenres, setAllGenres] = useState(false);
+  // Cheap sums over a few hundred rows; `data` is a fresh object each render, so a memo would never hit.
+  const stats = computeStats(data, lists);
+  const dist = ratingDistribution(data, lists);
 
-  if (isError) {
+  const loaded = lists.filter((c) => data[c]).length;
+  if (isError && loaded === 0) {
     return (
       <div className="screen">
         <PageHeader title="Stats" backTo="/more" />
@@ -38,7 +44,7 @@ export function StatsScreen() {
       </div>
     );
   }
-  if (isPending && lists.some((c) => !data[c])) {
+  if (isPending && !isError && lists.some((c) => !data[c])) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
         <PageHeader title="Stats" backTo="/more" />
@@ -59,13 +65,19 @@ export function StatsScreen() {
     );
   }
   const maxBin = Math.max(...dist, 1);
-  const genres = stats.animeGenres.slice(0, MAX_GENRES);
+  const genres = allGenres ? stats.animeGenres : stats.animeGenres.slice(0, MAX_GENRES);
   const maxGenre = Math.max(...genres.map((g) => g.count), 1);
 
   return (
     <div className="screen">
       <PageHeader title="Stats" backTo="/more" sub="Your lists that are turned on. Completed shows “—” for lists without a Status." />
       <div className="screen__body stats">
+        {isError && (
+          <div className="load-notice" role="status">
+            <span>Couldn't load some lists.</span>
+            <Button variant="secondary" onClick={() => void qc.refetchQueries({ queryKey: ['entries'], predicate: (q) => q.state.status === 'error' })}>Retry</Button>
+          </div>
+        )}
         <section aria-labelledby="stats-all" className="stats__card stats__all">
           <h2 id="stats-all" className="stats__card-title">All media</h2>
           <div className="stats__all-body">
@@ -108,21 +120,27 @@ export function StatsScreen() {
 
         <section aria-labelledby="stats-lists" className="stats__lists">
           <h2 id="stats-lists" className="stats__heading">By list</h2>
-          <div className="stats__table-wrap">
-            <table className="stats__table">
-              <caption className="sr-only">Stats by list</caption>
-              <thead>
-                <tr>
-                  <th scope="col">List</th><th scope="col" className="num">Entries</th><th scope="col" className="num">Rated</th>
-                  <th scope="col" className="num">Average</th><th scope="col" className="num">Completed</th><th scope="col" className="num">Highest</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.lists.map((l, i) => <StatsRow key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} />)}
-                <StatsRow name="All media" s={all} index={stats.lists.length} total />
-              </tbody>
-            </table>
-          </div>
+          {wide ? (
+            <div className="stats__table-wrap">
+              <table className="stats__table">
+                <caption className="sr-only">Stats by list</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">List</th><th scope="col" className="num">Entries</th><th scope="col" className="num">Rated</th>
+                    <th scope="col" className="num">Average</th><th scope="col" className="num">Completed</th><th scope="col" className="num">Highest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} />)}
+                  <StatsRow name="All media" s={all} index={stats.lists.length} total />
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <ul className="stats__cards" aria-label="Stats by list">
+              {stats.lists.map((l, i) => <ListCard key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} />)}
+            </ul>
+          )}
         </section>
 
         {genres.length > 0 && (
@@ -145,10 +163,36 @@ export function StatsScreen() {
                 </tbody>
               </table>
             </div>
+            {stats.animeGenres.length > MAX_GENRES && (
+              <Button variant="secondary" className="stats__more" aria-expanded={allGenres} onClick={() => setAllGenres((v) => !v)}>
+                {allGenres ? 'Show fewer genres' : `Show all ${stats.animeGenres.length} genres`}
+              </Button>
+            )}
           </section>
         )}
       </div>
     </div>
+  );
+}
+
+function ListCard({ name, s, index }: { name: string; s: ListStats; index: number }) {
+  return (
+    <li className="stats__list-card">
+      <div className="stats__list-head">
+        <h3 className="stats__list-name">{name}</h3>
+        {s.average !== null && <RatingBadge rating={s.average} size="xs" />}
+      </div>
+      <div className="stats__list-rated" aria-hidden="true">
+        <Bar value={s.entries ? s.rated / s.entries : 0} index={index} />{s.rated}/{s.entries}
+      </div>
+      <dl className="stats__list-dl">
+        <div><dt>Entries</dt><dd>{s.entries}</dd></div>
+        <div><dt>Rated</dt><dd>{s.rated}</dd></div>
+        <div><dt>Completed</dt><dd>{s.completed ?? DASH}</dd></div>
+        <div><dt>Highest</dt><dd>{s.highest === null ? DASH : formatRating(s.highest)}</dd></div>
+        {s.average === null && <div><dt>Average</dt><dd>{DASH}</dd></div>}
+      </dl>
+    </li>
   );
 }
 

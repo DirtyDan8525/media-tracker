@@ -61,8 +61,8 @@ describe('computeStats', () => {
 });
 
 describe('ratingDistribution', () => {
-  it('buckets ratings to the nearest whole score 1 to 10', () => {
-    const d = ratingDistribution({ anime: [10, 9.5, 9.4, 8, 0.2, null].map((rating) => makeEntry({ rating })) }, ['anime']);
-    expect(d).toEqual([1, 0, 0, 0, 0, 0, 0, 1, 1, 2]);
+  it('buckets by whole part, clamped to 1..10', () => {
+    const d = ratingDistribution({ anime: [10, 9.5, 9.99, 9, 8, 0.5, null].map((rating) => makeEntry({ rating })) }, ['anime']);
+    expect(d).toEqual([1, 0, 0, 0, 0, 0, 0, 1, 3, 1]);
   });
 });

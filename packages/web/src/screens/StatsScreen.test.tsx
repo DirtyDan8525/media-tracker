@@ -26,6 +26,7 @@ describe('Stats screen', () => {
     }
     expect(within(all).getByText('4', { selector: 'dd' })).toBeInTheDocument(); // entries
     expect(within(all).getByText('3', { selector: 'dd' })).toBeInTheDocument(); // rated
+    expect(within(all).getByText('Rated', { selector: 'dt' }).closest('div')).toHaveClass('sr-only');
     expect(within(all).getByRole('img', { name: '3 of 4 rated' })).toBeInTheDocument();
     // distribution as a table
     const dist = screen.getByRole('table', { name: 'Ratings by score' });
@@ -68,7 +69,7 @@ describe('Stats screen', () => {
     unmount();
     fakeBackend({ entries: rows(), me: makeMe({}, { anime: false }) });
     renderApp('/stats');
-    await screen.findByRole('table', { name: 'Stats by list' });
+    await screen.findByRole('list', { name: 'Stats by list' });
     expect(screen.queryByRole('table', { name: 'Anime by genre' })).not.toBeInTheDocument();
   });
 
@@ -83,5 +84,71 @@ describe('Stats screen', () => {
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByText("Couldn't load your lists")).not.toBeInTheDocument());
+  });
+
+  it('shows compact cards per list on a phone, not a table', async () => {
+    fakeBackend({ entries: rows(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false }) });
+    renderApp('/stats');
+    const cards = await screen.findByRole('list', { name: 'Stats by list' });
+    expect(screen.queryByRole('table', { name: 'Stats by list' })).not.toBeInTheDocument();
+    const [anime, movies] = within(cards).getAllByRole('listitem');
+    expect(within(anime!).getByRole('heading', { name: 'Anime' })).toBeInTheDocument();
+    expect(within(anime!).getByText('Completed', { selector: 'dt' }).nextSibling).toHaveTextContent('1');
+    expect(within(anime!).getByText('Highest', { selector: 'dt' }).nextSibling).toHaveTextContent('9.0');
+    expect(within(anime!).getByLabelText('Rating 8.5')).toBeInTheDocument();
+    expect(within(movies!).getByText('Completed', { selector: 'dt' }).nextSibling).toHaveTextContent('—');
+  });
+
+  it('shows a skeleton while loading', async () => {
+    mockApi(makeMe(), { 'GET /api/entries': () => new Promise(() => {}) });
+    renderApp('/stats');
+    expect(await screen.findByLabelText('Loading')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('says there is nothing to count with no entries, and with every list off', async () => {
+    fakeBackend({ entries: [] });
+    const { unmount } = renderApp('/stats');
+    expect(await screen.findByText('Nothing to count yet')).toBeInTheDocument();
+    unmount();
+    fakeBackend({ entries: [], me: makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false }) });
+    renderApp('/stats');
+    expect(await screen.findByText('Turn a list on in Settings, then add some titles.')).toBeInTheDocument();
+  });
+
+  it('keeps the lists that loaded and offers a retry for the ones that did not', async () => {
+    let failMovies = true;
+    mockApi(makeMe(), {
+      'GET /api/entries': (_b, url) => {
+        const c = url.searchParams.get('category');
+        if (c === 'movies' && failMovies) return { status: 500, body: { error: 'boom' } };
+        return { body: rows().filter((e) => e.category === c) };
+      },
+    });
+    renderApp('/stats');
+    expect(await screen.findByText("Couldn't load some lists.")).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'All media' })).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your lists")).not.toBeInTheDocument();
+    failMovies = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText("Couldn't load some lists.")).not.toBeInTheDocument());
+    expect(within(await screen.findByRole('region', { name: 'All media' })).getByText('4', { selector: 'dd' })).toBeInTheDocument();
+  });
+
+  it('shows the top 10 genres, with a button to show all when there are more', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => makeEntry({ category: 'anime', rating: 5, genres: `Genre ${String(i).padStart(2, '0')}` }));
+    fakeBackend({ entries: many });
+    renderApp('/stats');
+    const genres = await screen.findByRole('table', { name: 'Anime by genre' });
+    expect(within(genres).getAllByRole('row')).toHaveLength(11); // header + 10
+    await userEvent.click(screen.getByRole('button', { name: 'Show all 12 genres' }));
+    expect(within(screen.getByRole('table', { name: 'Anime by genre' })).getAllByRole('row')).toHaveLength(13);
+    expect(screen.getByRole('button', { name: 'Show fewer genres' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('shows no genre button for 10 or fewer genres', async () => {
+    fakeBackend({ entries: rows() });
+    renderApp('/stats');
+    await screen.findByRole('table', { name: 'Anime by genre' });
+    expect(screen.queryByRole('button', { name: /genres$/ })).not.toBeInTheDocument();
   });
 });

@@ -62,4 +62,39 @@ describe('Top 5 screen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByText("Couldn't load your lists")).not.toBeInTheDocument());
   });
+
+  it('shows #1 as a poster card on a backdrop of its cover and 2-5 as compact rows; albums get square covers', async () => {
+    fakeBackend({ entries: rows() });
+    renderApp('/top5');
+    const anime = await screen.findByRole('region', { name: 'Anime' });
+    const [first, second] = within(anime).getAllByRole('listitem');
+    expect(first).toHaveClass('top5__item--hero');
+    expect(first!.querySelector('.backdrop img')).toHaveAttribute('src', 'https://img.example/f.jpg');
+    expect(first!.querySelector('.cover--poster')).not.toBeNull();
+    expect(second).not.toHaveClass('top5__item--hero');
+    expect(second!.querySelector('.backdrop')).toBeNull();
+    const albums = screen.getByRole('region', { name: 'Albums' });
+    expect(albums.querySelector('.cover--square')).not.toBeNull();
+    expect(albums.querySelector('.cover--poster')).toBeNull();
+  });
+
+  it('keeps the lists that loaded and offers a retry for the ones that did not', async () => {
+    let failMovies = true;
+    mockApi(makeMe(), {
+      'GET /api/entries': (_b, url) => {
+        const c = url.searchParams.get('category');
+        if (c === 'movies' && failMovies) return { status: 500, body: { error: 'boom' } };
+        return { body: rows().filter((e) => e.category === c) };
+      },
+    });
+    renderApp('/top5');
+    expect(await screen.findByText("Couldn't load some lists.")).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Anime' })).getByRole('link', { name: /Frieren/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Movies' })).getByText("Couldn't load Movies.")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your lists")).not.toBeInTheDocument();
+    failMovies = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText("Couldn't load some lists.")).not.toBeInTheDocument());
+    expect(await within(await screen.findByRole('region', { name: 'Movies' })).findByRole('link', { name: /Heat/ })).toBeInTheDocument();
+  });
 });

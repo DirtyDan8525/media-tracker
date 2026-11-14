@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { topFive } from '../ratings/topFive';
 import { useAllEntries } from '../data/useEntries';
+import { Button } from '../design/components/Button';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
@@ -21,7 +22,8 @@ export function Top5Screen() {
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
   const { data, isPending, isError } = useAllEntries(lists);
 
-  if (isError) {
+  const loaded = lists.filter((c) => data[c]).length;
+  if (isError && loaded === 0) {
     return (
       <div className="screen">
         <PageHeader title="Top 5" backTo="/more" />
@@ -32,7 +34,7 @@ export function Top5Screen() {
       </div>
     );
   }
-  if (isPending && lists.some((c) => !data[c])) {
+  if (isPending && !isError && lists.some((c) => !data[c])) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
         <PageHeader title="Top 5" backTo="/more" />
@@ -44,23 +46,32 @@ export function Top5Screen() {
     <div className="screen">
       <PageHeader title="Top 5" backTo="/more" sub="Your highest rated in each list." />
       <div className="screen__body top5">
+        {isError && (
+          <div className="load-notice" role="status">
+            <span>Couldn't load some lists.</span>
+            <Button variant="secondary" onClick={() => void qc.refetchQueries({ queryKey: ['entries'], predicate: (q) => q.state.status === 'error' })}>Retry</Button>
+          </div>
+        )}
         {lists.length === 0 && (
           <EmptyState icon="info" title="No lists are turned on" body="Turn a list on in Settings to see its Top 5." />
         )}
-        {lists.map((c) => <TopBlock key={c} category={c} rows={data[c] ?? []} />)}
+        {lists.map((c) => <TopBlock key={c} category={c} rows={data[c]} />)}
       </div>
     </div>
   );
 }
 
-function TopBlock({ category, rows }: { category: Category; rows: Entry[] }) {
+/** `rows` is undefined when the list could not be loaded. */
+function TopBlock({ category, rows }: { category: Category; rows: Entry[] | undefined }) {
   const name = LIST_LABEL[category];
-  const top = useMemo(() => topFive(rows), [rows]);
+  const top = useMemo(() => topFive(rows ?? []), [rows]);
   const id = `top5-${category}`;
   return (
     <section aria-labelledby={id} className="top5__block">
       <h2 id={id} className="top5__heading">{name}</h2>
-      {top.length === 0 ? (
+      {!rows ? (
+        <div className="top5__empty"><p>Couldn't load {name}.</p></div>
+      ) : top.length === 0 ? (
         <div className="top5__empty">
           <p>Nothing rated yet.</p>
           <Link to={`/list/${category}`} className="btn btn--secondary top5__go">Go to {name}</Link>
@@ -78,7 +89,7 @@ function TopRow({ entry, rank }: { entry: Entry; rank: number }) {
   const square = CATEGORY_CONFIG[entry.category].square;
   const hero = rank === 1;
   return (
-    <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'}>
+    <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'} data-square={square || undefined}>
       <Link to={`/entry/${entry.id}`} className={hero ? 'top5__hero' : 'top5__row'}>
         {hero && <CoverBackdrop src={entry.coverUrl} />}
         <span className="top5__rank">{rank}</span>{' '}

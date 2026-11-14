@@ -5,7 +5,9 @@ export const SORT_KEYS: readonly SortKey[] = ['rating', 'release', 'title'];
 export const SORT_LABEL: Record<SortKey, string> = { rating: 'Rating', release: 'Release date', title: 'Title' };
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
-const byTitle = (a: { title: string }, b: { title: string }): number => collator.compare(a.title, b.title);
+/** Title, then id (Ruling P2), so equal titles keep one order whatever order the rows arrive in. */
+const byTitle = (a: { title: string; id?: string }, b: { title: string; id?: string }): number =>
+  collator.compare(a.title, b.title) || (a.id ?? '').localeCompare(b.id ?? '');
 
 /** 'YYYY-MM-DD' or 'YYYY' (as 1 January of that year) as a sortable number; null when undated. */
 function dateKey(d: string): number | null {
@@ -15,7 +17,7 @@ function dateKey(d: string): number | null {
 }
 
 /** A sorted copy. Rating: high to low, unrated last. Release: newest first, undated last. Ties by title. */
-export function sortEntries<T extends Pick<Entry, 'rating' | 'title' | 'releaseDate'>>(rows: T[], key: SortKey): T[] {
+export function sortEntries<T extends Pick<Entry, 'rating' | 'title' | 'releaseDate'> & { id?: string }>(rows: T[], key: SortKey): T[] {
   const out = [...rows];
   if (key === 'title') return out.sort(byTitle);
   if (key === 'rating') {

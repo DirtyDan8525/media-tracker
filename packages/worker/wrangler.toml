@@ -43,11 +43,11 @@ not_found_handling = "single-page-application"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "media-tracker"
-database_id = "REPLACE_ME_D1_DATABASE_ID" # from `wrangler d1 create media-tracker`
+database_id = "a0e8ea97-58e8-4669-bbb8-fc3616d53da8" # from `wrangler d1 create media-tracker`
 migrations_dir = "migrations"
 
 [env.production.vars]
 ENVIRONMENT = "prod"
-ACCESS_TEAM_DOMAIN = "REPLACE_ME_TEAM_DOMAIN" # e.g. yourteam.cloudflareaccess.com
-ACCESS_AUD = "REPLACE_ME_ACCESS_AUD"          # the Access application's Audience (AUD) tag
-ADMIN_EMAIL = "REPLACE_ME_YOUR_EMAIL"         # your sign-in email
+ACCESS_TEAM_DOMAIN = "withered-sound-6d85.cloudflareaccess.com" # e.g. yourteam.cloudflareaccess.com
+ACCESS_AUD = "79feeb37bf33c7031fed39f6cafd36c3e331dc275d745f7831f9da4091df54a5"          # the Access application's Audience (AUD) tag
+ADMIN_EMAIL = "daniellromanski@yahoo.com"         # your sign-in email

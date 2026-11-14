@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { makeMe, mockApi } from '../test/mockApi';
@@ -24,5 +24,22 @@ describe('More (SettingsMore.v2)', () => {
     expect(await screen.findByRole('radio', { name: 'Sakura' })).toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(router.state.location.pathname).toBe('/more');
+  });
+
+  it('Back on Appearance returns to Settings when you came from Settings', async () => {
+    mockApi(makeMe());
+    const { router } = renderApp('/settings');
+    await userEvent.click(await screen.findByRole('link', { name: 'Appearance Midnight' }));
+    await screen.findByRole('radiogroup', { name: 'Theme' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+  });
+
+  it('Back on Appearance opened directly falls back to More', async () => {
+    mockApi(makeMe());
+    const { router } = renderApp('/settings/appearance');
+    await screen.findByRole('radiogroup', { name: 'Theme' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/more'));
   });
 });

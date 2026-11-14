@@ -5,12 +5,13 @@ import { CustomColors } from './settings/CustomColors';
 import { ThemePicker } from './settings/ThemePicker';
 import '../design/settings.css';
 
-/** Settings → Appearance and Comparing (SettingsAppearance.v2 / SettingsCustom.v2), reached from More and Settings. */
+/** Settings → Appearance and Comparing (SettingsAppearance.v2 / SettingsCustom.v2), reached from More and Settings;
+ * Back returns to whichever you came from (More when opened directly). */
 export function AppearanceScreen() {
   const me = useSessionMe();
   return (
     <div className="screen">
-      <PageHeader title="Settings" backTo="/more" />
+      <PageHeader title="Settings" backTo="/more" backUsesHistory />
       <div className="screen__body stack-18">
         <section aria-labelledby="set-look" className="group">
           <h2 id="set-look" className="group__title">Appearance</h2>

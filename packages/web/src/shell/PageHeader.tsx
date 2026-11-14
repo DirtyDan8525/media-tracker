@@ -7,6 +7,8 @@ export interface PageHeaderProps {
   sub?: ReactNode;
   /** Phone-only back button target (PC has the side nav). */
   backTo?: string;
+  /** Back returns to the previous in-app screen when there is one; `backTo` is the fallback. */
+  backUsesHistory?: boolean;
   actions?: ReactNode;
   children?: ReactNode;
   /** A cover to blur behind the header (v2 list header: the list's highest-rated title). */
@@ -16,11 +18,11 @@ export interface PageHeaderProps {
 }
 
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
-export function PageHeader({ title, sub, backTo, actions, children, backdrop, titleRef }: PageHeaderProps) {
+export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef }: PageHeaderProps) {
   return (
     <header className={backdrop ? 'page-header has-backdrop' : 'page-header'}>
       <CoverBackdrop src={backdrop} />
-      {backTo && <BackButton to={backTo} />}
+      {backTo && <BackButton to={backTo} useHistory={backUsesHistory} />}
       <div className="page-header__row">
         <div className="page-header__titles">
           <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="page-title">{title}</h1>

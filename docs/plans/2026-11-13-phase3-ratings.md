@@ -484,7 +484,22 @@ UI (approved `Main.dc.html` / `ListPC.dc.html`): phone header has the 44 px "Sea
 
 ---
 
-## Open questions for Dan
+### Task 13: Settings: "Export my data"
 
-1. The Phase 1–2 plan pencilled in the offline write queue (spec §7), "Export my data" (the approved Settings mockup shows the button; `GET /api/export` already exists) and the admin source-health and diagnose pages (§5.6) for Phase 3. This plan leaves them out. Add them now, or later?
-2. On Light and Sakura, Highlight-coloured text (the Sort chip, links) is below AA on the background: Light `#b7791f` 3.6:1, Sakura `#d6457a` 4.0:1. Darken those two Highlight values, or show chip and link text in the Text colour on those themes?
+**Files:** Modify `packages/web/src/screens/SettingsScreen.tsx`; Test `packages/web/src/screens/SettingsScreen.test.tsx`.
+
+**Interfaces:** Consumes the existing `GET /api/export` (read its response shape and headers in `packages/worker/src/api/`; reuse, don't change). Produces nothing new.
+
+A "Your data" row "Export my data" (as in the approved Settings mockup) that fetches `/api/export` with credentials and downloads it as `media-tracker-export-YYYY-MM-DD.json` (local date) via a Blob + temporary `<a download>`; button shows "Exporting…" and is disabled while running; failure toast "Couldn't export your data. Try again."
+
+- [ ] **Step 1: Write the failing tests:** clicking calls `/api/export`, creates an object URL and clicks an anchor whose `download` matches `/^media-tracker-export-\d{4}-\d{2}-\d{2}\.json$/`; a 500 shows the toast and re-enables the button.
+- [ ] **Step 2: Run** `npx -y npm@11 test -w packages/web -- SettingsScreen`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Step 4: Run → PASS. Step 5: Commit `feat(settings): export my data`.
+
+---
+
+## Dan's answers (2026-11-13)
+
+1. "Export my data" goes into Phase 3 (Task 13). The offline write queue and the admin source-health/diagnose pages stay deferred.
+2. Darken the Highlight colour on Light and Sakura (Ruling P15, added to Task 9): pick the smallest HLS-lightness darkening of each that gives ≥ 4.5:1 for Highlight on Background **and** on Cards (same method as P10); Task 9's shared theme test asserts Highlight ≥ 4.5 on Background and Cards for Light and Sakura and pins the new hex values; record them in `docs/decisions-phase3.md`. Other themes' Highlight values unchanged (check them in the same test only if they already pass; report any that don't instead of changing them).
+3. Backend tasks (1–4) start now; UI tasks (5–11, 13) wait for Task 0 mockup approval.

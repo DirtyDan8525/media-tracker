@@ -27,6 +27,23 @@ describe('entry details', () => {
     expect(screen.getByText('Adventure, Drama')).toBeInTheDocument();
   });
 
+  it('v2: blurs its own cover behind the top of the page, and none without a cover', async () => {
+    fakeBackend({ entries: [frieren(), frieren({ id: 'f2', coverUrl: '' })] });
+    const { unmount } = renderApp('/entry/f1');
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.backdrop img')).toHaveAttribute('src', 'https://img.example/f.jpg');
+    unmount();
+    renderApp('/entry/f2');
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.backdrop')).not.toBeInTheDocument();
+  });
+
+  it('v2: the rating tile shows a coloured rating badge', async () => {
+    fakeBackend({ entries: [frieren()] });
+    renderApp('/entry/f1');
+    expect(await screen.findByLabelText('Rating 9.5')).toHaveClass('rating--lg');
+  });
+
   it('leaves out empty parts of the meta lines', async () => {
     fakeBackend({ entries: [frieren({ releaseDate: '', lengthLabel: '24 min', origin: '' })] });
     renderApp('/entry/f1');

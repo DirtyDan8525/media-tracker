@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { useListCounts } from '../data/useEntries';
+import { Icon } from '../design/components/Icon';
 import { enabledLists, LIST_LABEL, splitForPhone } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
@@ -19,7 +20,7 @@ export function MoreScreen() {
             <div className="group__card">
               {more.map((c) => (
                 <Link key={c} to={`/list/${c}`} className="group__row">
-                  <span>{LIST_LABEL[c]}</span>
+                  <span className="group__row-start"><span className="tile-icon"><Icon name={c} size={18} /></span>{LIST_LABEL[c]}</span>
                   {counts[c] !== undefined && <span className="group__value">{counts[c]}</span>}
                 </Link>
               ))}

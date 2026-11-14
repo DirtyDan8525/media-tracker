@@ -44,6 +44,19 @@ export function contrast(a: string, b: string): number {
   return (x! + 0.05) / (y! + 0.05);
 }
 
+/** Roles a label on a coloured fill may use, in order of preference. */
+const LABEL_ROLES = ['Bright text', 'Text', 'Background', 'Header row'] as const;
+
+/**
+ * Text colour for a label on `fill` (a rating badge): the first of Bright text, Text, Background,
+ * Header row that reaches 4.5:1, else whichever of them reads best. Always a theme role.
+ */
+export function labelColorOn(fill: string, colors: ThemeColors): string {
+  const roles = LABEL_ROLES.map((r) => colors[r] ?? MIDNIGHT[r]!);
+  return roles.find((c) => contrast(c, fill) >= 4.5)
+    ?? roles.reduce((best, c) => (contrast(c, fill) > contrast(best, fill) ? c : best));
+}
+
 /** The CF set for a theme. A Custom theme gets the light set when its Background is light. */
 export function cfFor(s: Pick<UserSettings, 'theme' | 'colors'>): CfSet {
   if (s.theme === 'Custom') return cfSetFor(luminance(themeColors(s).Background!) > 0.5 ? 'Light' : 'Midnight');

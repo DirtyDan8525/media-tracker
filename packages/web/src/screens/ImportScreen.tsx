@@ -1,12 +1,13 @@
 import { type Category, type ImportPreview, type UserSettings } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { useBackfill } from '../backfill/useBackfill';
 import { refreshCategories } from '../data/useEntries';
 import { useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
+import { Icon } from '../design/components/Icon';
 import { ProgressBar } from '../design/components/ProgressBar';
 import { chunkRows } from '../import/chunk';
 import { parseWorkbook } from '../import/parseWorkbook';
@@ -253,9 +254,12 @@ export function ImportScreen() {
 function Preview({ name, preview, onChange, onImport }: { name: string; preview: ImportPreview; onChange: () => void; onImport: () => void }) {
   const n = preview.rows.length;
   const settings = preview.settings && settingsLine(preview.settings);
+  const shown = LIST_ORDER.filter((c) => (preview.counts[c] ?? 0) > 0);
+  const most = Math.max(1, ...shown.map((c) => preview.counts[c] ?? 0));
   return (
     <>
       <div className="import__file">
+        <span className="tile-icon tile-icon--lg"><Icon name="upload" size={20} /></span>
         <div className="import__file-text">
           <span className="import__file-name">{name}</span>
           <span className="import__file-hint">Nothing is saved until you press Import</span>
@@ -265,8 +269,14 @@ function Preview({ name, preview, onChange, onImport }: { name: string; preview:
 
       <section aria-label="What will be imported" className="group__card">
         <ul className="plain-list import__counts">
-          {LIST_ORDER.filter((c) => (preview.counts[c] ?? 0) > 0).map((c) => (
-            <li key={c} className="import__count"><span>{LIST_LABEL[c]}</span><strong>{preview.counts[c]}</strong></li>
+          {shown.map((c, i) => (
+            <li key={c} className="import__count">
+              <span className="import__count-name">{LIST_LABEL[c]}</span>
+              <span className="import__bar" aria-hidden="true">
+                <span className="grow-x" style={{ width: `${Math.round(((preview.counts[c] ?? 0) / most) * 100)}%`, '--i': i } as CSSProperties} />
+              </span>
+              <strong>{preview.counts[c]}</strong>
+            </li>
           ))}
         </ul>
         {settings && (

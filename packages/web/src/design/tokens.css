@@ -14,7 +14,8 @@
  * Grid lines        -> --grid-line       |
  * Highlight         -> --highlight       | derived: --on-highlight (text on Highlight fills)
  *
- * Spacing, radii and type are measured from the approved mockups (docs/design/mockups).
+ * Spacing, radii and type are measured from the approved mockups (docs/design/mockups); the v2
+ * values (bigger covers, cover backdrops, calm motion) come from the approved *.v2.dc.html boards.
  */
 :root {
   --bg: #1b1b25;
@@ -56,10 +57,10 @@
   /* radii */
   --radius-pill: 6px;    /* status pill */
   --radius-sm: 8px;      /* covers, small buttons */
-  --radius-md: 10px;     /* rating badge, inputs, PC buttons, side-nav items */
-  --radius-lg: 12px;     /* icon buttons */
+  --radius-md: 10px;     /* rating badge, phone list covers, side-nav items */
+  --radius-lg: 12px;     /* icon buttons, buttons, inputs, picker covers */
   --radius-xl: 14px;     /* cards, grouped rows */
-  --radius-chip: 18px;   /* filter chips */
+  --radius-chip: 22px;   /* chips (44 px tall) */
   --radius-fab: 28px;    /* Add button */
 
   /* type */
@@ -76,12 +77,28 @@
 
   /* sizes */
   --tap: 44px;           /* minimum tap target */
+  --btn-h: 48px;         /* standard button */
+  --cover-list: 56px;    /* phone list cover width (56 × 84 poster) */
+  --cover-table: 40px;   /* PC table cover width (40 × 60) */
+  --cover-hero: 132px;   /* entry-details cover width (132 × 198) */
   --bottom-tabs-h: 76px;
   --side-nav-w: 240px;
   --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
 
-  /* motion */
+  /* cover backdrop: a blurred, scaled cover under a Background/Cards scrim (v2 boards' .bd) */
+  --backdrop-blur: 38px;
+  --backdrop-opacity: 0.55;
+  --backdrop-opacity-wide: 0.42;
+  --backdrop-h: 420px;   /* entry details */
+  --backdrop-h-wide: 260px;
+
+  /* motion (only ever used inside prefers-reduced-motion: no-preference) */
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms;
   --dur: 200ms;
+  --dur-rise: 500ms;     /* rows / cards rising in */
+  --dur-settle: 400ms;   /* rating badges settling after their row */
+  --dur-count: 900ms;    /* CountUp (kept in sync with CountUp.tsx) */
+  --stagger: 50ms;       /* per-item delay, set with --i */
 }

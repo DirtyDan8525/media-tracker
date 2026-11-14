@@ -1,5 +1,5 @@
 import { CATEGORY_CONFIG, type Category, type LookupInfo } from '@media-tracker/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type CSSProperties, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
 import { Sheet } from '../design/components/Sheet';
@@ -54,7 +54,7 @@ export function PickerSheet({ category, typed, choices, onChoose, onKeepTyped, o
           {choices.map((c, i) => {
             const subId = `${searchId}-sub-${i}`;
             return (
-              <li key={`${c.source}:${c.sourceId ?? c.title}:${i}`}>
+              <li key={`${c.source}:${c.sourceId ?? c.title}:${i}`} className="rise-in" style={{ '--i': Math.min(i, 10) } as CSSProperties}>
                 <button
                   type="button" className={`picker-card${i === 0 ? ' is-best' : ''}`} aria-label={c.title}
                   aria-describedby={subId} onClick={() => onChoose(c)}

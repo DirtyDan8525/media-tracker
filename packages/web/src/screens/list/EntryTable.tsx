@@ -11,7 +11,7 @@ import { StatusPill } from '../../design/components/StatusPill';
 import { parseRating } from '../../lists/validate';
 import { EditableCell } from './EditableCell';
 import { LookupNote } from './LookupNote';
-import type { RowActions } from './EntryCards';
+import { stagger, type RowActions } from './EntryCards';
 
 /** Moves focus to the same column in the nearest row above/below that has it. */
 function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
@@ -54,14 +54,14 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
           </tr>
         </thead>
         <tbody onKeyDown={onGridKeyDown}>
-          {rows.map((e) => <TableRow key={e.id} entry={e} showSeasonAvg={showSeasonAvg} {...actions} />)}
+          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={showSeasonAvg} {...actions} />)}
         </tbody>
       </table>
     </div>
   );
 }
 
-function TableRow({ entry: e, showSeasonAvg, ...actions }: { entry: Entry; showSeasonAvg: boolean } & RowActions) {
+function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean } & RowActions) {
   const qc = useQueryClient();
   const toast = useToast();
   const cfg = CATEGORY_CONFIG[e.category];
@@ -70,8 +70,8 @@ function TableRow({ entry: e, showSeasonAvg, ...actions }: { entry: Entry; showS
   const save = (patch: Partial<Entry>) => void saveEntryChange(qc, e, patch, () => toast.show(SAVE_FAILED));
 
   return (
-    <tr className={state === 'pending' ? 'is-pending' : undefined}>
-      <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={36} /></td>
+    <tr className={state === 'pending' ? 'is-pending rise-in' : 'rise-in'} style={stagger(index)}>
+      <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
       <td>
         {editable ? (
           <EditableCell

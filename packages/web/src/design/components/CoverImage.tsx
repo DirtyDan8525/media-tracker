@@ -7,14 +7,15 @@ export interface CoverImageProps {
   alt: string;
   /** Albums and songs are square; everything else is a 2:3 poster. */
   square?: boolean;
-  /** Width in px (height follows the aspect ratio). Default 52, the phone list row. */
+  /** Width in px (height follows the aspect ratio). Default 56, the v2 phone list row. */
   width?: number;
+  className?: string;
 }
 
-export function CoverImage({ src, alt, square, width = 52 }: CoverImageProps) {
+export function CoverImage({ src, alt, square, width = 56, className }: CoverImageProps) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
-  const cls = ['cover', square ? 'cover--square' : 'cover--poster'].join(' ');
+  const cls = ['cover', square ? 'cover--square' : 'cover--poster', className].filter(Boolean).join(' ');
   if (!src || failed) {
     return (
       <div role="img" aria-label={alt} className={`${cls} cover--fallback`} style={{ width }}>

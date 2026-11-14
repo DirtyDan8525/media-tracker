@@ -7,9 +7,9 @@ export function Skeleton({ width = '100%', height = 16, radius = 8 }: { width?: 
 export function SkeletonRow() {
   return (
     <div className="skeleton-row" aria-hidden="true">
-      <Skeleton width={52} height={78} />
+      <Skeleton width={56} height={84} radius={10} />
       <div className="skeleton-row__lines"><Skeleton width="70%" height={15} /><Skeleton width="45%" height={13} /></div>
-      <Skeleton width={48} height={36} radius={10} />
+      <Skeleton width={50} height={36} radius={10} />
     </div>
   );
 }

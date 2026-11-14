@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 // stylesheets: a control's effective hit height is its height / min-height / line-height plus
 // whatever its ::after hit area adds (inset: -Npx 0 adds N above and N below).
 const css = ['components.css', 'lists.css'].map((f) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8')).join('\n');
-const TAP = Number(/--tap:\s*(\d+)px/.exec(readFileSync(new URL('../src/design/tokens.css', import.meta.url), 'utf8'))![1]);
+const tokens = readFileSync(new URL('../src/design/tokens.css', import.meta.url), 'utf8');
+const TAP = Number(/--tap:\s*(\d+)px/.exec(tokens)![1]);
+/** A px size token from tokens.css (e.g. --tap, --btn-h), or null. */
+const token = (name: string): number | null => {
+  const m = new RegExp(`${name}:\\s*(\\d+)px`).exec(tokens);
+  return m ? Number(m[1]) : null;
+};
 
 function rules(selector: string): string[] {
   const out: string[] = [];
@@ -15,7 +21,12 @@ function rules(selector: string): string[] {
   return out;
 }
 
-const px = (v: string): number | null => (v.trim() === 'var(--tap)' ? TAP : /^(\d+)px$/.test(v.trim()) ? Number(v.trim().slice(0, -2)) : null);
+const px = (v: string): number | null => {
+  const t = v.trim();
+  const ref = /^var\((--[\w-]+)\)$/.exec(t);
+  if (ref) return token(ref[1]!);
+  return /^(\d+)px$/.test(t) ? Number(t.slice(0, -2)) : null;
+};
 
 /** The last declared value of `prop` across the rules for `selector` (later rules win). */
 function declared(selector: string, props: string[]): number | null {
@@ -56,8 +67,8 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     const props = prop === 'height' ? ['height', 'min-height'] : [prop];
     const size = hit(selector, props);
     if (selector === '.frame--wide .select-chip') {
-      // the wide variant overrides the height and its own ::after
-      expect(declared(selector, ['height'])! + afterExtent(selector)).toBeGreaterThanOrEqual(TAP);
+      // the wide variant may override the height (and its own ::after); otherwise it keeps the chip's
+      expect((declared(selector, ['height']) ?? declared('.select-chip', ['height']))! + afterExtent(selector)).toBeGreaterThanOrEqual(TAP);
     } else {
       expect(size, `${selector} is ${size}px`).toBeGreaterThanOrEqual(TAP);
     }
@@ -65,8 +76,11 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
 
   it('the cell button is also at least 44 px wide, and hit areas sit on positioned controls', () => {
     expect(declared('.cell-btn', ['min-width'])).toBe(TAP);
+    // v2: chips and compact buttons are 44 px themselves; any control that still pads with ::after must be positioned
     for (const s of ['.cell-btn', '.select-chip', '.btn--chip', '.btn--compact']) {
+      if (afterExtent(s) === 0) continue;
       expect(rules(s).join(';'), `${s} needs position: relative for its ::after`).toMatch(/position:\s*relative/);
     }
+    expect(afterExtent('.cell-btn')).toBeGreaterThan(0);
   });
 });

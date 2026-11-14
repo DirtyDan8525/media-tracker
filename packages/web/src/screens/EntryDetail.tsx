@@ -7,7 +7,10 @@ import { removeEntryFromCache } from '../data/entryCache';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntry } from '../data/useEntry';
 import { Button } from '../design/components/Button';
+import { CountUp } from '../design/components/CountUp';
+import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
+import { RatingBadge } from '../design/components/RatingBadge';
 import { EmptyState } from '../design/components/EmptyState';
 import { Sheet } from '../design/components/Sheet';
 import { closestFirst } from '../hooks/useAddEntry';
@@ -70,27 +73,38 @@ function DetailBody({ entry }: { entry: Entry }) {
   const moreUrl = sourceUrl(entry.source, entry.sourceId);
   const ratingCheck = (v: string) => { const p = parseRating(v); return p.ok ? null : p.error; };
 
+  const genres = entry.genres.split(',').map((g) => g.trim()).filter(Boolean);
+
   return (
-    <div className="screen">
+    <div className="screen has-backdrop">
+      <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
       <div className="detail-top"><BackButton to={`/list/${entry.category}`} /></div>
       <div className="screen__body detail">
         <div className="detail__top">
-          <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={120} />
+          <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />
           <div className="detail__facts">
             <h1 className="detail__title">{entry.title}</h1>
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
             {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
-            {entry.genres && <span className="detail__fact">{entry.genres}</span>}
+            {genres.length > 0 && (
+              <span className="detail__genres">
+                <span className="sr-only">{entry.genres}</span>
+                {genres.map((g, i) => <span key={`${g}-${i}`} className="genre-pill" aria-hidden="true">{g}</span>)}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="tiles">
-          <div className="tile">
+          <div className="tile tile--rating">
             <DetailField
-              label="Rating" type="number" value={entry.rating === null ? '' : String(entry.rating)} placeholder="Unrated"
+              className="tile__field" label="Rating" type="number" value={entry.rating === null ? '' : String(entry.rating)} placeholder="Unrated"
               check={ratingCheck} onSave={(v) => { const p = parseRating(v); if (p.ok) save({ rating: p.value }); }}
             />
+            <RatingBadge rating={entry.rating} size="lg">
+              {entry.rating !== null && <CountUp value={entry.rating} />}
+            </RatingBadge>
           </div>
           {cfg.hasStatus && (
             <div className="tile">

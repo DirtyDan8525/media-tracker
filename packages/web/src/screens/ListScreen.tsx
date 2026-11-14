@@ -1,10 +1,11 @@
-import { CATEGORY_CONFIG, formatRating, type Category, type Entry } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
+import { CountUp } from '../design/components/CountUp';
 import { EmptyState } from '../design/components/EmptyState';
 import { Icon } from '../design/components/Icon';
 import { Sheet } from '../design/components/Sheet';
@@ -59,8 +60,18 @@ function ListBody({ category }: { category: Category }) {
   const rated = rows.filter((e) => e.rating !== null);
   const average = rated.length ? rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length : null;
   const sub = data
-    ? `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated${wide && average !== null ? ` · average ${formatRating(average)}` : ''}`
+    ? (
+      <>
+        {`${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated`}
+        {wide && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
+      </>
+    )
     : undefined;
+  // v2 header backdrop: the highest-rated title that has a cover, whatever the chosen sort.
+  const backdrop = useMemo(
+    () => sortEntries(data ?? [], 'rating').find((e) => e.rating !== null && e.coverUrl)?.coverUrl ?? null,
+    [data],
+  );
   const label = `${LIST_LABEL[category]} list`;
   const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;
   const addLabel = `Add ${ADD_NOUN[category]}`;
@@ -100,7 +111,7 @@ function ListBody({ category }: { category: Category }) {
 
   return (
     <div className="screen">
-      <PageHeader title={LIST_LABEL[category]} sub={sub} actions={wide ? addButton : undefined}>
+      <PageHeader title={LIST_LABEL[category]} sub={sub} backdrop={backdrop} actions={wide ? addButton : undefined}>
         {rows.length > 1 && (
           <div className="sort">
             <label className="sort__label" htmlFor="list-sort">Sort</label>

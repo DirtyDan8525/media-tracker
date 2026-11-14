@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { BackButton } from './BackButton';
 
 export interface PageHeaderProps {
@@ -8,12 +9,15 @@ export interface PageHeaderProps {
   backTo?: string;
   actions?: ReactNode;
   children?: ReactNode;
+  /** A cover to blur behind the header (v2 list header: the list's highest-rated title). */
+  backdrop?: string | null;
 }
 
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
-export function PageHeader({ title, sub, backTo, actions, children }: PageHeaderProps) {
+export function PageHeader({ title, sub, backTo, actions, children, backdrop }: PageHeaderProps) {
   return (
-    <header className="page-header">
+    <header className={backdrop ? 'page-header has-backdrop' : 'page-header'}>
+      <CoverBackdrop src={backdrop} />
       {backTo && <BackButton to={backTo} />}
       <div className="page-header__row">
         <div className="page-header__titles">

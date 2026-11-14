@@ -1,5 +1,6 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { fakeBackend, makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
@@ -17,5 +18,31 @@ describe('AboutScreen', () => {
     )).toBeInTheDocument();
     expect(screen.getByText('This product uses the TMDB API but is not endorsed or certified by TMDB.')).toBeInTheDocument();
     expect(screen.getByText('Game data from IGDB.com.')).toBeInTheDocument();
+  });
+
+  it('v2: fans out your top-rated covers and blurs the #1 behind the top', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ title: 'A', rating: 9, coverUrl: 'https://img.example/a.jpg' }),
+      makeEntry({ title: 'B', rating: 10, category: 'movies', coverUrl: 'https://img.example/b.jpg' }),
+      makeEntry({ title: 'C', rating: 8, coverUrl: 'https://img.example/c.jpg' }),
+      makeEntry({ title: 'D', rating: 7, coverUrl: 'https://img.example/d.jpg' }),
+      makeEntry({ title: 'E', rating: 6, coverUrl: 'https://img.example/e.jpg' }),
+      makeEntry({ title: 'F', rating: null, coverUrl: 'https://img.example/f.jpg' }),
+    ] });
+    renderApp('/about');
+    await screen.findByRole('heading', { level: 1, name: 'WELCOME TO MEDIA TRACKER' });
+    // lists load one by one, so wait for the fan to settle on the top 4 across all of them
+    const fan = () => [...document.querySelectorAll<HTMLImageElement>('.about__fan img')].map((i) => i.getAttribute('src'));
+    await waitFor(() => expect(fan()).toEqual(['https://img.example/d.jpg', 'https://img.example/c.jpg', 'https://img.example/a.jpg', 'https://img.example/b.jpg']));
+    expect(document.querySelector('.about__fan')).toHaveAttribute('aria-hidden', 'true');
+    expect(document.querySelector('.backdrop img')).toHaveAttribute('src', 'https://img.example/b.jpg');
+  });
+
+  it('v2: no rated covers, no fan and no backdrop', async () => {
+    mockApi(makeMe());
+    renderApp('/about');
+    await screen.findByText('Created by Dan');
+    expect(document.querySelector('.about__fan')).not.toBeInTheDocument();
+    expect(document.querySelector('.backdrop')).not.toBeInTheDocument();
   });
 });

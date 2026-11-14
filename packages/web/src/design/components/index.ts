@@ -1,5 +1,7 @@
 export { BottomTabs } from './BottomTabs';
 export { Button } from './Button';
+export { CountUp, motionAllowed } from './CountUp';
+export { CoverBackdrop } from './CoverBackdrop';
 export { CoverImage } from './CoverImage';
 export { EmptyState } from './EmptyState';
 export { Icon } from './Icon';

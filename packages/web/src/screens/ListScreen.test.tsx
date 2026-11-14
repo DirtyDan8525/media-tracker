@@ -459,3 +459,50 @@ describe('list basics', () => {
     expect(router.state.location.pathname).toBe('/entry/abc');
   });
 });
+
+describe('v2 look', () => {
+  const headerBackdrop = () => document.querySelector<HTMLImageElement>('.page-header .backdrop img');
+
+  it("the list header's backdrop is the highest-rated title's cover", async () => {
+    fakeBackend({ entries: [
+      makeEntry({ title: 'Seven', rating: 7, coverUrl: 'https://img.example/seven.jpg' }),
+      makeEntry({ title: 'Best', rating: 9.5, coverUrl: 'https://img.example/best.jpg' }),
+      makeEntry({ title: 'Unrated', rating: null, coverUrl: 'https://img.example/none.jpg' }),
+    ] });
+    renderApp('/list/anime');
+    await screen.findByText('Best');
+    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/best.jpg');
+    // the sort chosen doesn't change it
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
+    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/best.jpg');
+  });
+
+  it('skips a top-rated title that has no cover', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ title: 'Top', rating: 10, coverUrl: '' }),
+      makeEntry({ title: 'Next', rating: 8, coverUrl: 'https://img.example/next.jpg' }),
+    ] });
+    renderApp('/list/anime');
+    await screen.findByText('Top');
+    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/next.jpg');
+  });
+
+  it('no rated titles: no backdrop', async () => {
+    fakeBackend({ entries: [makeEntry({ title: 'Plain', rating: null, coverUrl: 'https://img.example/p.jpg' })] });
+    renderApp('/list/anime');
+    await screen.findByText('Plain');
+    expect(document.querySelector('.backdrop')).not.toBeInTheDocument();
+  });
+
+  it('phone list covers are the v2 size (56 px posters, 56 px squares)', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ title: 'Poster', rating: 9, coverUrl: 'https://img.example/p.jpg' }),
+      makeEntry({ title: 'Blank', rating: 8, coverUrl: '' }),
+    ] });
+    renderApp('/list/anime');
+    const img = await screen.findByRole('img', { name: 'Poster cover' });
+    expect(img).toHaveAttribute('width', '56');
+    expect(img.style.width).toBe('56px');
+    expect(screen.getByRole('img', { name: 'Blank cover' }).style.width).toBe('56px');
+  });
+});

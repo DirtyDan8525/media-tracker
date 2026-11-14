@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { formatRating, type Season } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -64,7 +65,7 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
       {isPending && <Skeleton height={44} />}
       {isError && <p className="field-hint">Couldn't load seasons.</p>}
       {seasons.map((s, i) => (
-        <div key={s.id} className="season-row">
+        <div key={s.id} className="season-row rise-in" style={{ '--i': Math.min(i, 10) } as CSSProperties}>
           <DetailField hideLabel label={`Season ${i + 1} name`} value={s.label} maxLength={100} className="season-row__f"
             check={(v) => (v.trim() === '' ? 'Give the season a name.' : null)} onSave={(label) => void patch(s, { label })} />
           <DetailField hideLabel label={`Season ${i + 1} rating`} type="number" value={s.rating === null ? '' : String(s.rating)}

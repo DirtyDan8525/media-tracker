@@ -3,8 +3,8 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthState } from '../api/auth';
 import { useMe } from '../data/useMe';
 import { SignedOutScreen } from '../screens/SignedOutScreen';
-import { CfSetContext } from '../design/ThemeContext';
-import { cfFor, applyTheme } from '../design/theme';
+import { CfSetContext, ThemeColorsContext } from '../design/ThemeContext';
+import { cfFor, applyTheme, themeColors } from '../design/theme';
 import { Button } from '../design/components/Button';
 import { Skeleton } from '../design/components/Skeleton';
 import { homePath } from '../nav';
@@ -54,8 +54,10 @@ export function SessionGate() {
   if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={homePath(me.settings)} replace />;
 
   return (
-    <CfSetContext.Provider value={cfFor(me.settings)}>
-      <Outlet />
-    </CfSetContext.Provider>
+    <ThemeColorsContext.Provider value={themeColors(me.settings)}>
+      <CfSetContext.Provider value={cfFor(me.settings)}>
+        <Outlet />
+      </CfSetContext.Provider>
+    </ThemeColorsContext.Provider>
   );
 }

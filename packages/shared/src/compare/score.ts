@@ -66,6 +66,7 @@ export function rescore(order: CompareItem[], better: Set<string>, ties: Set<str
  * Placing ONE title (a new or unrated one): only that title's score changes. If the two neighbours are too
  * close for a whole-tenth score in between, `room` decides: an in-between score like 9.45, or the same score
  * as the one just above. Returns null for 'Push others down': the caller falls back to `rescore`.
+ * Precondition: `tie`, when given, is a rated item (non-null rating), as in the script.
  */
 export function placeScore(order: CompareItem[], idx: number, tie: CompareItem | null, room: CompareRoom): RatingChange[] | null {
   const me = order[idx], above = order[idx - 1] as CompareItem | undefined, below = order[idx + 1] as CompareItem | undefined;

@@ -1,4 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // src/lookup runs in the browser and on the Worker (fetch, AbortSignal); the tests use node:fs / node:vm.
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
   "include": ["src", "test"]
 }

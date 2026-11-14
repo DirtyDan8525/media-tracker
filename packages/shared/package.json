@@ -9,9 +9,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
+    "@types/node": "22.20.5",
     "typescript": "7.0.2",
     "vitest": "4.1.12"
   }

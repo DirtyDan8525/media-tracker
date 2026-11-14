@@ -2,6 +2,7 @@ import { CATEGORY_CONFIG, normTitle, similarity, type Category, type Entry, type
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
 import { LIST_LABEL } from '../nav';
@@ -119,6 +120,7 @@ export function useAddEntry(category: Category) {
       lookupRunning.add(entry.id);
       lookupRunning.delete(tempId);
       writeEntry(qc, entry, { replaceId: tempId });
+      if (entry.rating !== null) void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
       if (res.duplicateOf) toast.show(`Already on your ${LIST_LABEL[category]} list`);
     } catch {
       lookupRunning.delete(tempId);

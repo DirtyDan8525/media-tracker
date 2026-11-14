@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { localDb } from '../db/local';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
-import { useEntries } from './useEntries';
+import { useAllEntries, useEntries } from './useEntries';
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {
@@ -47,5 +47,16 @@ describe('useEntries', () => {
     expect(result.current.isSuccess).toBe(true);
     expect(result.current.isPlaceholderData).toBe(false);
     expect(result.current.data?.map((e) => e.id)).toEqual(['c1']);
+  });
+
+  it('useAllEntries returns every requested list from the cache before the network answers', async () => {
+    await localDb.entries.bulkPut([entry('a1'), entry('m1', { category: 'movies' })]);
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    const { result } = renderHook(() => useAllEntries(['anime', 'movies']), { wrapper });
+    await waitFor(() => {
+      expect(result.current.data.anime?.map((e) => e.id)).toEqual(['a1']);
+      expect(result.current.data.movies?.map((e) => e.id)).toEqual(['m1']);
+    });
+    expect(result.current.isPending).toBe(false);
   });
 });

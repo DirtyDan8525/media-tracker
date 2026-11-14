@@ -129,15 +129,15 @@ describe('compare queue', () => {
 });
 
 describe('compare save', () => {
-  it('saves 1,500 changes in one request', async () => {
-    const ids = await seedEntries(A, 1500);
+  it('saves 1,000 changes (the maximum) in one request', async () => {
+    const ids = await seedEntries(A, 1000);
     const res = await as(A, '/api/compare/save', 'POST', {
       changes: ids.map((id, i) => ({ id, rating: (i % 100) / 10 })),
     });
     expect(res.status).toBe(200);
     const json = (await res.json()) as { updated: number; entries: Entry[] };
-    expect(json.updated).toBe(1500);
-    expect(json.entries.length).toBe(1500);
+    expect(json.updated).toBe(1000);
+    expect(json.entries.length).toBe(1000);
     const row = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(ids[37]!).first<{ rating: number }>();
     expect(row!.rating).toBe(3.7);
   });
@@ -175,7 +175,7 @@ describe('compare save', () => {
       { changes: [{ id: e.id, rating: 10.5 }] },
       { changes: [{ id: e.id, rating: 8.333 }] },
       { changes: [{ id: e.id, rating: 5 }, { id: e.id, rating: 6 }] },
-      { changes: Array.from({ length: 2001 }, (_, i) => ({ id: `id${i}`, rating: 5 })) },
+      { changes: Array.from({ length: 1001 }, (_, i) => ({ id: `id${i}`, rating: 5 })) },
       { changes: 'x' },
       {},
       { changes: [{ id: '', rating: 5 }] },

@@ -1,6 +1,7 @@
 import type { Entry } from '@media-tracker/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { COMPARE_QUEUE_KEY } from './compare';
 import { patchLocal, restoreLocal, writeEntry } from './entryCache';
 
 export const SAVE_FAILED = "Couldn't save that change";
@@ -19,6 +20,8 @@ export async function saveEntryChange(
   try {
     const saved = await api.patch<Entry>(`/api/entries/${entry.id}`, patch);
     writeEntry(qc, saved);
+    // A new rating can put the entry on the Compare queue.
+    if ('rating' in patch) void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
     return saved;
   } catch (err) {
     if (prev) restoreLocal(qc, prev);

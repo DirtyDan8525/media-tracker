@@ -1,5 +1,5 @@
 import type { Category, Entry } from '@media-tracker/shared';
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { localDb } from '../db/local';
 import { LIST_ORDER } from '../nav';
@@ -26,20 +26,11 @@ async function storeEntries(category: Category, rows: Entry[]): Promise<void> {
   }
 }
 
-/**
- * A category's entries: painted from the on-device cache first, then fetched; a successful fetch
- * replaces that category in the cache. Offline, the cached rows are the result.
- */
-export function useEntries(category: Category) {
-  const qc = useQueryClient();
-  const cached = useQuery({
-    queryKey: ['entries-cache', category],
-    queryFn: () => cachedEntries(category),
-    staleTime: Infinity,
-  });
-  return useQuery({
-    queryKey: ['entries', category],
-    queryFn: async () => {
+/** The fetch (with cache write-through and offline fallback) behind every `['entries', category]` query. */
+export function entriesQueryOptions(qc: QueryClient, category: Category) {
+  return {
+    queryKey: ['entries', category] as const,
+    queryFn: async (): Promise<Entry[]> => {
       try {
         const rows = await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(category)}`);
         await storeEntries(category, rows);
@@ -53,9 +44,56 @@ export function useEntries(category: Category) {
         throw err;
       }
     },
+  };
+}
+
+const cacheQueryOptions = (category: Category) => ({
+  queryKey: ['entries-cache', category] as const,
+  queryFn: () => cachedEntries(category),
+  staleTime: Infinity,
+});
+
+/**
+ * A category's entries: painted from the on-device cache first, then fetched; a successful fetch
+ * replaces that category in the cache. Offline, the cached rows are the result.
+ */
+export function useEntries(category: Category) {
+  const qc = useQueryClient();
+  const cached = useQuery(cacheQueryOptions(category));
+  return useQuery({
+    ...entriesQueryOptions(qc, category),
     // An empty cache means "unknown", not "empty list": show the loading state instead.
     placeholderData: cached.data?.length ? cached.data : undefined,
   });
+}
+
+/**
+ * Several lists at once, over the same `['entries', c]` queries and device cache as `useEntries`,
+ * so a `writeEntry` shows up here too. A list with nothing cached stays absent until it is fetched.
+ */
+export function useAllEntries(categories: Category[]): {
+  data: Partial<Record<Category, Entry[]>>;
+  isPending: boolean;
+  isError: boolean;
+} {
+  const qc = useQueryClient();
+  const cached = useQueries({ queries: categories.map(cacheQueryOptions) });
+  const lists = useQueries({
+    queries: categories.map((c, i) => ({
+      ...entriesQueryOptions(qc, c),
+      placeholderData: cached[i]?.data?.length ? cached[i]!.data : undefined,
+    })),
+  });
+  const data: Partial<Record<Category, Entry[]>> = {};
+  categories.forEach((c, i) => {
+    const rows = lists[i]?.data;
+    if (rows) data[c] = rows;
+  });
+  return {
+    data,
+    isPending: lists.some((q) => q.isPending),
+    isError: lists.some((q) => q.isError),
+  };
 }
 
 export const COUNTS_KEY = ['list-counts'] as const;

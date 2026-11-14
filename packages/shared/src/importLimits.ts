@@ -45,4 +45,4 @@ export const importStatementCount = (rows: number, seasons: number) =>
 // POST /api/compare/save writes every change in one UPDATE whose changes travel as a single
 // JSON parameter (json_each), so the statement always has 3 bound parameters. A request
 // carries at most this many changes; the web client splits beyond that.
-export const COMPARE_SAVE_MAX_CHANGES = 2000;
+export const COMPARE_SAVE_MAX_CHANGES = 1000;

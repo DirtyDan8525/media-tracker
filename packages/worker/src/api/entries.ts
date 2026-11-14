@@ -7,6 +7,7 @@ import {
   type Season,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
+import { enqueueStatements } from './compare';
 import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
 
 export { validateEntryInput, validateSeasonInput } from './entryValidation';
@@ -67,7 +68,7 @@ export function rowToSeason(r: SeasonRow): Season {
   return { id: r.id, entryId: r.entry_id, label: r.label, rating: r.rating, notes: r.notes };
 }
 
-const ENTRY_SELECT = `SELECT e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg FROM entries e`;
+export const ENTRY_SELECT = `SELECT e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg FROM entries e`;
 
 // camelCase field -> column, with boolean columns stored 0/1.
 const COLUMNS: Record<keyof EntryFields, string> = {
@@ -110,7 +111,7 @@ entries.get('/entries/:id', async (c) => {
   return entry ? c.json(entry) : c.json(notFound, 404);
 });
 
-// 3 queries: duplicate candidates, insert, re-select (for seasonAvg/defaults)
+// 3 queries (up to 5 with the compare queue): duplicate candidates, insert [+ enqueue, trim], re-select
 entries.post('/entries', async (c) => {
   const body = await readJson(c.req.raw);
   const category = (body as { category?: unknown } | null)?.category;
@@ -141,15 +142,18 @@ entries.post('/entries', async (c) => {
 
   const keys = Object.keys(values) as (keyof EntryFields)[];
   const cols = ['id', 'user_id', 'category', ...keys.map((k) => COLUMNS[k]), 'created_at', 'updated_at'];
-  await c.env.DB.prepare(`INSERT INTO entries (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
-    .bind(id, userId, category, ...keys.map((k) => dbValue(values[k])), now, now)
-    .run();
+  const insert = c.env.DB.prepare(`INSERT INTO entries (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
+    .bind(id, userId, category, ...keys.map((k) => dbValue(values[k])), now, now);
+  const queued = typeof values.rating === 'number'
+    ? enqueueStatements(c.env.DB, userId, id, c.var.user.settings.compareAsk)
+    : [];
+  await c.env.DB.batch([insert, ...queued]);
 
   const entry = await loadEntry(c.env.DB, id, userId);
   return c.json({ entry, duplicateOf }, 201);
 });
 
-// 3 queries: category lookup, update, re-select
+// 3 queries (up to 5 with the compare queue): category lookup, update [+ enqueue, trim], re-select
 entries.patch('/entries/:id', async (c) => {
   const id = c.req.param('id');
   const userId = c.var.user.id;
@@ -163,9 +167,12 @@ entries.patch('/entries/:id', async (c) => {
 
   const keys = Object.keys(v.value) as (keyof EntryFields)[];
   const sets = [...keys.map((k) => `${COLUMNS[k]} = ?`), 'updated_at = ?'];
-  await c.env.DB.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`)
-    .bind(...keys.map((k) => dbValue(v.value[k])), new Date().toISOString(), id, userId)
-    .run();
+  const update = c.env.DB.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`)
+    .bind(...keys.map((k) => dbValue(v.value[k])), new Date().toISOString(), id, userId);
+  const queued = typeof v.value.rating === 'number'
+    ? enqueueStatements(c.env.DB, userId, id, c.var.user.settings.compareAsk)
+    : [];
+  await c.env.DB.batch([update, ...queued]);
   return c.json(await loadEntry(c.env.DB, id, userId));
 });
 

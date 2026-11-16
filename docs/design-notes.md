@@ -38,3 +38,7 @@
 ## Own sign-in wireframes (Phase 4b) — approved 2026-11-16
 - Approved with no changes: `SignIn`, `Waiting`, `ResetPassword`, `AdminSignups` (`*.wf.dc.html`); `AdminSignups` replaces `Admin.wf` for the Admin screen.
 - Copy as drawn: "Dan approves new accounts — you'll get in as soon as he does.", errors "That username or password isn't right." / "Too many tries. Wait 15 minutes and try again." / "That username is taken.", waiting "Dan needs to approve your account. This page updates by itself.", removed "Your access was removed. Ask Dan if this is a mistake.", expired reset "This link has expired. Ask Dan for a new one."
+
+## Phase 5 wireframes — approved 2026-11-16
+- Approved with no changes: `Home`, `AddPicker`, `Walkthrough`, `FeedV2`, `ProfilePC`, `EntryTiles` (`*.wf.dc.html`). Supersedes the 2026-11-15 bottom bar (Add tab → Home tab; Add is a floating bubble again) and S7's fixed reaction set (any single emoji via "+").
+- Plus: a "What's new / Coming soon" list in More (no wireframe; simple list rows).

@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { useCompareQueue } from '../data/compare';
+import { useUnread } from '../data/feed';
 import { Icon } from '../design/components/Icon';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
@@ -10,6 +11,8 @@ import '../design/settings.css';
 /** Phone "More" (B20): Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings (with the rating tier links) is under Profile. */
 export function MoreScreen() {
   const me = useSessionMe();
+  // The same count as the Profile dot; for the admin it includes people waiting for approval.
+  const requests = useUnread().data?.requests ?? 0;
   const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);
   return (
     <div className="screen">
@@ -47,7 +50,7 @@ export function MoreScreen() {
             <div className="group__card">
               <Link to="/admin" className="group__row">
                 <span className="group__row-start"><span className="tile-icon"><Icon name="user" size={18} /></span>Admin</span>
-                <span className="group__chev"><Icon name="chevron" size={18} /></span>
+                <span className="group__chev">{requests > 0 && <><span className="nav-dot nav-dot--inline" aria-hidden="true" /><span className="sr-only">{requests === 1 ? '1 new request' : `${requests} new requests`}</span></>}<Icon name="chevron" size={18} /></span>
               </Link>
             </div>
           </section>

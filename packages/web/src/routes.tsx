@@ -16,6 +16,7 @@ import { AppearanceScreen } from './screens/AppearanceScreen';
 import { TierEditor } from './screens/settings/TierEditor';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
+import { ResetScreen } from './screens/auth/ResetScreen';
 import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
@@ -88,10 +89,12 @@ function AdminRoute() {
 }
 
 /**
- * `/` → first enabled list. Everything sits under SessionGate, which sends a user with no
+ * `/` → first enabled list. Everything else sits under SessionGate, which shows sign-in to anyone without a session, Waiting to a pending account, and sends a user with no
  * username to /setup/username first. Setup has no nav; every other screen is in the AppFrame.
  */
 export const routes: RouteObject[] = [
+  // The reset link works signed out, so it sits outside the gate.
+  { path: 'reset/:token', element: <ResetScreen /> },
   {
     element: <SessionGate />,
     children: [

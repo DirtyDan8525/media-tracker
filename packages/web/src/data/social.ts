@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { useToast } from '../design/components/Toast';
 import { entriesKey, writeEntry } from './entryCache';
+import { UNREAD_KEY } from './feed';
 import { entriesQueryOptions } from './useEntries';
 import { ME_KEY, normalizeMe, storeMe } from './useMe';
 
@@ -23,11 +24,10 @@ export interface ProfileData { user: PublicUser; memberSince: string | null; rel
 export interface FriendEntryData { entry: FriendEntry; seasons: { id: string; label: string; rating: number | null; notes: string | null }[] }
 export interface FriendsEntries { userId: string; entries: FriendEntry[] }
 export interface AdminData {
-  seats: { used: number; total: number };
-  invites: { email: string; invitedAt: string; joined: PublicUser | null }[];
-  users: (PublicUser & { email: string; joinedAt: string | null })[];
+  pending: (PublicUser & { requestedAt: string })[];
+  active: (PublicUser & { joinedAt: string | null; isAdmin: boolean })[];
+  removed: PublicUser[];
 }
-export interface ApprovedInvite { email: string; link: string; alreadyAllowed: boolean }
 
 const USERNAME_Q_RE = /^[a-z0-9_]{2,20}$/;
 
@@ -201,19 +201,21 @@ export function useAdmin(enabled = true) {
   return useQuery({ queryKey: [...SOCIAL_KEY, 'admin'], queryFn: () => api.get<AdminData>('/api/admin'), enabled, staleTime: 0 });
 }
 
-export function useApproveEmail() {
+export type AdminAction = 'approve' | 'decline' | 'remove';
+
+/** Approve (also Restore), Decline and Remove access: one POST per person, then Admin and the unread badge refetch. */
+export function useAdminAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (email: string) => api.post<ApprovedInvite>('/api/admin/invites', { email }),
-    onSuccess: () => refresh(qc),
+    mutationFn: ({ id, action }: { id: string; action: AdminAction }) => api.post<void>(`/api/admin/users/${encodeURIComponent(id)}/${action}`),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: UNREAD_KEY }); return refresh(qc); },
   });
 }
 
-export function useRemoveAccess() {
-  const qc = useQueryClient();
+/** A one-time password-reset link for one person. */
+export function useResetLink() {
   return useMutation({
-    mutationFn: (email: string) => api.del<{ removed: boolean }>(`/api/admin/invites/${encodeURIComponent(email)}`),
-    onSuccess: () => refresh(qc),
+    mutationFn: (id: string) => api.post<{ link: string }>(`/api/admin/users/${encodeURIComponent(id)}/reset-link`),
   });
 }
 

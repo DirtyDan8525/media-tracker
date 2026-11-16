@@ -10,9 +10,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeManifestIcons: false, // the glob below already precaches them (no duplicates)
-      // Cloudflare Access gates the whole origin: the browser must send the Access cookie when
-      // fetching manifest.webmanifest, or it gets the login redirect and the PWA is not installable.
-      useCredentials: true,
       injectRegister: false, // registered in src/main.tsx via virtual:pwa-register
       manifest: {
         name: 'Media Tracker',
@@ -34,9 +31,8 @@ export default defineConfig({
         // Precache the app shell (JS, CSS, HTML, fonts, icons).
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
-        // /api/* (incl. /api/auth/reauth, the Access re-auth hop) and Cloudflare's /cdn-cgi/*
-        // (Access login callback, logout) must reach the network, never the SPA shell.
-        navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//],
+        // /api/* must reach the network, never the SPA shell.
+        navigateFallbackDenylist: [/^\/api\//],
         // Nothing is runtime-cached: /api/* always goes to the network (the app keeps its own
         // offline copy in IndexedDB), and covers load from their hosts.
         runtimeCaching: [],

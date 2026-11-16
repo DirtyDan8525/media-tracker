@@ -1,51 +1,112 @@
-import { useState, type FormEvent } from 'react';
+import { nameOf, type PublicUser } from '@media-tracker/shared';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../api/client';
-import { useAdmin, useApproveEmail, useCopy, useRemoveAccess, type AdminData, type ApprovedInvite } from '../data/social';
+import { useAdmin, useAdminAction, useCopy, useResetLink, type AdminAction } from '../data/social';
 import { Button } from '../design/components/Button';
 import { EmptyState } from '../design/components/EmptyState';
+import { IconButton } from '../design/components/IconButton';
 import { Sheet } from '../design/components/Sheet';
 import { Skeleton } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
+import { PersonAvatar } from './social/parts';
 import '../design/social.css';
 
-const NOT_SET_UP = "Admin invites aren't set up yet. See SETUP step 12.";
+const DONE: Record<AdminAction | 'restore', string> = { approve: 'Approved', decline: 'Declined', remove: 'Removed', restore: 'Restored' };
+const VERB: Record<AdminAction | 'restore', string> = { approve: 'approve', decline: 'decline', remove: 'remove', restore: 'restore' };
 
-/** Plain words for an admin API error. */
-export function adminError(err: unknown, action: 'approve' | 'remove'): string {
+/** "2 h ago", "1 d ago", "just now" (a request's age; Admin refetches on open, so no timer). */
+export function ago(iso: string, now = Date.now()): string {
+  const mins = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+  if (!Number.isFinite(mins)) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 48 * 60) return mins < 24 * 60 ? `${Math.floor(mins / 60)} h ago` : '1 d ago';
+  return `${Math.floor(mins / (24 * 60))} d ago`;
+}
+
+/** Plain words for a failed admin call. */
+export function adminError(err: unknown, action: AdminAction | 'restore' | 'reset', handle: string): string {
   if (err instanceof ApiError) {
-    if (err.status === 503 || err.error === 'not_configured') return NOT_SET_UP;
-    if (err.status === 502 || err.error === 'cloudflare') {
-      const message = (err.body as { message?: unknown } | undefined)?.message;
-      return `Cloudflare refused: ${typeof message === 'string' && message ? message : 'no reason given'}`;
-    }
-    if (err.error === 'bad_email') return "That doesn't look like an email address.";
-    if (err.error === 'self') return "That's your own email. You can't remove your own access.";
-    if (err.error === 'last_rule') return "That's the last approved email. Cloudflare needs at least one, so it can't be removed.";
+    if (err.error === 'self') return "You can't remove your own access.";
     if (err.status === 403) return 'Only the admin can do this.';
+    if (err.status === 404) return `${handle} has already changed. Refresh and look again.`;
   }
-  return action === 'approve' ? "Couldn't approve that email. Check your connection and try again." : "Couldn't remove access. Check your connection and try again.";
+  const what = action === 'reset' ? 'make a reset link for' : VERB[action];
+  return `Couldn't ${what} ${handle}. Check your connection and try again.`;
 }
 
-interface Row { email: string; joinedAs: string | null; invitedAt: string | null }
+const handleOf = (u: Pick<PublicUser, 'username'>) => `@${u.username}`;
 
-/** Everyone who can sign in, newest invite first: invited emails, then people who joined without an invite row. */
-function rowsOf(data: AdminData, hidden: Set<string>): Row[] {
-  const invited = data.invites.map((i) => ({ email: i.email, joinedAs: i.joined?.username ?? null, invitedAt: i.invitedAt }));
-  const known = new Set(invited.map((r) => r.email.toLowerCase()));
-  const others = data.users.filter((u) => !known.has(u.email.toLowerCase()))
-    .map((u) => ({ email: u.email, joinedAs: u.username, invitedAt: null }));
-  return [...invited, ...others].filter((r) => !hidden.has(r.email.toLowerCase()));
+function Row({ user, sub, children }: { user: PublicUser; sub?: ReactNode; children?: ReactNode }) {
+  const named = !!user.displayName;
+  return (
+    <li className="person person--admin">
+      <PersonAvatar user={user} size={36} />
+      <span className="person__meta">
+        <span className="person__name">{nameOf(user)}</span>
+        {(named || sub) && <span className="person__sub">{named ? handleOf(user) : null}{named && sub ? ' · ' : null}{sub}</span>}
+      </span>
+      {children}
+    </li>
+  );
 }
 
-/** Admin (route /admin, admin only): approve an email, copy the link to send, remove access. */
+function Section({ id, title, count, children }: { id: string; title: string; count?: number; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="group">
+      <h2 id={id} className="group__title">{count === undefined ? title : `${title} · ${count}`}</h2>
+      {children}
+    </section>
+  );
+}
+
+type Confirm = { kind: 'decline' | 'remove'; user: PublicUser };
+
+/** Admin (route /admin, admin only): approve or decline sign-ups, reset passwords, remove and restore people. */
 export function AdminScreen() {
   const me = useSessionMe();
   const { data, isPending, isError, refetch } = useAdmin();
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [removing, setRemoving] = useState<string | null>(null);
+  const act = useAdminAction();
+  const makeLink = useResetLink();
+  const copy = useCopy();
+  const toast = useToast();
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [link, setLink] = useState<{ user: PublicUser; url: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const header = <PageHeader title="Admin" backTo="/more" backUsesHistory />;
+
+  async function run(user: PublicUser, action: AdminAction, label: AdminAction | 'restore' = action): Promise<boolean> {
+    setBusy(user.id);
+    setError(null);
+    try {
+      await act.mutateAsync({ id: user.id, action });
+      toast.show(`${DONE[label]} ${handleOf(user)}`);
+      return true;
+    } catch (err) {
+      const msg = adminError(err, label, handleOf(user));
+      setError(msg);
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resetLink(user: PublicUser) {
+    setBusy(user.id);
+    setError(null);
+    try {
+      const { link: url } = await makeLink.mutateAsync(user.id);
+      setLink({ user, url });
+    } catch (err) {
+      const msg = adminError(err, 'reset', handleOf(user));
+      setError(msg);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (isPending) {
     return (
@@ -65,114 +126,104 @@ export function AdminScreen() {
       </div>
     );
   }
-  const rows = rowsOf(data, hidden);
+
   return (
     <div className="screen">
       {header}
       <div className="screen__body social-page">
-        <InviteForm />
-        <section aria-labelledby="admin-approved" className="group">
-          <h2 id="admin-approved" className="group__title">Approved · {data.seats.used} of {data.seats.total}</h2>
-          {rows.length === 0 ? (
-            <p className="friend-note">Nobody yet. Approve an email above to invite someone.</p>
+        {error && <p role="alert" className="field-error">{error}</p>}
+        <Section id="admin-requests" title="Requests" count={data.pending.length}>
+          {data.pending.length === 0 ? (
+            <p className="friend-note">No requests right now.</p>
           ) : (
             <ul className="people plain-list">
-              {rows.map((r) => {
-                const own = r.email.toLowerCase() === me.email.trim().toLowerCase();
-                return (
-                  <li key={r.email} className="person">
-                    <span className="person__meta">
-                      <span className="person__name">{r.email}</span>
-                      <span className="person__sub">{own ? 'You' : r.joinedAs ? `Joined as @${r.joinedAs}` : 'Not joined yet'}</span>
-                    </span>
-                    {!own && <Button compact aria-label={`Remove access for ${r.email}`} onClick={() => setRemoving(r.email)}>Remove access</Button>}
-                  </li>
-                );
-              })}
+              {data.pending.map((u) => (
+                <Row key={u.id} user={u} sub={`asked ${ago(u.requestedAt)}`}>
+                  <Button variant="primary" compact aria-label={`Approve ${handleOf(u)}`} disabled={busy === u.id} onClick={() => void run(u, 'approve')}>Approve</Button>
+                  <Button compact aria-label={`Decline ${handleOf(u)}`} disabled={busy === u.id} onClick={() => setConfirm({ kind: 'decline', user: u })}>Decline</Button>
+                </Row>
+              ))}
             </ul>
           )}
-        </section>
+        </Section>
+
+        <Section id="admin-members" title="Members" count={data.active.length}>
+          <ul className="people plain-list">
+            {data.active.map((u) => (
+              <Row key={u.id} user={u}>
+                {u.id === me.id ? <span className="person__you">You</span> : (
+                  <RowMenu user={u} disabled={busy === u.id} onReset={() => void resetLink(u)} onRemove={() => setConfirm({ kind: 'remove', user: u })} />
+                )}
+              </Row>
+            ))}
+          </ul>
+          {link && (
+            <div className="admin-result" role="status" aria-label="Reset link">
+              <b>Send this to {handleOf(link.user)}:</b>
+              <div className="admin-result__link">
+                <input className="link-box" readOnly value={link.url} aria-label="Reset link" onFocus={(e) => e.currentTarget.select()} />
+                <Button onClick={() => void copy(link.url)}>Copy</Button>
+              </div>
+              <span className="hint">Works once, for 24 hours.</span>
+            </div>
+          )}
+        </Section>
+
+        {data.removed.length > 0 && (
+          <Section id="admin-removed" title="Removed" count={data.removed.length}>
+            <ul className="people plain-list">
+              {data.removed.map((u) => (
+                <Row key={u.id} user={u}>
+                  <Button compact aria-label={`Restore ${handleOf(u)}`} disabled={busy === u.id} onClick={() => void run(u, 'approve', 'restore')}>Restore</Button>
+                </Row>
+              ))}
+            </ul>
+          </Section>
+        )}
       </div>
-      {removing && (
-        <RemoveSheet email={removing} onClose={() => setRemoving(null)}
-          onRemoved={() => { setHidden((h) => new Set(h).add(removing.toLowerCase())); setRemoving(null); }} />
+
+      {confirm && (
+        <Sheet open title={confirm.kind === 'decline' ? `Decline ${handleOf(confirm.user)}?` : `Remove ${handleOf(confirm.user)}?`} onClose={() => setConfirm(null)}
+          footer={
+            <div className="btn-row">
+              <Button className="btn--danger" disabled={busy === confirm.user.id}
+                onClick={() => void run(confirm.user, confirm.kind).then((ok) => { if (ok) setConfirm(null); })}>
+                {confirm.kind === 'decline' ? 'Decline' : 'Remove access'}
+              </Button>
+              <Button onClick={() => setConfirm(null)}>Cancel</Button>
+            </div>
+          }>
+          <p className="hint">
+            {confirm.kind === 'decline' ? "The request is deleted. They can sign up again if they want to." : "They won't be able to sign in. Their data stays."}
+          </p>
+        </Sheet>
       )}
     </div>
   );
 }
 
-function InviteForm() {
-  const approve = useApproveEmail();
-  const copy = useCopy();
-  const [email, setEmail] = useState('');
-  const [result, setResult] = useState<ApprovedInvite | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const value = email.trim();
-    if (!value) return;
-    setError(null);
-    setResult(null);
-    try {
-      setResult(await approve.mutateAsync(value));
-      setEmail('');
-    } catch (err) {
-      setError(adminError(err, 'approve'));
-    }
-  }
-
+/** The ⋯ button on a member's row: Reset password link, Remove access. */
+function RowMenu({ user, disabled, onReset, onRemove }: { user: PublicUser; disabled: boolean; onReset: () => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('pointerdown', close);
+    wrap.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    return () => document.removeEventListener('pointerdown', close);
+  }, [open]);
+  const pick = (fn: () => void) => () => { setOpen(false); fn(); };
   return (
-    <section aria-labelledby="admin-invite" className="group">
-      <h2 id="admin-invite" className="group__title">Invite a friend</h2>
-      <form className="admin-invite" onSubmit={(e) => void submit(e)} noValidate>
-        <div className={`text-field${error ? ' has-error' : ''}`}>
-          <input type="email" value={email} placeholder="friend@example.com" aria-label="Email" autoComplete="off" autoCapitalize="none"
-            spellCheck={false} aria-invalid={error ? true : undefined} onChange={(e) => { setEmail(e.target.value); setError(null); }} />
-        </div>
-        <Button type="submit" variant="primary" disabled={approve.isPending || !email.trim()}>{approve.isPending ? 'Approving…' : 'Approve'}</Button>
-      </form>
-      {error && <p role="alert" className="field-error">{error}</p>}
-      {result && (
-        <div className="admin-result" role="status" aria-label="Approval result">
-          <b>{result.alreadyAllowed ? `${result.email} could already sign in` : `Approved ${result.email}`}</b>
-          <span className="hint">Send them this link. It opens the app and offers to add you as a friend.</span>
-          <div className="admin-result__link">
-            <input className="link-box" readOnly value={result.link} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />
-            <Button onClick={() => void copy(result.link)}>Copy</Button>
-          </div>
+    <div className="person__menu" ref={wrap}
+      onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); wrap.current?.querySelector<HTMLElement>('button[aria-haspopup]')?.focus(); } }}>
+      <IconButton label={`More actions for ${handleOf(user)}`} icon="more" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)} />
+      {open && (
+        <div role="menu" aria-label={`Actions for ${handleOf(user)}`} className="menu">
+          <button type="button" role="menuitem" className="menu__item" onClick={pick(onReset)}>Reset password link</button>
+          <button type="button" role="menuitem" className="menu__item" onClick={pick(onRemove)}>Remove access</button>
         </div>
       )}
-    </section>
-  );
-}
-
-function RemoveSheet({ email, onClose, onRemoved }: { email: string; onClose: () => void; onRemoved: () => void }) {
-  const remove = useRemoveAccess();
-  const toast = useToast();
-  const [error, setError] = useState<string | null>(null);
-
-  async function go() {
-    setError(null);
-    try {
-      const { removed } = await remove.mutateAsync(email);
-      toast.show(removed ? `Removed access for ${email}` : `${email} was already off the list`);
-      onRemoved();
-    } catch (err) {
-      setError(adminError(err, 'remove'));
-    }
-  }
-
-  return (
-    <Sheet open title={`Remove access for ${email}?`} onClose={onClose}
-      footer={
-        <div className="btn-row">
-          <Button className="btn--danger" disabled={remove.isPending} onClick={() => void go()}>{remove.isPending ? 'Removing…' : 'Remove access'}</Button>
-          <Button onClick={onClose}>Cancel</Button>
-        </div>
-      }>
-      <p className="hint">They won't be able to sign in. Their data stays.</p>
-      {error && <p role="alert" className="field-error">{error}</p>}
-    </Sheet>
+    </div>
   );
 }

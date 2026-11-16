@@ -1,4 +1,4 @@
-import { clearReauthFlag, handleSignedOut } from './auth';
+import { handleSignedOut } from './auth';
 
 /** A failed API call. `error` is the server's `{error}` code (e.g. 'taken'), or `http_<status>`. */
 export class ApiError extends Error {
@@ -16,18 +16,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const hasBody = body !== undefined;
   const res = await fetch(path, {
     method,
-    credentials: 'include',
-    // Access answers an expired session with a redirect to its login domain. Followed, that is
-    // a CORS TypeError indistinguishable from offline; unfollowed, it is an 'opaqueredirect'.
-    redirect: 'manual',
+    // Same-origin only: the session cookie rides along, and the browser adds Origin on writes (the Worker checks it).
+    credentials: 'same-origin',
     // Every mutation says it is JSON (a bodyless DELETE too): the Worker refuses anything else (CSRF hardening).
     headers: hasBody || method !== 'GET' ? { 'content-type': 'application/json' } : undefined,
     body: hasBody ? JSON.stringify(body) : undefined,
   });
-  if (res.type === 'opaqueredirect' || res.status === 401) {
-    handleSignedOut();
-    throw new ApiError(401, 'unauthorized');
-  }
   const text = await res.text();
   let data: unknown;
   try {
@@ -35,11 +29,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     data = undefined;
   }
-  if (!res.ok) {
-    const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
-    throw new ApiError(res.status, code, data);
-  }
-  if (method === 'GET' && path === '/api/me') clearReauthFlag();
+  const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
+  // A 401 anywhere sends the app back to sign-in, except from /api/auth/* (a wrong password is just an error).
+  if (res.status === 401 && !path.startsWith('/api/auth/')) handleSignedOut(code === 'removed');
+  if (!res.ok) throw new ApiError(res.status, code, data);
   return data as T;
 }
 

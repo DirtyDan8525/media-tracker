@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import type { Entry } from '@media-tracker/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LOGOUT_PATH } from '../data/logout';
 import { CURRENT_LIST_KEY } from '../shell/currentList';
 import { fakeBackend, makeEntry } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
@@ -273,14 +272,14 @@ describe('Profile: photo', () => {
 });
 
 describe('Profile: Log out', () => {
-  it("calls location.assign('/cdn-cgi/access/logout')", async () => {
+  it('posts /api/auth/logout and reloads at /', async () => {
     const assign = vi.fn();
     vi.stubGlobal('location', { ...window.location, assign });
-    fakeBackend({ me: ME() });
+    const { calls } = fakeBackend({ me: ME(), extra: { 'POST /api/auth/logout': { status: 204 } } });
     renderApp('/profile');
     await userEvent.click(await screen.findByRole('button', { name: 'Log out' }));
-    await waitFor(() => expect(assign).toHaveBeenCalledExactlyOnceWith(LOGOUT_PATH));
-    expect(LOGOUT_PATH).toBe('/cdn-cgi/access/logout');
+    await waitFor(() => expect(assign).toHaveBeenCalledExactlyOnceWith('/'));
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/auth/logout')).toBe(true);
   });
 });
 

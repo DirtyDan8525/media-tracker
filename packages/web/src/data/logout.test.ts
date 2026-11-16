@@ -1,9 +1,10 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { REAUTH_FLAG } from '../api/auth';
 import { localDb } from '../db/local';
 import { CURRENT_LIST_KEY } from '../shell/currentList';
-import { LOGOUT_PATH, logOut, STEP_TIMEOUT_MS } from './logout';
+import { mockFetch } from '../test/mockApi';
+import { AFTER_SETUP_KEY } from './social';
+import { LOGOUT_REDIRECT, logOut, STEP_TIMEOUT_MS } from './logout';
 
 function stubLocation() {
   const assign = vi.fn();
@@ -12,15 +13,29 @@ function stubLocation() {
 }
 
 describe('logOut', () => {
-  it('uses the Cloudflare Access logout URL', () => {
-    expect(LOGOUT_PATH).toBe('/cdn-cgi/access/logout');
+  it('posts /api/auth/logout, then reloads the app at /', async () => {
+    const assign = stubLocation();
+    const calls = mockFetch({ 'POST /api/auth/logout': { status: 204 } });
+    await logOut(new QueryClient());
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['POST /api/auth/logout']);
+    expect(LOGOUT_REDIRECT).toBe('/');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
   });
 
-  it('clears entries and me tables, the query cache, mt-reauth and mt-current-list, then assigns LOGOUT_PATH', async () => {
+  it('still clears and reloads when the logout request fails', async () => {
+    const assign = stubLocation();
+    mockFetch({ 'POST /api/auth/logout': { status: 500, body: { error: 'x' } } });
+    await localDb.me.put({ key: 'me', value: { id: 'u1' } as never });
+    await logOut(new QueryClient());
+    expect(await localDb.me.count()).toBe(0);
+    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
+  });
+
+  it('clears entries and me tables, the query cache, the remembered return path and mt-current-list, then reloads at /', async () => {
     const assign = stubLocation();
     await localDb.entries.put({ id: 'e1', category: 'anime', title: 'X', rating: 5 } as never);
     await localDb.me.put({ key: 'me', value: { id: 'u1' } as never });
-    sessionStorage.setItem(REAUTH_FLAG, '1');
+    sessionStorage.setItem(AFTER_SETUP_KEY, '/add/x');
     localStorage.setItem(CURRENT_LIST_KEY, 'movies');
     const qc = new QueryClient();
     qc.setQueryData(['me'], { id: 'u1' });
@@ -30,9 +45,9 @@ describe('logOut', () => {
     expect(await localDb.entries.count()).toBe(0);
     expect(await localDb.me.count()).toBe(0);
     expect(qc.getQueryCache().getAll()).toHaveLength(0);
-    expect(sessionStorage.getItem(REAUTH_FLAG)).toBeNull();
+    expect(sessionStorage.getItem(AFTER_SETUP_KEY)).toBeNull();
     expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/cdn-cgi/access/logout');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
   });
 
   it('still assigns when Dexie clear throws, and clears what it can', async () => {
@@ -48,14 +63,14 @@ describe('logOut', () => {
     expect(await localDb.me.count()).toBe(0);
     expect(qc.getQueryCache().getAll()).toHaveLength(0);
     expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/cdn-cgi/access/logout');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
   });
 
   it('still assigns when storage itself throws', async () => {
     const assign = stubLocation();
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('denied'); });
     await logOut(new QueryClient());
-    expect(assign).toHaveBeenCalledWith('/cdn-cgi/access/logout');
+    expect(assign).toHaveBeenCalledWith('/');
   });
 
   it('a Dexie clear() that never settles does not stall the logout: each step has a timeout', async () => {
@@ -69,7 +84,7 @@ describe('logOut', () => {
       await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS + 10);
       await done;
       expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
-      expect(assign).toHaveBeenCalledExactlyOnceWith('/cdn-cgi/access/logout');
+      expect(assign).toHaveBeenCalledExactlyOnceWith('/');
     } finally {
       vi.useRealTimers();
     }

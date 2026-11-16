@@ -234,10 +234,10 @@ test('tier flow: add a title by tapping Loved; its tier shows on the entry and i
   await expect(page.getByText(new RegExp(`^Loved ${before + 1} · Liked \\d+ · Fine \\d+ · Didn't like \\d+$`))).toBeVisible();
 });
 
-test('Profile → Log out goes to /cdn-cgi/access/logout', async ({ page }) => {
+test('Profile → Log out ends the session (POST /api/auth/logout)', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/profile');
-  const logout = page.waitForRequest((r) => new URL(r.url()).pathname === '/cdn-cgi/access/logout');
+  const logout = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === '/api/auth/logout');
   await page.getByRole('button', { name: 'Log out' }).click();
   await logout;
 });

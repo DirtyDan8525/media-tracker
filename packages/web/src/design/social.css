@@ -104,3 +104,10 @@ a.person:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2p
 @media (prefers-reduced-motion: no-preference) {
   a.person { transition: background var(--dur-fast) var(--ease); }
 }
+
+/* Admin rows: sign-ups, members, removed. */
+.person--admin { min-height: 56px; padding-block: var(--space-3); }
+.person--admin .btn { white-space: nowrap; }
+.person__menu { position: relative; flex-shrink: 0; }
+.person__you { font-size: var(--fs-meta); color: var(--muted-text); padding-right: var(--space-4); }
+.admin-result { margin-top: var(--space-5); }

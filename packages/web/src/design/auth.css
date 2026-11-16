@@ -1,0 +1,36 @@
+/* Own sign-in (Phase 4b wireframes: SignIn, Waiting, ResetPassword). Calm v2 look. */
+.auth { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: var(--space-16) var(--space-8); }
+.auth__card { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: var(--space-8); }
+.auth__brand { align-self: center; padding-bottom: var(--space-4); }
+.auth__title { margin: 0; font-size: var(--fs-title); font-weight: 700; line-height: 1.2; color: var(--bright-text); overflow-wrap: anywhere; }
+.auth__sub { margin: 0; font-size: var(--fs-sm); color: var(--muted-text); }
+.auth__note { margin: 0; text-align: center; font-size: var(--fs-meta); color: var(--muted-text); }
+.auth__form { display: flex; flex-direction: column; gap: var(--space-5); }
+.auth-field { display: flex; flex-direction: column; gap: var(--space-2); }
+.auth__form .text-field { height: 50px; }
+.auth__form .text-field input { font-size: 16px; } /* 16 px: iOS does not zoom the page on focus */
+.auth__submit { width: 100%; min-height: 52px; font-size: var(--fs-lg); margin-top: var(--space-2); }
+.auth-pw__toggle {
+  all: unset; box-sizing: border-box; width: var(--tap); height: var(--tap); margin-right: calc(-1 * var(--space-4));
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: var(--radius-lg);
+  color: var(--text); cursor: pointer;
+}
+.auth-pw__toggle:hover { background: var(--panel); }
+.auth-pw__toggle:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.auth__vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Waiting / removed: one centred message. */
+.auth-wait { flex: 1; justify-content: center; text-align: center; align-items: center; padding-bottom: 12vh; }
+.auth-wait .auth__card { align-items: center; gap: var(--space-6); }
+.auth-wait__ring {
+  width: 150px; height: 150px; border-radius: 50%; background: var(--panel); margin-bottom: var(--space-5);
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-wait__ring > span { width: 104px; height: 104px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; }
+.auth-wait__ring > span > i { width: 44px; height: 44px; border-radius: 50%; background: var(--panel); border: 2px solid var(--highlight); }
+.auth-wait__text { margin: 0; font-size: var(--fs-lg); line-height: 1.4; color: var(--text); }
+.auth-wait .btn { min-width: 160px; min-height: var(--btn-h); margin-top: var(--space-5); }
+@media (prefers-reduced-motion: no-preference) {
+  .auth-wait__ring > span > i { animation: auth-breathe 2.4s var(--ease) infinite; }
+  @keyframes auth-breathe { 50% { transform: scale(1.18); } }
+}

@@ -3,7 +3,8 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthState } from '../api/auth';
 import { AFTER_SETUP_KEY } from '../data/social';
 import { useMe } from '../data/useMe';
-import { SignedOutScreen } from '../screens/SignedOutScreen';
+import { SignInScreen } from '../screens/auth/SignInScreen';
+import { RemovedScreen, WaitingScreen } from '../screens/auth/WaitingScreen';
 import { CfSetContext, ThemeColorsContext } from '../design/ThemeContext';
 import { cfFor, applyTheme, themeColors } from '../design/theme';
 import { Button } from '../design/components/Button';
@@ -52,9 +53,16 @@ export function SessionGate() {
     if (me?.username && pathname !== SETUP_PATH) sessionStorage.removeItem(AFTER_SETUP_KEY);
   }, [me?.username, pathname]);
 
-  if (auth === 'signedOut') return <SignedOutScreen />;
-  if (!me || auth === 'reauthing') {
-    if (isError && auth === 'ok') {
+  const signedOut = auth !== 'ok';
+  // Signed out at some path (say /add/<code>): remember it, so the app opens there after sign-in.
+  useEffect(() => {
+    if (signedOut && pathname + search !== '/') sessionStorage.setItem(AFTER_SETUP_KEY, pathname + search);
+  }, [signedOut, pathname, search]);
+
+  if (auth === 'removed') return <RemovedScreen />;
+  if (auth === 'signedOut') return <SignInScreen />;
+  if (!me) {
+    if (isError) {
       return (
         <div className="splash">
           <h1 className="splash__title">Couldn't reach Media Tracker</h1>
@@ -70,6 +78,7 @@ export function SessionGate() {
       </div>
     );
   }
+  if (me.status === 'pending') return <WaitingScreen username={me.username} />;
   if (me.username === null && pathname !== SETUP_PATH) return <ToSetup from={pathname + search} />;
   if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={afterSetupPath() ?? homePath(me.settings)} replace />;
 

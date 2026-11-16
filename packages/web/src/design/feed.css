@@ -66,3 +66,4 @@
 .switch[aria-checked='true'] i { background: var(--highlight); border-color: var(--highlight); }
 .switch[aria-checked='true'] i::after { left: 21px; background: var(--on-highlight); }
 .switch:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: 12px; }
+.nav-dot--inline { position: static; display: inline-block; margin-right: var(--space-4); border-color: transparent; vertical-align: middle; }

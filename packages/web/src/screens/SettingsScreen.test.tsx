@@ -124,7 +124,7 @@ describe('Settings: Export my data', () => {
     expect(busy).toBeDisabled();
     const call = calls.find((c) => c.path === '/api/export');
     expect(call?.method).toBe('GET');
-    expect(call?.init?.credentials).toBe('include');
+    expect(call?.init?.credentials).toBe('same-origin');
 
     finish({ body: exported });
     await waitFor(() => expect(anchors).toHaveLength(1));

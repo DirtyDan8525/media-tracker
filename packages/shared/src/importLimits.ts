@@ -46,3 +46,10 @@ export const importStatementCount = (rows: number, seasons: number) =>
 // JSON parameter (json_each), so the statement always has 3 bound parameters. A request
 // carries at most this many changes; the web client splits beyond that.
 export const COMPARE_SAVE_MAX_CHANGES = 1000;
+
+// ---- Ratings save sizing ----------------------------------------------------
+// POST /api/ratings/:set/save sends its picks, moves and done ids as JSON parameters (json_each,
+// Ruling Q11). A request carries at most this many of each; the web client splits beyond that.
+export const RATINGS_SAVE_MAX_PICKS = 1000;
+export const RATINGS_SAVE_MAX_MOVES = 1000;
+export const RATINGS_SAVE_MAX_DONE = 50;

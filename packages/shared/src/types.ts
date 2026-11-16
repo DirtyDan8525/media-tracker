@@ -1,3 +1,5 @@
+import type { TierSet } from './ratings/types';
+
 export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books';
 
 export type SourceId =
@@ -126,6 +128,8 @@ export interface UserSettings {
   compareStyle: string;
   compareRoom: string;
   compareWindow: number;
+  /** Rating tiers per list (missing = DEFAULT_TIERS). Written only by PUT /api/ratings/tiers/:list (Ruling Q3). */
+  tiers: Partial<Record<Category, TierSet>>;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -139,6 +143,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   compareStyle: 'Meet in the middle',
   compareRoom: 'Use in-between scores',
   compareWindow: 1,
+  tiers: {},
 };
 
 // Allowed values for the three compare options (the Sheet's Settings dropdowns).

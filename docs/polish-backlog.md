@@ -46,3 +46,7 @@ Minor items that were noticed and deliberately not fixed (lean mode, 2026-11-16)
 - Add to mine (from Compare) stays on the list instead of opening the new entry (deliberate, for adding several).
 - Sign-in: default to the Sign in tab on devices that signed in before; rate-limit countdown; keep the username after a failed sign-in; in-app Change password; "Done" on the reset-link card.
 - No requests dot on the PC side-nav profile row.
+
+## Reported by Dan (2026-11-16)
+- Entry detail on phone: the Rating and Status tiles sit side by side and are squished; stack them or give them room.
+- **Bug to check:** re-rating Invincible several times before settling on 9.6 made 5–6 Activity posts. Edits to one title within 10 minutes should fold into one post (S5). Check which version was deployed and which path wrote the rows (detail PATCH, slider, or a Compare save).

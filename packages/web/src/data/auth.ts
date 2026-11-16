@@ -11,8 +11,16 @@ export const PASSWORD_MAX = 128;
 export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 export const login = (username: string, password: string) => api.post<Me>('/api/auth/login', { username, password });
-export const signUp = (username: string, password: string, displayName?: string) =>
-  api.post<Me>('/api/auth/signup', displayName ? { username, password, displayName } : { username, password });
+/** `joinLink: 'invalid'` comes back when a sign-up link was sent but did not work (used, expired, revoked). */
+export type SignUpResult = Me & { joinLink?: 'invalid' };
+export const signUp = (username: string, password: string, displayName?: string, joinToken?: string) =>
+  api.post<SignUpResult>('/api/auth/signup', { username, password, ...(displayName ? { displayName } : {}), ...(joinToken ? { joinToken } : {}) });
+/** Is this sign-up link still good? (the /join page; no session needed) */
+export const checkJoinLink = (token: string) => api.get<{ valid: boolean }>(`/api/auth/join/${encodeURIComponent(token)}`);
+/** Set when a signed-up person's link did not work, so the Waiting screen can say so (once). */
+export const JOIN_INVALID_KEY = 'mt-join-invalid';
+export const JOIN_INVALID_TEXT = 'That link was already used or expired — Dan will approve you soon.';
+export const JOIN_INVITED_TEXT = "You're invited — your account is ready as soon as you sign up.";
 export const resetPassword = (token: string, password: string) => api.post<Me>('/api/auth/reset', { token, password });
 
 /**

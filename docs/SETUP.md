@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0006_social.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0007_signup_links.sql`) with a green check.
 
 ## 7. Deploy the app
 
@@ -126,7 +126,9 @@ Everyone signs in with a username and a password. Nobody gets in until you say s
    **Success:** within a minute their screen opens the app. They can now add you with your username or your invite link.
 4. To take someone's access away, press **Remove access** next to them under **Members**. They are signed out everywhere at once and cannot sign in again. Their lists stay in the database but nobody sees them. **Restore** under **Removed** lets them back in with their old password.
    **Success:** they move to **Removed**.
-5. If a friend forgets their password, press **Reset link** next to them and send them the link. It works once, for 24 hours, and signs them out on every other device.
+5. To let a friend in without waiting for you to approve them, press **Make a sign-up link** under **Sign-up links** in Admin and send them the link. It works once, for 7 days; whoever creates an account with it is approved at once. **Revoke** cancels an unused link. (In the Members ⋯ menu, **Delete account** removes a person and all their lists for good.)
+   **Success:** they open the link, see "You're invited", create an account and land straight in the app.
+6. If a friend forgets their password, press **Reset link** next to them and send them the link. It works once, for 24 hours, and signs them out on every other device.
    **Success:** they open the link, choose a new password and are signed in.
 
 If you forget your own password, run this in the Codespace terminal or PowerShell (after logging in to Cloudflare as in "Updating to a new version", step 3), with your username in place of `dan`:
@@ -179,6 +181,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0003_activity.sql`: the `activity` table (the Activity screen), with one "added" line for each title you already have.
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
+   - `0007_signup_links.sql`: the table behind pre-approved sign-up links (Admin > Sign-up links). Apply it **before** deploying.
    - `0006_social.sql`: friends, invite links, reactions, comments, and the app's own sign-in (passwords, sessions, approvals) (Phase 4). Apply it **before** deploying: the new app reads these tables. Coming from a version before Phase 4b, do the whole update with "Switching to the app's own sign-in" below instead.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
@@ -202,7 +205,7 @@ Until now Cloudflare Access (the emailed code) guarded the app. From Phase 4b th
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
    Type `y` when asked.
-   **Success:** it lists `0006_social.sql` with a green check (and any older ones you were missing).
+   **Success:** it lists `0006_social.sql` and `0007_signup_links.sql` with a green check (and any older ones you were missing).
 3. Give your account a password. Put your username in place of `dan` (it is the name the app shows as `@dan`):
    ```
    npm run set-password -w packages/worker -- dan

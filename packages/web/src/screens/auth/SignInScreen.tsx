@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
-import { finishSignIn, login, PASSWORD_MAX, PASSWORD_MIN, signUp, USERNAME_RE } from '../../data/auth';
+import { finishSignIn, JOIN_INVALID_KEY, login, PASSWORD_MAX, PASSWORD_MIN, signUp, USERNAME_RE } from '../../data/auth';
 import { Button } from '../../design/components/Button';
 import { USERNAME_RULES } from '../UsernameForm';
 import { Tabs } from '../social/parts';
@@ -29,9 +29,10 @@ export function authError(err: unknown, mode: Mode): string {
 
 /**
  * Shown to anyone without a session, at any path (the URL stays, so signing in lands right where
- * they were going). One screen, two tabs: Sign in and Create account.
+ * they were going). One screen, two tabs: Sign in and Create account. On /join/<token> the same
+ * screen carries the link's token (`joinToken`), a banner, and leaves the route when done.
  */
-export function SignInScreen() {
+export function SignInScreen({ joinToken, banner, onSignedIn }: { joinToken?: string; banner?: ReactNode; onSignedIn?: () => void } = {}) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>('signup');
   const [username, setUsername] = useState('');
@@ -59,8 +60,11 @@ export function SignInScreen() {
     setError(null);
     setBusy(true);
     try {
-      const me = mode === 'signup' ? await signUp(user, password, name.trim() || undefined) : await login(user, password);
+      const res = mode === 'signup' ? await signUp(user, password, name.trim() || undefined, joinToken) : await login(user, password);
+      const { joinLink, ...me } = res as typeof res & { joinLink?: 'invalid' };
+      if (joinLink === 'invalid') sessionStorage.setItem(JOIN_INVALID_KEY, '1');
       await finishSignIn(qc, me);
+      onSignedIn?.();
     } catch (err) {
       setError(authError(err, mode));
       setBusy(false);
@@ -68,12 +72,14 @@ export function SignInScreen() {
   }
 
   const signup = mode === 'signup';
+  const invited = !!joinToken && !!banner;
   const label = signup ? 'Create account' : 'Sign in';
   return (
     <main className="auth">
       <div className="auth__card">
         <span className="brand-mark auth__brand">Media Tracker</span>
         <Tabs label="Sign in or create account" tabs={TABS} value={mode} onChange={pick} idPrefix="auth" />
+        {banner}
         <form className="auth__form" role="tabpanel" id="auth-panel" aria-labelledby={`auth-tab-${mode}`} onSubmit={(e) => void submit(e)} noValidate>
           <div className={`text-field${error ? ' has-error' : ''}`}>
             <input type="text" value={username} placeholder="Username" aria-label="Username" autoComplete="username"
@@ -94,7 +100,7 @@ export function SignInScreen() {
           </Button>
         </form>
         <p className="auth__note">
-          {signup ? "Dan approves new accounts — you'll get in as soon as he does." : 'Forgot your password? Ask Dan for a reset link.'}
+          {signup ? (invited ? null : "Dan approves new accounts — you'll get in as soon as he does.") : 'Forgot your password? Ask Dan for a reset link.'}
         </p>
       </div>
     </main>

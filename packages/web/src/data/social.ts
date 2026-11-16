@@ -201,7 +201,7 @@ export function useAdmin(enabled = true) {
   return useQuery({ queryKey: [...SOCIAL_KEY, 'admin'], queryFn: () => api.get<AdminData>('/api/admin'), enabled, staleTime: 0 });
 }
 
-export type AdminAction = 'approve' | 'decline' | 'remove';
+export type AdminAction = 'approve' | 'decline' | 'remove' | 'delete';
 
 /** Approve (also Restore), Decline and Remove access: one POST per person, then Admin and the unread badge refetch. */
 export function useAdminAction() {
@@ -209,6 +209,37 @@ export function useAdminAction() {
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: AdminAction }) => api.post<void>(`/api/admin/users/${encodeURIComponent(id)}/${action}`),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: UNREAD_KEY }); return refresh(qc); },
+  });
+}
+
+export interface SignupLink {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  status: 'unused' | 'used' | 'expired' | 'revoked';
+  usedBy: string | null;
+  usedAt: string | null;
+}
+
+/** Dan's recent sign-up links (last 50; never the token). */
+export function useSignupLinks() {
+  return useQuery({ queryKey: [...SOCIAL_KEY, 'signup-links'], queryFn: async () => (await api.get<{ links: SignupLink[] }>('/api/admin/signup-links')).links, staleTime: 0 });
+}
+
+/** Makes a sign-up link: single use, 7 days. The answer holds the only copy of the token. */
+export function useMakeSignupLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ link: string; expiresAt: string }>('/api/admin/signup-links'),
+    onSuccess: () => refresh(qc),
+  });
+}
+
+export function useRevokeSignupLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/api/admin/signup-links/${encodeURIComponent(id)}`),
+    onSuccess: () => refresh(qc),
   });
 }
 

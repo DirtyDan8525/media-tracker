@@ -34,3 +34,6 @@
   .auth-wait__ring > span > i { animation: auth-breathe 2.4s var(--ease) infinite; }
   @keyframes auth-breathe { 50% { transform: scale(1.18); } }
 }
+
+.auth__banner { margin: 0; padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); background: var(--card); color: var(--bright-text); font-size: var(--fs-meta); text-align: center; }
+.auth__banner--warn { color: var(--muted-text); }

@@ -1,7 +1,7 @@
 import { nameOf, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../api/client';
-import { useAdmin, useAdminAction, useCopy, useResetLink, type AdminAction } from '../data/social';
+import { useAdmin, useAdminAction, useCopy, useMakeSignupLink, useResetLink, useRevokeSignupLink, useSignupLinks, type AdminAction, type SignupLink } from '../data/social';
 import { Button } from '../design/components/Button';
 import { EmptyState } from '../design/components/EmptyState';
 import { IconButton } from '../design/components/IconButton';
@@ -13,8 +13,8 @@ import { useSessionMe } from '../shell/SessionGate';
 import { PersonAvatar } from './social/parts';
 import '../design/social.css';
 
-const DONE: Record<AdminAction | 'restore', string> = { approve: 'Approved', decline: 'Declined', remove: 'Removed', restore: 'Restored' };
-const VERB: Record<AdminAction | 'restore', string> = { approve: 'approve', decline: 'decline', remove: 'remove', restore: 'restore' };
+const DONE: Record<AdminAction | 'restore', string> = { approve: 'Approved', decline: 'Declined', remove: 'Removed', restore: 'Restored', delete: 'Deleted' };
+const VERB: Record<AdminAction | 'restore', string> = { approve: 'approve', decline: 'decline', remove: 'remove', restore: 'restore', delete: 'delete' };
 
 /** "2 h ago", "1 d ago", "just now" (a request's age; Admin refetches on open, so no timer). */
 export function ago(iso: string, now = Date.now()): string {
@@ -29,7 +29,7 @@ export function ago(iso: string, now = Date.now()): string {
 /** Plain words for a failed admin call. */
 export function adminError(err: unknown, action: AdminAction | 'restore' | 'reset', handle: string): string {
   if (err instanceof ApiError) {
-    if (err.error === 'self') return "You can't remove your own access.";
+    if (err.error === 'self') return action === 'delete' ? "You can't delete your own account." : "You can't remove your own access.";
     if (err.status === 403) return 'Only the admin can do this.';
     if (err.status === 404) return `${handle} has already changed. Refresh and look again.`;
   }
@@ -62,7 +62,76 @@ function Section({ id, title, count, children }: { id: string; title: string; co
   );
 }
 
-type Confirm = { kind: 'decline' | 'remove'; user: PublicUser };
+type Confirm = { kind: 'decline' | 'remove' | 'delete'; user: PublicUser };
+
+const CONFIRM: Record<Confirm['kind'], { title: string; button: string }> = {
+  decline: { title: 'Decline', button: 'Decline' },
+  remove: { title: 'Remove', button: 'Remove access' },
+  delete: { title: 'Delete', button: 'Delete account' },
+};
+const STATUS_WORDS: Record<SignupLink['status'], string> = { unused: 'Unused', used: 'Used', expired: 'Expired', revoked: 'Revoked' };
+const statusText = (l: SignupLink) => (l.status === 'used' && l.usedBy ? `Used by @${l.usedBy}` : STATUS_WORDS[l.status]);
+
+/** Sign-up links: make one (shown once, with Copy), see the recent ones, revoke an unused one. */
+function SignupLinks() {
+  const { data: links } = useSignupLinks();
+  const make = useMakeSignupLink();
+  const revoke = useRevokeSignupLink();
+  const copy = useCopy();
+  const [made, setMade] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function makeOne() {
+    setError(null);
+    try {
+      setMade((await make.mutateAsync()).link);
+    } catch {
+      setError("Couldn't make a sign-up link. Check your connection and try again.");
+    }
+  }
+  async function revokeOne(id: string) {
+    setError(null);
+    try {
+      await revoke.mutateAsync(id);
+    } catch {
+      setError("Couldn't revoke that link. Refresh and look again.");
+    }
+  }
+
+  return (
+    <Section id="admin-links" title="Sign-up links">
+      <p className="friend-note">Anyone who joins with one of these is approved right away.</p>
+      <Button onClick={() => void makeOne()} disabled={make.isPending}>Make a sign-up link</Button>
+      {error && <p role="alert" className="field-error">{error}</p>}
+      {made && (
+        <div className="admin-result" role="status" aria-label="Sign-up link">
+          <b>Send this to your friend:</b>
+          <div className="admin-result__link">
+            <input className="link-box" readOnly value={made} aria-label="Sign-up link" onFocus={(e) => e.currentTarget.select()} />
+            <Button onClick={() => void copy(made)}>Copy</Button>
+          </div>
+          <span className="hint">Works once, for 7 days.</span>
+        </div>
+      )}
+      {links && links.length === 0 && <p className="friend-note">No links yet.</p>}
+      {links && links.length > 0 && (
+        <ul className="plain-list admin-links">
+          {links.map((l) => (
+            <li key={l.id} className="person person--admin">
+              <span className="person__meta">
+                <span className="person__name">{statusText(l)}</span>
+                <span className="person__sub">made {ago(l.createdAt)}</span>
+              </span>
+              {l.status === 'unused' && (
+                <Button compact aria-label="Revoke link" disabled={revoke.isPending} onClick={() => void revokeOne(l.id)}>Revoke</Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
 
 /** Admin (route /admin, admin only): approve or decline sign-ups, reset passwords, remove and restore people. */
 export function AdminScreen() {
@@ -152,7 +221,7 @@ export function AdminScreen() {
             {data.active.map((u) => (
               <Row key={u.id} user={u}>
                 {u.id === me.id ? <span className="person__you">You</span> : (
-                  <RowMenu user={u} disabled={busy === u.id} onReset={() => void resetLink(u)} onRemove={() => setConfirm({ kind: 'remove', user: u })} />
+                  <RowMenu user={u} disabled={busy === u.id} onReset={() => void resetLink(u)} onRemove={() => setConfirm({ kind: 'remove', user: u })} onDelete={() => setConfirm({ kind: 'delete', user: u })} />
                 )}
               </Row>
             ))}
@@ -169,6 +238,8 @@ export function AdminScreen() {
           )}
         </Section>
 
+        <SignupLinks />
+
         {data.removed.length > 0 && (
           <Section id="admin-removed" title="Removed" count={data.removed.length}>
             <ul className="people plain-list">
@@ -183,18 +254,20 @@ export function AdminScreen() {
       </div>
 
       {confirm && (
-        <Sheet open title={confirm.kind === 'decline' ? `Decline ${handleOf(confirm.user)}?` : `Remove ${handleOf(confirm.user)}?`} onClose={() => setConfirm(null)}
+        <Sheet open title={`${CONFIRM[confirm.kind].title} ${handleOf(confirm.user)}?`} onClose={() => setConfirm(null)}
           footer={
             <div className="btn-row">
               <Button className="btn--danger" disabled={busy === confirm.user.id}
                 onClick={() => void run(confirm.user, confirm.kind).then((ok) => { if (ok) setConfirm(null); })}>
-                {confirm.kind === 'decline' ? 'Decline' : 'Remove access'}
+                {CONFIRM[confirm.kind].button}
               </Button>
               <Button onClick={() => setConfirm(null)}>Cancel</Button>
             </div>
           }>
           <p className="hint">
-            {confirm.kind === 'decline' ? "The request is deleted. They can sign up again if they want to." : "They won't be able to sign in. Their data stays."}
+            {confirm.kind === 'delete'
+              ? `Delete ${handleOf(confirm.user)} and all their lists? This can't be undone.`
+              : confirm.kind === 'decline' ? "The request is deleted. They can sign up again if they want to." : "They won't be able to sign in. Their data stays."}
           </p>
         </Sheet>
       )}
@@ -202,8 +275,8 @@ export function AdminScreen() {
   );
 }
 
-/** The ⋯ button on a member's row: Reset password link, Remove access. */
-function RowMenu({ user, disabled, onReset, onRemove }: { user: PublicUser; disabled: boolean; onReset: () => void; onRemove: () => void }) {
+/** The ⋯ button on a member's row: Reset password link, Remove access, Delete account. */
+function RowMenu({ user, disabled, onReset, onRemove, onDelete }: { user: PublicUser; disabled: boolean; onReset: () => void; onRemove: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -222,6 +295,7 @@ function RowMenu({ user, disabled, onReset, onRemove }: { user: PublicUser; disa
         <div role="menu" aria-label={`Actions for ${handleOf(user)}`} className="menu">
           <button type="button" role="menuitem" className="menu__item" onClick={pick(onReset)}>Reset password link</button>
           <button type="button" role="menuitem" className="menu__item" onClick={pick(onRemove)}>Remove access</button>
+          <button type="button" role="menuitem" className="menu__item" onClick={pick(onDelete)}>Delete account</button>
         </div>
       )}
     </div>

@@ -7,7 +7,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { PublicUser } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
 import { publicUser, PUBLIC_USER_COLS, type PublicUserRow } from '../social/visibility';
-import { createResetLink } from './auth';
+import { createResetLink, createSignupLink } from './auth';
 
 export const admin = new Hono<AppEnv>();
 
@@ -73,4 +73,52 @@ admin.post('/users/:id/remove', async (c) => {
 admin.post('/users/:id/reset-link', async (c) => {
   const link = await createResetLink(c.env.DB, c.req.param('id'), new URL(c.req.url).origin);
   return link ? c.json({ link }) : c.json(notFound, 404);
+});
+
+// POST /api/admin/users/:id/delete: deletes the person and, by cascade, everything of theirs (lists,
+// sessions, friendships, activity). Never yourself. 1 query (+ sign-in).
+admin.post('/users/:id/delete', async (c) => {
+  const id = c.req.param('id');
+  if (id === c.get('user').id) return c.json({ error: 'self' }, 400);
+  const res = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+  return res.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
+});
+
+export type SignupLinkStatus = 'unused' | 'used' | 'expired' | 'revoked';
+export interface SignupLinkItem {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  status: SignupLinkStatus;
+  usedBy: string | null;
+  usedAt: string | null;
+}
+
+// POST /api/admin/signup-links -> { link, expiresAt, id }: single use, 7 days. 1 query (+ sign-in).
+admin.post('/signup-links', async (c) => c.json(await createSignupLink(c.env.DB, c.get('user').id, new URL(c.req.url).origin)));
+
+// GET /api/admin/signup-links -> { links }: the last 50, newest first. Never the token (only its hash is stored). 1 query (+ sign-in).
+admin.get('/signup-links', async (c) => {
+  const now = Date.now();
+  const { results } = await c.env.DB.prepare(
+    `SELECT l.id, l.created_at, l.expires_at, l.used_at, l.revoked_at, u.username AS used_by
+       FROM signup_links l LEFT JOIN users u ON u.id = l.used_by ORDER BY l.created_at DESC, l.id LIMIT 50`,
+  ).all<{ id: string; created_at: string; expires_at: string; used_at: string | null; revoked_at: string | null; used_by: string | null }>();
+  const links: SignupLinkItem[] = results.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+    status: r.used_at ? 'used' : r.revoked_at ? 'revoked' : Date.parse(r.expires_at) > now ? 'unused' : 'expired',
+    usedBy: r.used_by,
+    usedAt: r.used_at,
+  }));
+  return c.json({ links });
+});
+
+// DELETE /api/admin/signup-links/:id: revokes an unused, unexpired link (404 otherwise). 1 query (+ sign-in).
+admin.delete('/signup-links/:id', async (c) => {
+  const res = await c.env.DB.prepare(
+    'UPDATE signup_links SET revoked_at = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?1',
+  ).bind(new Date().toISOString(), c.req.param('id')).run();
+  return res.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
 });

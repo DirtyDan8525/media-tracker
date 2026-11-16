@@ -11,6 +11,12 @@ function adminBackend(requests = 2) {
     pending: [{ ...U('ren', 'Ren'), requestedAt: new Date(Date.now() - 2 * 3600_000).toISOString() }, { ...U('mika'), requestedAt: new Date(Date.now() - 26 * 3600_000).toISOString() }],
     active: [{ ...U('dan'), joinedAt: '2026-10-01T00:00:00Z', isAdmin: true }, { ...U('vance'), joinedAt: '2026-10-05T00:00:00Z', isAdmin: false }],
     removed: [U('jo')],
+    links: [
+      { id: 'l-unused', createdAt: new Date(Date.now() - 3600_000).toISOString(), expiresAt: new Date(Date.now() + 6 * 86_400_000).toISOString(), status: 'unused', usedBy: null, usedAt: null },
+      { id: 'l-used', createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), expiresAt: new Date(Date.now() + 5 * 86_400_000).toISOString(), status: 'used', usedBy: 'vance', usedAt: new Date(Date.now() - 86_400_000).toISOString() },
+      { id: 'l-expired', createdAt: new Date(Date.now() - 9 * 86_400_000).toISOString(), expiresAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), status: 'expired', usedBy: null, usedAt: null },
+      { id: 'l-revoked', createdAt: new Date(Date.now() - 4 * 86_400_000).toISOString(), expiresAt: new Date(Date.now() + 3 * 86_400_000).toISOString(), status: 'revoked', usedBy: null, usedAt: null },
+    ] as { id: string; createdAt: string; expiresAt: string; status: string; usedBy: string | null; usedAt: string | null }[],
   };
   const move = (id: string, from: 'pending' | 'removed', fn: (u: ReturnType<typeof U>) => unknown) => {
     const i = state[from].findIndex((u) => u.id === id);
@@ -33,9 +39,27 @@ function adminBackend(requests = 2) {
       return { status: 204 };
     },
     'POST /api/admin/users/:id/reset-link': { body: { link: 'https://mt.example/reset/k3f9x2m8q1ab' } },
+    'POST /api/admin/users/:id/delete': (_b, _u, p) => {
+      if (p.id === 'id-dan') return { status: 400, body: { error: 'self' } };
+      state.active = state.active.filter((x) => x.id !== p.id);
+      state.removed = state.removed.filter((x) => x.id !== p.id);
+      return { status: 204 };
+    },
+    'GET /api/admin/signup-links': () => ({ body: { links: state.links } }),
+    'POST /api/admin/signup-links': () => {
+      const l = { id: 'new1', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(), status: 'unused', usedBy: null, usedAt: null };
+      state.links = [l, ...state.links];
+      return { body: { id: 'new1', link: 'https://mt.example/join/T0KEN', expiresAt: l.expiresAt } };
+    },
+    'DELETE /api/admin/signup-links/:id': (_b, _u, p) => {
+      state.links = state.links.map((l) => (l.id === p.id ? { ...l, status: 'revoked' } : l));
+      return { status: 204 };
+    },
   });
   return { state, calls };
 }
+/** Admin's confirm sheets (the welcome walkthrough may be open as another dialog). */
+const CONFIRM_NAME = /^(Decline|Remove|Delete) @/;
 const posted = (calls: Call[]) => calls.filter((c) => c.method === 'POST').map((c) => c.path);
 const section = (name: RegExp) => screen.findByRole('region', { name });
 
@@ -77,14 +101,14 @@ describe('Admin screen', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
     await waitFor(() => expect(posted(calls)).toContain('/api/admin/users/id-mika/decline'));
     expect(await section(/^Requests · 1$/)).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: CONFIRM_NAME })).not.toBeInTheDocument();
   });
 
   it('Cancel in the Decline sheet does nothing', async () => {
     const { calls } = adminBackend();
     renderApp('/admin');
     await userEvent.click(await screen.findByRole('button', { name: 'Decline @mika' }));
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Decline @mika?' })).getByRole('button', { name: 'Cancel' }));
     expect(posted(calls)).toEqual([]);
   });
 
@@ -147,6 +171,104 @@ describe('Admin screen', () => {
     mockApi(makeMe({ isAdmin: true }), { 'GET /api/admin': { status: 500, body: { error: 'x' } } });
     renderApp('/admin');
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+});
+
+describe('Sign-up links', () => {
+  it('Make a sign-up link shows the link with Copy and "Works once, for 7 days", and lists it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { calls } = adminBackend();
+    renderApp('/admin');
+    const card = await section(/^Sign-up links/);
+    await userEvent.click(within(card).getByRole('button', { name: 'Make a sign-up link' }));
+    const result = await screen.findByRole('status', { name: 'Sign-up link' });
+    expect(within(result).getByRole('textbox', { name: 'Sign-up link' })).toHaveValue('https://mt.example/join/T0KEN');
+    expect(result).toHaveTextContent('Works once, for 7 days');
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/admin/signup-links')).toBe(true);
+    await userEvent.click(within(result).getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('https://mt.example/join/T0KEN');
+    // the new link joins the list (unused, with Revoke)
+    await waitFor(() => expect(within(card).getAllByRole('button', { name: 'Revoke link' })).toHaveLength(2));
+  });
+
+  it('lists recent links with a status each; only unused ones have Revoke; no token is shown', async () => {
+    adminBackend();
+    renderApp('/admin');
+    const card = await section(/^Sign-up links/);
+    const items = await within(card).findAllByRole('listitem');
+    expect(items).toHaveLength(4);
+    expect(items[0]).toHaveTextContent('Unused');
+    expect(items[1]).toHaveTextContent('Used by @vance');
+    expect(items[2]).toHaveTextContent('Expired');
+    expect(items[3]).toHaveTextContent('Revoked');
+    expect(within(items[0]!).getByRole('button', { name: 'Revoke link' })).toBeInTheDocument();
+    for (const i of [1, 2, 3]) expect(within(items[i]!).queryByRole('button')).not.toBeInTheDocument();
+    expect(card).not.toHaveTextContent(/\/join\//);
+  });
+
+  it('Revoke turns an unused link into Revoked', async () => {
+    const { calls } = adminBackend();
+    renderApp('/admin');
+    const card = await section(/^Sign-up links/);
+    await userEvent.click(await within(card).findByRole('button', { name: 'Revoke link' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/admin/signup-links/l-unused')).toBe(true));
+    await waitFor(() => expect(within(card).queryByRole('button', { name: 'Revoke link' })).not.toBeInTheDocument());
+    expect((await within(card).findAllByRole('listitem'))[0]).toHaveTextContent('Revoked');
+  });
+
+  it('says so when no link has been made yet, and when a link could not be made', async () => {
+    mockApi(makeMe({ id: 'id-dan', isAdmin: true }), {
+      'GET /api/admin': { body: { pending: [], active: [], removed: [] } },
+      'GET /api/admin/signup-links': { body: { links: [] } },
+      'POST /api/admin/signup-links': { status: 500, body: { error: 'x' } },
+    });
+    renderApp('/admin');
+    const card = await section(/^Sign-up links/);
+    expect(await within(card).findByText('No links yet.')).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('button', { name: 'Make a sign-up link' }));
+    expect(await screen.findByText("Couldn't make a sign-up link. Check your connection and try again.")).toBeInTheDocument();
+  });
+});
+
+describe('Delete account', () => {
+  it('⋯ → Delete account asks "Delete @vance and all their lists? This can\'t be undone.", then deletes', async () => {
+    const { calls } = adminBackend();
+    renderApp('/admin');
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions for @vance' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete account' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete @vance?' });
+    expect(within(dialog).getByText("Delete @vance and all their lists? This can't be undone.")).toBeInTheDocument();
+    expect(posted(calls).filter((p) => p.endsWith('/delete'))).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete account' }));
+    await waitFor(() => expect(posted(calls)).toContain('/api/admin/users/id-vance/delete'));
+    expect(await screen.findByText('Deleted @vance')).toBeInTheDocument();
+    expect(await section(/^Members · 1$/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: CONFIRM_NAME })).not.toBeInTheDocument();
+  });
+
+  it('Cancel deletes nothing; your own row has no menu', async () => {
+    const { calls } = adminBackend();
+    renderApp('/admin');
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions for @vance' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete account' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete @vance?' })).getByRole('button', { name: 'Cancel' }));
+    expect(posted(calls).filter((p) => p.endsWith('/delete'))).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'More actions for @dan' })).not.toBeInTheDocument();
+  });
+
+  it('a failed delete says so and keeps the row', async () => {
+    mockApi(makeMe({ id: 'id-dan', isAdmin: true }), {
+      'GET /api/admin': { body: { pending: [], active: [{ ...U('dan'), joinedAt: 'x', isAdmin: true }, { ...U('vance'), joinedAt: 'x', isAdmin: false }], removed: [] } },
+      'GET /api/admin/signup-links': { body: { links: [] } },
+      'POST /api/admin/users/:id/delete': { status: 500, body: { error: 'x' } },
+    });
+    renderApp('/admin');
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions for @vance' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete account' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete @vance?' })).getByRole('button', { name: 'Delete account' }));
+    expect(await screen.findByText("Couldn't delete @vance. Check your connection and try again.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for @vance' })).toBeInTheDocument();
   });
 });
 

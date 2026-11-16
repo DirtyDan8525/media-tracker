@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { JOIN_INVALID_KEY, JOIN_INVALID_TEXT } from '../../data/auth';
 import { logOut } from '../../data/logout';
 import { useMe } from '../../data/useMe';
 import { Button } from '../../design/components/Button';
@@ -12,6 +13,7 @@ export const WAITING_POLL_MS = 30_000;
 export function WaitingScreen({ username }: { username: string | null }) {
   const qc = useQueryClient();
   const { refetch } = useMe();
+  const joinInvalid = sessionStorage.getItem(JOIN_INVALID_KEY) === '1';
 
   useEffect(() => {
     const poll = () => { if (document.visibilityState !== 'hidden') void refetch(); };
@@ -26,7 +28,8 @@ export function WaitingScreen({ username }: { username: string | null }) {
         <div className="auth-wait__ring" aria-hidden="true"><span><i /></span></div>
         <h1 className="auth__title">{username ? `Thanks, @${username}!` : 'Thanks!'}</h1>
         <p className="auth-wait__text" role="status">Dan needs to approve your account. This page updates by itself.</p>
-        <Button onClick={() => void logOut(qc)}>Log out</Button>
+        {joinInvalid && <p className="auth-wait__text">{JOIN_INVALID_TEXT}</p>}
+        <Button onClick={() => { sessionStorage.removeItem(JOIN_INVALID_KEY); void logOut(qc); }}>Log out</Button>
       </div>
     </main>
   );

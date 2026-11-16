@@ -38,10 +38,18 @@ async function freshSession() {
   return { hash: await sha256Hex(token), created: new Date(now).toISOString(), expires: expiryFrom(now), cookie: sessionCookie(token) };
 }
 
+/** Sign-up links work once and expire after 7 days if unused. */
+export const SIGNUP_LINK_TTL_MS = 7 * 86_400_000;
+/** A sign-up link a person can use right now: not used, not revoked, not expired (?N = token hash, ?M = now). */
+const linkLive = (hash: string, now: string) =>
+  `token_hash = ${hash} AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ${now}`;
+
 const INSERT_SESSION = 'INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_used_at)';
 
-// POST /api/auth/signup { username, password, displayName? } -> 201 Me + cookie. 3 queries (one batch).
-// The first account on an empty database is the active admin; everyone after waits for approval.
+// POST /api/auth/signup { username, password, displayName?, joinToken? } -> 201 Me + cookie. 3 queries, 4 with a sign-up link (one batch).
+// The first account on an empty database is the active admin; everyone after waits for approval,
+// unless they carry a live sign-up link: then they are active and the link is used up in the same
+// batch (a link taken a moment earlier just means pending, with joinLink: 'invalid').
 auth.post('/signup', async (c) => {
   const body = await readJson(c.req.raw);
   if (!body || typeof body.username !== 'string') return c.json(invalid, 400);
@@ -49,30 +57,53 @@ auth.post('/signup', async (c) => {
   if (!USERNAME_RE.test(username) || !validPassword(body.password)) return c.json(invalid, 400);
   const displayName = body.displayName === undefined ? null : cleanDisplayName(body.displayName);
   if (displayName === undefined) return c.json(invalid, 400);
+  if (body.joinToken !== undefined && typeof body.joinToken !== 'string') return c.json(invalid, 400);
+  const joinHash = typeof body.joinToken === 'string' && isToken(body.joinToken) ? await sha256Hex(body.joinToken) : null;
 
   const db = c.env.DB;
   const id = crypto.randomUUID();
   const passwordHash = await hashPassword(body.password);
   const s = await freshSession();
   let created: UserRow | undefined;
+  let joined = false;
   try {
-    const [, , sel] = await db.batch([
+    // The batch is one transaction: the status check, the insert and the claim see the same link.
+    const results = await db.batch([
       db.prepare(
         `INSERT INTO users (id, email, username, display_name, settings_json, is_admin, status, password_hash, created_at)
-         SELECT ?1, 'u:' || ?1, ?2, ?3, ?4, f.first, CASE WHEN f.first = 1 THEN 'active' ELSE 'pending' END, ?5, ?6
+         SELECT ?1, 'u:' || ?1, ?2, ?3, ?4, f.first,
+                CASE WHEN f.first = 1 OR EXISTS (SELECT 1 FROM signup_links WHERE ${linkLive('?7', '?6')}) THEN 'active' ELSE 'pending' END, ?5, ?6
            FROM (SELECT NOT EXISTS (SELECT 1 FROM users) AS first) f`,
-      ).bind(id, username, displayName, JSON.stringify(DEFAULT_USER_SETTINGS), passwordHash, s.created),
+      ).bind(id, username, displayName, JSON.stringify(DEFAULT_USER_SETTINGS), passwordHash, s.created, joinHash),
       db.prepare(`${INSERT_SESSION} VALUES (?, ?, ?, ?, ?)`).bind(s.hash, id, s.created, s.expires, s.created),
       db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).bind(id),
+      // Claim the link (single use); only when a well-formed token came along. At most one signup can win it.
+      ...(joinHash
+        ? [db.prepare(`UPDATE signup_links SET used_by = ?1, used_at = ?3 WHERE ${linkLive('?2', '?3')}`).bind(id, joinHash, s.created)]
+        : []),
     ]);
-    created = sel!.results[0] as UserRow | undefined;
+    created = results[2]!.results[0] as UserRow | undefined;
+    joined = (results[3]?.meta.changes ?? 0) > 0;
   } catch (err) {
     // The UNIQUE (NOCASE) index on username is the guard; the whole batch rolled back.
     if (/UNIQUE/i.test(String(err instanceof Error ? err.message : err))) return c.json({ error: 'taken' }, 409);
     throw err;
   }
   if (!created) throw new Error('signup: user not created');
-  return c.json(meBody(toAppUser(created, c.env.ADMIN_EMAIL)), 201, { 'Set-Cookie': s.cookie });
+  const me = meBody(toAppUser(created, c.env.ADMIN_EMAIL));
+  // A link was offered but did not work (used, expired, revoked, unknown): the UI says so.
+  const offered = body.joinToken !== undefined && body.joinToken !== '';
+  return c.json(offered && !joined ? { ...me, joinLink: 'invalid' as const } : me, 201, { 'Set-Cookie': s.cookie });
+});
+
+// GET /api/auth/join/:token -> { valid } for the /join page: true only for an unused, unexpired, unrevoked link. 1 query.
+auth.get('/join/:token', async (c) => {
+  const token = c.req.param('token');
+  if (!isToken(token)) return c.json({ valid: false });
+  const row = await c.env.DB.prepare(`SELECT 1 AS ok FROM signup_links WHERE ${linkLive('?1', '?2')}`)
+    .bind(await sha256Hex(token), new Date().toISOString())
+    .first();
+  return c.json({ valid: row !== null });
 });
 
 /** True when the last 10 failures fell within 15 minutes and the newest is under 15 minutes old. */
@@ -192,4 +223,17 @@ export async function createResetLink(db: D1Database, userId: string, origin: st
     ).bind(userId, await sha256Hex(token), new Date(now).toISOString(), new Date(now + RESET_TTL_MS).toISOString()),
   ]);
   return inserted!.meta.changes ? `${origin}/reset/${token}` : null;
+}
+
+/** A fresh sign-up link made by `adminId`: only its hash is stored. 1 query. */
+export async function createSignupLink(db: D1Database, adminId: string, origin: string) {
+  const token = newToken();
+  const now = Date.now();
+  const expiresAt = new Date(now + SIGNUP_LINK_TTL_MS).toISOString();
+  const id = crypto.randomUUID();
+  await db
+    .prepare('INSERT INTO signup_links (token_hash, id, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(await sha256Hex(token), id, adminId, new Date(now).toISOString(), expiresAt)
+    .run();
+  return { id, link: `${origin}/join/${token}`, expiresAt };
 }

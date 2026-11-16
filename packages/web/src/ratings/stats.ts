@@ -7,7 +7,12 @@ export interface ListStats {
   /** Count of Completed; null for lists without a Status column (Ruling P8). */
   completed: number | null;
   highest: number | null;
+  /** Titles per tier, index = tier (0 Didn't like .. 3 Loved). Unrated and pre-3c rows count in none. */
+  tiers: [number, number, number, number];
 }
+
+/** All media spans lists with different tier sets, so it has no tier counts. */
+export type AllStats = Omit<ListStats, 'tiers'>;
 
 export interface GenreStat { genre: string; count: number; average: number | null }
 
@@ -17,6 +22,12 @@ const ratingsOf = (rows: Entry[]): number[] => rows.flatMap((e) => (e.rating ===
 const mean = (xs: number[]): number | null => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const maxOf = (xs: number[]): number | null => (xs.length ? Math.max(...xs) : null);
 
+function tierCounts(rows: Entry[]): [number, number, number, number] {
+  const out: [number, number, number, number] = [0, 0, 0, 0];
+  for (const e of rows) if ((e.tier === 0 || e.tier === 1 || e.tier === 2 || e.tier === 3)) out[e.tier]++;
+  return out;
+}
+
 function listStats(category: Category, rows: Entry[]): ListStats {
   const ratings = ratingsOf(rows);
   return {
@@ -25,6 +36,7 @@ function listStats(category: Category, rows: Entry[]): ListStats {
     average: mean(ratings),
     completed: CATEGORY_CONFIG[category].hasStatus ? rows.filter((e) => e.status === 'Completed').length : null,
     highest: maxOf(ratings),
+    tiers: tierCounts(rows),
   };
 }
 
@@ -52,14 +64,14 @@ function genreStats(rows: Entry[]): GenreStat[] {
 /** Per-list figures for the enabled lists (in the order given), the totals over them, and Anime's genres. */
 export function computeStats(byCategory: Partial<Record<Category, Entry[]>>, enabled: Category[]): {
   lists: (ListStats & { category: Category })[];
-  all: ListStats;
+  all: AllStats;
   animeGenres: GenreStat[];
 } {
   const lists = enabled.map((category) => ({ category, ...listStats(category, byCategory[category] ?? []) }));
   const every = enabled.flatMap((c) => byCategory[c] ?? []);
   const ratings = ratingsOf(every);
   const withStatus = lists.filter((l) => l.completed !== null);
-  const all: ListStats = {
+  const all: AllStats = {
     entries: lists.reduce((n, l) => n + l.entries, 0),
     rated: lists.reduce((n, l) => n + l.rated, 0),
     average: mean(ratings),

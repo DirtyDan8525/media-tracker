@@ -196,7 +196,7 @@ function ListCard({ name, s, index }: { name: string; s: ListStats; index: numbe
   );
 }
 
-function StatsRow({ name, s, index, total }: { name: string; s: ListStats; index: number; total?: boolean }) {
+function StatsRow({ name, s, index, total }: { name: string; s: Omit<ListStats, 'tiers'>; index: number; total?: boolean }) {
   return (
     <tr className={total ? 'stats__total' : undefined}>
       <th scope="row">{name}</th>

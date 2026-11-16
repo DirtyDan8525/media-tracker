@@ -25,4 +25,25 @@ describe('sortEntries', () => {
     expect(sortEntries(rows, 'title').map((r) => r.title)).toEqual(['a', 'b', 'C']);
     expect(rows.map((r) => r.title)).toEqual(['b', 'C', 'a']);
   });
+
+  it('equal shown score: higher tier first, then stronger first', () => {
+    const r = (id: string, tier: 0 | 1 | 2 | 3 | null, strength: number | null, rating = 9) => ({ id, title: 'T', rating, releaseDate: '', tier, strength });
+    const rows = [r('weak', 3, 0.1), r('low-tier', 2, 5), r('strong', 3, 1.2), r('none', null, null)];
+    expect(sortEntries(rows, 'rating').map((x) => x.id)).toEqual(['strong', 'weak', 'low-tier', 'none']);
+  });
+  it('a different shown score still wins over tier and strength', () => {
+    const rows = [
+      { id: 'a', title: 'A', rating: 8.9, releaseDate: '', tier: 3 as const, strength: 9 },
+      { id: 'b', title: 'B', rating: 9.1, releaseDate: '', tier: 2 as const, strength: -3 },
+    ];
+    expect(sortEntries(rows, 'rating').map((x) => x.id)).toEqual(['b', 'a']);
+  });
+  it('a pre-3c cached row (no tier fields) sorts as unrated tier without throwing', () => {
+    const old = { id: 'old', title: 'Old', rating: 9, releaseDate: '' }; // no tier/strength at all
+    const fresh = { id: 'new', title: 'New', rating: 9, releaseDate: '', tier: 3 as const, strength: 0.5 };
+    const rows = [old, fresh, { ...old, id: 'old2', title: 'Old2' }];
+    expect(() => sortEntries(rows, 'rating')).not.toThrow();
+    expect(sortEntries(rows, 'rating').map((x) => x.id)).toEqual(['new', 'old', 'old2']);
+    expect(sortEntries([...rows].reverse(), 'rating').map((x) => x.id)).toEqual(['new', 'old', 'old2']);
+  });
 });

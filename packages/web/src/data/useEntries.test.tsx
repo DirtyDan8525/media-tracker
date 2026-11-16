@@ -59,4 +59,18 @@ describe('useEntries', () => {
     });
     expect(result.current.isPending).toBe(false);
   });
+
+  it('normalizes pre-3c rows (cached and fetched): missing tier/priorMean/strength become null, scoreLocked false', async () => {
+    const old = { ...entry('o1') } as Record<string, unknown>;
+    delete old.tier; delete old.priorMean; delete old.strength; delete old.scoreLocked;
+    await localDb.entries.bulkPut([old as unknown as Entry]);
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    const first = renderHook(() => useEntries('anime'), { wrapper });
+    await waitFor(() => expect(first.result.current.data?.[0]?.id).toBe('o1'));
+    expect(first.result.current.data![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+    mockFetch({ 'GET /api/entries': { body: [old] } });
+    const second = renderHook(() => useEntries('anime'), { wrapper });
+    await waitFor(() => expect(second.result.current.data && !second.result.current.isPlaceholderData).toBeTruthy());
+    expect(second.result.current.data![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+  });
 });

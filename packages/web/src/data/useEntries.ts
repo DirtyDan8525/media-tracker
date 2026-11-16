@@ -7,9 +7,14 @@ import { LIST_ORDER } from '../nav';
 /** Network failure (offline, DNS, aborted) as opposed to an HTTP error answer. */
 export const isOffline = (err: unknown): boolean => !(err instanceof ApiError);
 
+/** Rows cached before Phase 3c lack the tier fields: read them as unrated-tier, unlocked. */
+export function normalizeEntry(e: Entry): Entry {
+  return { ...e, tier: e.tier ?? null, priorMean: e.priorMean ?? null, strength: e.strength ?? null, scoreLocked: e.scoreLocked ?? false };
+}
+
 export async function cachedEntries(category: Category): Promise<Entry[]> {
   try {
-    return await localDb.entries.where('category').equals(category).toArray();
+    return (await localDb.entries.where('category').equals(category).toArray()).map(normalizeEntry);
   } catch {
     return []; // IndexedDB unavailable (e.g. some private modes): no cache, not an error
   }
@@ -32,7 +37,7 @@ export function entriesQueryOptions(qc: QueryClient, category: Category) {
     queryKey: ['entries', category] as const,
     queryFn: async (): Promise<Entry[]> => {
       try {
-        const rows = await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(category)}`);
+        const rows = (await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(category)}`)).map(normalizeEntry);
         await storeEntries(category, rows);
         void qc.invalidateQueries({ queryKey: COUNTS_KEY });
         return rows;

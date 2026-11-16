@@ -89,10 +89,7 @@ describe('adding an entry', () => {
     const d = await openAdd(/^Add album$/i);
     await userEvent.type(within(d).getByRole('textbox', { name: 'Album' }), 'Abbey Road');
     await userEvent.type(within(d).getByRole('textbox', { name: /^Artist/ }), 'The Beatles');
-    const slider = within(d).getByRole('slider', { name: 'Rating' });
-    expect(slider).toHaveAttribute('aria-valuetext', 'Unrated');
-    fireEvent.change(slider, { target: { value: '9.5' } });
-    expect(slider).toHaveAttribute('aria-valuetext', '9.5');
+    await userEvent.type(within(d).getByRole('spinbutton', { name: 'Or type a number' }), '9.5');
     await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(calls.some((c) => c.path === '/api/lookup')).toBe(true));
     expect(calls.find((c) => c.path === '/api/entries')?.body).toMatchObject({ title: 'Abbey Road', creator: 'The Beatles', rating: 9.5 });
@@ -101,7 +98,7 @@ describe('adding an entry', () => {
     });
   });
 
-  it('leaves a title unrated unless the slider is moved, and hides empty creator for categories without one', async () => {
+  it('leaves a title unrated unless a tier or number is given, and hides empty creator for categories without one', async () => {
     const { calls } = fakeBackend();
     renderApp('/list/tv');
     const d = await openAdd(/^Add TV show$/i);
@@ -122,7 +119,7 @@ describe('adding an entry', () => {
     renderApp('/list/movies');
     const d2 = await openAdd(/^Add movie$/i);
     expect(within(d2).queryByRole('button', { name: 'Completed' })).not.toBeInTheDocument();
-    expect(within(d2).getByRole('slider', { name: 'Rating' })).toBeInTheDocument();
+    expect(within(d2).getByRole('group', { name: 'Tier' })).toBeInTheDocument();
   });
 
   it('sends the chosen status', async () => {

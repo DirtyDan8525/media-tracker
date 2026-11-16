@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status, type Tier } from '@media-tracker/shared';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { api } from '../api/client';
@@ -13,7 +13,10 @@ import { runLookup } from '../lookup/run';
 export interface AddInput {
   title: string;
   creator?: string;
+  /** A typed number: the Worker picks the tier it falls in. */
   rating?: number | null;
+  /** A tapped tier, with no number (the title starts in the middle of it). */
+  tier?: Tier;
   status?: Status | null;
 }
 
@@ -90,14 +93,16 @@ export function useAddEntry(category: Category) {
     }
   }, [apply, markNotFound, setJobs]);
 
-  const add = useCallback(async (input: AddInput): Promise<void> => {
+  /** Saves the entry and looks it up. Resolves to the saved entry, or null when nothing was added. */
+  const add = useCallback(async (input: AddInput): Promise<Entry | null> => {
     const title = input.title.trim();
-    if (!title) return;
+    if (!title) return null;
     const cfg = CATEGORY_CONFIG[category];
     const creator = cfg.creatorLabel ? (input.creator ?? '').trim() : '';
     const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: 'pending' };
     if (creator) body.creator = creator;
     if (input.rating !== undefined && input.rating !== null) body.rating = input.rating;
+    else if (input.tier !== undefined) body.tier = input.tier;
     if (cfg.hasStatus && input.status) body.status = input.status;
 
     // The row appears before anything comes back.
@@ -107,7 +112,7 @@ export function useAddEntry(category: Category) {
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
       rating: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
-      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
+      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: input.tier ?? null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
     };
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });
@@ -126,9 +131,10 @@ export function useAddEntry(category: Category) {
       lookupRunning.delete(tempId);
       removeTemp(qc, temp);
       toast.show("Couldn't save that. Check your connection and try again.");
-      return;
+      return null;
     }
     await resolve(entry, title, lookup);
+    return entry;
   }, [category, qc, toast, resolve]);
 
   /** Look an entry up again (Retry), with its own title or `term`. */

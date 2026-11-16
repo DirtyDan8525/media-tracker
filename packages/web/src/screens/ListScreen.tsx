@@ -11,7 +11,7 @@ import { Icon } from '../design/components/Icon';
 import { Sheet } from '../design/components/Sheet';
 import { Skeleton, SkeletonRow } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
-import { useAddEntry } from '../hooks/useAddEntry';
+import { useAddEntry, type AddInput } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
 import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
@@ -57,6 +57,16 @@ function ListBody({ category }: { category: Category }) {
   const add = useAddEntry(category);
   const [sort, setSort] = useState<SortKey>('rating');
   const [addOpen, setAddOpen] = useState(false);
+  // "Add and place it": once the entry is saved and its lookup (and picker) is done, open Compare on it.
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  useEffect(() => {
+    if (placeId === null || (add.state !== 'idle' && add.state !== 'saved')) return;
+    navigate(`/compare?place=${encodeURIComponent(placeId)}`);
+  }, [placeId, add.state, navigate]);
+  const submitAdd = async (input: AddInput, opts?: { place?: boolean }) => {
+    const entry = await add.add(input);
+    if (entry && opts?.place) setPlaceId(entry.id);
+  };
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
 
   const [params, setParams] = useSearchParams();
@@ -199,7 +209,7 @@ function ListBody({ category }: { category: Category }) {
 
       {addOpen && (
         <Suspense fallback={<SheetFallback title={`Add to ${LIST_LABEL[category]}`} onClose={() => setAddOpen(false)} />}>
-          <AddEntry category={category} onSubmit={(input) => void add.add(input)} onClose={() => setAddOpen(false)} />
+          <AddEntry category={category} onSubmit={(input, opts) => void submitAdd(input, opts)} onClose={() => setAddOpen(false)} />
         </Suspense>
       )}
       {add.state === 'choose' && add.pickTarget && (

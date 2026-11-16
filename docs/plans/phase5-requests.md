@@ -21,6 +21,9 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 ## Friends
 11. **Messages** from a friend's profile (later; bigger feature).
 
+## More tab
+13. **What's new / Coming soon** list in More, updated with every release (static list in the app; each future update adds its new features and moves items from Coming soon).
+
 ## PC
 12. Pages like Profile are too small on a full-screen PC; they should **scale up** to use the space.
 

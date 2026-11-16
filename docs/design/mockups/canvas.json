@@ -525,6 +525,48 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Admin sign-ups"
+    },
+    "Home.wf.dc.html": {
+      "x": 0,
+      "y": 17700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Home (list dropdown + Add bubble)"
+    },
+    "AddPicker.wf.dc.html": {
+      "x": 470,
+      "y": 17700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Add: pick the list"
+    },
+    "Walkthrough.wf.dc.html": {
+      "x": 940,
+      "y": 17700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Walkthrough + Install"
+    },
+    "FeedV2.wf.dc.html": {
+      "x": 1410,
+      "y": 17700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Feed v2 (richer posts + React)"
+    },
+    "ProfilePC.wf.dc.html": {
+      "x": 1880,
+      "y": 17700,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · Profile on PC (scales up)"
+    },
+    "EntryTiles.wf.dc.html": {
+      "x": 2350,
+      "y": 17700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Entry: stacked Rating and Status"
     }
   },
   "order": [
@@ -599,7 +641,13 @@
     "SignIn.wf.dc.html",
     "Waiting.wf.dc.html",
     "ResetPassword.wf.dc.html",
-    "AdminSignups.wf.dc.html"
+    "AdminSignups.wf.dc.html",
+    "Home.wf.dc.html",
+    "AddPicker.wf.dc.html",
+    "Walkthrough.wf.dc.html",
+    "FeedV2.wf.dc.html",
+    "ProfilePC.wf.dc.html",
+    "EntryTiles.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -847,6 +895,13 @@
       "text": "Wireframes — own sign-in (for Dan's review)",
       "kind": "title1",
       "maxW": 1800
+    },
+    "wfp5": {
+      "x": 0,
+      "y": 17500,
+      "text": "Wireframes — Phase 5 (for Dan's review)",
+      "kind": "title1",
+      "maxW": 3000
     }
   },
   "designSystems": [],
@@ -889,6 +944,7 @@
     "wf1",
     "wf2",
     "wfp4",
-    "wfp4b"
+    "wfp4b",
+    "wfp5"
   ]
 }

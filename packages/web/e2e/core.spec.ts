@@ -199,6 +199,49 @@ test('phone shell: Lists button picks a list, Add from Activity opens that list\
   await expect(page.getByRole('main').getByText('@e2e_user')).toBeVisible();
 });
 
+test('Activity (You) shows "You added Frieren to Anime", reached from the Main nav', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await ensureAnime(page, 'Frieren');
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Activity' }).click();
+  await expect(page).toHaveURL(/\/activity/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'You' })).toBeChecked();
+  await expect(page.getByText(/You\s+added\s+Frieren\s+to\s+Anime/).first()).toBeVisible();
+});
+
+test('tier flow: add a title by tapping Loved; its tier shows on the entry and in the Profile tier counts', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  const lovedCount = async () =>
+    ((await (await page.request.get('/api/entries?category=anime')).json()) as { rating: number | null; tier: number | null }[])
+      .filter((e) => e.rating !== null && e.tier === 3).length;
+  const before = await lovedCount();
+
+  await page.goto('/list/anime');
+  await openAddAnime(page);
+  await page.getByLabel('Title').fill('Monster');
+  await page.getByRole('group', { name: 'Tier' }).getByRole('button', { name: /^Loved/ }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('link', { name: /Monster/i }).first()).toBeVisible();
+  expect(await lovedCount()).toBe(before + 1);
+
+  // The entry shows the tier it was added in.
+  await page.getByRole('link', { name: /Monster/i }).first().click();
+  await expect(page.getByRole('group', { name: 'Tier' }).getByRole('button', { name: /^Loved/ })).toHaveAttribute('aria-pressed', 'true');
+
+  // Profile: the tier bar and its line count it (Loved comes first in the line).
+  await page.goto('/profile');
+  await expect(page.getByRole('img', { name: new RegExp(`^Loved ${before + 1} · `) })).toBeVisible();
+  await expect(page.getByText(new RegExp(`^Loved ${before + 1} · Liked \\d+ · Fine \\d+ · Didn't like \\d+$`))).toBeVisible();
+});
+
+test('Profile → Log out goes to /cdn-cgi/access/logout', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/profile');
+  const logout = page.waitForRequest((r) => new URL(r.url()).pathname === '/cdn-cgi/access/logout');
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await logout;
+});
+
 test('Settings → Appearance → Sakura sets the page background', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/settings/appearance');

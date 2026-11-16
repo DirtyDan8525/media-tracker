@@ -20,6 +20,8 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 
 ## Friends
 11. **Messages** from a friend's profile (later; bigger feature).
+    - **Group chats** (name + members, add/leave) and **pictures** in chats (resized on the phone before upload, stored in Cloudflare R2; free tier 10 GB; R2 may ask for a payment method once as verification). Live updates via a Durable Object (available on Workers Free, SQLite-backed) or simple polling first.
+    - **Notifications** (Phase 6 web push) cover messages too; Settings gets switches per type (messages, friend requests, comments, reactions) and a master off switch.
     - **Recommendations (built with Messages):** a small **Share** button on any title's page → pick one or more friends → sends a recommendation into your chat with them. In a chat, a **Recommend** button picks a title from your lists. The message shows as a card: cover, title, list, your rating and an optional note, with **Add to mine** (and "On your list" if they have it). Lists of what friends recommended you, for later.
 
 ## More tab

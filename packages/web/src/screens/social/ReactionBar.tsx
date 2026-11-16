@@ -88,13 +88,13 @@ export function ReactButton({ mine, onPick, disabled }: { mine: readonly Reactio
   return (
     <span className="react" ref={root} onKeyDown={onKeyDown}
       onBlur={(e) => { if (open && e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) close(false); }}>
-      <Button ref={btn} variant="secondary" className="react__btn" disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
+      <button ref={btn} type="button" className="btn btn--secondary react__btn" disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
         aria-controls={open ? id : undefined} onClick={() => (open ? close(true) : setOpen(true))}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9" /><path d="M8 14c1 2 7 2 8 0M9 9.5h.01M15 9.5h.01" />
         </svg>
         React
-      </Button>
+      </button>
       {open && (
         <div id={id} ref={pop} role="dialog" aria-label="Pick a reaction" className="react__pop">
           {typing ? (

@@ -29,3 +29,8 @@
 - Wireframe level: build to the calm v2 visual language (approved *.v2 boards) with these layouts.
 - Every main screen, Activity included, keeps the profile button and the Lists button (the Activity board omitted them only for room).
 - Medal colours for Share images: gold #f2c14e, silver #c9cfd9, bronze #e0925a (checked ≥4.5:1 on the card surface).
+
+## Phase 4 mockups (social) — approved 2026-11-16
+- Approved with no changes: `FriendProfile`, `Friends`, `AddFriend`, `Feed`, `CompareFriend`, `EntryPrivacy`, `Admin` (`*.wf.dc.html`). Build to the calm v2 visual language with these layouts.
+- Copy drafted on the boards and approved: "Wants to be friends", "Add a friend to see what they rate.", privacy notes "Friends can't see it, its posts or its notes." / "Friends see the title, not your notes.", remove-access confirm "They won't be able to sign in. Their data stays."
+- Admin rows carry **Remove access** with a confirm (Dan's answer 1). Sub-screens use a back button instead of the profile button.

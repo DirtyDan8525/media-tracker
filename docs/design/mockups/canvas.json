@@ -448,6 +448,55 @@
       "h": 900,
       "title": "Wireframe · PC Re-tier, four columns",
       "expand": "fill"
+    },
+    "FriendProfile.wf.dc.html": {
+      "x": 0,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Friend profile"
+    },
+    "Friends.wf.dc.html": {
+      "x": 470,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Friends"
+    },
+    "AddFriend.wf.dc.html": {
+      "x": 940,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Add friend"
+    },
+    "Feed.wf.dc.html": {
+      "x": 1410,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Feed"
+    },
+    "CompareFriend.wf.dc.html": {
+      "x": 1880,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Compare with a friend"
+    },
+    "EntryPrivacy.wf.dc.html": {
+      "x": 2350,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Entry privacy"
+    },
+    "Admin.wf.dc.html": {
+      "x": 2820,
+      "y": 15400,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin"
     }
   },
   "order": [
@@ -511,7 +560,14 @@
     "SideNavPC.wf.dc.html",
     "SearchPC.wf.dc.html",
     "FixRatingsPC.wf.dc.html",
-    "ReTierPC.wf.dc.html"
+    "ReTierPC.wf.dc.html",
+    "FriendProfile.wf.dc.html",
+    "Friends.wf.dc.html",
+    "AddFriend.wf.dc.html",
+    "Feed.wf.dc.html",
+    "CompareFriend.wf.dc.html",
+    "EntryPrivacy.wf.dc.html",
+    "Admin.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -745,6 +801,13 @@
       "y": 11600,
       "w": 380,
       "text": "Assumptions: Midnight and Inter, grey placeholder covers (blurred for the cover backdrops), no motion. Bottom bar slot 4 is Compare (with its waiting count); Top 5 is reached from Profile and More. List heading is a Header-colour band with icon, title and profile button. Tier ranges use the plan's defaults (Loved 9–10, Liked 7.5–8.9, Fine 6–7.4, Didn't like 0–5.9). Medal colours: gold #f2c14e, silver #c9cfd9, bronze #e0925a (contrast on cards 8.4, 9.0, 5.6 to 1). Share previews are the 1080×1350 card scaled down; the #1s card uses example titles for non-anime lists. Activity shows friends' lines with an Everyone / Friends / You filter; until Phase 4 it shows only your own. Friends count, Add friend and the Re-tier / empty-state wording are drafts."
+    },
+    "wfp4": {
+      "x": 0,
+      "y": 15200,
+      "text": "Wireframes — Phase 4 social (for Dan's review)",
+      "kind": "title1",
+      "maxW": 3300
     }
   },
   "designSystems": [],
@@ -785,6 +848,7 @@
     "m21",
     "m22",
     "wf1",
-    "wf2"
+    "wf2",
+    "wfp4"
   ]
 }

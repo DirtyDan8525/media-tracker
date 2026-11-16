@@ -55,6 +55,20 @@ describe('SettingsScreen', () => {
     expect(screen.getByRole('region', { name: 'Comparing' })).toBeInTheDocument();
   });
 
+  it('has the rating tier links (Rating tiers, Re-tier review) beside Comparing, reached from Profile', async () => {
+    mockApi(makeMe({}, { anime: false }));
+    const { router } = renderApp('/profile');
+    await userEvent.click(await screen.findByRole('link', { name: 'Settings' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+    const section = await screen.findByRole('region', { name: 'Appearance and comparing' });
+    expect(within(section).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      'Appearance Midnight', 'Rating tiers', 'Re-tier review', 'Comparing Ask: Both',
+    ]);
+    expect(within(section).getByRole('link', { name: 'Rating tiers' })).toHaveAttribute('href', '/settings/tiers');
+    // Re-tier review opens the first enabled list.
+    expect(within(section).getByRole('link', { name: 'Re-tier review' })).toHaveAttribute('href', '/retier/movies');
+  });
+
   it('changes the username, showing a taken error inline', async () => {
     const me = makeMe();
     let n = 0;

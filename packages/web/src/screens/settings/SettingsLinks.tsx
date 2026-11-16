@@ -6,8 +6,9 @@ import { useSessionMe } from '../../shell/SessionGate';
 export const APPEARANCE_PATH = '/settings/appearance';
 
 /**
- * The rows that open the Appearance page (SettingsMore.v2's "Settings" section): Appearance with
- * the current theme's Background, Cards and Highlight and its name; Comparing with "Ask: …".
+ * Settings' "Appearance and comparing" rows (under Profile → Settings): Appearance with the current
+ * theme's Background, Cards and Highlight and its name; the rating tier links (Rating tiers and
+ * Re-tier review, also on the Appearance page's Comparing section); Comparing with "Ask: …".
  */
 export function SettingsLinks() {
   const { settings } = useSessionMe();
@@ -20,6 +21,9 @@ export function SettingsLinks() {
           <span className="theme-dots" aria-hidden="true"><i style={{ background: 'var(--bg)' }} /><i style={{ background: 'var(--card)' }} /><i style={{ background: 'var(--highlight)' }} /></span>
           {settings.theme}
         </span>
+      </Link>
+      <Link to="/settings/tiers" className="group__row">
+        <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Rating tiers</span>
       </Link>
       {retier && (
         <Link to={`/retier/${retier}`} className="group__row">

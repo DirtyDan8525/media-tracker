@@ -7,7 +7,7 @@ import { waitingCount } from './CompareBanner';
 import { ExportRow } from './settings/ExportRow';
 import '../design/settings.css';
 
-/** Phone "More" (B20): Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings is under Profile. */
+/** Phone "More" (B20): Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings (with the rating tier links) is under Profile. */
 export function MoreScreen() {
   const me = useSessionMe();
   const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);

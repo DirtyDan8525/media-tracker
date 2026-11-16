@@ -32,9 +32,26 @@ import { BackButton } from '../shell/BackButton';
 import { useSessionMe } from '../shell/SessionGate';
 import { DetailField } from './entry/DetailField';
 import { SeasonsEditor } from './entry/SeasonsEditor';
+import { EntrySocial } from './social/EntrySocial';
+import '../design/feed.css';
 
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;
-export const PRIVATE_NOTE = 'Private items are hidden from friends (coming soon)';
+
+/** A switch with its own explanation underneath (EntryPrivacy.wf). The note describes the switch. */
+function PrivacySwitch({ id, label, note, checked, onChange }: {
+  id: string; label: string; note: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="switch-row switch-row--detail privacy-row">
+      <input type="checkbox" role="switch" checked={checked} aria-labelledby={`${id}-l`} aria-describedby={`${id}-n`}
+        onChange={(e) => onChange(e.target.checked)} />
+      <span className="privacy-row__text">
+        <span id={`${id}-l`} className="privacy-row__label">{label}</span>
+        <span id={`${id}-n`} className="privacy-row__note">{note}</span>
+      </span>
+    </label>
+  );
+}
 
 export function EntryDetail() {
   const { id = '' } = useParams();
@@ -67,6 +84,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   const navigate = useNavigate();
   const me = useSessionMe();
   const cfg = CATEGORY_CONFIG[entry.category];
+  const uid = useId();
   const statusId = useId();
   const lockHintId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -171,17 +189,14 @@ function DetailBody({ entry }: { entry: Entry }) {
             onSave={(notes) => save({ notes })} />
         </section>
 
+        {!entry.isPrivate && <EntrySocial entryId={entry.id} ownerId={me.id} />}
+
         <section className="detail__section" aria-label="Privacy">
           <h2 className="detail__h">Privacy</h2>
-          <label className="switch-row switch-row--detail">
-            <input type="checkbox" role="switch" checked={entry.isPrivate} onChange={(e) => save({ isPrivate: e.target.checked })} />
-            Keep this title private
-          </label>
-          <label className="switch-row switch-row--detail">
-            <input type="checkbox" role="switch" checked={entry.notesPrivate} onChange={(e) => save({ notesPrivate: e.target.checked })} />
-            Keep my notes private
-          </label>
-          <p className="field-hint">{PRIVATE_NOTE}</p>
+          <PrivacySwitch id={`${uid}-private`} label="Private — only you see this title" note="Friends can't see it, its posts or its notes."
+            checked={entry.isPrivate} onChange={(isPrivate) => save({ isPrivate })} />
+          <PrivacySwitch id={`${uid}-notes`} label="Keep notes private" note="Friends see the title, not your notes."
+            checked={entry.notesPrivate} onChange={(notesPrivate) => save({ notesPrivate })} />
         </section>
 
         <section className="detail__section" aria-label="Edit details">

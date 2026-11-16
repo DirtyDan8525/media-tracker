@@ -1,7 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
+import { AddByCodeScreen } from './screens/social/AddByCodeScreen';
+import { FriendEntryDetail } from './screens/social/FriendEntryDetail';
+import { FriendProfile } from './screens/social/FriendProfile';
+import { FriendsScreen } from './screens/social/FriendsScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
+import { AdminScreen } from './screens/AdminScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -15,7 +20,7 @@ import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
 import { HomeRedirect } from './shell/HomeRedirect';
-import { SessionGate, SETUP_PATH } from './shell/SessionGate';
+import { SessionGate, SETUP_PATH, useSessionMe } from './shell/SessionGate';
 
 // Entry details load on demand: the list screen is what most visits need.
 const EntryDetail = lazy(() => import('./screens/EntryDetail').then((m) => ({ default: m.EntryDetail })));
@@ -77,6 +82,11 @@ function EntryRoute() {
   );
 }
 
+/** Admin is for the admin only (the Worker enforces it too): anyone else lands on `/`. */
+function AdminRoute() {
+  return useSessionMe().isAdmin ? <AdminScreen /> : <Navigate to="/" replace />;
+}
+
 /**
  * `/` → first enabled list. Everything sits under SessionGate, which sends a user with no
  * username to /setup/username first. Setup has no nav; every other screen is in the AppFrame.
@@ -96,6 +106,10 @@ export const routes: RouteObject[] = [
           { path: 'activity', element: <ActivityScreen /> },
           { path: 'search', element: <SearchScreen /> },
           { path: 'profile', element: <ProfileScreen /> },
+          { path: 'friends', element: <FriendsScreen /> },
+          { path: 'add/:code', element: <AddByCodeScreen /> },
+          { path: 'u/:username', element: <FriendProfile /> },
+          { path: 'u/:username/entry/:id', element: <FriendEntryDetail /> },
           { path: 'compare', element: <CompareRoute /> },
           { path: 'retier/:set', element: <RetierRoute /> },
           { path: 'top5', element: <Top5Screen /> },
@@ -105,6 +119,7 @@ export const routes: RouteObject[] = [
           { path: 'settings/tiers', element: <TierEditor /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'more', element: <MoreScreen /> },
+          { path: 'admin', element: <AdminRoute /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },

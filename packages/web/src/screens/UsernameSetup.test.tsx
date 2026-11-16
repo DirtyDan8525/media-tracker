@@ -37,4 +37,14 @@ describe('UsernameSetup', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/setup/username'));
     expect(await screen.findByRole('heading', { name: 'Pick a username' })).toBeInTheDocument();
   });
+
+  it('goes back to the path the user was opening (the add link) once the name is saved', async () => {
+    const me = makeMe({ username: null });
+    mockApi(me, { 'PUT /api/me/username': (b) => ({ body: { ...me, username: (b as { username: string }).username } }) });
+    sessionStorage.setItem('mt-after-setup', '/add/abc');
+    const { router } = renderApp('/setup/username');
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Username' }), 'dan');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/add/abc'));
+  });
 });

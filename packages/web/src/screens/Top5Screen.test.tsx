@@ -4,6 +4,7 @@ import type { Entry } from '@media-tracker/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderCardPng, saveImage, shareOrSave } from '../share/shareImage';
 import { fakeBackend, makeEntry } from '../test/fakeBackend';
+import { friendsOf, makeFriendEntry, REN } from '../test/friends';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
@@ -250,5 +251,64 @@ describe('Top 5 sharing (B17)', () => {
     const sheet = await screen.findByRole('dialog', { name: 'Share your Anime Top 5' });
     expect(within(sheet).getByText('Making your image…')).toBeInTheDocument();
     expect(within(sheet).queryByRole('button', { name: 'Save image' })).not.toBeInTheDocument();
+  });
+
+  describe('Friends view (group Top 5)', () => {
+    const friendRows = [{
+      userId: 'id-ren',
+      entries: [
+        makeFriendEntry({ id: 'r1', title: 'Frieren', rating: 8.5, category: 'anime' }),
+        makeFriendEntry({ id: 'r2', title: 'Mushishi', rating: 3, category: 'anime' }),
+        makeFriendEntry({ id: 'r3', title: 'Only Ren', rating: 10, category: 'anime' }),
+      ],
+    }, {
+      userId: 'id-mika',
+      entries: [makeFriendEntry({ id: 'k1', userId: 'id-mika', title: 'Frieren', rating: 9, category: 'anime' })],
+    }];
+    const extra = (fe: unknown = friendRows, friends = friendsOf(REN)) => ({
+      'GET /api/friends/entries': { body: fe },
+      'GET /api/friends': { body: friends },
+    }) as never;
+
+    it('the toggle switches to group rows "8.9 · 3 ratings" and back', async () => {
+      fakeBackend({ entries: [...rows(), makeEntry({ id: 'p1', title: 'Secret', rating: 9, isPrivate: true })], extra: extra() });
+      renderApp('/top5');
+      await screen.findByRole('region', { name: 'Anime' });
+      expect(screen.getByRole('radiogroup', { name: 'Whose Top 5' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('radio', { name: 'Friends' }));
+      const anime = await screen.findByRole('region', { name: 'Anime' });
+      // you 9.5, Ren 8.5, Mika 9 -> 9.0 over 3; Mushishi: you 9 + Ren 3 -> 6.0 over 2
+      await waitFor(() => expect(within(anime).getAllByRole('listitem')).toHaveLength(2));
+      expect(within(anime).getAllByRole('listitem')[0]).toHaveTextContent(/Frieren\s*9\.0 · 3 ratings/);
+      expect(within(anime).getAllByRole('listitem')[1]).toHaveTextContent(/Mushishi\s*6\.0 · 2 ratings/);
+      expect(screen.queryByText('Only Ren')).not.toBeInTheDocument(); // one rater
+      expect(screen.queryByText('Secret')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Share/ })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('radio', { name: 'Mine' }));
+      expect(await screen.findByRole('button', { name: 'Share Anime Top 5' })).toBeInTheDocument();
+    });
+
+    it('a list with no title two of you rated says "Rate more together"', async () => {
+      fakeBackend({ entries: rows(), extra: extra() });
+      renderApp('/top5');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Friends' }));
+      const movies = await screen.findByRole('region', { name: 'Movies' });
+      expect(within(movies).getByText(/Rate more together/)).toBeInTheDocument();
+    });
+
+    it('no friends yet → "No friends yet" with Add friend', async () => {
+      fakeBackend({ entries: rows(), extra: extra([], { friends: [], incoming: [], outgoing: [] }) });
+      renderApp('/top5');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Friends' }));
+      expect(await screen.findByRole('heading', { name: 'No friends yet' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add friend' })).toBeInTheDocument();
+    });
+
+    it('a failed friends load offers Retry', async () => {
+      fakeBackend({ entries: rows(), extra: { 'GET /api/friends/entries': { status: 500, body: { error: 'x' } }, 'GET /api/friends': { body: friendsOf(REN) } } as never });
+      renderApp('/top5');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Friends' }));
+      expect(await screen.findByRole('heading', { name: "Couldn't load your friends' lists" })).toBeInTheDocument();
+    });
   });
 });

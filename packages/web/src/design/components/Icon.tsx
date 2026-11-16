@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { Category } from '@media-tracker/shared';
 
 export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers';
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -35,6 +35,7 @@ const PATHS: Record<IconName, ReactElement> = {
   download: <path d="M12 4v12M7 11l5 5 5-5M4 20h16" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   logout: <path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9" />,
+  lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   share: <path d="M12 15V3M7 8l5-5 5 5M5 12v8h14v-8" />,
 };
 

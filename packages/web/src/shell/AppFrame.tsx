@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router';
 import { BackfillProvider } from '../backfill/useBackfill';
 import { useCompareQueue } from '../data/compare';
+import { useUnread } from '../data/feed';
 import { useListCounts } from '../data/useEntries';
 import { BottomTabs } from '../design/components/BottomTabs';
 import { SideNav } from '../design/components/SideNav';
@@ -8,6 +9,7 @@ import { useIsWide } from '../hooks';
 import { waitingCount } from '../screens/CompareBanner';
 import { enabledLists } from '../nav';
 import { useCurrentList } from './currentList';
+import { AddFriendProvider } from './AddFriendHost';
 import { ListsButton } from './ListsButton';
 import { useSessionMe } from './SessionGate';
 import '../design/nav.css';
@@ -19,7 +21,9 @@ import '../design/nav.css';
 export function AppFrame() {
   return (
     <BackfillProvider>
-      <FrameLayout />
+      <AddFriendProvider>
+        <FrameLayout />
+      </AddFriendProvider>
     </BackfillProvider>
   );
 }
@@ -30,11 +34,12 @@ function FrameLayout() {
   const counts = useListCounts().data ?? {};
   const lists = enabledLists(me.settings);
   const compareCount = waitingCount(useCompareQueue().data ?? [], me.settings);
+  const activityCount = useUnread().data?.feed ?? 0;
   const current = useCurrentList();
   if (wide) {
     return (
       <div className="frame frame--wide">
-        <SideNav lists={lists} counts={counts} compareCount={compareCount} current={current} me={me} />
+        <SideNav lists={lists} counts={counts} compareCount={compareCount} activityCount={activityCount} current={current} me={me} />
         <main className="frame__main">
           <Outlet />
         </main>
@@ -47,7 +52,7 @@ function FrameLayout() {
         <Outlet />
       </main>
       <ListsButton lists={lists} current={current} counts={counts} />
-      <BottomTabs current={current} compareCount={compareCount} />
+      <BottomTabs current={current} compareCount={compareCount} activityCount={activityCount} />
     </div>
   );
 }

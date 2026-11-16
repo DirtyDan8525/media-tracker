@@ -7,6 +7,7 @@ import { RatingBadge } from '../../design/components/RatingBadge';
 import { Skeleton } from '../../design/components/Skeleton';
 import { StatusPill } from '../../design/components/StatusPill';
 import { LookupNote } from './LookupNote';
+import { PrivateLock } from './PrivateLock';
 
 export interface RowActions {
   onRetry: (e: Entry) => void;
@@ -35,7 +36,7 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
       <li className="entry-card entry-card--pending rise-in" style={stagger(index)}>
         <Skeleton width={56} height={square ? 56 : 84} radius={10} />
         <div className="entry-card__text">
-          <span className="entry-card__title" data-role="title">{e.title}</span>
+          <span className="entry-card__title" data-role="title">{e.title}{e.isPrivate && <PrivateLock />}</span>
           <LookupNote entry={e} {...actions} />
         </div>
       </li>
@@ -46,7 +47,7 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
       <li className="entry-card rise-in" style={stagger(index)}>
         <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />
         <div className="entry-card__text">
-          <Link className="entry-card__title" data-role="title" to={`/entry/${e.id}`}>{e.title}</Link>
+          <Link className="entry-card__title" data-role="title" to={`/entry/${e.id}`}>{e.title}{e.isPrivate && <PrivateLock />}</Link>
           <LookupNote entry={e} {...actions} />
         </div>
         <RatingBadge rating={e.rating} />
@@ -58,7 +59,7 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
       <Link className="entry-card__link" to={`/entry/${e.id}`}>
         <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />
         <div className="entry-card__text">
-          <span className="entry-card__title" data-role="title">{e.title}</span>
+          <span className="entry-card__title" data-role="title">{e.title}{e.isPrivate && <PrivateLock />}</span>
           {meta && <span className="entry-card__meta">{meta}</span>}
           {e.status && <StatusPill status={e.status} category={e.category} />}
         </div>

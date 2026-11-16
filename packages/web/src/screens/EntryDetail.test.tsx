@@ -148,13 +148,14 @@ describe('entry details', () => {
     expect(patches(calls)).toEqual([]);
   });
 
-  it('saves private toggles and says they are not enforced yet', async () => {
+  it('saves private toggles under the approved privacy copy', async () => {
     const { calls } = fakeBackend({ entries: [frieren()] });
     renderApp('/entry/f1');
-    expect(await screen.findByText('Private items are hidden from friends (coming soon)')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('switch', { name: 'Keep this title private' }));
+    expect(await screen.findByText("Friends can't see it, its posts or its notes.")).toBeInTheDocument();
+    expect(screen.getByText('Friends see the title, not your notes.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch', { name: 'Private — only you see this title' }));
     await waitFor(() => expect(patches(calls)).toContainEqual({ isPrivate: true }));
-    await userEvent.click(screen.getByRole('switch', { name: 'Keep my notes private' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Keep notes private' }));
     await waitFor(() => expect(patches(calls)).toContainEqual({ notesPrivate: true }));
   });
 });

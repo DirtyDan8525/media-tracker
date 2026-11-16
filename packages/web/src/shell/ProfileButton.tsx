@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useUnread } from '../data/feed';
 import { Avatar } from '../design/components/Avatar';
 import { useIsWide } from '../hooks';
 import { useSessionMe } from './SessionGate';
@@ -10,10 +11,12 @@ import { useSessionMe } from './SessionGate';
 export function ProfileButton() {
   const me = useSessionMe();
   const wide = useIsWide();
+  const requests = useUnread().data?.requests ?? 0;
   if (wide) return null;
   return (
-    <Link to="/profile" className="profile-btn" aria-label="Profile">
+    <Link to="/profile" className="profile-btn" aria-label={requests > 0 ? `Profile, ${requests} friend ${requests === 1 ? 'request' : 'requests'}` : 'Profile'}>
       <Avatar me={me} size={40} />
+      {requests > 0 && <span className="nav-dot" aria-hidden="true" />}
     </Link>
   );
 }

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ME_KEY } from '../data/useMe';
 import type { Me } from '../api/types';
 import { homePath } from '../nav';
+import { afterSetupPath } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 
 /** First run: the user picks the username friends will find them by. */
@@ -19,7 +20,7 @@ export function UsernameSetup() {
           submitLabel="Continue"
           onSaved={() => {
             const me = qc.getQueryData<Me>(ME_KEY);
-            navigate(me ? homePath(me.settings) : '/', { replace: true });
+            navigate(afterSetupPath() ?? (me ? homePath(me.settings) : '/'), { replace: true });
           }}
         />
       </div>

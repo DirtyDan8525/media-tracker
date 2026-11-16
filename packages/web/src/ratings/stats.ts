@@ -14,21 +14,24 @@ export interface ListStats {
 /** All media spans lists with different tier sets, so it has no tier counts. */
 export type AllStats = Omit<ListStats, 'tiers'>;
 
+/** What the figures need of a row: your own `Entry` and a friend's `FriendEntry` both have it. */
+export type StatsRow = Pick<Entry, 'rating' | 'status' | 'genres' | 'tier'>;
+
 export interface GenreStat { genre: string; count: number; average: number | null }
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
 
-const ratingsOf = (rows: Entry[]): number[] => rows.flatMap((e) => (e.rating === null ? [] : [e.rating]));
+const ratingsOf = (rows: StatsRow[]): number[] => rows.flatMap((e) => (e.rating === null ? [] : [e.rating]));
 const mean = (xs: number[]): number | null => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const maxOf = (xs: number[]): number | null => (xs.length ? Math.max(...xs) : null);
 
-function tierCounts(rows: Entry[]): [number, number, number, number] {
+function tierCounts(rows: StatsRow[]): [number, number, number, number] {
   const out: [number, number, number, number] = [0, 0, 0, 0];
   for (const e of rows) if ((e.tier === 0 || e.tier === 1 || e.tier === 2 || e.tier === 3)) out[e.tier]++;
   return out;
 }
 
-function listStats(category: Category, rows: Entry[]): ListStats {
+function listStats(category: Category, rows: StatsRow[]): ListStats {
   const ratings = ratingsOf(rows);
   return {
     entries: rows.length,
@@ -40,7 +43,7 @@ function listStats(category: Category, rows: Entry[]): ListStats {
   };
 }
 
-function genreStats(rows: Entry[]): GenreStat[] {
+function genreStats(rows: StatsRow[]): GenreStat[] {
   const byKey = new Map<string, { genre: string; count: number; ratings: number[] }>();
   for (const e of rows) {
     const seen = new Set<string>();
@@ -62,7 +65,7 @@ function genreStats(rows: Entry[]): GenreStat[] {
 }
 
 /** Per-list figures for the enabled lists (in the order given), the totals over them, and Anime's genres. */
-export function computeStats(byCategory: Partial<Record<Category, Entry[]>>, enabled: Category[]): {
+export function computeStats(byCategory: Partial<Record<Category, StatsRow[]>>, enabled: Category[]): {
   lists: (ListStats & { category: Category })[];
   all: AllStats;
   animeGenres: GenreStat[];
@@ -82,7 +85,7 @@ export function computeStats(byCategory: Partial<Record<Category, Entry[]>>, ena
 }
 
 /** How many rated entries fall on each score 1..10 (index 0 is score 1): the rating's whole part (9.0 to 9.9 is score 9; 10.0 is 10), clamped to 1..10 so 0.x counts as 1. */
-export function ratingDistribution(byCategory: Partial<Record<Category, Entry[]>>, enabled: Category[]): number[] {
+export function ratingDistribution(byCategory: Partial<Record<Category, StatsRow[]>>, enabled: Category[]): number[] {
   const out = new Array<number>(10).fill(0);
   for (const r of ratingsOf(enabled.flatMap((c) => byCategory[c] ?? []))) {
     out[Math.min(10, Math.max(1, Math.floor(r))) - 1]!++;

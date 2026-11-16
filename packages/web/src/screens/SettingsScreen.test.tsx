@@ -180,4 +180,46 @@ describe('Settings: Export my data', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
   });
+
+  it('saves a display name, and Remove (empty) clears it', async () => {
+    const me = makeMe();
+    const calls = mockApi(me, {
+      'PUT /api/me/display-name': (b) => ({ body: { ...me, displayName: (b as { displayName: string | null }).displayName } }),
+    });
+    renderApp('/settings');
+    expect(await screen.findByText('Not set')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Change display name' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Display name' }), ' Danny ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Display name saved')).toBeInTheDocument();
+    expect(calls.find((c) => c.path === '/api/me/display-name')?.body).toEqual({ displayName: 'Danny' });
+    expect(await screen.findByText('Danny')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change display name' }));
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Display name' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls.filter((c) => c.path === '/api/me/display-name').at(-1)?.body).toEqual({ displayName: null }));
+    expect(await screen.findByText('Not set')).toBeInTheDocument();
+  });
+
+  it('a failed display-name save shows an alert and keeps the form', async () => {
+    mockApi(makeMe(), { 'PUT /api/me/display-name': { status: 500, body: { error: 'x' } } });
+    renderApp('/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Change display name' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Display name' }), 'Danny');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save your display name");
+  });
+
+  it('Copy invite link fetches the code and copies the /add/ link', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const calls = mockApi(makeMe(), { 'GET /api/me/invite': { body: { code: 'k3f9x2m8q1ab' } } });
+    renderApp('/settings');
+    await screen.findByText('Invite link');
+    expect(calls.some((c) => c.path === '/api/me/invite')).toBe(false); // nothing is made just by opening Settings
+    await userEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${location.origin}/add/k3f9x2m8q1ab`));
+    expect(await screen.findByText('Link copied')).toBeInTheDocument();
+  });
 });

@@ -41,6 +41,17 @@ export function MoreScreen() {
             <ExportRow />
           </div>
         </section>
+        {me.isAdmin && (
+          <section aria-labelledby="more-admin" className="group">
+            <h2 id="more-admin" className="group__title">Admin</h2>
+            <div className="group__card">
+              <Link to="/admin" className="group__row">
+                <span className="group__row-start"><span className="tile-icon"><Icon name="user" size={18} /></span>Admin</span>
+                <span className="group__chev"><Icon name="chevron" size={18} /></span>
+              </Link>
+            </div>
+          </section>
+        )}
         <section aria-labelledby="more-app" className="group">
           <h2 id="more-app" className="group__title">App</h2>
           <div className="group__card">

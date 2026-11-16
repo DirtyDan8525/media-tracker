@@ -1,0 +1,106 @@
+/* Friends, Add friend, friend profile, Compare with a friend and Admin (Phase 4 wireframes; calm v2 look). */
+
+/* A person or title row on a Card: avatar or cover, a name and sub-line, then actions. */
+.person {
+  position: relative; display: flex; align-items: center; gap: var(--space-6); min-height: 64px;
+  padding: var(--space-5) var(--space-6); border-radius: var(--radius-xl); background: var(--card); color: var(--text);
+  text-decoration: none;
+}
+a.person:hover { background: var(--panel); }
+a.person:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.person__meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.person__name { font-size: var(--fs-body); font-weight: 600; color: var(--bright-text); overflow-wrap: anywhere; }
+.person__sub { font-size: var(--fs-meta); color: var(--muted-text); overflow-wrap: anywhere; }
+.person__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-4); }
+.person__actions .btn { min-height: var(--tap); }
+.people { display: flex; flex-direction: column; gap: var(--space-4); }
+.people--joined { gap: 0; border-radius: var(--radius-xl); background: var(--card); overflow: hidden; }
+.people--joined .person { border-radius: 0; }
+.people--joined .person + .person { border-top: 1px solid var(--grid-line); }
+
+.social-page { display: flex; flex-direction: column; gap: var(--space-9); }
+.social-add { width: 100%; min-height: 56px; font-size: var(--fs-lg); }
+
+/* Add friend sheet. */
+.add-friend { display: flex; flex-direction: column; gap: var(--space-8); }
+.add-friend__link { display: flex; flex-direction: column; gap: var(--space-5); }
+.link-box {
+  min-height: 50px; padding: var(--space-5) var(--space-7); display: flex; align-items: center; border-radius: var(--radius-lg);
+  border: 1px solid var(--grid-line); background: var(--bg); color: var(--bright-text); font-size: var(--fs-sm); overflow-wrap: anywhere;
+}
+.btn-row { display: flex; gap: var(--space-4); }
+.btn-row > .btn { flex: 1; }
+.confirm { display: flex; flex-direction: column; gap: var(--space-5); }
+.confirm__title { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--bright-text); }
+.hint { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); }
+
+/* /add/<code>: one centred card. */
+.add-code { display: flex; justify-content: center; padding: var(--space-14) var(--space-8); }
+.add-code__card {
+  width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: var(--space-8);
+  padding: var(--space-12) var(--space-8); border-radius: var(--radius-xl); background: var(--card); text-align: center;
+}
+.add-code__card h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
+.add-code__card .btn { width: 100%; min-height: 56px; font-size: var(--fs-lg); }
+
+/* Friend profile. */
+.friend-top { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-4) 0; position: relative; }
+.friend-top__end { position: relative; margin-left: auto; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + var(--space-2)); z-index: 5; min-width: 180px; padding: var(--space-2);
+  border-radius: var(--radius-xl); background: var(--card); border: 1px solid var(--grid-line); box-shadow: var(--shadow-float);
+}
+.menu__item {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; width: 100%; min-height: var(--tap);
+  padding: 0 var(--space-7); border-radius: var(--radius-md); font-size: var(--fs-body); color: var(--text); cursor: pointer;
+}
+.menu__item:hover, .menu__item:focus-visible { background: var(--panel); }
+.menu__item:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.friend-id { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+.friend-id h1 { margin: var(--space-3) 0 0; font-size: var(--fs-title); font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
+.friend-id__user { font-size: var(--fs-meta); color: var(--muted-text); }
+.friend-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.friend-tile { padding: var(--space-6) var(--space-3); border-radius: var(--radius-xl); background: var(--card); text-align: center; }
+.friend-tile > div { display: flex; flex-direction: column-reverse; align-items: center; gap: var(--space-1); }
+.friend-tile dd { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--bright-text); font-variant-numeric: tabular-nums; }
+.friend-tile dt { font-size: var(--fs-pill); color: var(--muted-text); }
+.tabs { display: flex; gap: var(--space-2); border-bottom: 1px solid var(--grid-line); }
+.tabs__tab {
+  all: unset; box-sizing: border-box; flex: 1; min-height: var(--tap); display: flex; align-items: center; justify-content: center;
+  padding: 0 var(--space-4); font-size: var(--fs-body); font-weight: 500; color: var(--muted-text); cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.tabs__tab[aria-selected='true'] { color: var(--bright-text); font-weight: 700; border-bottom-color: var(--highlight); }
+.tabs__tab:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; border-radius: var(--radius-md); }
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.friend-panel { display: flex; flex-direction: column; gap: var(--space-7); }
+.friend-note { margin: 0; padding: var(--space-6) var(--space-7); border-radius: var(--radius-xl); background: var(--card); color: var(--text); font-size: var(--fs-body); }
+.stranger { display: flex; align-items: center; gap: var(--space-6); }
+
+/* Friend entry. */
+.friend-detail__actions { display: flex; flex-direction: column; gap: var(--space-5); }
+.friend-seasons { display: flex; flex-direction: column; gap: var(--space-4); }
+.friend-season { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); border-radius: var(--radius-xl); background: var(--card); }
+.friend-season__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); font-size: var(--fs-body); color: var(--bright-text); }
+.friend-notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-body); color: var(--text); }
+
+/* Compare with a friend. */
+.cmp-scores { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; font-size: var(--fs-meta); color: var(--muted-text); }
+
+/* Admin. */
+.admin-invite { display: flex; gap: var(--space-4); }
+.admin-invite .text-field { flex: 1; }
+.admin-invite .btn { min-height: 50px; }
+.admin-result { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-6) var(--space-7); border-radius: var(--radius-xl); background: var(--card); }
+.admin-result > b { color: var(--bright-text); overflow-wrap: anywhere; }
+.admin-result__link { display: flex; align-items: center; gap: var(--space-4); }
+.admin-result__link .link-box { flex: 1; min-width: 0; }
+.admin-result__link .btn { min-height: var(--tap); }
+.btn--danger-text { color: var(--bright-text); }
+
+@media (min-width: 768px) {
+  .social-page, .friend-panel { max-width: 720px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  a.person { transition: background var(--dur-fast) var(--ease); }
+}

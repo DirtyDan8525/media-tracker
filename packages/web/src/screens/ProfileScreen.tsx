@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { logOut } from '../data/logout';
+import { useFriends } from '../data/social';
 import { useRemoveAvatar, useSaveAvatar } from '../data/useAvatar';
 import { useAllEntries } from '../data/useEntries';
 import { Avatar } from '../design/components/Avatar';
@@ -14,7 +15,7 @@ import { sortEntries } from '../lists/sort';
 import { enabledLists, LIST_LABEL } from '../nav';
 import { computeStats } from '../ratings/stats';
 import { numberOnes } from '../ratings/topFive';
-import { useAddFriend } from '../shell/comingWithFriends';
+import { useAddFriend } from '../shell/AddFriendHost';
 import { useCurrentList } from '../shell/currentList';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
@@ -49,6 +50,7 @@ export function ProfileScreen() {
   const qc = useQueryClient();
   const toast = useToast();
   const addFriend = useAddFriend();
+  const friends = useFriends();
   const current = useCurrentList();
   const save = useSaveAvatar();
   const remove = useRemoveAvatar();
@@ -68,6 +70,7 @@ export function ProfileScreen() {
   const [draft, setDraft] = useState<{ type: 'image/webp' | 'image/jpeg'; data: string } | null>(null);
 
   const since = memberSince(me.createdAt);
+  const requests = friends.data?.incoming.length ?? 0;
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -142,10 +145,15 @@ export function ProfileScreen() {
           <Tile value={num(all.entries)} label="Titles" />
           <Tile value={num(all.rated)} label="Rated" />
           <Tile value={waiting ? DASH : all.average === null ? DASH : formatRating(Math.round(all.average * 10) / 10)} label="Avg" />
-          <Tile value={0} label="Friends" wide>
+          <Tile value={friends.data ? friends.data.friends.length : DASH} label="Friends" wide to="/friends">
             <Button variant="primary" compact className="profile__add-friend" onClick={addFriend}>Add friend</Button>
           </Tile>
         </div>
+        {requests > 0 && (
+          <Link to="/friends" className="profile__requests">
+            {requests === 1 ? '1 friend request' : `${requests} friend requests`}
+          </Link>
+        )}
 
         <section aria-labelledby="profile-ones" className="profile__ones">
           <h2 id="profile-ones" className="group__title">My #1s</h2>
@@ -193,12 +201,15 @@ export function ProfileScreen() {
   );
 }
 
-function Tile({ value, label, wide, children }: { value: number | string; label: string; wide?: boolean; children?: ReactNode }) {
+function Tile({ value, label, wide, to, children }: { value: number | string; label: string; wide?: boolean; to?: string; children?: ReactNode }) {
+  const stat = (
+    <dl className="profile-stat">
+      <div><dt>{label}</dt><dd>{value}</dd></div>
+    </dl>
+  );
   return (
     <div className={wide ? 'profile-tile profile-tile--wide' : 'profile-tile'}>
-      <dl className="profile-stat">
-        <div><dt>{label}</dt><dd>{value}</dd></div>
-      </dl>
+      {to ? <Link to={to} className="profile-tile__link">{stat}</Link> : stat}
       {children}
     </div>
   );

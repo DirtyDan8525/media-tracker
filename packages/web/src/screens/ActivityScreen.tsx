@@ -1,7 +1,9 @@
-import { CATEGORY_CONFIG, formatRating, statusLabel, foldPosts, type ActivityLine, type Status } from '@media-tracker/shared';
-import { useMemo, type ReactNode } from 'react';
+import {
+  CATEGORY_CONFIG, formatRating, nameOf, statusLabel, foldPosts, type ActivityLine, type PostSocial, type PublicUser, type Reaction, type Status,
+} from '@media-tracker/shared';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useActivity } from '../data/useActivity';
+import { useFeed, useMarkSeen, useReact } from '../data/feed';
 import { Button } from '../design/components/Button';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
@@ -10,11 +12,14 @@ import { SkeletonRow } from '../design/components/Skeleton';
 import { useNow } from '../hooks';
 import { LIST_LABEL } from '../nav';
 import { useCurrentList } from '../shell/currentList';
-import { useAddFriend } from '../shell/comingWithFriends';
+import { useAddFriend } from '../shell/AddFriendHost';
 import { PageHeader } from '../shell/PageHeader';
+import { CommentsSheet } from './social/CommentsSheet';
+import { ReactionBar } from './social/ReactionBar';
 import { useSessionMe } from '../shell/SessionGate';
 import { dayLabel, timeAgo, type ActivityFilter } from './activity/format';
 import '../design/activity.css';
+import '../design/feed.css';
 
 const FILTERS: readonly { value: ActivityFilter; label: string }[] = [
   { value: 'everyone', label: 'Everyone' },
@@ -24,46 +29,57 @@ const FILTERS: readonly { value: ActivityFilter; label: string }[] = [
 
 const isFilter = (v: string | null): v is ActivityFilter => FILTERS.some((f) => f.value === v);
 
-/** Activity (route /activity). Built for friends (Everyone / Friends / You); until Phase 4 only You has rows. */
+const NO_SOCIAL: PostSocial = { reactions: {}, mine: [], comments: 0 };
+
+/** Activity (route /activity, S6): Everyone (default) / Friends / You; each post carries reactions and comments. */
 export function ActivityScreen() {
   const me = useSessionMe();
   const current = useCurrentList();
   const addFriend = useAddFriend();
   const [params, setParams] = useSearchParams();
   const shown = params.get('show');
-  const filter: ActivityFilter = isFilter(shown) ? shown : 'you';
+  const filter: ActivityFilter = isFilter(shown) ? shown : 'everyone';
   const setFilter = (v: ActivityFilter) =>
     setParams((prev) => {
       const p = new URLSearchParams(prev);
-      if (v === 'you') p.delete('show');
+      if (v === 'everyone') p.delete('show');
       else p.set('show', v);
       return p;
     }, { replace: true });
 
-  // Only You has data until Phase 4: the other two never ask the server.
-  const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
-    useActivity(filter === 'you');
+  const { data, isPending, isError, isSuccess, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
+    useFeed(filter);
+  const [commenting, setCommenting] = useState<string | null>(null);
+
+  // S8: Everyone and Friends count as seen once they have loaded.
+  const markSeen = useMarkSeen();
+  const seenFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (filter === 'you' || !isSuccess || seenFor.current === filter) return;
+    seenFor.current = filter;
+    markSeen.mutate();
+  }, [filter, isSuccess, markSeen]);
 
   // S5: the server groups rows into posts; fold over every loaded page at once.
   const lines = useMemo(() => foldPosts(data?.pages.flatMap((p) => p.items) ?? []), [data]);
-  const initial = (me.username ?? me.email).charAt(0).toUpperCase();
+  const users = useMemo(() => Object.assign({}, ...(data?.pages.map((p) => p.users) ?? [])) as Record<string, PublicUser>, [data]);
+  const social = useMemo(() => Object.assign({}, ...(data?.pages.map((p) => p.social) ?? [])) as Record<string, PostSocial>, [data]);
   // Ticks once a minute while the screen is visible, so "5 min ago" keeps up.
   const now = useNow();
 
   let body: ReactNode;
-  if (filter !== 'you') {
-    body = (
-      <EmptyState icon="activity" title="Nothing here yet"
-        body="Add friends to see what they rate and finish. Your own activity shows here too."
-        actionLabel="Add friend" onAction={addFriend} />
-    );
-  } else if (isError && !data) {
+  if (isError && !data) {
     body = (
       <EmptyState icon="info" title="Couldn't load your activity" body="Check your connection and try again."
         actionLabel="Retry" onAction={() => void refetch()} />
     );
   } else if (isPending) {
     body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>;
+  } else if (lines.length === 0 && !hasNextPage && filter !== 'you') {
+    body = (
+      <EmptyState icon="activity" title="Nothing here yet" body="Add a friend to see what they rate."
+        actionLabel="Add friend" onAction={addFriend} />
+    );
   } else if (lines.length === 0 && !hasNextPage) {
     body = (
       <EmptyState icon="activity" title="Nothing here yet" body="Add or rate something and it shows up here."
@@ -85,7 +101,10 @@ export function ActivityScreen() {
           <section key={d.label} aria-labelledby={`activity-day-${i}`} className="activity__day">
             <h2 id={`activity-day-${i}`} className="activity__day-title">{d.label}</h2>
             <ul className="stack-10 plain-list">
-              {d.lines.map((line) => <ActivityRow key={line.key} line={line} initial={initial} now={now} />)}
+              {d.lines.map((line) => (
+                <FeedPost key={line.key} line={line} now={now} social={social[line.key] ?? NO_SOCIAL}
+                  who={line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null }} onComments={() => setCommenting(line.key)} />
+              ))}
             </ul>
           </section>
         ))}
@@ -108,20 +127,58 @@ export function ActivityScreen() {
         <SegRadio block="activity-filter" label="Show" value={filter} options={FILTERS} onChange={setFilter} />
       </PageHeader>
       <div className="screen__body">{body}</div>
+      {commenting && <CommentsSheet target={{ activityId: commenting }} open onClose={() => setCommenting(null)} />}
     </div>
   );
 }
 
-function ActivityRow({ line, initial, now }: { line: ActivityLine; initial: string; now: Date }) {
-  const title = (
-    <Link className="activity-line__title" to={`/entry/${line.entryId}`}><strong>{line.title}</strong></Link>
+/** One post: the line, then reactions and the comment count under it. `who` is null for your own. */
+function FeedPost({ line, now, social, who, onComments }: {
+  line: ActivityLine; now: Date; social: PostSocial; who: PublicUser | null; onComments: () => void;
+}) {
+  const react = useReact();
+  const target = { activityId: line.key } as const;
+  const n = social.comments;
+  return (
+    <li className="feed-post">
+      <ActivityRow line={line} now={now} who={who} />
+      <div className="feed-post__social">
+        <ReactionBar social={social} onToggle={(emoji: Reaction) => react.mutate({ target, emoji })} />
+        <button type="button" className="feed-post__comments" onClick={onComments}>
+          {n === 0 ? 'Comment' : n === 1 ? '1 comment' : `${n} comments`}
+        </button>
+      </div>
+    </li>
   );
+}
+
+function PersonAvatar({ user }: { user: PublicUser }) {
+  const [failed, setFailed] = useState(false);
+  const initial = (user.displayName || user.username).charAt(0).toUpperCase();
+  return (
+    <span className="activity-line__avatar" aria-hidden="true">
+      {user.avatarAt && !failed
+        ? <img src={`/api/users/${encodeURIComponent(user.id)}/avatar?v=${encodeURIComponent(user.avatarAt)}`} alt="" width={40} height={40} decoding="async" onError={() => setFailed(true)} />
+        : initial}
+    </span>
+  );
+}
+
+function ActivityRow({ line, now, who }: { line: ActivityLine; now: Date; who: PublicUser | null }) {
+  const me = useSessionMe();
+  const own = who === null;
+  const title = (
+    <Link className="activity-line__title" to={own ? `/entry/${line.entryId}` : `/u/${who.username}/entry/${line.entryId}`}>
+      <strong>{line.title}</strong>
+    </Link>
+  );
+  const name = own ? <strong>You</strong> : <Link className="activity-line__name" to={`/u/${who.username}`}>{nameOf(who)}</Link>;
   const status = line.status ? statusLabel(line.status.to as Status, line.category) : null;
   let sentence: ReactNode;
   if (line.added) {
     sentence = (
       <>
-        <strong>You</strong> added {title} to {LIST_LABEL[line.category]}
+        {name} added {title} to {LIST_LABEL[line.category]}
         {line.rating && ` · rated ${formatRating(line.rating.to)}`}
         {status && ` · marked ${status}`}
       </>
@@ -130,17 +187,19 @@ function ActivityRow({ line, initial, now }: { line: ActivityLine; initial: stri
     const { from, to } = line.rating;
     sentence = (
       <>
-        <strong>You</strong> {from === null ? 'rated' : 're-rated'} {title}{' '}
+        {name} {from === null ? 'rated' : 're-rated'} {title}{' '}
         {from === null ? formatRating(to) : `${formatRating(from)} → ${formatRating(to)}`}
         {status && ` · marked ${status}`}
       </>
     );
   } else {
-    sentence = <><strong>You</strong> marked {title} {status}</>;
+    sentence = <>{name} marked {title} {status}</>;
   }
   return (
-    <li className="activity-line">
-      <span className="activity-line__avatar" aria-hidden="true">{initial}</span>
+    <div className="activity-line">
+      {own
+        ? <span className="activity-line__avatar" aria-hidden="true">{(me.username ?? me.email).charAt(0).toUpperCase()}</span>
+        : <PersonAvatar user={who} />}
       <div className="activity-line__text">
         <span className="activity-line__sentence">{sentence}</span>
         <time className="activity-line__time" dateTime={line.at}>{timeAgo(line.at, now)}</time>
@@ -148,6 +207,6 @@ function ActivityRow({ line, initial, now }: { line: ActivityLine; initial: stri
       <span aria-hidden="true" className="activity-line__cover">
         <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={40} />
       </span>
-    </li>
+    </div>
   );
 }

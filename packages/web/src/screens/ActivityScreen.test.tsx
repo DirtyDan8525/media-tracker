@@ -13,7 +13,7 @@ let n = 0;
 function item(over: Partial<ActivityItem> & Pick<ActivityItem, 'type' | 'title'>): ActivityItem {
   n++;
   // Each row is its own post unless the test names one.
-  return { id: `a${n}`, postId: `a${n}`, userId: 'u-dan', entryId: `e-${over.title}`, category: 'anime', coverUrl: '', payload: {}, createdAt: ago(1), ...over };
+  return { id: `a${n}`, postId: `a${n}`, userId: 'u1', entryId: `e-${over.title}`, category: 'anime', coverUrl: '', payload: {}, createdAt: ago(1), ...over };
 }
 const page = (items: ActivityItem[], next: ActivityPage['next'] = null): ActivityPage => ({ items, users: {}, social: {}, next });
 
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const activityCalls = (calls: { path: string }[]) => calls.filter((c) => c.path.startsWith('/api/activity'));
+const activityCalls = (calls: { path: string }[]) => calls.filter((c) => c.path.startsWith('/api/activity?'));
 
 describe('ActivityScreen', () => {
   it('renders "You re-rated Steins;Gate 7.0 → 8.5" with the title as a link to the entry', async () => {
@@ -88,32 +88,28 @@ describe('ActivityScreen', () => {
     expect(yest.compareDocumentPosition(screen.getByRole('link', { name: 'Naruto' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('the filter radiogroup "Show" has Everyone, Friends, You with You checked', async () => {
-    fakeBackend({ extra: { 'GET /api/activity': { body: page([]) } } });
+  it('the filter radiogroup "Show" has Everyone, Friends, You with Everyone checked, and asks for show=everyone', async () => {
+    const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([]) } } });
     renderApp('/activity');
     const group = await screen.findByRole('radiogroup', { name: 'Show' });
     expect(within(group).getAllByRole('radio').map((r) => (r as HTMLInputElement).value)).toEqual(['everyone', 'friends', 'you']);
-    expect(within(group).getByRole('radio', { name: 'You' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Everyone' })).toBeChecked();
+    await waitFor(() => expect(activityCalls(calls)[0]!.path).toBe('/api/activity?show=everyone'));
   });
 
-  it('choosing Friends sets ?show=friends, shows "Nothing here yet" and Add friend toasts, with no request', async () => {
-    const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([item({ type: 'added', title: 'Bleach' })]) } } });
+  it('choosing Friends and You ask for their own scope and keep the choice in ?show=', async () => {
+    const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([]) } } });
     const { router } = renderApp('/activity?show=friends');
     expect(await screen.findByText('Nothing here yet')).toBeInTheDocument();
-    expect(screen.getByText('Add friends to see what they rate and finish. Your own activity shows here too.')).toBeInTheDocument();
+    expect(screen.getByText('Add a friend to see what they rate.')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Friends' })).toBeChecked();
-    await userEvent.click(screen.getByRole('button', { name: 'Add friend' }));
-    expect(await screen.findByText('Coming with friends')).toBeInTheDocument();
-    expect(activityCalls(calls)).toHaveLength(0);
-
+    expect(screen.getByRole('button', { name: 'Add friend' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'You' }));
-    expect(await screen.findByRole('link', { name: 'Bleach' })).toBeInTheDocument();
-    expect(router.state.location.search).toBe('');
-    const after = activityCalls(calls).length;
+    expect(router.state.location.search).toBe('?show=you');
+    expect(await screen.findByText('Add or rate something and it shows up here.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Everyone' }));
-    expect(router.state.location.search).toBe('?show=everyone');
-    expect(await screen.findByText('Nothing here yet')).toBeInTheDocument();
-    expect(activityCalls(calls)).toHaveLength(after);
+    expect(router.state.location.search).toBe('');
+    expect(activityCalls(calls).map((c) => c.path)).toEqual(expect.arrayContaining(['/api/activity?show=friends', '/api/activity?show=you', '/api/activity?show=everyone']));
   });
 
   it('Show more fetches with before & beforeId and appends', async () => {
@@ -122,7 +118,7 @@ describe('ActivityScreen', () => {
         ? page([item({ type: 'added', title: 'Older', createdAt: ago(300) })])
         : page([item({ type: 'added', title: 'Newer', createdAt: ago(2) })], { before: ago(2), beforeId: 'a-last' }),
     }) } });
-    renderApp('/activity');
+    renderApp('/activity?show=you');
     await screen.findByRole('link', { name: 'Newer' });
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
     expect(await screen.findByRole('link', { name: 'Older' })).toBeInTheDocument();
@@ -158,7 +154,7 @@ describe('ActivityScreen', () => {
 
   it('You with no rows shows "Nothing here yet" and a link to the current list', async () => {
     fakeBackend({ extra: { 'GET /api/activity': { body: page([]) } } });
-    renderApp('/activity');
+    renderApp('/activity?show=you');
     expect(await screen.findByText('Nothing here yet')).toBeInTheDocument();
     expect(screen.getByText('Add or rate something and it shows up here.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Anime' })).toHaveAttribute('href', '/list/anime');
@@ -242,5 +238,77 @@ describe('ActivityScreen', () => {
     up = true;
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('link', { name: 'Bleach' })).toBeInTheDocument();
+  });
+});
+
+describe('ActivityScreen: friends, reactions, comments', () => {
+  const ren = { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarAt: '2026-11-01T00:00:00.000Z' };
+  const frieren = (over: Partial<ActivityItem> = {}) =>
+    item({ type: 'rated', title: 'Frieren', userId: 'u-ren', entryId: 'e-fr', id: 'p-fr', postId: 'p-fr', payload: { from: null, to: 9 }, ...over });
+  const renPage = (social: ActivityPage['social'] = {}): ActivityPage => ({ items: [frieren()], users: { 'u-ren': ren }, social, next: null });
+
+  it('Everyone shows "Ren rated Frieren 9.0" with Ren\'s avatar, the name linking to /u/ren and the title to /u/ren/entry/<id>', async () => {
+    fakeBackend({ extra: { 'GET /api/activity': { body: renPage() } } });
+    const { container } = renderApp('/activity');
+    const row = (await screen.findByRole('link', { name: 'Frieren' })).closest('li')!;
+    expect(row).toHaveTextContent('Ren rated Frieren 9.0');
+    expect(screen.getByRole('link', { name: 'Ren' })).toHaveAttribute('href', '/u/ren');
+    expect(screen.getByRole('link', { name: 'Frieren' })).toHaveAttribute('href', '/u/ren/entry/e-fr');
+    expect(container.querySelector('.activity-line__avatar img')).toHaveAttribute('src', expect.stringContaining('/api/users/u-ren/avatar?v='));
+  });
+
+  it('your own lines still read "You" and link to /entry/<id> next to a friend\'s', async () => {
+    fakeBackend({ extra: { 'GET /api/activity': { body: { ...renPage(), items: [frieren(), item({ type: 'added', title: 'Bleach' })] } } } });
+    renderApp('/activity');
+    const row = (await screen.findByRole('link', { name: 'Bleach' })).closest('li')!;
+    expect(row).toHaveTextContent('You added Bleach to Anime');
+    expect(screen.getByRole('link', { name: 'Bleach' })).toHaveAttribute('href', '/entry/e-Bleach');
+  });
+
+  it('tapping 🔥 toggles aria-pressed and the count at once, and rolls back with a toast on error', async () => {
+    let fail = true;
+    let release: (() => void) | undefined;
+    fakeBackend({ extra: {
+      'GET /api/activity': { body: renPage({ 'p-fr': { reactions: { '🔥': 1 }, mine: [], comments: 2 } }) },
+      'POST /api/reactions': () => new Promise((resolve) => {
+        release = () => resolve(fail ? { status: 500, body: { error: 'boom' } } : { body: { reactions: { '🔥': 2 }, mine: ['🔥'], comments: 2 } });
+      }),
+    } });
+    renderApp('/activity');
+    const fire = await screen.findByRole('button', { name: '🔥 1' });
+    expect(fire).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(fire);
+    const pressed = await screen.findByRole('button', { name: '🔥 2' });
+    expect(pressed).toHaveAttribute('aria-pressed', 'true');
+    release!();
+    expect(await screen.findByText("Couldn't save your reaction. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '🔥 1' })).toHaveAttribute('aria-pressed', 'false');
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: '🔥 1' }));
+    expect(await screen.findByRole('button', { name: '🔥 2' })).toHaveAttribute('aria-pressed', 'true');
+    release!();
+    await waitFor(() => expect(screen.getByRole('button', { name: '🔥 2' })).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('opening Everyone and Friends calls POST /api/activity/seen, You does not', async () => {
+    const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([]) }, 'POST /api/activity/seen': { status: 204 } } });
+    renderApp('/activity?show=you');
+    await screen.findByText('Nothing here yet');
+    expect(calls.filter((c) => c.path === '/api/activity/seen')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('radio', { name: 'Everyone' }));
+    await waitFor(() => expect(calls.filter((c) => c.path === '/api/activity/seen')).toHaveLength(1));
+    await userEvent.click(screen.getByRole('radio', { name: 'Friends' }));
+    await waitFor(() => expect(calls.filter((c) => c.path === '/api/activity/seen')).toHaveLength(2));
+  });
+
+  it('"2 comments" opens the thread sheet for that post', async () => {
+    const { calls } = fakeBackend({ extra: {
+      'GET /api/activity': { body: renPage({ 'p-fr': { reactions: {}, mine: [], comments: 2 } }) },
+      'GET /api/comments': { body: [] },
+    } });
+    renderApp('/activity');
+    await userEvent.click(await screen.findByRole('button', { name: '2 comments' }));
+    expect(await screen.findByRole('dialog', { name: 'Comments' })).toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/api/comments?activityId=p-fr')).toBe(true);
   });
 });

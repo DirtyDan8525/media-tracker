@@ -30,13 +30,36 @@ describe('app shell', () => {
       expect(cells[3]).toHaveTextContent('Compare');
     });
 
-    it('Activity has no count badge', async () => {
+    it('Activity has no count badge when nothing is unread', async () => {
       mockApi(makeMe());
       renderApp('/list/anime');
       const activity = within(await mainNav()).getByRole('link', { name: 'Activity' });
       expect(activity).toHaveAttribute('href', '/activity');
       expect(activity.querySelector('.count-pill')).toBeNull();
       expect(activity).toHaveTextContent(/^Activity$/);
+    });
+
+    it('the Activity tab reads "Activity, 3 new" when unread.feed is 3, shows nothing at 0 and "99+" above 99', async () => {
+      const unread = { feed: 3, requests: 0 };
+      mockApi(makeMe(), { 'GET /api/activity/unread': () => ({ body: unread }) });
+      const { queryClient } = renderApp('/list/anime');
+      const nav = await mainNav();
+      const tab = await within(nav).findByRole('link', { name: 'Activity, 3 new' });
+      expect(tab.querySelector('.count-pill')).toHaveTextContent('3');
+      unread.feed = 120;
+      await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
+      const capped = await within(nav).findByRole('link', { name: 'Activity, 99+ new' });
+      expect(capped.querySelector('.count-pill')).toHaveTextContent('99+');
+      unread.feed = 0;
+      await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
+      await waitFor(() => expect(within(nav).getByRole('link', { name: 'Activity' }).querySelector('.count-pill')).toBeNull());
+    });
+
+    it('the profile button has a dot and reads "Profile, 1 friend request" when requests is 1', async () => {
+      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 1 } } });
+      renderApp('/list/anime');
+      const profile = await screen.findByRole('link', { name: 'Profile, 1 friend request' });
+      expect(profile.querySelector('.nav-dot')).not.toBeNull();
     });
 
     it('Add on /activity navigates to /list/<current> and opens "Add to Anime"', async () => {
@@ -199,6 +222,14 @@ describe('app shell', () => {
 
   describe('PC side nav (Main, SideNavPC board)', () => {
     const sideNav = () => screen.findByRole('navigation', { name: 'Main' });
+
+    it('the Activity row reads "Activity, 3 new" with the count beside it', async () => {
+      setViewportWidth(1280);
+      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 3, requests: 0 } } });
+      renderApp('/list/anime');
+      const row = await within(await sideNav()).findByRole('link', { name: 'Activity, 3 new' });
+      expect(row.querySelector('.count-pill')).toHaveTextContent('3');
+    });
 
     it('reads Profile, Add anime, Search, Activity, Compare, the enabled lists, then Import, Export my data, About', async () => {
       setViewportWidth(1280);

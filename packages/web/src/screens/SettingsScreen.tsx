@@ -1,5 +1,6 @@
 import { SEARCH_SCOPE } from '@media-tracker/shared';
-import { useState } from 'react';
+import { useId, useState, type FormEvent } from 'react';
+import { inviteLink, useCopy, useInviteCode, useSaveDisplayName } from '../data/social';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
@@ -83,6 +84,8 @@ export function SettingsScreen() {
                 </span>
               </div>
             )}
+            <DisplayNameRow />
+            <InviteLinkRow />
           </div>
         </section>
 
@@ -93,6 +96,76 @@ export function SettingsScreen() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** Friends see this instead of @username. 1–40 characters; empty clears it. */
+function DisplayNameRow() {
+  const me = useSessionMe();
+  const toast = useToast();
+  const save = useSaveDisplayName();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const id = useId();
+  const errId = useId();
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const name = value.trim();
+    save.mutate(name === '' ? null : name, {
+      onSuccess: () => { setEditing(false); toast.show(name === '' ? 'Display name removed' : 'Display name saved'); },
+    });
+  }
+
+  if (!editing) {
+    return (
+      <div className="group__row">
+        <span>Display name</span>
+        <span className="group__row-end">
+          <span className="group__value">{me.displayName ?? 'Not set'}</span>
+          <Button variant="ghost" compact aria-label="Change display name"
+            onClick={() => { setValue(me.displayName ?? ''); save.reset(); setEditing(true); }}>Change</Button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="group__pad">
+      <form className="username-form" onSubmit={submit} noValidate>
+        <label htmlFor={id} className="field-label">Display name</label>
+        <div className={`text-field${save.isError ? ' has-error' : ''}`}>
+          <input id={id} type="text" value={value} maxLength={40} autoComplete="nickname" enterKeyHint="done"
+            aria-describedby={save.isError ? errId : undefined} aria-invalid={save.isError ? true : undefined}
+            onChange={(e) => { setValue(e.target.value); if (save.isError) save.reset(); }} />
+        </div>
+        <span className="field-hint">Friends see this instead of @{me.username}. Leave it empty to remove it.</span>
+        {save.isError && <p id={errId} role="alert" className="field-error">Couldn't save your display name. Check your connection and try again.</p>}
+        <div className="username-form__actions">
+          <Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+          <Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** Your invite link, one tap from being copied. */
+function InviteLinkRow() {
+  const code = useInviteCode(false); // fetched when you ask: opening Settings makes no code
+  const copy = useCopy();
+  const toast = useToast();
+  async function onCopy() {
+    const c = code.data ?? (await code.refetch()).data;
+    if (c) await copy(inviteLink(c));
+    else toast.show("Couldn't load your link. Try again.");
+  }
+  return (
+    <div className="group__row">
+      <span>Invite link</span>
+      <span className="group__row-end">
+        <Button variant="ghost" compact aria-label="Copy invite link" disabled={code.isFetching} onClick={() => void onCopy()}>Copy</Button>
+      </span>
     </div>
   );
 }

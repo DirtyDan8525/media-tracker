@@ -1,6 +1,8 @@
 -- Phase 4 (social). See docs/plans/2026-11-16-phase4-social.md (S3–S9).
 ALTER TABLE users ADD COLUMN invite_code TEXT;
 ALTER TABLE users ADD COLUMN feed_seen_at TEXT;
+-- Set when the admin takes the email off the Access policy; cleared when approved again. Data stays.
+ALTER TABLE users ADD COLUMN access_removed_at TEXT;
 CREATE UNIQUE INDEX idx_users_invite ON users(invite_code);
 
 -- S5: a post's id is its anchor row's id; later rows within 10 minutes point at the anchor.

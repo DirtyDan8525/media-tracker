@@ -38,8 +38,8 @@ admin.get('/', async (c) => {
       `SELECT i.email, i.created_at, ${PUBLIC_USER_COLS.split(', ').map((k) => `u.${k} AS u_${k}`).join(', ')}
        FROM invites i LEFT JOIN users u ON u.email = i.email ORDER BY i.created_at DESC`,
     ),
-    db.prepare(`SELECT ${PUBLIC_USER_COLS}, email, created_at FROM users ORDER BY created_at`),
-    db.prepare('SELECT COUNT(*) AS n FROM users'),
+    db.prepare(`SELECT ${PUBLIC_USER_COLS}, email, created_at FROM users WHERE access_removed_at IS NULL ORDER BY created_at`),
+    db.prepare('SELECT COUNT(*) AS n FROM users WHERE access_removed_at IS NULL'),
   ]);
   const invites = (inv!.results as Record<string, string | null>[]).map((r) => ({
     email: r.email as string,
@@ -57,7 +57,7 @@ admin.get('/', async (c) => {
   return c.json({ seats: { used, total: ACCESS_SEATS }, invites, users });
 });
 
-/** POST /api/admin/invites { email }: Cloudflare GET (+PUT), then 1 insert + invite code (<= 3 queries). Nothing is recorded if Cloudflare fails. */
+/** POST /api/admin/invites { email }: Cloudflare GET (+PUT), then 2 writes + invite code (<= 4 queries). Nothing is recorded if Cloudflare fails. */
 admin.post('/invites', async (c) => {
   const body = await c.req.json().catch(() => null);
   const email = cleanEmail((body as { email?: unknown } | null)?.email);
@@ -68,13 +68,16 @@ admin.post('/invites', async (c) => {
   } catch (e) {
     return failure(c, e);
   }
-  await c.env.DB.prepare('INSERT OR IGNORE INTO invites (email, created_at) VALUES (?, ?)').bind(email, new Date().toISOString()).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare('INSERT OR IGNORE INTO invites (email, created_at) VALUES (?, ?)').bind(email, new Date().toISOString()),
+    c.env.DB.prepare('UPDATE users SET access_removed_at = NULL WHERE email = ?').bind(email),
+  ]);
   const code = await ensureInviteCode(c.env.DB, c.get('user').id);
   return c.json({ email, link: `${new URL(c.req.url).origin}/add/${code}`, alreadyAllowed: !added });
 });
 
 /**
- * DELETE /api/admin/invites/:email: takes the email off the Access policy and deletes its invites row (1 query).
+ * DELETE /api/admin/invites/:email: takes the email off the Access policy and deletes its invites row and marks the user removed (2 queries).
  * The person's data is not deleted. Refuses the admin's own email (400 self) and the last include rule (400 last_rule).
  */
 admin.delete('/invites/:email', async (c) => {
@@ -87,6 +90,9 @@ admin.delete('/invites/:email', async (c) => {
   } catch (e) {
     return failure(c, e);
   }
-  await c.env.DB.prepare('DELETE FROM invites WHERE email = ?').bind(email).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM invites WHERE email = ?').bind(email),
+    c.env.DB.prepare('UPDATE users SET access_removed_at = ? WHERE email = ?').bind(new Date().toISOString(), email),
+  ]);
   return c.json({ removed });
 });

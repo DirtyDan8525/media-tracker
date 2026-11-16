@@ -11,6 +11,7 @@ import { StatusPill } from '../../design/components/StatusPill';
 import { parseRating } from '../../lists/validate';
 import { EditableCell } from './EditableCell';
 import { LookupNote } from './LookupNote';
+import { PrivateLock } from './PrivateLock';
 import { stagger, type RowActions } from './EntryCards';
 
 /** Moves focus to the same column in the nearest row above/below that has it. */
@@ -86,6 +87,7 @@ function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry
       <td>
         <div className="cell-title">
           {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} data-nav="title" data-role="title">{e.title}</Link>}
+          {e.isPrivate && <PrivateLock />}
           <LookupNote entry={e} {...actions} />
         </div>
       </td>

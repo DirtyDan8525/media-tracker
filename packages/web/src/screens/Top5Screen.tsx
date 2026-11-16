@@ -1,10 +1,11 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { numberOnes, topFive } from '../ratings/topFive';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
+import { SegRadio } from '../design/components/SegRadio';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
@@ -16,6 +17,7 @@ import { enabledLists, LIST_LABEL } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import type { CardSpec } from '../share/shareImage';
+import { GroupTop5 } from './social/GroupTop5';
 import { ShareSheet, type ShareRequest } from './top5/ShareSheet';
 import '../design/ratings.css';
 
@@ -27,8 +29,16 @@ function cardRow(e: Entry, rank: number, listLabel?: string): CardSpec['rows'][n
   };
 }
 
-/** The five best-rated titles of every list that is turned on (route /top5). */
+const WHOSE = [{ value: 'mine', label: 'Mine' }, { value: 'friends', label: 'Friends' }] as const;
+
+/** The five best-rated titles of every list that is turned on (route /top5), or the group's with "Friends". */
 export function Top5Screen() {
+  const [whose, setWhose] = useState<'mine' | 'friends'>('mine');
+  const toggle = <SegRadio label="Whose Top 5" value={whose} options={WHOSE} onChange={setWhose} />;
+  return whose === 'friends' ? <GroupTop5 toggle={toggle} /> : <MineTop5 toggle={toggle} />;
+}
+
+function MineTop5({ toggle }: { toggle: ReactNode }) {
   const me = useSessionMe();
   const qc = useQueryClient();
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
@@ -41,7 +51,7 @@ export function Top5Screen() {
   if (isError && loaded === 0) {
     return (
       <div className="screen">
-        <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile />
+        <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile>{toggle}</PageHeader>
         <div className="screen__body">
           <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
             actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
@@ -52,7 +62,7 @@ export function Top5Screen() {
   if (isPending && !isError && lists.some((c) => !data[c])) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
-        <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile />
+        <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile>{toggle}</PageHeader>
         <div className="screen__body stack-10"><Skeleton height={144} /><Skeleton height={56} /><Skeleton height={56} /></div>
       </div>
     );
@@ -73,6 +83,7 @@ export function Top5Screen() {
   return (
     <div className="screen">
       <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile sub="Your highest rated in each list.">
+        {toggle}
         {ones.length > 0 && (
           <div className="top5__share-ones">
             <Button onClick={shareOnes}><Icon name="share" size={18} />Share my #1s</Button>
@@ -129,12 +140,15 @@ function TopBlock({ category, rows, onShare }: {
   );
 }
 
-function TopRow({ entry, rank }: { entry: Entry; rank: number }) {
+type TopEntry = Pick<Entry, 'id' | 'category' | 'title' | 'creator' | 'coverUrl' | 'rating'>;
+
+/** One ranked row; it links to your entry, or to `to` (a friend's entry). */
+export function TopRow({ entry, rank, to }: { entry: TopEntry; rank: number; to?: string }) {
   const square = CATEGORY_CONFIG[entry.category].square;
   const hero = rank === 1;
   return (
     <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'} data-square={square || undefined}>
-      <Link to={`/entry/${entry.id}`} className={hero ? 'top5__hero' : 'top5__row'}>
+      <Link to={to ?? `/entry/${entry.id}`} className={hero ? 'top5__hero' : 'top5__row'}>
         {hero && <CoverBackdrop src={entry.coverUrl} />}
         <span className="top5__rank">{rank}</span>{' '}
         {/* Decorative: the row's name is its text, so the cover stays out of the link's name. */}

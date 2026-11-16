@@ -14,7 +14,7 @@ describe('More (SettingsMore.v2)', () => {
   });
 
   it('has the sections Ratings (Compare, Top 5, Stats), Your data and App (About), and nothing else', async () => {
-    mockApi(makeMe());
+    mockApi(makeMe({ isAdmin: false }));
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
@@ -49,5 +49,23 @@ describe('More (SettingsMore.v2)', () => {
     await screen.findByRole('radiogroup', { name: 'Theme' });
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+  });
+
+  it('the admin gets an Admin row linking to /admin', async () => {
+    mockApi(makeMe({ isAdmin: true }));
+    renderApp('/more');
+    const region = await screen.findByRole('region', { name: 'Admin' });
+    expect(within(region).getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin');
+  });
+
+  it('a non-admin has no Admin row, and /admin sends them home', async () => {
+    mockApi(makeMe({ isAdmin: false }));
+    const { router } = renderApp('/more');
+    await screen.findByRole('region', { name: 'Ratings' });
+    expect(screen.queryByRole('region', { name: 'Admin' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+    await router.navigate('/admin');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(screen.queryByRole('heading', { name: 'Admin' })).not.toBeInTheDocument();
   });
 });

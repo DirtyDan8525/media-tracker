@@ -188,3 +188,12 @@
   .lists-menu { animation: lists-pop var(--dur-fast) var(--ease-out) both; }
   @keyframes lists-pop { from { transform: scale(0.96); } }
 }
+
+/* Friends tile: the count links to /friends; "N friend requests" under the tiles. */
+.profile-tile__link { display: flex; align-items: center; justify-content: center; min-height: var(--tap); color: inherit; text-decoration: none; border-radius: var(--radius-md); }
+.profile-tile__link:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.profile__requests {
+  display: flex; align-items: center; justify-content: center; min-height: var(--tap); border-radius: var(--radius-xl);
+  background: var(--card); color: var(--highlight); font-size: var(--fs-body); font-weight: 600; text-decoration: none;
+}
+.profile__requests:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }

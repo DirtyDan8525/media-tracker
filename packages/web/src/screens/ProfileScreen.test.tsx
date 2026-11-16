@@ -44,22 +44,49 @@ describe('Profile: info, tiles, strip, rows', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Profile' })).toBeInTheDocument();
   });
 
-  it('tiles Titles 3 / Rated 2 / Avg 8.8 / Friends 0 (Avg is 9 and 8.5 over rated titles only)', async () => {
-    fakeBackend({ me: ME(), entries: rows().filter((e) => e.id !== 'a2') });
+  const FRIENDS = (n = 3, incoming = 0) => ({
+    'GET /api/friends': {
+      body: {
+        friends: Array.from({ length: n }, (_, i) => ({ id: `f${i}`, username: `f${i}`, displayName: null, avatarAt: null, since: '2026-11-01T00:00:00Z' })),
+        incoming: Array.from({ length: incoming }, (_, i) => ({ id: `r${i}`, username: `r${i}`, displayName: null, avatarAt: null })),
+        outgoing: [],
+      },
+    },
+  });
+
+  it('tiles Titles 3 / Rated 2 / Avg 8.8 / Friends 3 (Avg is 9 and 8.5 over rated titles only)', async () => {
+    fakeBackend({ me: ME(), entries: rows().filter((e) => e.id !== 'a2'), extra: FRIENDS(3) });
     renderApp('/profile');
     await screen.findByText('@dan');
     const value = async (label: string) => (await screen.findByText(label)).closest('div')!.textContent;
     await waitFor(async () => expect(await value('Titles')).toBe('Titles3'));
     expect(await value('Rated')).toBe('Rated2');
     expect(await value('Avg')).toBe('Avg8.8');
-    expect(await value('Friends')).toBe('Friends0');
+    await waitFor(async () => expect(await value('Friends')).toBe('Friends3'));
   });
 
-  it('Add friend toasts "Coming with friends"', async () => {
-    fakeBackend({ me: ME() });
+  it('the Friends tile links to /friends and a pending request shows a line that does too', async () => {
+    fakeBackend({ me: ME(), extra: FRIENDS(3, 2) });
+    renderApp('/profile');
+    const tile = (await screen.findByText('Friends')).closest('a')!;
+    expect(tile).toHaveAttribute('href', '/friends');
+    const line = await screen.findByRole('link', { name: '2 friend requests' });
+    expect(line).toHaveAttribute('href', '/friends');
+  });
+
+  it('with no requests there is no requests line', async () => {
+    fakeBackend({ me: ME(), extra: FRIENDS(1, 0) });
+    renderApp('/profile');
+    await screen.findByText('@dan');
+    await waitFor(async () => expect((await screen.findByText('Friends')).closest('div')!.textContent).toBe('Friends1'));
+    expect(screen.queryByRole('link', { name: /friend request/ })).not.toBeInTheDocument();
+  });
+
+  it('Add friend opens the Add friend sheet', async () => {
+    fakeBackend({ me: ME(), extra: { ...FRIENDS(0), 'GET /api/me/invite': { body: { code: 'k3f9x2m8q1ab' } } } });
     renderApp('/profile');
     await userEvent.click(await screen.findByRole('button', { name: 'Add friend' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Coming with friends');
+    expect(await screen.findByRole('dialog', { name: 'Add friend' })).toBeInTheDocument();
   });
 
   it('the banner uses the highest-rated cover', async () => {

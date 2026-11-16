@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthState } from '../api/auth';
+import { AFTER_SETUP_KEY } from '../data/social';
 import { useMe } from '../data/useMe';
 import { SignedOutScreen } from '../screens/SignedOutScreen';
 import { CfSetContext, ThemeColorsContext } from '../design/ThemeContext';
@@ -11,6 +12,20 @@ import { homePath } from '../nav';
 import type { Me } from '../api/types';
 
 export const SETUP_PATH = '/setup/username';
+
+/** Where setup sends the user next: the in-app path they were opening (a /add/<code> link), else null. */
+export function afterSetupPath(): string | null {
+  const p = sessionStorage.getItem(AFTER_SETUP_KEY);
+  return p && p.startsWith('/') && !p.startsWith('//') ? p : null;
+}
+
+/** Remembers the attempted path, then goes to username setup. */
+function ToSetup({ from }: { from: string }) {
+  useLayoutEffect(() => {
+    if (from !== '/') sessionStorage.setItem(AFTER_SETUP_KEY, from);
+  }, [from]);
+  return <Navigate to={SETUP_PATH} replace />;
+}
 
 /** The signed-in user, for screens under the gate (which only renders them once it has one). */
 export function useSessionMe(): Me {
@@ -24,13 +39,18 @@ export function useSessionMe(): Me {
  */
 export function SessionGate() {
   const { data: me, isError, refetch, isFetching } = useMe();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const auth = useAuthState();
   const settings = me?.settings;
 
   useEffect(() => {
     if (settings) applyTheme(settings);
   }, [settings]);
+
+  // Setup is done and the user is somewhere else: the remembered path has been used.
+  useEffect(() => {
+    if (me?.username && pathname !== SETUP_PATH) sessionStorage.removeItem(AFTER_SETUP_KEY);
+  }, [me?.username, pathname]);
 
   if (auth === 'signedOut') return <SignedOutScreen />;
   if (!me || auth === 'reauthing') {
@@ -50,8 +70,8 @@ export function SessionGate() {
       </div>
     );
   }
-  if (me.username === null && pathname !== SETUP_PATH) return <Navigate to={SETUP_PATH} replace />;
-  if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={homePath(me.settings)} replace />;
+  if (me.username === null && pathname !== SETUP_PATH) return <ToSetup from={pathname + search} />;
+  if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={afterSetupPath() ?? homePath(me.settings)} replace />;
 
   return (
     <ThemeColorsContext.Provider value={themeColors(me.settings)}>

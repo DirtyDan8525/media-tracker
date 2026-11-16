@@ -4,6 +4,7 @@ import type { Me } from '../../api/types';
 import { ADD_NOUN, addPath, LIST_LABEL, SEARCH_PATH } from '../../nav';
 import { useExportData } from '../../screens/settings/ExportRow';
 import { Avatar } from './Avatar';
+import { countText } from './BottomTabs';
 import { Icon } from './Icon';
 
 /**
@@ -13,12 +14,13 @@ import { Icon } from './Icon';
  * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats
  * and Settings are reached through Profile.
  */
-export function SideNav({ lists, counts, compareCount = 0, current, me }: {
+export function SideNav({ lists, counts, compareCount = 0, activityCount = 0, current, me }: {
   lists: Category[];
   counts: Partial<Record<Category, number>>;
   compareCount?: number;
+  activityCount?: number;
   current: Category | null;
-  me: Pick<Me, 'username' | 'email' | 'avatarAt'>;
+  me: Pick<Me, 'username' | 'email' | 'avatarAt'> & Partial<Pick<Me, 'isAdmin'>>;
 }) {
   const { pathname, search } = useLocation();
   const exporting = useExportData();
@@ -38,8 +40,9 @@ export function SideNav({ lists, counts, compareCount = 0, current, me }: {
       <NavLink to={SEARCH_PATH} className="side-nav__link">
         <span className="side-nav__link-start"><Icon name="search" size={18} />Search</span>
       </NavLink>
-      <NavLink to="/activity" className="side-nav__link">
+      <NavLink to="/activity" className="side-nav__link side-nav__link--split" aria-label={activityCount > 0 ? `Activity, ${countText(activityCount)} new` : undefined}>
         <span className="side-nav__link-start"><Icon name="activity" size={18} />Activity</span>
+        {activityCount > 0 && <span className="count-pill">{countText(activityCount)}</span>}
       </NavLink>
       <NavLink to="/compare" className="side-nav__link side-nav__link--split" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
         <span className="side-nav__link-start"><Icon name="compare" size={18} />Compare</span>
@@ -57,6 +60,7 @@ export function SideNav({ lists, counts, compareCount = 0, current, me }: {
         <button type="button" className="side-nav__link side-nav__button" disabled={exporting.busy} onClick={exporting.run}>
           {exporting.busy ? 'Exporting…' : 'Export my data'}
         </button>
+        {me.isAdmin && <NavLink to="/admin" className="side-nav__link">Admin</NavLink>}
         <NavLink to="/about" className="side-nav__link">About</NavLink>
       </div>
     </nav>

@@ -259,4 +259,19 @@ describe('GET /api/admin', () => {
     expect(body.users.map((u) => u.email).sort()).toEqual([ADMIN, 'ren@x.com']);
     expect(body.users[0]).toHaveProperty('joinedAt');
   });
+
+  it('a removed person drops out of users and seats; approving again brings them back', async () => {
+    await as(ADMIN, '/api/me');
+    await as('ren@x.com', '/api/me');
+    stubCf(policy([{ email: { email: ADMIN } }, { email: { email: 'ren@x.com' } }]));
+    expect((await as(ADMIN, '/api/admin/invites/ren@x.com', 'DELETE')).status).toBe(200);
+    let body = (await (await as(ADMIN, '/api/admin')).json()) as { seats: { used: number }; users: { email: string }[] };
+    expect(body.seats.used).toBe(1);
+    expect(body.users.map((u) => u.email)).toEqual([ADMIN]);
+    vi.restoreAllMocks();
+    stubCf(policy([{ email: { email: ADMIN } }]));
+    await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
+    body = (await (await as(ADMIN, '/api/admin')).json()) as typeof body;
+    expect(body.seats.used).toBe(2);
+  });
 });

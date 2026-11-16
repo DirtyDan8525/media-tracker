@@ -181,7 +181,7 @@ export function StatsScreen() {
   );
 }
 
-function ListCard({ name, s, index, tiers }: { name: string; s: ListStats; index: number; tiers: string | null }) {
+export function ListCard({ name, s, index, tiers }: { name: string; s: ListStats; index: number; tiers: string | null }) {
   return (
     <li className="stats__list-card">
       <div className="stats__list-head">

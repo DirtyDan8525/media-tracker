@@ -12,12 +12,12 @@ const call = (email: string, path: string, method = 'GET') =>
     new Request(`https://app.test${path}`, { method, headers: { 'content-type': 'application/json' } }),
     { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env,
   );
-const mk = async (email: string, coverUrl: string) => {
+const mk = async (email: string, coverUrl: string, title = 'T', category = 'movies') => {
   const res = await app.fetch(
     new Request('https://app.test/api/entries', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ category: 'anime', title: 'T', coverUrl }),
+      body: JSON.stringify({ category, title, coverUrl }),
     }),
     { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env,
   );
@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   vi.restoreAllMocks();
+  await env.DB.exec('DELETE FROM lookup_cache');
   vi.useRealTimers();
   await env.DB.exec('DELETE FROM users');
 });
@@ -216,5 +217,125 @@ describe('GET /api/cover', () => {
   it('requires sign-in', async () => {
     const res = await app.fetch(new Request(`https://app.test/api/cover?url=${encodeURIComponent(COVER)}`), { ...env, ENVIRONMENT: 'prod' } as Env);
     expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /api/cover Kitsu fallback', () => {
+  const ANILIST = 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587.jpg';
+  const POSTER = 'https://media.kitsu.app/anime/46474/poster_image/large.jpg';
+  const SEARCH = 'https://kitsu.io/api/edge/anime?filter[text]=';
+  const kitsuBody = (title: string, large: string | null = POSTER) =>
+    JSON.stringify({ data: [{ id: '46474', attributes: { canonicalTitle: title, posterImage: { large, original: large } } }], included: [] });
+  const json = (body: string) => new Response(body, { headers: { 'content-type': 'application/vnd.api+json' } });
+  const jpeg = () => new Response(IMG, { headers: { 'content-type': 'image/jpeg' } });
+  const searches = () => fetchSpy.mock.calls.filter((c: unknown[]) => String(c[0]).startsWith(SEARCH));
+  const cacheRows = async () =>
+    (await env.DB.prepare("SELECT query_key, result_json FROM lookup_cache WHERE source = 'kitsu-cover'").all<{ query_key: string; result_json: string }>()).results;
+
+  it('AniList 403 -> Kitsu search -> poster served with 200 and the usual headers', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren')) : url === POSTER ? jpeg() : new Response('no', { status: 403 })));
+    const res = await proxy(A, ANILIST);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(IMG);
+    expect(searches()).toHaveLength(1);
+    expect(decodeURIComponent(String(searches()[0]![0]))).toContain('filter[text]=Sousou no Frieren');
+    expect(fetchSpy.mock.calls.map((c: unknown[]) => String(c[0]))).toContain(POSTER);
+    expect(await cacheRows()).toEqual([{ query_key: ANILIST, result_json: JSON.stringify({ poster: POSTER }) }]);
+  });
+
+  it('uses the cached mapping the second time, with no second search', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren')) : url === POSTER ? jpeg() : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(200);
+    expect((await proxy(A, ANILIST)).status).toBe(200);
+    expect(searches()).toHaveLength(1);
+    expect(fetchSpy.mock.calls.filter((c: unknown[]) => String(c[0]) === POSTER)).toHaveLength(2);
+  });
+
+  it('no Kitsu match is 502 and "no match" is cached, so the next share does not search again', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Totally Unrelated Show Name')) : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    expect(await cacheRows()).toEqual([{ query_key: ANILIST, result_json: JSON.stringify({ poster: null }) }]);
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    expect(searches()).toHaveLength(1);
+  });
+
+  it('a Kitsu hit with no poster counts as no match', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren', null)) : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    expect(await cacheRows()).toHaveLength(1);
+  });
+
+  it('a Kitsu outage is 502 and is not cached', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? new Response('down', { status: 503 }) : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    expect(await cacheRows()).toEqual([]);
+  });
+
+  it('the Kitsu poster is fetched through the same safe path (private redirect refused, bad type refused)', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) =>
+      url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren'))
+        : url === POSTER ? new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/x' } })
+        : new Response('no', { status: 403 }));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren')) : url === POSTER ? new Response('<html>', { headers: { 'content-type': 'text/html' } }) : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+  });
+
+  it('a non-http(s) or private poster URL from Kitsu is refused', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren', 'http://127.0.0.1/p.jpg')) : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(502);
+    expect(fetchSpy.mock.calls.map((c: unknown[]) => String(c[0]))).not.toContain('http://127.0.0.1/p.jpg');
+  });
+
+  it('also falls back when AniList answers with a bad type or the fetch errors', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren')) : url === POSTER ? jpeg() : new Response('<html>', { headers: { 'content-type': 'text/html' } })));
+    expect((await proxy(A, ANILIST)).status).toBe(200);
+    await env.DB.exec('DELETE FROM lookup_cache');
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith(SEARCH)) return Promise.resolve(json(kitsuBody('Sousou no Frieren')));
+      if (url === POSTER) return Promise.resolve(jpeg());
+      return Promise.reject(new TypeError('network'));
+    }) as typeof fetch);
+    expect((await proxy(A, ANILIST)).status).toBe(200);
+  });
+
+  it('non-anime failures are 502 with no Kitsu call', async () => {
+    const MOVIE = 'https://img.example.com/movies/poster.jpg';
+    await mk(A, MOVIE, 'Sousou no Frieren', 'movies');
+    upstream(() => new Response('no', { status: 403 }));
+    expect((await proxy(A, MOVIE)).status).toBe(502);
+    expect(searches()).toHaveLength(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(await cacheRows()).toEqual([]);
+  });
+
+  it('ownership is still enforced: another user gets 404, with no upstream, Kitsu or cache activity', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream(() => new Response('no', { status: 403 }));
+    expect((await proxy(B, ANILIST)).status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await cacheRows()).toEqual([]);
+  });
+
+  it('a cached mapping does not let a non-owner in', async () => {
+    await mk(A, ANILIST, 'Sousou no Frieren', 'anime');
+    upstream((url) => (url.startsWith(SEARCH) ? json(kitsuBody('Sousou no Frieren')) : url === POSTER ? jpeg() : new Response('no', { status: 403 })));
+    expect((await proxy(A, ANILIST)).status).toBe(200);
+    fetchSpy.mockClear();
+    expect((await proxy(B, ANILIST)).status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

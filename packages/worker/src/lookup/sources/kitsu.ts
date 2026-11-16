@@ -72,18 +72,21 @@ export function toInfo(a: KitsuAnime, included: KitsuReply['included'] = []): Lo
   };
 }
 
-export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> => {
+/** The search with its outcome: `answered` is false when Kitsu did not give a real answer (so a caller must not remember "no match"). */
+export async function searchKitsu(q: LookupQuery, d: LookupDeps): Promise<{ answered: boolean; info: LookupInfo | null }> {
   const { name } = splitYear(q.term);
   const url = `${BASE}?filter[text]=${encodeURIComponent(name)}&page[limit]=10&include=categories`;
   const { status, body } = await fetchJson<KitsuReply>(url, { headers: JSON_API }, d);
-  if (status !== 200) return null;
+  if (status !== 200) return { answered: false, info: null };
   const best = pickBest(body?.data || [], q.term);
   if (!best) {
     logLine(d, 'kitsu: no hit scored well enough');
-    return null;
+    return { answered: true, info: null };
   }
-  return toInfo(best, body?.included);
-};
+  return { answered: true, info: toInfo(best, body?.included) };
+}
+
+export const search: SourceFn = async (q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> => (await searchKitsu(q, d)).info;
 
 // ---- details ----------------------------------------------------------------
 

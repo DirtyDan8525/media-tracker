@@ -135,10 +135,21 @@ describe('Fix my ratings: home', () => {
       .toEqual(['All tiers', 'Loved 1', 'Liked 1', 'Fine 0', 'Didn\'t like 0']));
   });
 
+  it('home is a bottom-bar tab: no Back button on it (the profile button stays), but a run keeps its way back', async () => {
+    setup({ entries: lovedAnime() });
+    expect(await screen.findByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Profile/ })).toBeInTheDocument();
+    await openTier('Anime (6)', 'Loved 3 titles');
+    await screen.findByRole('group', { name: 'Pick the better one' });
+    expect(screen.getByRole('button', { name: 'Back to Fix my ratings' })).toBeInTheDocument();
+  });
+
   it('home: Off says comparing is off', async () => {
     setup({ entries: lovedAnime(), ask: 'Off' });
     expect(await screen.findByRole('heading', { name: 'Comparing is off' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/appearance');
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
   it('home: Only for new ratings offers no lists, with its own text', async () => {

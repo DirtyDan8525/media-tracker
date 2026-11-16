@@ -40,14 +40,14 @@ export function CompareScreen() {
     case 'loading':
       return (
         <div className="screen" aria-busy="true" aria-label="Loading">
-          <PageHeader title={HOME_TITLE} backTo="/more" profile />
+          <PageHeader title={HOME_TITLE} profile />
           <div className="screen__body stack-10"><Skeleton height={64} /><Skeleton height={64} /></div>
         </div>
       );
     case 'off':
       return (
         <div className="screen">
-          <PageHeader title="Comparing is off" backTo="/more" profile
+          <PageHeader title="Comparing is off" profile
             sub={<>Turn it on in <Link to="/settings/appearance">Settings</Link>: “Ask to compare”.</>} />
         </div>
       );
@@ -55,7 +55,7 @@ export function CompareScreen() {
       if (isError) {
         return (
           <div className="screen">
-            <PageHeader title={HOME_TITLE} backTo="/more" profile />
+            <PageHeader title={HOME_TITLE} profile />
             <div className="screen__body">
               <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
                 actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />

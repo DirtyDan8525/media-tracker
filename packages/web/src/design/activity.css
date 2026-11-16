@@ -1,0 +1,36 @@
+/* Activity screen (Activity.wf, ActivityEmpty.wf; calm v2 look). */
+.activity-filter { display: flex; gap: var(--space-4); margin-top: var(--space-5); flex-wrap: wrap; }
+.activity-filter__opt {
+  all: unset; position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); padding: 0 var(--space-8); border-radius: var(--radius-chip); cursor: pointer;
+  border: 1px solid var(--grid-line); background: var(--card); color: var(--text);
+  font-size: var(--fs-meta); font-weight: 500; white-space: nowrap;
+}
+.activity-filter__opt--on { background: var(--panel); color: var(--text); font-weight: 700; border-color: var(--highlight); }
+.activity-filter__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.activity-filter__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
+
+.activity { display: flex; flex-direction: column; gap: var(--space-6); }
+.activity__day { display: flex; flex-direction: column; gap: var(--space-4); }
+.activity__day-title {
+  margin: var(--space-4) var(--space-2) 0; font-size: var(--fs-meta); font-weight: 600; line-height: 1.3;
+  color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.activity__more { align-self: flex-start; }
+
+.activity-line {
+  display: flex; align-items: center; gap: var(--space-6); min-height: 64px; padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-xl); background: var(--card); color: var(--text);
+}
+.activity-line__avatar {
+  flex: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--grid-line); color: var(--bright-text); font-size: var(--fs-body); font-weight: 700;
+}
+.activity-line__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.activity-line__sentence { font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; }
+.activity-line__sentence strong { color: var(--bright-text); }
+.activity-line__title { color: var(--text); text-decoration: none; }
+.activity-line__title:hover { text-decoration: underline; }
+.activity-line__time { font-size: var(--fs-pill); color: var(--muted-text); }
+.activity-line__cover { flex: none; display: block; line-height: 0; }
+@media (min-width: 768px) { .activity-filter { max-width: 560px; } }

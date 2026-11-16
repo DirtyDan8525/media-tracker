@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
+import { ActivityScreen } from './screens/ActivityScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { SearchScreen } from './screens/SearchScreen';
@@ -77,6 +78,7 @@ export const routes: RouteObject[] = [
           { path: 'list/:category', element: <ListScreen /> },
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
+          { path: 'activity', element: <ActivityScreen /> },
           { path: 'search', element: <SearchScreen /> },
           { path: 'compare', element: <CompareRoute /> },
           { path: 'top5', element: <Top5Screen /> },

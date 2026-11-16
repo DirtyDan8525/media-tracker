@@ -51,7 +51,7 @@ export function makeMe(over: Partial<Me> = {}, tabs: Partial<Record<string, bool
     ...DEFAULT_USER_SETTINGS,
     tabs: { ...DEFAULT_USER_SETTINGS.tabs, ...tabs } as Record<string, boolean>,
   };
-  return { id: 'u1', email: 'dan@example.com', username: 'dan', isAdmin: true, settings, ...over };
+  return { id: 'u1', email: 'dan@example.com', username: 'dan', isAdmin: true, settings, avatarAt: null, createdAt: null, ...over };
 }
 
 /** A standard API: /api/me answers `me`, entries are empty, settings PUTs merge like the Worker (tabs, colors per key) and echo back. */

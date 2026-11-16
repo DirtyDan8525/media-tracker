@@ -7,7 +7,8 @@ import {
   THEMES,
   type UserSettings,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import { decodeAvatar } from '@media-tracker/shared';
+import type { AppEnv, AppUser } from '../auth/access';
 
 export const me = new Hono<AppEnv>();
 
@@ -87,10 +88,13 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-me.get('/', (c) => {
-  const { id, email, username, isAdmin, settings } = c.var.user;
-  return c.json({ id, email, username, isAdmin, settings });
-});
+/** The one shape every /api/me* response returns. */
+export function meBody(user: AppUser) {
+  const { id, email, username, isAdmin, settings, avatarAt, createdAt } = user;
+  return { id, email, username, isAdmin, settings, avatarAt, createdAt };
+}
+
+me.get('/', (c) => c.json(meBody(c.var.user)));
 
 me.put('/username', async (c) => {
   const body = await readJson(c.req.raw);
@@ -111,8 +115,7 @@ me.put('/username', async (c) => {
     if (/UNIQUE/i.test(String(err instanceof Error ? err.message : err))) return c.json({ error: 'taken' }, 409);
     throw err;
   }
-  const { id, email, isAdmin, settings } = user;
-  return c.json({ id, email, username, isAdmin, settings });
+  return c.json(meBody({ ...user, username }));
 });
 
 me.put('/settings', async (c) => {
@@ -124,4 +127,50 @@ me.put('/settings', async (c) => {
     .bind(JSON.stringify(result.settings), c.var.user.id)
     .run();
   return c.json({ settings: result.settings });
+});
+
+// 2 queries (+ sign-in). The photo is the caller's own: the row key is the signed-in user id.
+me.put('/avatar', async (c) => {
+  const decoded = decodeAvatar(await readJson(c.req.raw));
+  if (!decoded) return c.json(invalid, 400);
+
+  const user = c.var.user;
+  // avatarAt is the cache-busting version in /api/me/avatar?v=; keep it strictly increasing.
+  let now = new Date().toISOString();
+  if (user.avatarAt !== null && now <= user.avatarAt) now = new Date(Date.parse(user.avatarAt) + 1).toISOString();
+  const data = decoded.bytes.buffer.slice(decoded.bytes.byteOffset, decoded.bytes.byteOffset + decoded.bytes.byteLength) as ArrayBuffer;
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO avatars (user_id, mime, data, updated_at) VALUES (?1, ?2, ?3, ?4)
+       ON CONFLICT (user_id) DO UPDATE SET mime = excluded.mime, data = excluded.data, updated_at = excluded.updated_at`,
+    ).bind(user.id, decoded.type, data, now),
+    c.env.DB.prepare('UPDATE users SET avatar_at = ? WHERE id = ?').bind(now, user.id),
+  ]);
+  return c.json(meBody({ ...user, avatarAt: now }));
+});
+
+// 1 query (+ sign-in)
+me.get('/avatar', async (c) => {
+  const row = await c.env.DB.prepare('SELECT mime, data FROM avatars WHERE user_id = ?')
+    .bind(c.var.user.id)
+    .first<{ mime: string; data: ArrayBuffer | number[] }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  const bytes = row.data instanceof ArrayBuffer ? new Uint8Array(row.data) : Uint8Array.from(row.data);
+  return new Response(bytes, {
+    headers: {
+      'Content-Type': row.mime,
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
+
+// 2 queries (+ sign-in)
+me.delete('/avatar', async (c) => {
+  const user = c.var.user;
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM avatars WHERE user_id = ?').bind(user.id),
+    c.env.DB.prepare('UPDATE users SET avatar_at = NULL WHERE id = ?').bind(user.id),
+  ]);
+  return c.json(meBody({ ...user, avatarAt: null }));
 });

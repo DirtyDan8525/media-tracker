@@ -7,4 +7,6 @@ export interface Me {
   username: string | null;
   isAdmin: boolean;
   settings: UserSettings;
+  avatarAt: string | null;
+  createdAt: string | null;
 }

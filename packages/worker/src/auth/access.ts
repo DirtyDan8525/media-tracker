@@ -9,6 +9,8 @@ export interface AppUser {
   username: string | null;
   isAdmin: boolean;
   settings: UserSettings;
+  avatarAt: string | null;
+  createdAt: string | null;
 }
 
 /** Hono generics for the whole app: bindings plus the user set by requireUser. */
@@ -53,6 +55,8 @@ interface UserRow {
   username: string | null;
   settings_json: string;
   is_admin: number;
+  avatar_at: string | null;
+  created_at: string | null;
 }
 
 function toAppUser(row: UserRow): AppUser {
@@ -67,6 +71,8 @@ function toAppUser(row: UserRow): AppUser {
     email: row.email,
     username: row.username,
     isAdmin: row.is_admin === 1,
+    avatarAt: row.avatar_at ?? null,
+    createdAt: row.created_at ?? null,
     // merge over defaults so older rows missing a key still get one
     settings: { ...DEFAULT_USER_SETTINGS, ...stored },
   };
@@ -74,7 +80,7 @@ function toAppUser(row: UserRow): AppUser {
 
 async function getOrCreateUser(env: Env, email: string): Promise<AppUser> {
   const select = () =>
-    env.DB.prepare('SELECT id, email, username, settings_json, is_admin FROM users WHERE email = ?')
+    env.DB.prepare('SELECT id, email, username, settings_json, is_admin, avatar_at, created_at FROM users WHERE email = ?')
       .bind(email)
       .first<UserRow>();
 

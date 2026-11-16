@@ -1,9 +1,9 @@
-import { countedPicks, fitTier } from './fit';
+import { countedPicks, fitTier, type FitStats } from './fit';
 import { priorFromScore, round1, round2, scoreOf } from './score';
 import { tierFor, tierRange } from './tiers';
 import type { Comparison, RatedItem, Tier, TierSet } from './types';
 
-type RefitOpts = { rangeChanged?: boolean; priorSd?: number };
+type RefitOpts = { rangeChanged?: boolean; priorSd?: number; stats?: FitStats };
 
 /** Strengths closer than this count as equal (no pick ordered the two). */
 const SAME_STRENGTH = 1e-9;
@@ -37,7 +37,7 @@ export function shownValue(score: number, range: [number, number], twoDecimals: 
  * Every value it writes goes through `shownValue`, so it stays below the next tier's lower bound.
  */
 export function refitTier(items: RatedItem[], comparisons: Comparison[], range: [number, number], opts?: RefitOpts): RatedItem[] {
-  const strengths = fitTier(items, comparisons, { priorSd: opts?.priorSd });
+  const strengths = fitTier(items, comparisons, { priorSd: opts?.priorSd, stats: opts?.stats });
   const ids = new Set(items.map((i) => i.id));
   const fitted = new Set<string>();
   for (const c of countedPicks(ids, comparisons)) { fitted.add(c.winnerId); fitted.add(c.loserId); }

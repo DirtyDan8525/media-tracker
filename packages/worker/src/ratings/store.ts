@@ -10,6 +10,7 @@ import {
   tiersFor,
   type Category,
   type Comparison,
+  type FitStats,
   type PickInput,
   type RatedItem,
   type RatingSet,
@@ -73,8 +74,10 @@ export async function ensureTiers(db: D1Database, userId: string, settings: Pick
 // ---- Loading a rating set ------------------------------------------------------------------
 
 export type SetKind = 'entry' | 'season';
-export type LoadedItem = SetItem & { kind: SetKind };
+export type LoadedItem = SetItem & { kind: SetKind; /** seasons: the parent entry */ entryId?: string };
 type RatedFields = Pick<RatedItem, 'rating' | 'tier' | 'priorMean' | 'strength' | 'scoreLocked'>;
+/** As stored, with the row's `rating_rev` (the optimistic guard's version). */
+type StoredFields = RatedFields & { rev: number };
 
 export interface LoadedSet {
   set: RatingSet;
@@ -82,15 +85,16 @@ export interface LoadedSet {
   items: LoadedItem[];
   /** The set's comparisons that are not undone. */
   comparisons: Comparison[];
-  /** The rating fields exactly as stored, by id: what a write is diffed against. */
-  stored: Map<string, RatedFields>;
+  /** The rating fields exactly as stored, by id: what a write is diffed against and guarded on. */
+  stored: Map<string, StoredFields>;
 }
 
 export const isSeasonSet = (s: RatingSet): s is 'anime_seasons' | 'tv_seasons' => s === 'anime_seasons' || s === 'tv_seasons';
 
 interface ItemRow {
   id: string; title: string; label?: string; rating: number | null; tier: Tier | null; prior_mean: number | null;
-  strength: number | null; score_locked: number; cover_url: string; status?: Status | null;
+  strength: number | null; score_locked: number; rating_rev: number; cover_url: string; status?: Status | null;
+  entry_id?: string;
 }
 interface ComparisonRow {
   id: string; category: string; winner_id: string; loser_id: string; is_tie: number; created_at: string; undone_at: string | null;
@@ -109,22 +113,24 @@ export function ratedFields(r: Pick<ItemRow, 'rating' | 'tier' | 'prior_mean' | 
 function itemsQuery(db: D1Database, userId: string, set: RatingSet): D1PreparedStatement {
   if (isSeasonSet(set)) {
     return db.prepare(
-      `SELECT s.id, e.title AS title, s.label, s.rating, s.tier, s.prior_mean, s.strength, s.score_locked, e.cover_url
+      `SELECT s.id, s.entry_id, e.title AS title, s.label, s.rating, s.tier, s.prior_mean, s.strength, s.score_locked, s.rating_rev, e.cover_url
          FROM seasons s JOIN entries e ON e.id = s.entry_id
         WHERE e.user_id = ? AND e.category = ? ORDER BY e.created_at, e.rowid, s.created_at, s.id`,
     ).bind(userId, listOfSet(set));
   }
   return db.prepare(
-    `SELECT id, title, rating, tier, prior_mean, strength, score_locked, cover_url, status
+    `SELECT id, title, rating, tier, prior_mean, strength, score_locked, rating_rev, cover_url, status
        FROM entries WHERE user_id = ? AND category = ? ORDER BY created_at, rowid`,
   ).bind(userId, set);
 }
 
 /**
- * Loads rating sets of one list (the list and/or its season tab) in one batch: one query per set
- * plus one for their comparisons. `tiers` are that list's tiers, used only for rows with no tier.
+ * Loads rating sets in one batch: one query per set plus one for their comparisons. `tiers` are the
+ * sets' tiers (or a function of the set), used only for rows with no tier yet.
  */
-export async function loadSets(db: D1Database, userId: string, sets: RatingSet[], tiers: TierSet): Promise<LoadedSet[]> {
+export async function loadSets(
+  db: D1Database, userId: string, sets: RatingSet[], tiers: TierSet | ((s: RatingSet) => TierSet),
+): Promise<LoadedSet[]> {
   const res = await db.batch([
     ...sets.map((s) => itemsQuery(db, userId, s)),
     db.prepare(
@@ -136,14 +142,16 @@ export async function loadSets(db: D1Database, userId: string, sets: RatingSet[]
   return sets.map((set, k) => {
     const season = isSeasonSet(set);
     const square = CATEGORY_CONFIG[listOfSet(set)].square;
-    const stored = new Map<string, RatedFields>();
+    const setTiers = typeof tiers === 'function' ? tiers(set) : tiers;
+    const stored = new Map<string, StoredFields>();
     const items = (res[k]!.results as ItemRow[]).map((r): LoadedItem => {
-      stored.set(r.id, { rating: r.rating, tier: r.tier, priorMean: r.prior_mean, strength: r.strength, scoreLocked: r.score_locked === 1 });
+      stored.set(r.id, { rating: r.rating, tier: r.tier, priorMean: r.prior_mean, strength: r.strength, scoreLocked: r.score_locked === 1, rev: r.rating_rev });
       return {
         id: r.id, kind: season ? 'season' : 'entry',
         title: season ? `${r.title} · ${r.label}` : r.title,
         cover: r.cover_url, square, status: season ? null : (r.status ?? null),
-        ...ratedFields(r, tiers),
+        ...(season ? { entryId: r.entry_id } : {}),
+        ...ratedFields(r, setTiers),
       };
     });
     return { set, items, comparisons: comps.filter((c) => c.category === set).map(rowToComparison), stored };
@@ -170,7 +178,7 @@ export const changedOf = <T extends RatedItem>(items: T[], stored: Map<string, R
  * independently, so re-fitting the touched tiers equals a full refitSet). Same order as `items`.
  */
 export function refitTouched<T extends RatedItem>(
-  items: T[], comparisons: Comparison[], tiers: TierSet, touched: Iterable<Tier | null>, opts?: { rangeChanged?: boolean },
+  items: T[], comparisons: Comparison[], tiers: TierSet, touched: Iterable<Tier | null>, opts?: { rangeChanged?: boolean; stats?: FitStats },
 ): T[] {
   const out = new Map<string, T>();
   for (const t of new Set(touched)) {
@@ -235,7 +243,9 @@ export function planEdit(loaded: LoadedSet, next: LoadedItem, tiers: TierSet): {
  * touched by a move or by a counted pick. Unknown or foreign ids are dropped. Returns the changed
  * items and the picks to store (undone ones included).
  */
-export function planSave(loaded: LoadedSet, payload: SavePayload, tiers: TierSet): { changed: LoadedItem[]; picks: PickInput[] } {
+export function planSave(
+  loaded: LoadedSet, payload: SavePayload, tiers: TierSet, opts?: { stats?: FitStats },
+): { changed: LoadedItem[]; picks: PickInput[] } {
   const byId = new Map(loaded.items.map((i) => [i.id, i]));
   const touched = new Set<Tier | null>();
   for (const m of payload.moves) {
@@ -253,29 +263,83 @@ export function planSave(loaded: LoadedSet, payload: SavePayload, tiers: TierSet
     if (tw !== null && tw === byId.get(p.loserId)!.tier) touched.add(tw);
   });
   const items = loaded.items.map((i) => byId.get(i.id)!);
-  const final = refitTouched(items, [...loaded.comparisons, ...counted], tiers, touched);
+  const final = refitTouched(items, [...loaded.comparisons, ...counted], tiers, touched, opts);
   return { changed: changedOf(final, loaded.stored), picks };
+}
+
+/**
+ * Titles leaving a set (deleted entries, seasons or an import): the tiers they were in re-fit
+ * without them, so a neighbour that loses its picks or its two-decimal twin shows its own number
+ * again. Comparisons naming them simply stop counting. Returns the remaining changed items.
+ */
+export function planRemove(loaded: LoadedSet, gone: (i: LoadedItem) => boolean, tiers: TierSet): LoadedItem[] {
+  const touched = new Set<Tier | null>();
+  const items = loaded.items.filter((i) => {
+    if (!gone(i)) return true;
+    if (i.tier !== null) touched.add(i.tier);
+    return false;
+  });
+  if (touched.size === 0) return [];
+  return changedOf(refitTouched(items, loaded.comparisons, tiers, touched), loaded.stored);
 }
 
 // ---- Writing -------------------------------------------------------------------------------
 
-const J = `SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rating') AS rating,
+/** A set write found a row changed since it was loaded (a concurrent write); nothing was saved. */
+export class RatingConflict extends Error {
+  constructor() { super('rating_conflict'); }
+}
+
+/**
+ * Runs a batch that contains set writes. A stale row makes its UPDATE fail (see
+ * `setWriteStatements`), which rolls the whole batch back; that failure becomes RatingConflict,
+ * which the app answers with 409.
+ */
+export async function runBatch(db: D1Database, stmts: D1PreparedStatement[]): Promise<D1Result[]> {
+  try {
+    return await db.batch(stmts);
+  } catch (e) {
+    if (/malformed JSON/i.test(String(e instanceof Error ? e.message : e))) throw new RatingConflict();
+    throw e;
+  }
+}
+
+const J = `SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rev') AS rev,
+                  json_type(value, '$.rating') IS NOT NULL AS rc, json_extract(value, '$.rating') AS rating,
                   json_extract(value, '$.tier') AS tier, json_extract(value, '$.prior') AS prior,
                   json_extract(value, '$.strength') AS strength, json_extract(value, '$.locked') AS locked
              FROM json_each(?1)`;
 
 /**
- * The write for a set's changed rows: one UPDATE of tier, prior_mean, strength, score_locked and
- * rating (plus updated_at on entries), its rows as one JSON parameter (Ruling P14). Entries are
- * guarded by user and list; seasons by their entry's user and list. No statement when nothing changed.
+ * The write for a set's changed rows: one UPDATE of tier, prior_mean, strength, score_locked and,
+ * only where it changed, rating (plus updated_at on entries). The rows travel as one JSON
+ * parameter (Ruling P14); a row whose rating did not change carries no rating, so a stored score
+ * never round-trips through JSON. Entries are guarded by user and list; seasons by their entry's
+ * user and list.
+ *
+ * Optimistic guard: each row carries the `rating_rev` it was loaded with. If the stored rev
+ * differs (another write landed in between), evaluating its rating raises an SQL error that
+ * aborts the batch (`runBatch` → 409). The expression depends on the row, so SQLite can't hoist
+ * it. Rows deleted in between simply match nothing. No statement when nothing changed.
  */
-export function setWriteStatements(db: D1Database, userId: string, set: RatingSet, changed: RatedItem[]): D1PreparedStatement[] {
+export function setWriteStatements(
+  db: D1Database, userId: string, set: RatingSet, changed: RatedItem[], stored: Map<string, StoredFields>,
+): D1PreparedStatement[] {
   if (changed.length === 0) return [];
-  const json = JSON.stringify(changed.map((i) => ({
-    id: i.id, rating: i.rating, tier: i.tier, prior: i.priorMean, strength: i.strength, locked: i.scoreLocked ? 1 : 0,
-  })));
-  const sets = 'rating = j.rating, tier = j.tier, prior_mean = j.prior, strength = j.strength, score_locked = j.locked';
-  if (isSeasonSet(set)) {
+  const json = JSON.stringify(changed.map((i) => {
+    const old = stored.get(i.id);
+    const row: Record<string, unknown> = {
+      id: i.id, rev: old?.rev ?? 0, tier: i.tier, prior: i.priorMean, strength: i.strength, locked: i.scoreLocked ? 1 : 0,
+    };
+    if (old === undefined || old.rating !== i.rating) row.rating = i.rating;
+    return row;
+  }));
+  const t = isSeasonSet(set) ? 'seasons' : 'entries';
+  const sets = `rating = CASE WHEN ${t}.rating_rev IS NOT j.rev THEN json('rating_conflict ' || ${t}.id)
+                              WHEN j.rc THEN j.rating ELSE ${t}.rating END,
+                tier = j.tier, prior_mean = j.prior, strength = j.strength, score_locked = j.locked,
+                rating_rev = ${t}.rating_rev + 1`;
+  if (t === 'seasons') {
     return [db.prepare(
       `UPDATE seasons SET ${sets} FROM (${J}) AS j
         WHERE seasons.id = j.id AND seasons.entry_id IN (SELECT id FROM entries WHERE user_id = ?2 AND category = ?3)`,
@@ -288,4 +352,4 @@ export function setWriteStatements(db: D1Database, userId: string, set: RatingSe
 }
 
 /** A SetItem as the API returns it (no `kind`). */
-export const toSetItem = ({ kind: _, ...i }: LoadedItem): SetItem => i;
+export const toSetItem = ({ kind: _k, entryId: _e, ...i }: LoadedItem): SetItem => i;

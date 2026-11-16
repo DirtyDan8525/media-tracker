@@ -5,11 +5,15 @@ ALTER TABLE entries ADD COLUMN tier INTEGER;
 ALTER TABLE entries ADD COLUMN prior_mean REAL;
 ALTER TABLE entries ADD COLUMN strength REAL;
 ALTER TABLE entries ADD COLUMN score_locked INTEGER NOT NULL DEFAULT 0;
+-- Bumped by every model write of the rating fields: the optimistic guard that keeps a save and a
+-- PATCH racing on the same set from losing either (a stale write fails and answers 409).
+ALTER TABLE entries ADD COLUMN rating_rev INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE seasons ADD COLUMN tier INTEGER;
 ALTER TABLE seasons ADD COLUMN prior_mean REAL;
 ALTER TABLE seasons ADD COLUMN strength REAL;
 ALTER TABLE seasons ADD COLUMN score_locked INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE seasons ADD COLUMN rating_rev INTEGER NOT NULL DEFAULT 0;
 
 -- Picks. Never shown to anyone but their owner. category is a RatingSet (a list, or
 -- anime_seasons / tv_seasons). winner_id/loser_id name entries or seasons; Back sets undone_at.

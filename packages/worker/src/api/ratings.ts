@@ -20,7 +20,7 @@ import {
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 import {
-  changedOf, isSeasonSet, loadSet, loadSets, planSave, refitTouched, setWriteStatements, toSetItem,
+  changedOf, isSeasonSet, loadSet, loadSets, planSave, refitTouched, runBatch, setWriteStatements, toSetItem,
 } from '../ratings/store';
 import { ENTRY_SELECT, rowToEntry, type EntryRow } from './entries';
 import { CATEGORIES, isTier } from './entryValidation';
@@ -110,7 +110,7 @@ ratings.post('/:set/save', async (c) => {
          FROM json_each(?1)`,
     ).bind(json, userId, set));
   }
-  stmts.push(...setWriteStatements(db, userId, set, changed));
+  stmts.push(...setWriteStatements(db, userId, set, changed, loaded.stored));
   if (payload.done.length > 0) {
     stmts.push(db.prepare('DELETE FROM compare_queue WHERE user_id = ?1 AND entry_id IN (SELECT value FROM json_each(?2))')
       .bind(userId, JSON.stringify(payload.done)));
@@ -121,7 +121,7 @@ ratings.post('/:set/save', async (c) => {
       `${ENTRY_SELECT} WHERE e.user_id = ?2 AND e.id IN (SELECT value FROM json_each(?1)) ORDER BY e.created_at, e.rowid`,
     ).bind(JSON.stringify(entryIds), userId));
   }
-  const res = stmts.length > 0 ? await db.batch(stmts) : [];
+  const res = stmts.length > 0 ? await runBatch(db, stmts) : [];
   const entries: Entry[] = entryIds.length > 0 ? (res[res.length - 1]!.results as EntryRow[]).map(rowToEntry) : [];
   return c.json({ items: changed.map(toSetItem), entries });
 });
@@ -177,7 +177,7 @@ ratings.put('/tiers/:list', async (c) => {
     for (const loaded of await loadSets(db, userId, sets, oldTiers)) {
       const final = refitTouched(loaded.items, loaded.comparisons, newTiers, touched, { rangeChanged: true });
       const changed = changedOf(final, loaded.stored);
-      stmts.push(...setWriteStatements(db, userId, loaded.set, changed));
+      stmts.push(...setWriteStatements(db, userId, loaded.set, changed, loaded.stored));
       if (!isSeasonSet(loaded.set)) entryIds = changed.map((i) => i.id);
     }
   }
@@ -186,7 +186,7 @@ ratings.put('/tiers/:list', async (c) => {
       `${ENTRY_SELECT} WHERE e.user_id = ?2 AND e.id IN (SELECT value FROM json_each(?1)) ORDER BY e.created_at, e.rowid`,
     ).bind(JSON.stringify(entryIds), userId));
   }
-  const res = await db.batch(stmts);
+  const res = await runBatch(db, stmts);
   const entries: Entry[] = entryIds.length > 0 ? (res[res.length - 1]!.results as EntryRow[]).map(rowToEntry) : [];
   return c.json({ settings, entries });
 });

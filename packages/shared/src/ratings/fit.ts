@@ -5,6 +5,15 @@ type FitItem = Pick<RatedItem, 'id' | 'priorMean' | 'scoreLocked'>;
 type FitComparison = Pick<Comparison, 'winnerId' | 'loserId' | 'isTie' | 'undoneAt'>;
 
 const MAX_STEPS = 100;
+
+/**
+ * Work counters for a fit, added up across calls (pass the same object to several fits). They are
+ * deterministic, so tests can guard the fit's cost without timing it: `fits` calls, `groups`
+ * Newton solves (one per group of free titles linked by picks), `steps` Newton steps in total,
+ * `maxGroup` the largest group (the dense solve is O(maxGroup³) per step), `picks` counted picks.
+ */
+export interface FitStats { fits: number; groups: number; steps: number; maxGroup: number; picks: number }
+export const newFitStats = (): FitStats => ({ fits: 0, groups: 0, steps: 0, maxGroup: 0, picks: 0 });
 const TOLERANCE = 1e-12;
 
 const cmpStr = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -31,12 +40,14 @@ export function countedPicks<C extends FitComparison>(ids: ReadonlySet<string>, 
  * groups, so fitting each group on its own gives the same optimum and costs far less than one
  * dense solve over the whole tier (Newton's dense Cholesky solve is O(k³) per step).
  */
-export function fitTier(items: FitItem[], comparisons: FitComparison[], opts?: { priorSd?: number }): Map<string, number> {
+export function fitTier(items: FitItem[], comparisons: FitComparison[], opts?: { priorSd?: number; stats?: FitStats }): Map<string, number> {
   const sd = opts?.priorSd ?? PRIOR_SD;
   const invVar = 1 / (sd * sd);
   const sorted = [...items].sort((a, b) => cmpStr(a.id, b.id));
   const ids = new Set(sorted.map((i) => i.id));
   const picks = countedPicks(ids, comparisons);
+  const stats = opts?.stats;
+  if (stats) { stats.fits++; stats.picks += picks.length; }
 
   const s = new Map<string, number>();
   for (const it of sorted) s.set(it.id, it.priorMean ?? 0);
@@ -65,12 +76,15 @@ export function fitTier(items: FitItem[], comparisons: FitComparison[], opts?: {
     const i = pos.get(p.winnerId) ?? pos.get(p.loserId);
     if (i !== undefined) groups.get(root(i))!.picks.push(p);
   }
-  for (const g of groups.values()) newton(g.free, g.picks, s, invVar);
+  for (const g of groups.values()) {
+    const steps = newton(g.free, g.picks, s, invVar);
+    if (stats) { stats.groups++; stats.steps += steps; stats.maxGroup = Math.max(stats.maxGroup, g.free.length); }
+  }
   return s;
 }
 
-/** Newton steps for one group of free titles; writes their strengths into `s`. */
-function newton(free: FitItem[], picks: FitComparison[], s: Map<string, number>, invVar: number): void {
+/** Newton steps for one group of free titles; writes their strengths into `s`. Returns the steps taken. */
+function newton(free: FitItem[], picks: FitComparison[], s: Map<string, number>, invVar: number): number {
   const k = free.length, n = picks.length;
   const idx = new Map<string, number>(free.map((it, i) => [it.id, i]));
   const mu = Float64Array.from(free, (it) => it.priorMean ?? 0);
@@ -85,7 +99,9 @@ function newton(free: FitItem[], picks: FitComparison[], s: Map<string, number>,
 
   const g = new Float64Array(k);
   const H = new Float64Array(k * k);
+  let taken = 0;
   for (let step = 0; step < MAX_STEPS; step++) {
+    taken++;
     H.fill(0);
     for (let i = 0; i < k; i++) { g[i] = -(x[i] - mu[i]) * invVar; H[i * k + i] = invVar; }
     for (let j = 0; j < n; j++) {
@@ -103,6 +119,7 @@ function newton(free: FitItem[], picks: FitComparison[], s: Map<string, number>,
     if (max < TOLERANCE) break;
   }
   for (let i = 0; i < k; i++) s.set(free[i].id, x[i]);
+  return taken;
 }
 
 /** Σ A[a+m]·A[b+m] for m < n, four sums at a time (a fixed order, so results are reproducible). */

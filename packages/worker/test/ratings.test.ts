@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
 import {
-  DEFAULT_TIERS, applyMove, fitTier, priorFromScore, refitSet, scoreOf, tierFor, tierRange,
+  DEFAULT_TIERS, applyMove, newFitStats, priorFromScore, refitSet, scoreOf, tierFor, tierRange,
   type Comparison, type Entry, type RatedItem, type SavePayload, type Season, type SetItem, type Tier, type TierSet,
 } from '@media-tracker/shared';
 import { loadSet, planSave } from '../src/ratings/store';
@@ -330,33 +330,167 @@ describe('POST /api/ratings/:set/save', () => {
       moves: [{ id: L[149]!, tier: 2 }],
       done: [],
     };
-    // The in-memory part of the save (moves, touched-tier re-fit, diff): the Worker's CPU.
+    // The in-memory part of the save (moves, touched-tier re-fit, diff) is the Worker's CPU. Its
+    // work is guarded deterministically: exactly the two touched tiers are fitted, one dense
+    // 150-title group, in a bounded number of Newton steps (7 measured; see the shared fit guard).
     const loaded = await loadSet(env.DB, uid, 'anime', DEFAULT_TIERS);
     expect(loaded.comparisons.length).toBe(600);
-    planSave(loaded, payload, DEFAULT_TIERS); // warm-up
-    const times: number[] = [];
-    for (let k = 0; k < 15; k++) {
+    const stats = newFitStats();
+    planSave(loaded, payload, DEFAULT_TIERS, { stats });
+    // The moved title is in 8 of the stored picks (4 as winner, 4 as loser); they stop counting.
+    expect(stats).toMatchObject({ fits: 2, groups: 1, maxGroup: 149, picks: 600 - 8 + 10 });
+    expect(stats.steps).toBeLessThanOrEqual(10);
+    // One loose time bound (min of 5), for a gross slowdown only. The strict 10 ms Workers budget is
+    // the opt-in perf test below.
+    let min = Infinity;
+    for (let k = 0; k < 5; k++) {
       const t0 = performance.now();
       planSave(loaded, payload, DEFAULT_TIERS);
-      times.push(performance.now() - t0);
+      min = Math.min(min, performance.now() - t0);
     }
+    expect(min).toBeLessThan(30);
+    expect((await save(A, 'anime', payload)).status).toBe(200);
+  });
+});
+
+// Opt-in: the strict Workers CPU budget (10 ms). Run alone, on a quiet machine:
+//   PERF=1 npx -y npm@11 test -w packages/worker -- test/ratings.test.ts -t perf
+describe.runIf(env.PERF)('perf', () => {
+  it('perf: a save into a 150-title tier with 600 picks plans within 10 ms (median of 15)', async () => {
+    const uid = await userId(A);
+    const ids = await seed(uid, 'anime', Array.from({ length: 150 }, (_, i) => Math.round((9 + (i % 100) / 100) * 100) / 100));
+    const comparisons: Comparison[] = Array.from({ length: 600 }, (_, k) => {
+      const i = k % 150, j = (i + 1 + Math.floor(k / 150)) % 150;
+      return { id: `c${k}`, winnerId: ids[i]!, loserId: ids[j]!, isTie: k % 7 === 0, createdAt: '', undoneAt: null };
+    });
+    const loaded = { ...(await loadSet(env.DB, uid, 'anime', DEFAULT_TIERS)), comparisons };
+    const payload: SavePayload = { picks: Array.from({ length: 10 }, (_, k) => pick(ids[(k * 13) % 150]!, ids[(k * 13 + 5) % 150]!)), moves: [{ id: ids[149]!, tier: 2 }], done: [] };
+    for (let k = 0; k < 3; k++) planSave(loaded, payload, DEFAULT_TIERS);
+    const times: number[] = [];
+    for (let k = 0; k < 15; k++) { const t0 = performance.now(); planSave(loaded, payload, DEFAULT_TIERS); times.push(performance.now() - t0); }
     times.sort((x, y) => x - y);
-    // The bare fit of the touched 150-title tier on the same data, for comparison.
-    const lovedItems = loaded.items.filter((i) => i.tier === 3);
-    const fits: number[] = [];
-    for (let k = 0; k < 15; k++) {
-      const t1 = performance.now();
-      fitTier(lovedItems, loaded.comparisons);
-      fits.push(performance.now() - t1);
-    }
-    fits.sort((x, y) => x - y);
-    const t0 = performance.now();
-    const res = await save(A, 'anime', payload);
-    const wall = performance.now() - t0;
-    expect(res.status).toBe(200);
-    console.log(`[ratings save CPU] 150-title tier, 600 picks: planSave median ${times[7]} ms (min ${times[0]}, max ${times[14]}); bare fit median ${fits[7]} ms; whole request ${wall} ms`);
-    // The median of 15 guards against one slow run on a shared machine (Workers allow 10 ms CPU).
-    expect(times[7]).toBeLessThan(10);
+    expect(times[7], `median ${times[7]} ms (min ${times[0]}, max ${times[14]})`).toBeLessThan(10);
+  });
+});
+
+describe('concurrent writes', () => {
+  it('a save loaded before a concurrent PATCH answers 409 and loses nothing', async () => {
+    const uid = await userId(A);
+    const [x, y] = await seed(uid, 'anime', [9.5, 9.2]);
+    const spy = spyD1(env.DB);
+    // Between the save's load (batch 1) and its write (batch 2), another device re-types x.
+    spy.beforeBatch = async (n) => { if (n === 2) expect((await patch(A, x!, { rating: 9.1 })).status).toBe(200); };
+    const res = await save(A, 'anime', { picks: [pick(y!, x!)] }, spy.db);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'conflict' });
+    const [rx] = await rows('entries', [x!]);
+    expect([rx!.rating, rx!.prior_mean, rx!.strength]).toEqual([9.1, priorFromScore(9.1, [9, 10]), priorFromScore(9.1, [9, 10])]);
+    expect(await comparisonsOf(uid)).toEqual([]); // the whole batch rolled back
+    // Retried, the save goes through on top of the PATCH.
+    expect((await save(A, 'anime', { picks: [pick(y!, x!)] })).status).toBe(200);
+  });
+
+  it('a PATCH loaded before a concurrent save answers 409 too', async () => {
+    const uid = await userId(A);
+    const [x, y] = await seed(uid, 'anime', [9.5, 9.2]);
+    const spy = spyD1(env.DB);
+    spy.beforeBatch = async (n) => { if (n === 2) expect((await save(A, 'anime', { picks: [pick(y!, x!)] })).status).toBe(200); };
+    const res = await as(A, `/api/entries/${x}`, 'PATCH', { rating: 9.6, notes: 'n' }, spy.db);
+    expect(res.status).toBe(409);
+    const [rx] = await rows('entries', [x!]) as (Row & { notes: string })[];
+    expect(rx!.notes).toBe('');
+    expect(rx!.strength).not.toBe(rx!.prior_mean); // the save's fit stands
+  });
+
+  it('rows whose rating did not change are written without a rating', async () => {
+    const uid = await userId(A);
+    const legacy = await seed(uid, 'anime', [9.97, 8.25], { legacy: true });
+    const [x, y] = await seed(uid, 'anime', [9.5, 9.4]);
+    const spy = spyD1(env.DB);
+    await save(A, 'anime', { picks: [pick(y!, x!)] }, spy.db);
+    const upd = spy.binds.find((b) => b.sql.includes('UPDATE entries SET'))!;
+    const sent = JSON.parse(upd.values[0] as string) as Record<string, unknown>[];
+    const byId = new Map(sent.map((r) => [r.id, r]));
+    // The legacy rows get their tier on the fly; their rating never travels through JSON.
+    for (const id of legacy) expect(byId.get(id)!.rating).toBeUndefined();
+    expect(byId.get(x!)!.rating).toEqual(expect.any(Number));
+    expect((await rows('entries', legacy)).map((r) => [r.rating, r.tier])).toEqual([[9.97, 3], [8.25, 2]]);
+  });
+});
+
+describe('deletes re-fit the tier', () => {
+  it('deleting an entry re-fits its tier and its seasons\' tiers', async () => {
+    const uid = await userId(A);
+    const [x, y, z] = await seed(uid, 'anime', [9.5, 9.4, 9.2]);
+    const [s1] = await seedSeasons(y!, [9.5]);
+    const [s2] = await seedSeasons(z!, [9.3]);
+    await save(A, 'anime', { picks: [pick(y!, x!)] });
+    await save(A, 'anime_seasons', { picks: [pick(s2!, s1!)] });
+    expect((await as(A, `/api/entries/${y}`, 'DELETE')).status).toBe(204);
+    // x lost its only pick: it shows its prior again (Q6). So does s2 in the season tab.
+    const [rx] = await rows('entries', [x!]);
+    expect(rx!.strength).toBe(rx!.prior_mean);
+    expect(rx!.rating).toBe(Math.round(scoreOf(rx!.prior_mean!, [9, 10]) * 10) / 10);
+    const [rs2] = await rows('seasons', [s2!]);
+    expect(rs2!.strength).toBe(rs2!.prior_mean);
+  });
+
+  it('deleting a season re-fits its tier', async () => {
+    const uid = await userId(A);
+    const [e] = await seed(uid, 'anime', [9]);
+    const [s1, s2] = await seedSeasons(e!, [9.5, 9.4]);
+    await save(A, 'anime_seasons', { picks: [pick(s1!, s2!)] });
+    expect((await as(A, `/api/seasons/${s1}`, 'DELETE')).status).toBe(204);
+    const [r2] = await rows('seasons', [s2!]);
+    expect(r2!.strength).toBe(r2!.prior_mean);
+  });
+
+  it('undoing an import re-fits the affected tiers and removes that import\'s comparisons', async () => {
+    const uid = await userId(A);
+    const importId = crypto.randomUUID();
+    const r = (title: string, rating: number, seasons?: { label: string; rating: number; notes: string }[]) =>
+      ({ category: 'anime', title, status: null, rating, genres: '', creator: '', album: '', coverUrl: '', notes: '', seasons });
+    expect((await as(A, '/api/import', 'POST', { importId, rows: [r('Imp', 9.5, [{ label: 'S1', rating: 9.5, notes: '' }])] })).status).toBe(200);
+    const [m] = await seed(uid, 'anime', [9.4]);
+    const [ms] = await seedSeasons(m!, [9.4]);
+    const imp = (await env.DB.prepare("SELECT id FROM entries WHERE title = 'Imp'").first<{ id: string }>())!.id;
+    const impS = (await env.DB.prepare('SELECT id FROM seasons WHERE entry_id = ?').bind(imp).first<{ id: string }>())!.id;
+    await save(A, 'anime', { picks: [pick(m!, imp)] });
+    await save(A, 'anime_seasons', { picks: [pick(ms!, impS)] });
+    const [m1] = await rows('entries', [m!]);
+    expect(m1!.strength).not.toBe(m1!.prior_mean);
+    expect((await as(A, `/api/import/${importId}`, 'DELETE')).status).toBe(200);
+    const [m2] = await rows('entries', [m!]);
+    expect(m2!.strength).toBe(m2!.prior_mean);
+    expect(m2!.rating).toBe(Math.round(scoreOf(m2!.prior_mean!, [9, 10]) * 10) / 10);
+    const [ms2] = await rows('seasons', [ms!]);
+    expect(ms2!.strength).toBe(ms2!.prior_mean);
+    expect(await comparisonsOf(uid)).toEqual([]);
+  });
+});
+
+describe('read paths derive missing tiers (Q10), read-only', () => {
+  it('GET /entries, /entries/:id, seasons and export show derived tiers and write nothing', async () => {
+    const uid = await userId(A);
+    const [e, u] = await seed(uid, 'anime', [8.25, null], { legacy: true });
+    const [s] = await seedSeasons(e!, [9.97]);
+    await env.DB.prepare('UPDATE seasons SET tier = NULL, prior_mean = NULL, strength = NULL').run();
+    const p = priorFromScore(8.25, [7.5, 9]), ps = priorFromScore(9.97, [9, 10]);
+    const want = { rating: 8.25, tier: 2, priorMean: p, strength: p, scoreLocked: false };
+    const list = (await (await as(A, '/api/entries')).json()) as Entry[];
+    expect(list.find((x) => x.id === e)).toMatchObject(want);
+    expect(list.find((x) => x.id === u)).toMatchObject({ rating: null, tier: null, priorMean: null, strength: null });
+    expect(await (await as(A, `/api/entries/${e}`)).json()).toMatchObject(want);
+    expect(((await (await as(A, `/api/entries/${e}/seasons`)).json()) as Season[])[0]).toMatchObject({ id: s, tier: 3, priorMean: ps, strength: ps });
+    const exp = (await (await as(A, '/api/export')).json()) as { entries: Entry[]; seasons: Season[] };
+    expect(exp.entries.find((x) => x.id === e)).toMatchObject(want);
+    expect(exp.seasons[0]).toMatchObject({ tier: 3, priorMean: ps });
+    // A notes-only PATCH returns the derived tier too.
+    expect((await patch(A, e!, { notes: 'n' })).entry).toMatchObject(want);
+    // Nothing was written.
+    const raw = await rows('entries', [e!]);
+    expect([raw[0]!.tier, raw[0]!.prior_mean]).toEqual([null, null]);
+    expect((await rows('seasons', [s!]))[0]!.tier).toBeNull();
   });
 });
 

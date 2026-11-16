@@ -18,6 +18,8 @@ export default defineConfig(async () => {
             ACCESS_TEAM_DOMAIN: '',
             ACCESS_AUD: '',
             ADMIN_EMAIL: '',
+            // Opt-in perf tests (PERF=1): the strict CPU budgets, run alone on a quiet machine.
+            PERF: process.env.PERF ?? '',
           },
           serviceBindings: {
             ASSETS: () => new Response('asset-stub', { status: 200 }),

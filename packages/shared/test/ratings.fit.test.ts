@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { fitTier, priorFromScore, round2, scoreOf, type Comparison } from '../src/ratings';
+import { fitTier, newFitStats, priorFromScore, round2, scoreOf, type Comparison } from '../src/ratings';
 import { rng } from './helpers/prng';
+
+/** Newton steps for one dense guard tier: 7 measured (quadratic convergence from the priors); 10 leaves room. */
+const STEPS_BOUND = 10;
 
 type Item = { id: string; priorMean: number | null; scoreLocked: boolean };
 type Cmp = Pick<Comparison, 'winnerId' | 'loserId' | 'isTie' | 'undoneAt'>;
@@ -177,21 +180,43 @@ describe('fitTier', () => {
   });
 
   // Complexity guard (Review Focus 5), sized past a big real tier: one connected 150-title tier with
-  // 600 picks. Median of 5 runs after warm-up, so one slow run on a busy machine doesn't fail it.
-  test('a 150-title tier with 600 picks fits in under 8 ms', () => {
+  // 600 picks (and the plan's 120/480). Deterministic work counts catch a complexity regression
+  // without timing anything; one loose min-of-N time bound catches a gross slowdown. The strict
+  // Workers budget (10 ms CPU) is an opt-in perf test below: run it alone, on a quiet machine,
+  //   PERF=1 npx -y npm@11 test -w packages/shared -- test/ratings.fit.test.ts -t perf
+  const bigTier = (n: number, m: number) => {
     const R = rng(9);
-    const items = Array.from({ length: 150 }, (_, i) => item(`t${String(i).padStart(3, '0')}`, logit(0.03 + 0.94 * R())));
-    const picks = Array.from({ length: 600 }, () => {
-      const a = Math.floor(R() * 150); let b = Math.floor(R() * 149); if (b >= a) b++;
+    const items = Array.from({ length: n }, (_, i) => item(`t${String(i).padStart(3, '0')}`, logit(0.03 + 0.94 * R())));
+    const picks = Array.from({ length: m }, () => {
+      const a = Math.floor(R() * n); let b = Math.floor(R() * (n - 1)); if (b >= a) b++;
       return win(items[a].id, items[b].id, R() < 0.15);
     });
-    for (let k = 0; k < 3; k++) fitTier(items, picks); // warm up the JIT
+    return { items, picks };
+  };
+
+  test.each([[150, 600], [120, 480]])('a %i-title tier with %i picks: bounded Newton work', (n, m) => {
+    const { items, picks } = bigTier(n, m);
+    const stats = newFitStats();
+    const s = fitTier(items, picks, { stats });
+    expect(s.size).toBe(n);
+    expect(stats).toMatchObject({ fits: 1, groups: 1, maxGroup: n, picks: m });
+    expect(stats.steps).toBeLessThanOrEqual(STEPS_BOUND);
+  });
+
+  test('a 150-title tier with 600 picks: loose time bound (min of 5 < 30 ms)', () => {
+    const { items, picks } = bigTier(150, 600);
+    for (let k = 0; k < 2; k++) fitTier(items, picks); // warm up the JIT
+    let min = Infinity;
+    for (let k = 0; k < 5; k++) { const t0 = performance.now(); fitTier(items, picks); min = Math.min(min, performance.now() - t0); }
+    expect(min).toBeLessThan(30);
+  });
+
+  test.runIf(process.env.PERF)('perf: a 150-title tier with 600 picks fits within the 8 ms budget (median of 15)', () => {
+    const { items, picks } = bigTier(150, 600);
+    for (let k = 0; k < 3; k++) fitTier(items, picks);
     const times: number[] = [];
-    let s = new Map<string, number>();
-    for (let k = 0; k < 5; k++) { const t0 = performance.now(); s = fitTier(items, picks); times.push(performance.now() - t0); }
+    for (let k = 0; k < 15; k++) { const t0 = performance.now(); fitTier(items, picks); times.push(performance.now() - t0); }
     times.sort((a, b) => a - b);
-    if (process.env.PRINT_FIT) console.log('fit 150/600 ms', times);
-    expect(times[2]).toBeLessThan(8);
-    expect(s.size).toBe(150);
+    expect(times[7], `median ${times[7]} ms (min ${times[0]}, max ${times[14]})`).toBeLessThan(8);
   });
 });

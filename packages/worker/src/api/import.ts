@@ -8,12 +8,14 @@ import {
   IMPORT_SEASON_PARAMS,
   SEASONS_PER_STATEMENT,
   importStatementCount,
+  seasonSetOf,
   tiersFor,
   type Category,
+  type RatingSet,
   type ImportRow,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
-import { tierFieldsFor } from '../ratings/store';
+import { loadSets, planRemove, runBatch, setWriteStatements, tierFieldsFor } from '../ratings/store';
 import { CATEGORIES, validateEntryInput, validateSeasonInput } from './entryValidation';
 
 export const importApi = new Hono<AppEnv>();
@@ -193,24 +195,49 @@ importApi.post('/', async (c) => {
   return c.json({ inserted: clean.length });
 });
 
-// 1 lookup (with count) + 1 batch of 2 (seasons go via ON DELETE CASCADE).
+// 1 batch of 2 (owner with count, the import's entry ids and lists); loadSets of the lists it
+// touched and their season tabs (≤ 10, one batch); then 1 batch: its comparisons, its entries
+// (seasons go via ON DELETE CASCADE), the imports row, and the re-fit of every tier its rated
+// titles leave (≤ 9 set UPDATEs). ≤ 27 queries with sign-in.
 importApi.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const userId = c.var.user.id;
   if (!UUID_RE.test(id)) return c.json(notFound, 404);
   const db = c.env.DB;
-  const owned = await db
-    .prepare(
+  const [own, mine] = await db.batch([
+    db.prepare(
       `SELECT (SELECT COUNT(*) FROM entries e WHERE e.import_id = i.id AND e.user_id = i.user_id) AS n
        FROM imports i WHERE i.id = ? AND i.user_id = ?`,
-    )
-    .bind(id, userId)
-    .first<{ n: number }>();
+    ).bind(id, userId),
+    db.prepare('SELECT id, category FROM entries WHERE import_id = ? AND user_id = ?').bind(id, userId),
+  ]);
+  const owned = (own!.results as { n: number }[])[0];
   if (!owned) return c.json(notFound, 404);
-  // (D1's meta.changes would include cascaded season rows, so count entries up front.)
-  await db.batch([
+  const imported = mine!.results as { id: string; category: Category }[];
+  const gone = new Set(imported.map((r) => r.id));
+
+  // The import's titles leave their tiers: re-fit those tiers without them.
+  const sets: RatingSet[] = [];
+  for (const cat of new Set(imported.map((r) => r.category))) {
+    sets.push(cat);
+    const s = seasonSetOf(cat);
+    if (s !== null) sets.push(s);
+  }
+  const settings = c.var.user.settings;
+  const refits = sets.length === 0 ? [] : (await loadSets(db, userId, sets, (s) => tiersFor(settings, s))).flatMap((l) =>
+    setWriteStatements(db, userId, l.set,
+      planRemove(l, (i) => gone.has(i.kind === 'entry' ? i.id : i.entryId!), tiersFor(settings, l.set)), l.stored));
+
+  // Undo removes everything the import brought, including the picks that name its titles or
+  // their seasons. They go first, while the seasons still exist to be named.
+  const named = `SELECT id FROM entries WHERE import_id = ?2 AND user_id = ?1
+                 UNION ALL SELECT s.id FROM seasons s JOIN entries e ON e.id = s.entry_id WHERE e.import_id = ?2 AND e.user_id = ?1`;
+  // (D1's meta.changes would include cascaded season rows, so entries were counted up front.)
+  await runBatch(db, [
+    db.prepare(`DELETE FROM comparisons WHERE user_id = ?1 AND (winner_id IN (${named}) OR loser_id IN (${named}))`).bind(userId, id),
     db.prepare('DELETE FROM entries WHERE import_id = ? AND user_id = ?').bind(id, userId),
     db.prepare('DELETE FROM imports WHERE id = ? AND user_id = ?').bind(id, userId),
+    ...refits,
   ]);
   return c.json({ deleted: owned.n });
 });

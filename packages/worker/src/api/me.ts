@@ -89,10 +89,16 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-// 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10)
+// 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10). The backfill is
+// optional (every read and rating path derives missing tiers), so a failure is logged and /me,
+// which the app needs to boot, still answers.
 me.get('/', async (c) => {
   const { id, email, username, isAdmin, settings } = c.var.user;
-  await ensureTiers(c.env.DB, id, settings);
+  try {
+    await ensureTiers(c.env.DB, id, settings);
+  } catch (err) {
+    console.error('ensureTiers failed', err);
+  }
   return c.json({ id, email, username, isAdmin, settings });
 });
 

@@ -9,11 +9,12 @@ import {
   type RatedItem,
   type Season,
   type Tier,
+  type UserSettings,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 import {
-  applyRatingEdit, loadSet, planEdit, ratedFields, rowToComparison, setWriteStatements,
-  type LoadedItem, type RatingEdit,
+  applyRatingEdit, loadSet, loadSets, planEdit, planRemove, ratedFields, rowToComparison, runBatch, setWriteStatements,
+  tierFieldsFor, type LoadedItem, type RatingEdit,
 } from '../ratings/store';
 import { enqueueStatements } from './compare';
 import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
@@ -134,7 +135,7 @@ async function editStored(
   const next = applyRatingEdit(before, edit, tiers);
   if (next === null || next === 'invalid') return next;
   const { changed, item } = planEdit(loaded, next, tiers);
-  return { stmts: setWriteStatements(db, userId, set, changed), before, item };
+  return { stmts: setWriteStatements(db, userId, set, changed, loaded.stored), before, item };
 }
 
 async function readJson(req: Request): Promise<unknown> {
@@ -145,9 +146,22 @@ async function readJson(req: Request): Promise<unknown> {
   }
 }
 
-async function loadEntry(db: D1Database, id: string, userId: string): Promise<Entry | null> {
+/**
+ * Q10 on read paths: a rated row the lazy backfill hasn't reached yet shows the tier, prior and
+ * strength it will get (the same pure derivation), without writing anything.
+ */
+export function deriveEntry(e: Entry, settings: Pick<UserSettings, 'tiers'>): Entry {
+  if (e.tier !== null || e.rating === null) return e;
+  return { ...e, ...tierFieldsFor(e.rating, tiersFor(settings, e.category)) };
+}
+export function deriveSeason(s: Season, category: Category, settings: Pick<UserSettings, 'tiers'>): Season {
+  if (s.tier !== null || s.rating === null) return s;
+  return { ...s, ...tierFieldsFor(s.rating, tiersFor(settings, category)) };
+}
+
+async function loadEntry(db: D1Database, id: string, userId: string, settings: UserSettings): Promise<Entry | null> {
   const row = await db.prepare(`${ENTRY_SELECT} WHERE e.id = ? AND e.user_id = ?`).bind(id, userId).first<EntryRow>();
-  return row ? rowToEntry(row) : null;
+  return row ? deriveEntry(rowToEntry(row), settings) : null;
 }
 
 // 1 query
@@ -159,12 +173,12 @@ entries.get('/entries', async (c) => {
     ? c.env.DB.prepare(`${ENTRY_SELECT} WHERE e.user_id = ? AND e.category = ? ORDER BY e.created_at, e.rowid`).bind(userId, category)
     : c.env.DB.prepare(`${ENTRY_SELECT} WHERE e.user_id = ? ORDER BY e.created_at, e.rowid`).bind(userId);
   const { results } = await stmt.all<EntryRow>();
-  return c.json(results.map(rowToEntry));
+  return c.json(results.map((r) => deriveEntry(rowToEntry(r), c.var.user.settings)));
 });
 
 // 1 query
 entries.get('/entries/:id', async (c) => {
-  const entry = await loadEntry(c.env.DB, c.req.param('id'), c.var.user.id);
+  const entry = await loadEntry(c.env.DB, c.req.param('id'), c.var.user.id, c.var.user.settings);
   return entry ? c.json(entry) : c.json(notFound, 404);
 });
 
@@ -207,7 +221,7 @@ entries.post('/entries', async (c) => {
     const loaded = await loadSet(db, userId, cat, tiers);
     const { changed, item } = planEdit(loaded, rated as LoadedItem, tiers);
     rated = item;
-    setStmts = setWriteStatements(db, userId, cat, changed.filter((i) => i.id !== id));
+    setStmts = setWriteStatements(db, userId, cat, changed.filter((i) => i.id !== id), loaded.stored);
   }
 
   const keys = Object.keys(values) as (keyof PlainFields)[];
@@ -216,9 +230,9 @@ entries.post('/entries', async (c) => {
     .bind(id, userId, cat, ...keys.map((k) => dbValue(values[k])), ...ratedValues(rated), now, now);
   // A tier-only rating counts as a new rating for the queue (Q15).
   const queued = rated.rating !== null ? enqueueStatements(db, userId, id, c.var.user.settings.compareAsk) : [];
-  await db.batch([insert, ...setStmts, ...queued]);
+  await runBatch(db, [insert, ...setStmts, ...queued]);
 
-  const entry = await loadEntry(db, id, userId);
+  const entry = await loadEntry(db, id, userId, c.var.user.settings);
   return c.json({ entry, duplicateOf }, 201);
 });
 
@@ -257,18 +271,30 @@ entries.patch('/entries/:id', async (c) => {
   const sets = [...keys.map((k) => `${COLUMNS[k]} = ?`), 'updated_at = ?'];
   const update = db.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`)
     .bind(...keys.map((k) => dbValue(rest[k])), new Date().toISOString(), id, userId);
-  await db.batch([update, ...ratingStmts, ...queued]);
-  return c.json(await loadEntry(db, id, userId));
+  await runBatch(db, [update, ...ratingStmts, ...queued]);
+  return c.json(await loadEntry(db, id, userId, c.var.user.settings));
 });
 
-// 1 batch of 2 queries: the entry (seasons and queue rows go via ON DELETE CASCADE; D1 enforces
-// foreign keys) and the comparisons that name it (Q22; those naming its seasons stay).
+// 1 query (404) or 5, plus sign-in (1-3): owner row; loadSets of the list and its season tab (3);
+// then 1 batch: the entry (seasons and queue rows go via ON DELETE CASCADE; D1 enforces foreign
+// keys), the comparisons that name it (Q22; those naming its seasons stay), and the re-fit of the
+// tiers it and its seasons leave (≤ 2 set UPDATEs).
 entries.delete('/entries/:id', async (c) => {
   const id = c.req.param('id');
+  const db = c.env.DB;
   const userId = c.var.user.id;
-  const [res] = await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM entries WHERE id = ? AND user_id = ?').bind(id, userId),
-    c.env.DB.prepare('DELETE FROM comparisons WHERE user_id = ?1 AND (winner_id = ?2 OR loser_id = ?2)').bind(userId, id),
+  const owner = await ownedEntry(db, id, userId);
+  if (!owner) return c.json(notFound, 404);
+  const tiers = tiersFor(c.var.user.settings, owner.category);
+  const seasonSet = seasonSetOf(owner.category);
+  const loaded = await loadSets(db, userId, seasonSet === null ? [owner.category] : [owner.category, seasonSet], tiers);
+  const refits = loaded.flatMap((l) => setWriteStatements(
+    db, userId, l.set, planRemove(l, (i) => (i.kind === 'entry' ? i.id === id : i.entryId === id), tiers), l.stored,
+  ));
+  const [res] = await runBatch(db, [
+    db.prepare('DELETE FROM entries WHERE id = ? AND user_id = ?').bind(id, userId),
+    db.prepare('DELETE FROM comparisons WHERE user_id = ?1 AND (winner_id = ?2 OR loser_id = ?2)').bind(userId, id),
+    ...refits,
   ]);
   if (res!.meta.changes === 0) return c.json(notFound, 404);
   return c.body(null, 204);
@@ -288,7 +314,7 @@ entries.get('/entries/:id/seasons', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM seasons WHERE entry_id = ? ORDER BY created_at, id')
     .bind(c.req.param('id'))
     .all<SeasonRow>();
-  return c.json(results.map(rowToSeason));
+  return c.json(results.map((r) => deriveSeason(rowToSeason(r), owner.category, c.var.user.settings)));
 });
 
 const seasonOf = (base: Pick<Season, 'id' | 'entryId' | 'label' | 'notes'>, r: RatedItem): Season => ({
@@ -320,9 +346,9 @@ entries.post('/entries/:id/seasons', async (c) => {
     const loaded = await loadSet(db, userId, set, tiers);
     const { changed, item } = planEdit(loaded, rated as LoadedItem, tiers);
     rated = item;
-    setStmts = setWriteStatements(db, userId, set, changed.filter((i) => i.id !== base.id));
+    setStmts = setWriteStatements(db, userId, set, changed.filter((i) => i.id !== base.id), loaded.stored);
   }
-  await db.batch([
+  await runBatch(db, [
     db.prepare(`INSERT INTO seasons (id, entry_id, label, notes, ${RATED_COLS.join(', ')}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(base.id, entryId, base.label, base.notes, ...ratedValues(rated), new Date().toISOString()),
     ...setStmts,
@@ -355,21 +381,29 @@ entries.patch('/seasons/:id', async (c) => {
     if (r === 'gone') return c.json(notFound, 404);
     if (r !== null) { ratingStmts = r.stmts; rated = r.item; }
   }
-  await db.batch([
+  await runBatch(db, [
     db.prepare('UPDATE seasons SET label = ?, notes = ? WHERE id = ?').bind(base.label, base.notes, id),
     ...ratingStmts,
   ]);
   return c.json(seasonOf(base, rated));
 });
 
-// 1 query
+// 1 query (404) or 4, plus sign-in (1-3): owner row; loadSet of its season tab (2); then 1 batch:
+// the delete and the re-fit of the tier it leaves. Comparisons naming it stay (Q22).
 entries.delete('/seasons/:id', async (c) => {
-  const res = await c.env.DB.prepare(
-    'DELETE FROM seasons WHERE id = ? AND entry_id IN (SELECT id FROM entries WHERE user_id = ?)',
-  )
-    .bind(c.req.param('id'), c.var.user.id)
-    .run();
-  if (res.meta.changes === 0) return c.json(notFound, 404);
+  const id = c.req.param('id');
+  const db = c.env.DB;
+  const userId = c.var.user.id;
+  const owned = await db.prepare(SEASON_OWNED).bind(id, userId).first<SeasonRow & { category: Category }>();
+  if (!owned) return c.json(notFound, 404);
+  const set = seasonSetOf(owned.category)!;
+  const tiers = tiersFor(c.var.user.settings, set);
+  const loaded = await loadSet(db, userId, set, tiers);
+  const [res] = await runBatch(db, [
+    db.prepare('DELETE FROM seasons WHERE id = ? AND entry_id IN (SELECT id FROM entries WHERE user_id = ?)').bind(id, userId),
+    ...setWriteStatements(db, userId, set, planRemove(loaded, (i) => i.id === id, tiers), loaded.stored),
+  ]);
+  if (res!.meta.changes === 0) return c.json(notFound, 404);
   return c.body(null, 204);
 });
 
@@ -380,15 +414,15 @@ entries.get('/export', async (c) => {
   const [e, s, k] = await c.env.DB.batch([
     c.env.DB.prepare(`${ENTRY_SELECT} WHERE e.user_id = ? ORDER BY e.created_at, e.rowid`).bind(userId),
     c.env.DB.prepare(
-      'SELECT s.* FROM seasons s JOIN entries e ON e.id = s.entry_id WHERE e.user_id = ? ORDER BY s.created_at, s.id',
+      'SELECT s.*, e.category AS category FROM seasons s JOIN entries e ON e.id = s.entry_id WHERE e.user_id = ? ORDER BY s.created_at, s.id',
     ).bind(userId),
     c.env.DB.prepare(
       'SELECT id, category, winner_id, loser_id, is_tie, created_at, undone_at FROM comparisons WHERE user_id = ? ORDER BY created_at, rowid',
     ).bind(userId),
   ]);
   const body = {
-    entries: (e!.results as EntryRow[]).map(rowToEntry),
-    seasons: (s!.results as SeasonRow[]).map(rowToSeason),
+    entries: (e!.results as EntryRow[]).map((r) => deriveEntry(rowToEntry(r), c.var.user.settings)),
+    seasons: (s!.results as (SeasonRow & { category: Category })[]).map((r) => deriveSeason(rowToSeason(r), r.category, c.var.user.settings)),
     comparisons: (k!.results as Parameters<typeof rowToComparison>[0][]).map((r) => ({ category: r.category, ...rowToComparison(r) })),
     settings: c.var.user.settings,
   };

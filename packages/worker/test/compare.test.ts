@@ -128,70 +128,18 @@ describe('compare queue', () => {
   });
 });
 
-describe('compare save', () => {
-  it('saves 1,000 changes (the maximum) in one request', async () => {
-    const ids = await seedEntries(A, 1000);
-    const res = await as(A, '/api/compare/save', 'POST', {
-      changes: ids.map((id, i) => ({ id, rating: (i % 100) / 10 })),
-    });
-    expect(res.status).toBe(200);
-    const json = (await res.json()) as { updated: number; entries: Entry[] };
-    expect(json.updated).toBe(1000);
-    expect(json.entries.length).toBe(1000);
-    const row = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(ids[37]!).first<{ rating: number }>();
-    expect(row!.rating).toBe(3.7);
-  });
-
-  it('ignores ids that are missing or belong to someone else', async () => {
-    const mine = await mk(A);
-    const theirs = await mk(B);
-    const res = await as(A, '/api/compare/save', 'POST', {
-      changes: [
-        { id: mine.id, rating: 9 },
-        { id: theirs.id, rating: 1 },
-        { id: 'gone', rating: 2 },
-      ],
-    });
-    const json = (await res.json()) as { updated: number; entries: Entry[] };
-    expect(json.updated).toBe(1);
-    expect(json.entries.map((e) => e.id)).toEqual([mine.id]);
-    const other = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(theirs.id).first<{ rating: number | null }>();
-    expect(other!.rating).toBeNull();
-  });
-
-  it('drops doneEntryId from the queue in the same request, and never enqueues', async () => {
-    const e1 = await mk(A, { rating: 8 });
-    const e2 = await mk(A, { rating: 7 });
-    const res = await as(A, '/api/compare/save', 'POST', { changes: [{ id: e2.id, rating: 6 }], doneEntryId: e1.id });
-    expect(res.status).toBe(200);
-    expect((await queue(A)).map((i) => i.entryId)).toEqual([e2.id]);
-  });
-
-  it('rejects bad bodies with 400', async () => {
-    const e = await mk(A);
-    const f = (b: unknown) => as(A, '/api/compare/save', 'POST', b);
-    const bad: unknown[] = [
-      { changes: [{ id: e.id, rating: null }] },
-      { changes: [{ id: e.id, rating: 10.5 }] },
-      { changes: [{ id: e.id, rating: 8.333 }] },
-      { changes: [{ id: e.id, rating: 5 }, { id: e.id, rating: 6 }] },
-      { changes: Array.from({ length: 1001 }, (_, i) => ({ id: `id${i}`, rating: 5 })) },
-      { changes: 'x' },
-      {},
-      { changes: [{ id: '', rating: 5 }] },
-      { changes: [{ id: 'x'.repeat(65), rating: 5 }] },
-      { changes: [{ id: 3, rating: 5 }] },
-      { changes: [], doneEntryId: 5 },
-    ];
-    for (const b of bad) expect((await f(b)).status, JSON.stringify(b).slice(0, 60)).toBe(400);
-  });
-
-  it('returns the saved entries with their new ratings and updated_at', async () => {
+// The Sheet engine's save wrote `rating` alone, bypassing the tier model, so it is switched off
+// until Task 12 deletes it (Tasks 6–8 review, Important 2).
+describe('compare save (retired)', () => {
+  it('answers 410 gone for any body and writes nothing', async () => {
     const e = await mk(A, { rating: 4 });
-    const res = await as(A, '/api/compare/save', 'POST', { changes: [{ id: e.id, rating: 9.25 }] });
-    const json = (await res.json()) as { updated: number; entries: Entry[] };
-    expect(json.entries[0]!.rating).toBe(9.25);
-    expect(json.entries[0]!.updatedAt >= e.updatedAt).toBe(true);
-    expect(json.entries[0]!.updatedAt).not.toBe('');
+    for (const body of [{ changes: [{ id: e.id, rating: 9.25 }] }, { changes: [] }, {}, 'x']) {
+      const res = await as(A, '/api/compare/save', 'POST', body);
+      expect(res.status).toBe(410);
+      expect(await res.json()).toMatchObject({ error: 'gone' });
+    }
+    const row = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(e.id).first<{ rating: number }>();
+    expect(row!.rating).toBe(4);
+    expect((await queue(A)).map((i) => i.entryId)).toEqual([e.id]);
   });
 });

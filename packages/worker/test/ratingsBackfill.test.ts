@@ -53,6 +53,24 @@ afterEach(async () => {
 const DAN = [10, 10, 9.9, 9.97, 9, 8.25, 7.5, 7.49, 6, 5.99, 0];
 
 describe('ensureTiers (GET /api/me)', () => {
+  it('GET /api/me still answers when the backfill fails', async () => {
+    const uid = await userId(A);
+    await seedLegacy(uid, 'anime', [9]);
+    // Every batch fails (ensureTiers is the only batch GET /api/me runs).
+    const broken = new Proxy(env.DB, {
+      get(t, p) {
+        if (p === 'batch') return async () => { throw new Error('D1_ERROR: simulated'); };
+        const v = Reflect.get(t, p, t);
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+    const res = await as(A, '/api/me', 'GET', undefined, broken);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ email: A });
+    const row = await env.DB.prepare('SELECT tier FROM entries').first<{ tier: number | null }>();
+    expect(row!.tier).toBeNull();
+  });
+
   it('backfill keeps every rating exactly and assigns tier + prior', async () => {
     const uid = await userId(A);
     await seedLegacy(uid, 'anime', DAN);

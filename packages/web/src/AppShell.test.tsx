@@ -138,6 +138,17 @@ describe('app shell', () => {
       expect(screen.getByRole('button', { name: 'Lists' })).toBeInTheDocument();
     });
 
+    it.each(['/compare', '/retier/anime'])('B9: the profile button is in the header on %s (phone)', async (path) => {
+      mockApi(makeMe(), { 'GET /api/ratings/anime': { body: { items: [], comparisons: [] } } });
+      renderApp(path);
+      await screen.findByRole('heading', { level: 1, name: path === '/compare' ? 'Fix my ratings' : 'Re-tier' });
+      await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull()); // the loaded screen, not its skeleton
+      const profile = await screen.findByRole('link', { name: 'Profile' });
+      expect(profile).toHaveAttribute('href', '/profile');
+      expect(profile).toHaveClass('profile-btn');
+      expect(profile.closest('header')).not.toBeNull();
+    });
+
     it.each(['/settings', '/profile'])('the profile button is not on %s (the Lists button is)', async (path) => {
       mockApi(makeMe());
       renderApp(path);

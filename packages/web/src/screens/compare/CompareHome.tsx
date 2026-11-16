@@ -47,7 +47,7 @@ export function CompareHome({
 
   return (
     <div className="screen compare-home">
-      <PageHeader title={HOME_TITLE} sub={sub} backTo="/more" titleRef={heading} />
+      <PageHeader title={HOME_TITLE} sub={sub} backTo="/more" titleRef={heading} profile />
       <div className="screen__body stack-18">
         {!onlyNew && lists.length > 0 && (
           <div className="stack-10">

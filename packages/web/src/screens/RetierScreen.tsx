@@ -243,7 +243,7 @@ function Retier({ set }: { set: RatingSet }) {
 
   return (
     <div className={wide ? 'screen retier retier--wide' : 'screen retier'}>
-      <PageHeader title="Re-tier" sub={labelOf(set)} backTo="/settings" backUsesHistory actions={wide ? saveButton : undefined} />
+      <PageHeader title="Re-tier" sub={labelOf(set)} backTo="/settings" backUsesHistory actions={wide ? saveButton : undefined} profile />
       <div className="screen__body stack-10">
         <p className="compare__sub retier__intro">{RETIER_INTRO}</p>
         <nav aria-label="Lists to re-tier" className="retier__chips">

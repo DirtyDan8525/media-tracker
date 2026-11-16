@@ -243,6 +243,31 @@ describe('Task 10 review fixes', () => {
     await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.4));
   });
 
+  it('a 409 reloads the list before the retry, so a late reload can not overwrite the retry\'s rows', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'other', category: 'anime', rating: 8 })]);
+    let posts = 0;
+    let stored = 8;
+    mockFetch({
+      'POST /api/ratings/anime/save': () => {
+        if (++posts === 1) return { status: 409, body: { error: 'conflict' } };
+        stored = 8.5; // the Worker's re-fit
+        return { body: { items: [], entries: [makeEntry({ id: 'other', category: 'anime', rating: 8.5 })] } };
+      },
+      'GET /api/ratings/anime': { body: setBody },
+      // the reload answers with what the Worker held when it was asked, and slowly
+      'GET /api/entries': async () => {
+        const rating = stored;
+        await new Promise((r) => setTimeout(r, 40));
+        return { body: [makeEntry({ id: 'other', category: 'anime', rating })] };
+      },
+      'GET /api/compare/queue': { body: { items: [] } },
+    });
+    expect(await saveRatings(qc, 'anime', payload)).toBe(true);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.5);
+  });
+
   it('a 409 that fails again still refreshes the list', async () => {
     const qc = makeQueryClient();
     qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'other', category: 'anime', rating: 8 })]);

@@ -32,12 +32,15 @@ interface Setup {
   save?: Handler | MockResponse;
   tabs?: Record<string, boolean>;
   path?: string;
+  /** Answers GET /api/ratings/:set instead of the rows (the n-th call is `n`, from 1). */
+  ratingSet?: (set: string, n: number) => MockResponse;
 }
 
-function setup({ entries, seasons = [], queue = [], ask = 'Both', save, tabs = {}, path = '/compare' }: Setup) {
+function setup({ entries, seasons = [], queue = [], ask = 'Both', save, tabs = {}, path = '/compare', ratingSet }: Setup) {
   const me = makeMe({}, tabs);
   me.settings = { ...me.settings, compareAsk: ask };
   const rows = entries.map((e) => ({ ...e }));
+  let setLoads = 0;
   const calls = mockApi(me, {
     'GET /api/entries': (_b, url) => ({ body: rows.filter((e) => e.category === url.searchParams.get('category')) }),
     'GET /api/compare/queue': () => ({
@@ -45,6 +48,7 @@ function setup({ entries, seasons = [], queue = [], ask = 'Both', save, tabs = {
     }),
     'DELETE /api/compare/queue/:id': { status: 204 },
     'GET /api/ratings/:set': (_b, _u, p) => {
+      if (ratingSet) return ratingSet(p.set!, ++setLoads);
       if (p.set === 'anime_seasons') {
         return { body: { items: seasons.map((s) => setItem({ ...s, title: `Show · ${s.label}`, coverUrl: '', status: null })), comparisons: [] } };
       }
@@ -83,7 +87,7 @@ async function openTier(list: string, tier: string) {
 
 /** Fix my ratings on Anime · Loved: Bebop > Clannad, then Stop: the review. */
 async function fixToReview() {
-  await openTier('Anime (6)', 'Loved 3');
+  await openTier('Anime (6)', 'Loved, 3 titles');
   await userEvent.click(await within(pair()).findByRole('button', { name: 'Bebop, now 9.5' }));
   await screen.findByText('Pick 2');
   await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
@@ -124,6 +128,7 @@ describe('Fix my ratings: home', () => {
     await userEvent.click(within(lists).getByRole('button', { name: 'Anime (6)' }));
     const tiers = await screen.findByRole('group', { name: 'Tiers' });
     expect(within(tiers).getAllByRole('button').map((b) => b.textContent)).toEqual(['All tiers', 'Loved 3', 'Liked 2', 'Fine 1', 'Didn\'t like 0']);
+    expect(within(tiers).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([null, 'Loved, 3 titles', 'Liked, 2 titles', 'Fine, 1 title', 'Didn\'t like, 0 titles']);
     expect(within(lists).getByRole('button', { name: 'Anime (6)' })).toHaveAttribute('aria-pressed', 'true');
 
     // a season tab has no count until opened; then its own tier counts
@@ -148,7 +153,7 @@ describe('Fix my ratings: home', () => {
 describe('Fix my ratings: a session', () => {
   it('fix: asks the two closest titles in the chosen tier; About the same, Skip, Stop, Back; review shows old → new; Save posts the payload', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved 3');
+    await openTier('Anime (6)', 'Loved, 3 titles');
     expect(await screen.findByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
     expect(screen.getByText('Anime · Loved')).toBeInTheDocument();
     expect(screen.getByText('Which do you like more? Tap it.')).toBeInTheDocument();
@@ -186,7 +191,7 @@ describe('Fix my ratings: a session', () => {
 
   it('Belongs in another tier moves the title, the next question changes, and the review shows the tier change', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved 3');
+    await openTier('Anime (6)', 'Loved, 3 titles');
     await screen.findByText('Pick 1');
     const move = screen.getByRole('button', { name: 'Belongs in another tier: Clannad' });
     expect(move).toHaveAttribute('aria-expanded', 'false');
@@ -208,7 +213,7 @@ describe('Fix my ratings: a session', () => {
 
   it('the settledness bar shows checked of total and grows after a pick between neighbours', async () => {
     setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved 3');
+    await openTier('Anime (6)', 'Loved, 3 titles');
     const bar = await screen.findByRole('progressbar', { name: 'Neighbours checked' });
     expect(bar).toHaveAttribute('aria-valuenow', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '2');
@@ -220,7 +225,7 @@ describe('Fix my ratings: a session', () => {
 
   it('nothing left to ask: a one-title tier ends at once with the friendly line', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Fine 1');
+    await openTier('Anime (6)', 'Fine, 1 title');
     expect(await screen.findByText('Nothing left to ask in Anime · Fine. Your order is as settled as your picks make it.')).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -258,7 +263,7 @@ describe('Fix my ratings: a session', () => {
 
   it('keys and swipe still answer (←, →, ↓, S, Backspace; ±80 px)', async () => {
     setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved 3');
+    await openTier('Anime (6)', 'Loved, 3 titles');
     await screen.findByText('Pick 1');
     fireEvent.keyDown(document, { key: 'Backspace' }); // nothing to go back to
     expect(screen.getByText('Pick 1')).toBeInTheDocument();
@@ -296,6 +301,59 @@ describe('Fix my ratings: a session', () => {
     swipe(80, 0); // right: Bebop
     await screen.findByText('Pick 2');
     expect(screen.getByRole('heading', { name: 'Fix my ratings' })).toHaveFocus();
+  });
+});
+
+const LOAD_FAILED = "Couldn't load your ratings. Check your connection and try again.";
+const setReply = (rows: Entry[]): MockResponse => ({ body: { items: rows.map(setItem), comparisons: [] } });
+const setGets = (calls: { method: string; path: string }[]) => calls.filter((c) => c.method === 'GET' && c.path === '/api/ratings/anime').length;
+
+describe('Fix my ratings: more runs', () => {
+  it('a fix run loads the set fresh, not from the chip row\'s cached copy', async () => {
+    const rows = lovedAnime();
+    const changed = rows.map((e) => (e.id === 'Clannad' ? rated('Clannad', 9.45) : e)); // changed on another device
+    const { calls } = setup({ entries: rows, ratingSet: (_s, n) => setReply(n === 1 ? rows : changed) });
+    await openTier('Anime (6)', 'Loved, 3 titles');
+    await screen.findByText('Pick 1');
+    expect(cardNames()).toEqual(['Bebop, now 9.5', 'Clannad, now 9.45']);
+    expect(setGets(calls)).toBe(2);
+  });
+
+  it('All tiers: runs over every tier with their neighbour pairs counted together', async () => {
+    setup({ entries: lovedAnime() });
+    await userEvent.click(await screen.findByRole('button', { name: 'Anime (6)' }));
+    await userEvent.click(await within(await screen.findByRole('group', { name: 'Tiers' })).findByRole('button', { name: 'All tiers' }));
+    expect(await screen.findByText('Anime · All tiers')).toBeInTheDocument();
+    expect(screen.getByText('0 of 3 neighbours checked')).toBeInTheDocument(); // Loved 2 + Liked 1 + Fine 0
+    const first = cardNames();
+    expect(first).toHaveLength(2);
+    await userEvent.click(within(pair()).getAllByRole('button', { name: /, now / })[0]!);
+    await screen.findByText('Pick 2');
+    expect(screen.getByText('1 of 3 neighbours checked')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+  });
+
+  it('a set that fails to load: a toast, and the list and its tiers stay for another try', async () => {
+    const rows = lovedAnime();
+    setup({ entries: rows, ratingSet: (_s, n) => (n === 1 ? setReply(rows) : { status: 500, body: { error: 'boom' } }) });
+    await openTier('Anime (6)', 'Loved, 3 titles');
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Tiers' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
+  });
+
+  it('flipped cards: the left card is the question\'s second title, and it answers "b"', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // below .5: flip
+    setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved, 3 titles');
+    await screen.findByText('Pick 1');
+    expect(cardNames()).toEqual(['Clannad, now 9.4', 'Bebop, now 9.5']); // question order is Bebop, Clannad
+    fireEvent.keyDown(document, { key: 'ArrowLeft' }); // the left card: Clannad
+    await screen.findByText('Pick 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    await screen.findByRole('heading', { name: 'New ratings' });
+    expect(reviewRows()).toEqual([['Clannad', null, '9.4', 'Rating 9.5', 'up'], ['Bebop', null, '9.5', 'Rating 9.4', 'down']]);
   });
 });
 
@@ -362,6 +420,47 @@ describe('placing new ratings', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
     expect(saves(calls)).toEqual([]);
+  });
+});
+
+describe('placing: gating, no tier and failures', () => {
+  const queued = () => [rated('Akira', 9.8), rated('Bebop', 9.5), rated('Clannad', 9.4), rated('Gintama', 9.2), rated('Haikyu', 9.1), rated('Dorohedoro', 8)];
+
+  it('?place= with no tier asks the tier first, then places it', async () => {
+    const { calls, router } = setup({ entries: [...queued(), unrated('Zed')], path: '/compare?place=Zed' });
+    expect(await screen.findByRole('heading', { name: 'Which tier is Zed in?' })).toBeInTheDocument();
+    expect(screen.getByText('Anime · 1 of 1 with no score')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('group', { name: 'Tier' })).getByRole('button', { name: 'Loved · 9–10' }));
+    expect(await screen.findByText(/^Placing Zed · pick 1 of about 3/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save new ratings' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(saves(calls)).toEqual([{ picks: [], moves: [{ id: 'Zed', tier: 3 }], done: ['Zed'] }]);
+  });
+
+  it('?place= works when Ask is Only for new ratings', async () => {
+    setup({ entries: queued(), ask: 'Only for new ratings', path: '/compare?place=Bebop' });
+    expect(await screen.findByText('Placing Bebop · pick 1 of about 3')).toBeInTheDocument();
+  });
+
+  it('?place= does nothing when Ask is Only when I start it (Q15): the home shows', async () => {
+    const { calls } = setup({ entries: queued(), ask: 'Only when I start it', path: '/compare?place=Bebop' });
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Place it' })).not.toBeInTheDocument();
+    expect(setGets(calls)).toBe(0);
+  });
+
+  it('?place= whose set fails to load: a toast and back to its list', async () => {
+    const { router } = setup({ entries: queued(), path: '/compare?place=Bebop', ratingSet: () => ({ status: 500, body: { error: 'boom' } }) });
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+  });
+
+  it('offline with a queue: one load attempt, one toast, then home (not one per title)', async () => {
+    const { calls } = setup({ entries: queued(), queue: ['Bebop', 'Gintama', 'Haikyu'], ratingSet: () => ({ status: 500, body: { error: 'boom' } }) });
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(setGets(calls)).toBe(1);
   });
 });
 

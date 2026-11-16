@@ -54,7 +54,8 @@ async function withConflictRetry<T>(qc: QueryClient, set: RatingSet, run: () => 
   } catch (err) {
     if (!isConflict(err)) throw err;
     // Another device changed the set: its rows in the list are stale too, whatever the retry does.
-    void refreshCategories(qc, [listOfSet(set)]);
+    // Wait for the reload: one that landed after the retry would overwrite the Worker's new rows.
+    await refreshCategories(qc, [listOfSet(set)]);
     try {
       await qc.fetchQuery({ queryKey: ratingSetKey(set), queryFn: () => loadSet(set), staleTime: 0 });
     } catch {

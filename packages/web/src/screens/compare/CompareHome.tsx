@@ -108,7 +108,9 @@ function TierChipRow({ tiers, onTier, onRetry }: { tiers: TierChips; onTier(t: T
     <div role="group" aria-label="Tiers" className="cmp-chips">
       <Button variant="chip" onClick={() => onTier(null)}>All tiers</Button>
       {TIERS_TOP_FIRST.map((t) => (
-        <Button key={t} variant="chip" onClick={() => onTier(t)}>{tiers.names[t]} {counts[t]}</Button>
+        <Button key={t} variant="chip" aria-label={`${tiers.names[t]}, ${counts[t]} ${counts[t] === 1 ? 'title' : 'titles'}`} onClick={() => onTier(t)}>
+          {tiers.names[t]} {counts[t]}
+        </Button>
       ))}
     </div>
   );

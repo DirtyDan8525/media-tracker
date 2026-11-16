@@ -41,6 +41,27 @@ describe('PairView', () => {
     expect(bar).toHaveAttribute('aria-valuenow', '18');
     expect(bar).toHaveAttribute('aria-valuemax', '40');
     expect(screen.getByText('18 of 40 neighbours checked')).toBeInTheDocument();
+    expect(bar).toHaveAttribute('aria-valuetext', '18 of 40 neighbours checked');
+  });
+
+  it('settledness 0 of 0: the bar is full and says the same as the text', () => {
+    renderPair({ settled: { checked: 0, total: 0 } });
+    expect(screen.getByText('0 of 0 neighbours checked')).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar', { name: 'Neighbours checked' });
+    expect(bar).toHaveAttribute('aria-valuenow', '1');
+    expect(bar).toHaveAttribute('aria-valuemax', '1');
+    expect(bar).toHaveAttribute('aria-valuetext', '0 of 0 neighbours checked');
+  });
+
+  it('a polite live region announces each new pair', () => {
+    const props = { heading: 'Fix my ratings', aId: 'X', canBack: true, onAnswer: vi.fn(), onBack: vi.fn(), onMove: vi.fn(), wide: false, tierNames: NAMES, tierRanges: RANGES };
+    const { rerender } = render(<PairView {...props} left={Y} right={X} progress="Pick 1" />);
+    const live = screen.getByRole('status');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toHaveTextContent('Y or X. Pick 1');
+    const Z = item('Z', 8);
+    rerender(<PairView {...props} left={X} right={Z} progress="Pick 2" />);
+    expect(screen.getByRole('status')).toHaveTextContent('X or Z. Pick 2');
   });
 
   it('maps the flipped cards back to the question: left (= b) answers "b", right (= a) answers "a"', async () => {
@@ -136,5 +157,29 @@ describe('PairView', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(b).toHaveFocus();
     expect(b).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('Tab closes the menu (focus moves on as usual)', async () => {
+    renderPair();
+    const b = screen.getByRole('button', { name: 'Belongs in another tier: X' });
+    await userEvent.click(b);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getAllByRole('menuitem')[0]!, { key: 'Tab' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(b).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('a press outside the menu closes it; a press on its own button is that button\'s toggle', async () => {
+    const { onAnswer } = renderPair();
+    const b = screen.getByRole('button', { name: 'Belongs in another tier: X' });
+    await userEvent.click(b);
+    fireEvent.pointerDown(screen.getByText('Which do you like more? Tap it.'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(onAnswer).not.toHaveBeenCalled();
+    // pressing the opener again toggles it closed once, not closed-then-open
+    await userEvent.click(b);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    await userEvent.click(b);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 });

@@ -130,10 +130,10 @@ export function useRatingFlow(opts: { place?: string; random?: () => number; onP
     const latest = (c: Category): Entry[] => ctx.current.qc.getQueryData<Entry[]>(entriesKey(c)) ?? ctx.current.data[c] ?? [];
     const ask = () => ctx.current.me.settings.compareAsk;
 
-    const goHome = (afterQueue: boolean) => {
+    const goHome = (afterQueue: boolean, chosen: RatingSet | null = null) => {
       st.gen++;
       st.run = null;
-      st.mode = { kind: 'home', afterQueue, chosen: null };
+      st.mode = { kind: 'home', afterQueue, chosen };
       rerender();
     };
 
@@ -177,7 +177,11 @@ export function useRatingFlow(opts: { place?: string; random?: () => number; onP
         if (!item) return onGone();
         const mode = item.tier === null ? { kind: 'unrated' as const, ids: [item.id] } : { kind: 'place' as const, ids: [item.id] };
         begin(kind, q.category, data, null, mode, q.entryId);
-      }, onGone);
+      }, () => {
+        // A set that won't load (offline) would fail for every queued title too: one toast, not one each.
+        st.queue = [];
+        onGone();
+      });
     };
 
     const placeQueue = (): void => {
@@ -216,7 +220,8 @@ export function useRatingFlow(opts: { place?: string; random?: () => number; onP
       init(queueItems: QueueItem[]) {
         if (ask() === 'Off') { st.mode = { kind: 'off' }; rerender(); return; }
         const place = ctx.current.opts.place;
-        if (place) {
+        // "Place it" follows Ask to compare (Q15): a stale ?place= link must not override Only when I start it.
+        if (place && (ask() === 'Both' || ask() === 'Only for new ratings')) {
           for (const c of ctx.current.lists) {
             if (latest(c).some((e) => e.id === place)) return placeEntry({ entryId: place, category: c }, 'place', () => leavePlaceFor(c));
           }
@@ -237,10 +242,10 @@ export function useRatingFlow(opts: { place?: string; random?: () => number; onP
       },
       chooseTier(t: Tier | null) {
         if (st.mode.kind !== 'home' || st.mode.chosen === null) return;
-        const set = st.mode.chosen, data = ctx.current.chosenData;
-        if (!data) return;
-        st.gen++;
-        begin('fix', set, data, t, { kind: 'fix', tier: t });
+        // The chip row's copy may be up to 30 s old: a run starts from the set as the Worker has it now.
+        const set = st.mode.chosen;
+        if (!ctx.current.chosenData) return;
+        void load(set, (data) => begin('fix', set, data, t, { kind: 'fix', tier: t }), () => goHome(false, set));
       },
       retryTiers() {
         if (st.mode.kind === 'home' && st.mode.chosen) void ctx.current.qc.refetchQueries({ queryKey: ratingSetKey(st.mode.chosen) });
@@ -373,7 +378,7 @@ export function useRatingFlow(opts: { place?: string; random?: () => number; onP
       const names = tiersFor(me.settings, chosenSet_).names;
       const data = chosenSet.data;
       const counts = data ? ([0, 1, 2, 3] as Tier[]).map((t) => data.items.filter((i) => i.tier === t).length) : null;
-      tiers = { names, counts: chosenSet.isError ? null : counts, failed: chosenSet.isError && !data };
+      tiers = { names, counts, failed: chosenSet.isError && !data };
     }
     return { kind: 'home', afterQueue, lists: homeLists, unrated, onlyNew, chosen: chosenSet_, tiers };
   }

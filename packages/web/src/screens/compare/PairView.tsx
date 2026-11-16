@@ -69,10 +69,14 @@ export function PairView({
 
   // A new question remounts the cards (they slide in again) and screen readers hear its heading.
   const qKey = `${left.id}|${right.id}|${progress}`;
+  // The heading is the same on every question, so a polite live region says what is new.
+  const [announce, setAnnounce] = useState('');
   useEffect(() => {
     setMenuFor(null);
     headingRef.current?.focus();
+    setAnnounce(`${left.title} or ${right.title}. ${progress}`);
   }, [qKey]);
+  const settledText = settled ? `${settled.checked} of ${settled.total} neighbours checked` : '';
 
   const latest = useRef({ side, onAnswer, onBack, canBack });
   latest.current = { side, onAnswer, onBack, canBack };
@@ -158,11 +162,12 @@ export function PairView({
         <div className="compare__settled">
           {/* With nothing to check the order is as settled as it gets: a full bar. */}
           {settled.total > 0
-            ? <ProgressBar label="Neighbours checked" value={settled.checked} max={settled.total} />
-            : <ProgressBar label="Neighbours checked" value={1} max={1} />}
-          <span>{settled.checked} of {settled.total} neighbours checked</span>
+            ? <ProgressBar label="Neighbours checked" value={settled.checked} max={settled.total} valueText={settledText} />
+            : <ProgressBar label="Neighbours checked" value={1} max={1} valueText={settledText} />}
+          <span>{settledText}</span>
         </div>
       )}
+      <span className="sr-only" role="status" aria-live="polite">{announce}</span>
       <span className="compare__sub">Which do you like more? {wide ? 'Click it.' : 'Tap it.'}</span>
       <div role="group" aria-label="Pick the better one" className="duel"
         onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { down.current = null; }}>

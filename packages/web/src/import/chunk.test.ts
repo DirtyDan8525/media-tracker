@@ -9,10 +9,10 @@ const row = (i: number, seasons = 0): ImportRow => ({
 const seasonsOf = (c: ImportRow[]) => c.reduce((n, r) => n + (r.seasons?.length ?? 0), 0);
 
 describe('chunkRows', () => {
-  it('splits 400 rows into requests of at most 180 rows, in order', () => {
+  it('splits 400 rows into requests of at most 150 rows, in order', () => {
     const rows = Array.from({ length: 400 }, (_, i) => row(i));
     const chunks = chunkRows(rows);
-    expect(chunks.map((c) => c.length)).toEqual([180, 180, 40]);
+    expect(chunks.map((c) => c.length)).toEqual([150, 150, 100]);
     expect(chunks.flat()).toEqual(rows);
   });
 

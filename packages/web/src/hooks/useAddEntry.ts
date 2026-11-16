@@ -107,7 +107,7 @@ export function useAddEntry(category: Category) {
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
       rating: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
-      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, createdAt: now, updatedAt: now,
+      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
     };
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });

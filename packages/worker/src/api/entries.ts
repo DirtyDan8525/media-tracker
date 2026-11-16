@@ -5,6 +5,7 @@ import {
   type Category,
   type Entry,
   type Season,
+  type Tier,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 import { enqueueStatements } from './compare';
@@ -19,16 +20,18 @@ const notFound = { error: 'not_found' } as const;
 const noSeasons = { error: 'no_seasons' } as const;
 
 // Database row (snake_case) shapes.
-interface EntryRow {
+export interface EntryRow {
   id: string; user_id: string; category: Category; title: string; typed_title: string;
   status: Entry['status']; rating: number | null; genres: string; creator: string; album: string;
   cover_url: string; notes: string; release_date: string; synopsis: string; length_label: string;
   origin: string; details_state: Entry['detailsState']; is_private: number; notes_private: number;
   source: Entry['source']; source_id: string | null; lookup_state: Entry['lookupState'];
   import_id: string | null; season_avg: number | null; created_at: string; updated_at: string;
+  tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
 }
-interface SeasonRow {
+export interface SeasonRow {
   id: string; entry_id: string; label: string; rating: number | null; notes: string; created_at: string;
+  tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -59,13 +62,20 @@ export function rowToEntry(r: EntryRow): Entry {
     lookupState: r.lookup_state,
     importId: r.import_id,
     seasonAvg: r.season_avg === null || r.season_avg === undefined ? null : round2(r.season_avg),
+    tier: r.tier,
+    priorMean: r.prior_mean,
+    strength: r.strength,
+    scoreLocked: r.score_locked === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
 
 export function rowToSeason(r: SeasonRow): Season {
-  return { id: r.id, entryId: r.entry_id, label: r.label, rating: r.rating, notes: r.notes };
+  return {
+    id: r.id, entryId: r.entry_id, label: r.label, rating: r.rating, notes: r.notes,
+    tier: r.tier, priorMean: r.prior_mean, strength: r.strength, scoreLocked: r.score_locked === 1,
+  };
 }
 
 export const ENTRY_SELECT = `SELECT e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg FROM entries e`;
@@ -212,7 +222,10 @@ entries.post('/entries/:id/seasons', async (c) => {
   const v = validateSeasonInput(await readJson(c.req.raw));
   if (!v.ok) return c.json(invalid, 400);
 
-  const season: Season = { id: crypto.randomUUID(), entryId, label: '', rating: null, notes: '', ...v.value };
+  const season: Season = {
+    id: crypto.randomUUID(), entryId, label: '', rating: null, notes: '',
+    tier: null, priorMean: null, strength: null, scoreLocked: false, ...v.value,
+  };
   await c.env.DB.prepare(
     'INSERT INTO seasons (id, entry_id, label, rating, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
   )

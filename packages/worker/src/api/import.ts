@@ -8,10 +8,12 @@ import {
   IMPORT_SEASON_PARAMS,
   SEASONS_PER_STATEMENT,
   importStatementCount,
+  tiersFor,
   type Category,
   type ImportRow,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
+import { tierFieldsFor } from '../ratings/store';
 import { CATEGORIES, validateEntryInput, validateSeasonInput } from './entryValidation';
 
 export const importApi = new Hono<AppEnv>();
@@ -74,7 +76,14 @@ const placeholders = (params: number, rows: number, literalTail = '') =>
   Array.from({ length: rows }, () => `(${Array(params).fill('?').join(', ')}${literalTail})`).join(', ');
 
 const ENTRY_COLS =
-  'id, user_id, category, title, typed_title, status, rating, genres, creator, album, cover_url, notes, lookup_state, import_id, created_at, updated_at';
+  'id, user_id, category, title, typed_title, status, rating, genres, creator, album, cover_url, notes, lookup_state, import_id, created_at, updated_at, tier, prior_mean, strength';
+
+/** tier, prior_mean, strength for an imported rating (spec §5.5): its list's tier, shown score unchanged. */
+const tierCols = (rating: number | null, settings: AppEnv['Variables']['user']['settings'], category: Category) => {
+  if (rating === null) return [null, null, null];
+  const f = tierFieldsFor(rating, tiersFor(settings, category));
+  return [f.tier, f.priorMean, f.strength];
+};
 
 // 1 lookup + 1 batch (<= 46 statements). All-or-nothing.
 importApi.post('/', async (c) => {
@@ -140,16 +149,18 @@ importApi.post('/', async (c) => {
   const now = new Date(baseMs).toISOString();
   const entryVals: unknown[][] = [];
   const seasonVals: unknown[][] = [];
+  const settings = c.var.user.settings;
   clean.forEach((r) => {
     const id = crypto.randomUUID();
     entryVals.push([
       id, userId, r.category, r.title, r.title, r.status, r.rating, r.genres, r.creator, r.album,
-      r.coverUrl, r.notes, r.coverUrl ? 'ok' : 'not_found', importId, now, now,
+      r.coverUrl, r.notes, r.coverUrl ? 'ok' : 'not_found', importId, now, now, ...tierCols(r.rating, settings, r.category),
     ]);
     for (const s of r.seasons) {
       // Distinct created_at keeps the sheet's season order (seasons list by created_at).
       const at = new Date(baseMs + seasonVals.length).toISOString();
-      seasonVals.push([crypto.randomUUID(), id, s.label, s.rating, s.notes, at]);
+      // Seasons use their parent list's tiers (Ruling Q4).
+      seasonVals.push([crypto.randomUUID(), id, s.label, s.rating, s.notes, at, ...tierCols(s.rating, settings, r.category)]);
     }
   });
 
@@ -174,7 +185,7 @@ importApi.post('/', async (c) => {
     const part = seasonVals.slice(i, i + SEASONS_PER_STATEMENT);
     stmts.push(
       db
-        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
+        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at, tier, prior_mean, strength) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
         .bind(...(part.flat() as never[])),
     );
   }

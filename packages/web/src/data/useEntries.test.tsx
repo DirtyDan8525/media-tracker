@@ -12,7 +12,7 @@ function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {
     id, userId: 'u1', category: 'anime', title: id, typedTitle: id, status: null, rating: 9, genres: '', creator: '',
     album: '', coverUrl: '', notes: '', releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none',
-    isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null,
+    isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false,
     createdAt: '', updatedAt: '', ...over,
   };
 }

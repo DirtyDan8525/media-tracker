@@ -8,6 +8,7 @@ import {
   type UserSettings,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
+import { ensureTiers } from '../ratings/store';
 
 export const me = new Hono<AppEnv>();
 
@@ -87,8 +88,10 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-me.get('/', (c) => {
+// 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10)
+me.get('/', async (c) => {
   const { id, email, username, isAdmin, settings } = c.var.user;
+  await ensureTiers(c.env.DB, id, settings);
   return c.json({ id, email, username, isAdmin, settings });
 });
 

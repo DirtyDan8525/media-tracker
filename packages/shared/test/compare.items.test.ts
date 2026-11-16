@@ -5,7 +5,7 @@ let n = 0;
 const entry = (category: Category, title: string, rating: number | null, status: Status | null = null): Entry => ({
   id: `e${++n}`, userId: 'u', category, title, typedTitle: title, status, rating, genres: '', creator: '', album: '',
   coverUrl: `https://img/${n}.jpg`, notes: '', releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none',
-  isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null,
+  isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false,
   createdAt: '', updatedAt: '',
 });
 

@@ -12,7 +12,9 @@ const frieren = (over: Partial<Entry> = {}) => makeEntry({
   releaseDate: '2023-09-29', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023', synopsis: 'An elf outlives her party.',
   coverUrl: 'https://img.example/f.jpg', notes: 'so good', source: 'anilist', sourceId: '154587', ...over,
 });
-const season = (over: Partial<Season>): Season => ({ id: 's', entryId: 'f1', label: '', rating: null, notes: '', ...over });
+const season = (over: Partial<Season>): Season => ({
+  id: 's', entryId: 'f1', label: '', rating: null, notes: '', tier: null, priorMean: null, strength: null, scoreLocked: false, ...over,
+});
 const patches = (calls: { method: string; path: string; body: unknown }[], id = 'f1') =>
   calls.filter((c) => c.method === 'PATCH' && c.path === `/api/entries/${id}`).map((c) => c.body as Record<string, unknown>);
 

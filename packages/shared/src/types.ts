@@ -1,4 +1,4 @@
-import type { TierSet } from './ratings/types';
+import type { Tier, TierSet } from './ratings/types';
 
 export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books';
 
@@ -89,6 +89,14 @@ export interface Entry {
   lookupState: 'ok' | 'not_found' | 'pending';
   importId: string | null;
   seasonAvg: number | null;
+  /** Rating tier (null when unrated). Stored explicitly; never re-derived from an unchanged rating. */
+  tier: Tier | null;
+  /** Where the title starts inside its tier (a strength); null when unrated. */
+  priorMean: number | null;
+  /** The last fitted strength (= priorMean with no counted picks); null when unrated. */
+  strength: number | null;
+  /** A locked score shows exactly the typed number and still counts as an opponent. */
+  scoreLocked: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +107,10 @@ export interface Season {
   label: string;
   rating: number | null;
   notes: string;
+  tier: Tier | null;
+  priorMean: number | null;
+  strength: number | null;
+  scoreLocked: boolean;
 }
 
 export interface CategoryConfig {

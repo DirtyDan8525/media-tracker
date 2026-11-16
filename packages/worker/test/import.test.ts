@@ -4,19 +4,20 @@ import { app } from '../src/index';
 import { IMPORT_CHUNK_ROWS, IMPORT_CHUNK_SEASONS, importStatementCount } from '../src/api/import';
 import { D1_MAX_QUERIES } from '../src/env';
 import type { Env } from '../src/env';
-import type { Entry, ImportRow } from '@media-tracker/shared';
+import { DEFAULT_TIERS, priorFromScore, tierRange, type Entry, type ImportRow, type Season, type TierSet } from '@media-tracker/shared';
+import { spyD1 } from './d1spy';
 
 const A = 'a@example.com';
 const B = 'b@example.com';
 
-const as = (email: string, path: string, method = 'GET', body?: unknown) =>
+const as = (email: string, path: string, method = 'GET', body?: unknown, db: D1Database = env.DB) =>
   app.fetch(
     new Request(`https://app.test${path}`, {
       method,
       headers: { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-    { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env,
+    { ...env, DB: db, ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env,
   );
 
 const row = (i: number, extra: Partial<ImportRow> = {}): ImportRow => ({
@@ -227,5 +228,66 @@ describe('DELETE /api/import/:id', () => {
     expect(await count('SELECT COUNT(*) n FROM entries')).toBe(2);
     expect((await as(A, `/api/import/${crypto.randomUUID()}`, 'DELETE')).status).toBe(404);
     expect((await as(A, '/api/import/zzz', 'DELETE')).status).toBe(404);
+  });
+});
+
+describe('import and rating tiers', () => {
+  const DAN = [10, 9.97, 9.9, 9, 8.99, 8.25, 7.5, 7.49, 6, 5.99, 0.5, 0];
+
+  it('import writes tier, prior and strength; rating unchanged', async () => {
+    const id = crypto.randomUUID();
+    const rows = [
+      ...DAN.map((rating, i) => row(i, { category: 'anime', title: `A${i}`, rating })),
+      row(99, { category: 'anime', title: 'Unrated', rating: null,
+        seasons: [{ label: 'S1', rating: 8.25, notes: '' }, { label: 'S2', rating: 9.97, notes: '' }, { label: 'S3', rating: null, notes: '' }] }),
+    ];
+    expect((await post(A, id, rows)).status).toBe(200);
+    const spy = spyD1(env.DB);
+    // Nothing for the backfill to do: import already set the tiers (sign-in + 2 SELECTs).
+    await as(A, '/api/me', 'GET', undefined, spy.db);
+    expect(spy.queries).toBe(3);
+
+    const list = (await (await as(A, '/api/entries?category=anime')).json()) as Entry[];
+    const rated = list.filter((e) => e.title !== 'Unrated');
+    expect(rated.map((e) => e.rating)).toEqual(DAN);
+    expect(rated.map((e) => e.tier)).toEqual([3, 3, 3, 3, 2, 2, 2, 1, 1, 0, 0, 0]);
+    for (const e of rated) {
+      expect(e.priorMean).toBe(priorFromScore(e.rating!, tierRange(DEFAULT_TIERS, e.tier!)));
+      expect(e.strength).toBe(e.priorMean);
+      expect(e.scoreLocked).toBe(false);
+    }
+    const u = list.find((e) => e.title === 'Unrated')!;
+    expect(u).toMatchObject({ rating: null, tier: null, priorMean: null, strength: null, scoreLocked: false });
+    const seasons = (await (await as(A, `/api/entries/${u.id}/seasons`)).json()) as Season[];
+    expect(seasons.map((s) => [s.rating, s.tier, s.scoreLocked])).toEqual([[8.25, 2, false], [9.97, 3, false], [null, null, false]]);
+    expect(seasons[0]!.priorMean).toBe(priorFromScore(8.25, [7.5, 9]));
+    expect(seasons[0]!.strength).toBe(seasons[0]!.priorMean);
+  });
+
+  it("uses the importing user's own tiers for the list (and its seasons)", async () => {
+    await as(A, '/api/compare/queue');
+    const anime: TierSet = { names: ['D', 'F', 'Li', 'Lo'], bounds: [5, 7, 8.5] };
+    await env.DB.prepare("UPDATE users SET settings_json = json_set(settings_json, '$.tiers', json(?)) WHERE email = ?")
+      .bind(JSON.stringify({ anime }), A).run();
+    await post(A, crypto.randomUUID(), [
+      row(1, { category: 'anime', title: 'X', rating: 8.6, seasons: [{ label: 'S1', rating: 6.5, notes: '' }] }),
+      row(2, { category: 'movies', title: 'Y', rating: 8.6 }),
+    ]);
+    const list = (await (await as(A, '/api/entries')).json()) as Entry[];
+    const x = list.find((e) => e.title === 'X')!;
+    expect(x).toMatchObject({ rating: 8.6, tier: 3, priorMean: priorFromScore(8.6, [8.5, 10]) });
+    expect(list.find((e) => e.title === 'Y')).toMatchObject({ rating: 8.6, tier: 2, priorMean: priorFromScore(8.6, [7.5, 9]) });
+    const seasons = (await (await as(A, `/api/entries/${x.id}/seasons`)).json()) as Season[];
+    expect(seasons[0]).toMatchObject({ rating: 6.5, tier: 1, priorMean: priorFromScore(6.5, [5, 7]) });
+  });
+
+  it('a full chunk stays within 100 bound params per statement', async () => {
+    const seasons = Array.from({ length: IMPORT_CHUNK_SEASONS }, (_, i) => ({ label: `S${i}`, rating: 5, notes: '' }));
+    const rows = Array.from({ length: IMPORT_CHUNK_ROWS }, (_, i) => row(i, { category: 'anime', seasons: i === 0 ? seasons : undefined }));
+    const spy = spyD1(env.DB);
+    const res = await as(A, '/api/import', 'POST', { importId: crypto.randomUUID(), rows }, spy.db);
+    expect(res.status).toBe(200);
+    expect(spy.maxParams).toBeLessThanOrEqual(100);
+    expect(spy.queries).toBeLessThanOrEqual(D1_MAX_QUERIES);
   });
 });

@@ -39,3 +39,10 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
     - Tiers vanish from the UI (no Loved/Liked chips, no tier editor, no Re-tier review, no locks). They can stay inside the math.
     - The Compare tab goes; an optional **"Sharpen my ratings"** in More asks only about close pairs, one list at a time, with a simple "Done".
     - Settings: one switch "Ask me to compare close ratings" (on by default).
+
+## Plan to watch (Dan, 2026-11-16)
+15. A small **"Plan to watch" toggle** at the top of each list, next to the filters. On: the list shows only planned titles; off: as now.
+    - Planned titles **don't need a rating** (no rating field or close-call question while Planned).
+    - The planned view has **its own order**: drag to rearrange (with a handle; keyboard and "Move up/down" alternatives for accessibility), so the top is what's next. Saved per list on the server; new planned titles go to the bottom.
+    - A friend's recommendation can be saved straight into Plan to watch.
+16. **Filters take too much room on phones:** shrink the filter area (e.g. one compact row: search + "Filters" button opening a sheet, with active filters as small chips).

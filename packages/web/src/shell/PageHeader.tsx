@@ -1,6 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { Icon, type IconName } from '../design/components/Icon';
+import { useIsWide } from '../hooks';
 import { BackButton } from './BackButton';
 import { ProfileButton } from './ProfileButton';
 
@@ -30,9 +31,12 @@ export interface PageHeaderProps {
 
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
 export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef, className, icon, profile }: PageHeaderProps) {
+  const wide = useIsWide();
   const h1 = <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="page-title">{title}</h1>;
-  const end = (actions || profile) && (
-    <div className="page-header__actions">{actions}{profile && <ProfileButton />}</div>
+  // ProfileButton is phone-only: on PC a header with no other actions gets no (empty) actions box.
+  const showProfile = profile && !wide;
+  const end = (actions || showProfile) && (
+    <div className="page-header__actions">{actions}{showProfile && <ProfileButton />}</div>
   );
   if (icon) {
     // The band is the header itself; the sub-line and chips follow it on Background.

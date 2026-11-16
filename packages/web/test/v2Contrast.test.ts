@@ -157,6 +157,20 @@ describe('v2 contrast', () => {
     });
   });
 
+  // The current list's check icon (Highlight on the see-through menu) is non-text: >= 3:1 (WCAG 1.4.11).
+  describe('Lists menu check icon', () => {
+    const alpha = tokenNum('--see-through');
+    const ROLE: Record<string, string> = { text: 'Text', 'bright-text': 'Bright text', highlight: 'Highlight' };
+    it.each(NAMES)('%s: the check icon is >= 3:1 on Cards at --see-through over #ffffff and #000000, and on opaque Cards', (name) => {
+      const role = ROLE[/var\(--([\w-]+)\)/.exec(decls('.lists-menu__check').color ?? '')?.[1] ?? ''];
+      expect(role, 'check colour is a theme role').toBeDefined();
+      const t = THEMES[name]!;
+      for (const under of [t.Cards!, over(t.Cards!, alpha, '#ffffff'), over(t.Cards!, alpha, '#000000')]) {
+        expect(contrast(t[role!]!, under), `${name} ${role} on ${under}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
   // B22: the themed bar is Header row; its title and icon use barTextColor (CSS: --bar-text).
   describe('themed list bar', () => {
     it('the bar is Header row and its title and icon use --bar-text', () => {

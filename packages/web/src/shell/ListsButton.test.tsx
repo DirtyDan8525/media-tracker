@@ -100,11 +100,60 @@ describe('Lists button (phone)', () => {
     expect(router.state.location.pathname).toBe('/list/anime');
   });
 
+  it('stays open while focus moves between the menu and its button, and closes when focus leaves both', async () => {
+    fakeBackend();
+    renderApp('/list/anime');
+    const button = await listsButton();
+    await userEvent.click(button);
+    const nav = screen.getByRole('navigation', { name: 'Lists' });
+    const links = within(nav).getAllByRole('link');
+    // Tab from the last list to the button: still open.
+    links[links.length - 1]!.focus();
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+    expect(screen.getByRole('navigation', { name: 'Lists' })).toBeInTheDocument();
+    // Tab on from the button into the bottom bar: closed.
+    await userEvent.tab();
+    expect(button).not.toHaveFocus();
+    expect(screen.queryByRole('navigation', { name: 'Lists' })).not.toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('not rendered on /entry/:id', async () => {
     fakeBackend({ entries: [makeEntry({ id: 'e-1', title: 'Frieren' })] });
     renderApp('/entry/e-1');
     expect(await screen.findByRole('heading', { level: 1, name: 'Frieren' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument();
+  });
+
+  // Toasts clear the 56 px Lists button only while it is on screen (Task 7 review).
+  describe('toast clearance', () => {
+    const lifted = () => document.documentElement.classList.contains('has-lists-fab');
+
+    it('is on while the Lists button shows, off on /entry/:id', async () => {
+      fakeBackend({ entries: [makeEntry({ id: 'e-1', title: 'Frieren' })] });
+      const { router } = renderApp('/list/anime');
+      await listsButton();
+      expect(lifted()).toBe(true);
+      await router.navigate('/entry/e-1');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Frieren' })).toBeInTheDocument();
+      expect(lifted()).toBe(false);
+    });
+
+    it('is off with every list turned off', async () => {
+      fakeBackend({ me: makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false }) });
+      renderApp('/more');
+      await screen.findByRole('heading', { level: 1, name: 'More' });
+      expect(lifted()).toBe(false);
+    });
+
+    it('is off on PC', async () => {
+      setViewportWidth(1280);
+      fakeBackend();
+      renderApp('/list/anime');
+      await screen.findByRole('heading', { level: 1, name: 'Anime' });
+      expect(lifted()).toBe(false);
+    });
   });
 
   it('PC has no Lists button (the side nav lists them)', async () => {

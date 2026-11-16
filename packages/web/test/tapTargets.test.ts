@@ -115,3 +115,27 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     expect(afterExtent('.cell-btn')).toBeGreaterThan(0);
   });
 });
+
+// Task 7 review: in iPhone landscape the notch / curved corners sit at the sides, so the phone's
+// fixed nav pieces keep clear of them with the left/right safe-area insets.
+describe('phone nav keeps clear of the side safe areas', () => {
+  const body = (sel: string) => rules(sel).join(';');
+  it('.lists-fab and .lists-menu add env(safe-area-inset-right) to right', () => {
+    for (const sel of ['.lists-fab', '.lists-menu']) {
+      expect(body(sel), sel).toMatch(/(?:^|;)\s*right:\s*calc\([^;]*env\(safe-area-inset-right\)/);
+    }
+  });
+  it('.bottom-tabs pads by env(safe-area-inset-left) and env(safe-area-inset-right)', () => {
+    expect(body('.bottom-tabs')).toMatch(/padding-left:\s*env\(safe-area-inset-left\)/);
+    expect(body('.bottom-tabs')).toMatch(/padding-right:\s*env\(safe-area-inset-right\)/);
+  });
+});
+
+// Task 7 review: toasts clear the 56 px Lists button only while it shows (ListsButton puts
+// .has-lists-fab on <html>); otherwise they sit just above the bottom bar.
+it('the toast region lifts above the Lists button only under .has-lists-fab', () => {
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const base = /(?:^|\})\s*\.toast-region\s*\{([^}]*)\}/.exec(plain)![1]!;
+  expect(base).not.toMatch(/56px/);
+  expect(plain).toMatch(/\.has-lists-fab \.toast-region\s*\{[^}]*bottom:[^;}]*56px/);
+});

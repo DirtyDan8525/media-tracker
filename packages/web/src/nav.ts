@@ -42,9 +42,15 @@ export const ADD_NOUN: Record<Category, string> = {
   anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book',
 };
 
-/** B3: the bottom bar's Add opens the current list's Add sheet through this URL (ListScreen strips `add`). */
-export function addPath(c: Category): string {
-  return `/list/${c}?add=1`;
+/**
+ * B3: the bottom bar's Add opens the current list's Add sheet through this URL (ListScreen strips `add`).
+ * `keep`: the list's own query (Status, Genre, …) when Add is used on that list, so its filters survive.
+ */
+export function addPath(c: Category, keep?: URLSearchParams | string): string {
+  const p = new URLSearchParams(keep);
+  p.delete('add');
+  p.append('add', '1');
+  return `/list/${c}?${p.toString()}`;
 }
 
 /** Global search (`/search?q=`). */

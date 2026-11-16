@@ -13,13 +13,13 @@ const MORE_PATHS = ['/more', '/import', '/about', '/top5', '/stats'];
  * Add opens the current list's Add sheet (B3); with no list on there is no Add (an empty cell).
  */
 export function BottomTabs({ current, compareCount }: { current: Category | null; compareCount: number }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const moreCurrent = MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const onCurrentList = current !== null && pathname === `/list/${current}`;
   return (
     <nav aria-label="Main" className="bottom-tabs">
       {current ? (
-        <Link to={addPath(current)} replace={onCurrentList} className="bottom-tabs__item" aria-label={`Add ${ADD_NOUN[current]}`}>
+        <Link to={addPath(current, onCurrentList ? search : undefined)} replace={onCurrentList} className="bottom-tabs__item" aria-label={`Add ${ADD_NOUN[current]}`}>
           <Icon name="plus" size={22} />
           <span>Add</span>
         </Link>

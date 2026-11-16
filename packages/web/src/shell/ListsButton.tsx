@@ -4,6 +4,9 @@ import { Link, useLocation } from 'react-router';
 import { Icon } from '../design/components/Icon';
 import { LIST_LABEL } from '../nav';
 
+/** On <html> while the Lists button shows, so toasts clear it. */
+export const FAB_CLASS = 'has-lists-fab';
+
 /**
  * B5 (ListsMenu board): the round floating button (bottom right, above the bar) that opens the
  * see-through Lists menu just above it: every enabled list with its icon and cached count, the
@@ -43,12 +46,21 @@ export function ListsButton({ lists, current, counts }: {
   // A route change (a list picked, Back) closes it.
   useEffect(() => setOpen(false), [pathname]);
 
-  if (lists.length === 0 || pathname.startsWith('/entry/')) return null;
+  const shown = lists.length > 0 && !pathname.startsWith('/entry/');
+  // Toasts lift above the button only while it is on screen (components.css `.has-lists-fab`).
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.classList.add(FAB_CLASS);
+    return () => root.classList.remove(FAB_CLASS);
+  }, [shown]);
 
-  // Tabbing out of the menu (to anything but the button) closes it; a click elsewhere is the backdrop's.
+  if (!shown) return null;
+
+  // Focus moving anywhere but the menu or its button (Tab, Shift+Tab) closes it; a click elsewhere is the backdrop's.
   const onBlur = (e: FocusEvent<HTMLElement>) => {
     const to = e.relatedTarget as Node | null;
-    if (to && !menu.current?.contains(to) && to !== button.current) setOpen(false);
+    if (open && to && !menu.current?.contains(to) && to !== button.current) setOpen(false);
   };
 
   return (
@@ -77,7 +89,7 @@ export function ListsButton({ lists, current, counts }: {
         </nav>
       )}
       <button ref={button} type="button" className="lists-fab" aria-label="Lists" aria-expanded={open}
-        aria-controls={open ? menuId : undefined} onClick={() => (open ? close(true) : setOpen(true))}>
+        aria-controls={open ? menuId : undefined} onBlur={onBlur} onClick={() => (open ? close(true) : setOpen(true))}>
         <Icon name="lists" size={24} />
       </button>
     </>

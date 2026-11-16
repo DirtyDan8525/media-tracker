@@ -60,6 +60,26 @@ describe('app shell', () => {
       expect(router.state.location.search).toBe('');
     });
 
+    it('Add on the current list keeps its Status and Genre filters', async () => {
+      fakeBackend({ entries: [makeEntry({ title: 'Frieren', status: 'Completed', genres: 'Fantasy' })] });
+      const { router } = renderApp('/list/anime?status=Completed&genre=Fantasy');
+      await screen.findByText('Frieren');
+      const add = within(await mainNav()).getByRole('link', { name: 'Add anime' });
+      expect(add).toHaveAttribute('href', '/list/anime?status=Completed&genre=Fantasy&add=1');
+      await userEvent.click(add);
+      expect(await screen.findByRole('dialog', { name: 'Add to Anime' })).toBeInTheDocument();
+      await waitFor(() => expect(router.state.location.search).toBe('?status=Completed&genre=Fantasy'));
+    });
+
+    it('Add from another list or screen carries no filters over', async () => {
+      mockApi(makeMe(), { 'GET /api/activity': { body: { items: [], next: null } } });
+      const { router } = renderApp('/list/anime?status=Completed');
+      await screen.findByRole('heading', { level: 1, name: 'Anime' });
+      await router.navigate('/activity?show=you');
+      await screen.findByRole('heading', { level: 1, name: 'Activity' });
+      expect(within(await mainNav()).getByRole('link', { name: 'Add anime' })).toHaveAttribute('href', '/list/anime?add=1');
+    });
+
     it('Add\'s name follows the current list ("Add movie" after visiting /list/movies)', async () => {
       mockApi(makeMe());
       const { router } = renderApp('/list/movies');
@@ -167,7 +187,10 @@ describe('app shell', () => {
       const bar = document.querySelector<HTMLElement>('.page-header--bar')!;
       expect(within(bar).getByRole('heading', { level: 1, name: 'Anime' })).toBeInTheDocument();
       expect(within(bar).queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument(); // the side nav's first row is the link
-      expect(screen.getAllByRole('link', { name: 'Profile' })).toHaveLength(1);
+      expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: /^Profile/ })).toHaveLength(1);
+      // PC: the header renders no empty actions box for the (phone-only) profile button
+      expect(bar.querySelector('.page-header__actions:empty')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument();
       expect(document.querySelector('.bottom-tabs')).toBeNull();
       expect(screen.getByRole('button', { name: 'Add anime' })).toBeInTheDocument();
@@ -186,7 +209,7 @@ describe('app shell', () => {
       // every row, in document order: links and the Export button
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile', 'Add anime', 'Search', 'Activity',
+        'Profile, @dan', 'Add anime', 'Search', 'Activity',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books',
         'Import', 'Export my data', 'About',
       ]);
@@ -204,11 +227,11 @@ describe('app shell', () => {
       for (const n of ['Top 5', 'Stats', 'Settings']) expect(within(nav).queryByRole('link', { name: new RegExp(`^${n}`) })).not.toBeInTheDocument();
     });
 
-    it('the Profile row links to /profile and shows a 32 px avatar and @dan', async () => {
+    it('the Profile row is named "Profile, @dan" (contains its visible text), links to /profile and shows a 32 px avatar and @dan', async () => {
       setViewportWidth(1280);
       mockApi(makeMe());
       renderApp('/list/anime');
-      const profile = within(await sideNav()).getByRole('link', { name: 'Profile' });
+      const profile = within(await sideNav()).getByRole('link', { name: 'Profile, @dan' });
       expect(profile).toHaveAttribute('href', '/profile');
       expect(profile).toHaveTextContent('@dan');
       const avatar = profile.querySelector<HTMLElement>('.avatar')!;
@@ -220,7 +243,7 @@ describe('app shell', () => {
       setViewportWidth(1280);
       mockApi(makeMe({ avatarAt: '2026-11-15T10:00:00Z' }));
       renderApp('/list/anime');
-      const profile = within(await sideNav()).getByRole('link', { name: 'Profile' });
+      const profile = within(await sideNav()).getByRole('link', { name: 'Profile, @dan' });
       expect(profile.querySelector('img')).toHaveAttribute('src', `/api/me/avatar?v=${encodeURIComponent('2026-11-15T10:00:00Z')}`);
     });
 
@@ -234,6 +257,26 @@ describe('app shell', () => {
       await userEvent.click(add);
       expect(await screen.findByRole('dialog', { name: 'Add to Movies' })).toBeInTheDocument();
       expect(router.state.location.search).toBe('');
+    });
+
+    it('Add on the current list keeps its Status and Genre filters (PC)', async () => {
+      setViewportWidth(1280);
+      fakeBackend({ entries: [makeEntry({ title: 'Frieren', status: 'Completed', genres: 'Fantasy' })] });
+      const { router } = renderApp('/list/anime?status=Completed&genre=Fantasy');
+      await screen.findByText('Frieren');
+      const add = within(await sideNav()).getByRole('link', { name: 'Add anime' });
+      expect(add).toHaveAttribute('href', '/list/anime?status=Completed&genre=Fantasy&add=1');
+      await userEvent.click(add);
+      expect(await screen.findByRole('dialog', { name: 'Add to Anime' })).toBeInTheDocument();
+      await waitFor(() => expect(router.state.location.search).toBe('?status=Completed&genre=Fantasy'));
+    });
+
+    it('a header with only the (phone-only) profile button renders no empty actions box on PC', async () => {
+      setViewportWidth(1280);
+      fakeBackend({ entries: [makeEntry({ rating: 8 })] });
+      renderApp('/top5');
+      await screen.findByRole('heading', { level: 1, name: 'Top 5' });
+      expect(document.querySelector('.page-header__actions')).toBeNull();
     });
 
     it('with every list off there is no Add row', async () => {

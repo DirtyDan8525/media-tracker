@@ -21,16 +21,17 @@ export function SideNav({ lists, counts, compareCount = 0, current, me }: {
   current: Category | null;
   me: Pick<Me, 'username' | 'email' | 'avatarAt'>;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const exporting = useExportData();
+  const onCurrentList = current !== null && pathname === `/list/${current}`;
   return (
     <nav aria-label="Main" className="side-nav">
-      <NavLink to="/profile" className="side-nav__profile" aria-label="Profile">
+      <NavLink to="/profile" className="side-nav__profile" aria-label={me.username ? `Profile, @${me.username}` : 'Profile'}>
         <Avatar me={me} size={32} />
         <b className="side-nav__username">@{me.username}</b>
       </NavLink>
       {current && (
-        <Link to={addPath(current)} replace={pathname === `/list/${current}`} className="btn btn--primary side-nav__add" aria-label={`Add ${ADD_NOUN[current]}`}>
+        <Link to={addPath(current, onCurrentList ? search : undefined)} replace={onCurrentList} className="btn btn--primary side-nav__add" aria-label={`Add ${ADD_NOUN[current]}`}>
           <Icon name="plus" size={18} />
           <span>Add {ADD_NOUN[current]}</span>
         </Link>

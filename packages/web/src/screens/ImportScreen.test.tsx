@@ -261,6 +261,24 @@ describe('ImportScreen', () => {
     expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/movies');
   });
 
+  it('Check your tiers points at the first list that has a rated row, and is absent when none was rated', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games', rating: 7 })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/games');
+  });
+
+  it('Import done has no Check your tiers when no imported row was rated', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games' })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.queryByRole('link', { name: 'Check your tiers' })).not.toBeInTheDocument();
+  });
+
   it('the done screen offers to fill in details; Start runs the backfill, Not now dismisses', async () => {
     const entries = [makeEntry({ id: 'a1', title: 'Frieren', category: 'anime', creator: '' })];
     const { calls } = fakeBackend({

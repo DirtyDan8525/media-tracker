@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   applyMove, DEFAULT_TIERS, priorFromScore, tierFor, tierRange, type Entry, type SavePayload, type SetItem,
 } from '@media-tracker/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
+import { Icon } from '../design/components/Icon';
 import { makeMe, mockApi, type MockResponse } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 import { setViewportWidth } from '../test/viewport';
@@ -28,8 +29,8 @@ function setup(opts: { save?: MockResponse; path?: string } = {}) {
     'GET /api/ratings/:set': () => ({ body: { items: rows.map(setItem), comparisons: [] } }),
     'POST /api/ratings/:set/save': opts.save ?? { body: { items: [], entries: [] } },
   });
-  renderApp(opts.path ?? '/retier/anime');
-  return { calls, rows };
+  const { router } = renderApp(opts.path ?? '/retier/anime');
+  return { calls, rows, router };
 }
 const saves = (calls: { method: string; path: string; body: unknown }[]) =>
   calls.filter((c) => c.method === 'POST' && c.path === '/api/ratings/anime/save').map((c) => c.body as SavePayload);
@@ -157,9 +158,155 @@ describe('Re-tier review', () => {
     expect(chips.getByRole('link', { name: 'Movies' })).toHaveAttribute('href', '/retier/movies');
   });
 
-  it('Settings links to the review', async () => {
-    mockApi(makeMe(), { 'GET /api/entries': () => ({ body: [] }) });
+  it('Settings links to the review, on the first enabled list, with its own icon', async () => {
+    mockApi(makeMe({}, { anime: false }), { 'GET /api/entries': () => ({ body: [] }) });
     renderApp('/settings');
-    expect(await screen.findByRole('link', { name: 'Re-tier review' })).toHaveAttribute('href', '/retier/anime');
+    const link = await screen.findByRole('link', { name: 'Re-tier review' });
+    expect(link).toHaveAttribute('href', '/retier/movies');
+    const icon = render(<Icon name="stats" />).container.innerHTML;
+    expect(link.querySelector('svg')!.outerHTML).not.toBe(icon);
+  });
+
+  it('the route sends a disabled list to the first enabled one', async () => {
+    mockApi(makeMe({}, { anime: false }), {
+      'GET /api/entries': () => ({ body: [] }),
+      'GET /api/ratings/:set': () => ({ body: { items: [], comparisons: [] } }),
+    });
+    const { router } = renderApp('/retier/anime');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/retier/movies'));
+    const seasons = renderApp('/retier/anime_seasons');
+    await waitFor(() => expect(seasons.router.state.location.pathname).toBe('/retier/movies'));
+  });
+
+  it('while a save is in flight the moves are locked, and nothing made after it is lost', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    const rows = ROWS();
+    mockApi(makeMe(), {
+      'GET /api/entries': () => ({ body: rows }),
+      'GET /api/ratings/:set': () => ({ body: { items: rows.map(setItem), comparisons: [] } }),
+      'POST /api/ratings/:set/save': async () => { await gate; return { body: { items: [], entries: [] } }; },
+    });
+    setViewportWidth(1024);
+    renderApp('/retier/anime');
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move Erased to…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /^Fine/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save (1 moved)' }));
+    expect(screen.getByRole('button', { name: 'Move Dorohedoro to…' })).toBeDisabled();
+    expect(screen.getByText('Dorohedoro').closest('li')).toHaveAttribute('draggable', 'false');
+    release();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move Dorohedoro to…' })).toBeEnabled());
+  });
+
+  it('if the reload after a save fails, the moves stay and an error says so', async () => {
+    const rows = ROWS();
+    let loads = 0;
+    mockApi(makeMe(), {
+      'GET /api/entries': () => ({ body: rows }),
+      'GET /api/ratings/:set': () => (++loads === 1 ? { body: { items: rows.map(setItem), comparisons: [] } } : { status: 500, body: { error: 'boom' } }),
+      'POST /api/ratings/:set/save': { body: { items: [], entries: [] } },
+    });
+    renderApp('/retier/anime');
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move Erased to…' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Fine/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save (1 moved)' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Saved, but couldn't reload/);
+    expect(screen.getByRole('heading', { name: 'Fine · 2' })).toBeInTheDocument(); // the move is still on screen
+    expect(screen.getByRole('button', { name: /^Save/ })).toBeDisabled(); // already saved: no second send
+  });
+
+  it('leaving with unsaved moves asks first: chips, Back and the nav; Keep editing stays, Discard goes', async () => {
+    const { calls, router } = setup();
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move Erased to…' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Fine/ }));
+    const chips = within(screen.getByRole('navigation', { name: 'Lists to re-tier' }));
+    await userEvent.click(chips.getByRole('link', { name: 'Movies' }));
+    const ask = await screen.findByRole('dialog', { name: 'Discard your moves?' });
+    await userEvent.click(within(ask).getByRole('button', { name: 'Keep editing' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fine · 2' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Discard your moves?' })).getByRole('button', { name: 'Discard moves' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+    expect(saves(calls)).toHaveLength(0);
+  });
+
+  it('with no moves, leaving does not ask', async () => {
+    const { router } = setup();
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    const chips = within(screen.getByRole('navigation', { name: 'Lists to re-tier' }));
+    await userEvent.click(chips.getByRole('link', { name: 'Movies' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/retier/movies'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('PC: the dragged row is marked while it is dragged, and not after', async () => {
+    setViewportWidth(1024);
+    setup();
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    const row = screen.getByText('Erased').closest('li')!;
+    fireEvent.dragStart(row, { dataTransfer: { setData: () => {}, getData: () => 'Erased', effectAllowed: '' } });
+    expect(row).toHaveClass('is-dragging');
+    fireEvent.dragEnd(row);
+    expect(row).not.toHaveClass('is-dragging');
+  });
+
+  it('a save that conflicts twice keeps the moves and says the ratings changed elsewhere', async () => {
+    const { calls } = setup({ save: { status: 409, body: { error: 'conflict' } } });
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move Erased to…' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Fine/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save (1 moved)' }));
+    expect(await screen.findByText(/Your ratings changed elsewhere\. Your moves are still here/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save (1 moved)' })).toBeEnabled();
+    expect(saves(calls).length).toBeGreaterThan(0);
+  });
+
+  it('season chips: Anime Seasons loads its own set and saves against it', async () => {
+    const seasonRows = [rated('Akira S1', 9.4), rated('Akira S2', 6.2)];
+    const calls = mockApi(makeMe(), {
+      'GET /api/entries': () => ({ body: ROWS() }),
+      'GET /api/ratings/anime': () => ({ body: { items: ROWS().map(setItem), comparisons: [] } }),
+      'GET /api/ratings/anime_seasons': () => ({ body: { items: seasonRows.map(setItem), comparisons: [] } }),
+      'POST /api/ratings/:set/save': { body: { items: [], entries: [] } },
+    });
+    renderApp('/retier/anime');
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    const chips = within(screen.getByRole('navigation', { name: 'Lists to re-tier' }));
+    expect(chips.getByRole('link', { name: 'Anime Seasons' })).toHaveAttribute('href', '/retier/anime_seasons');
+    expect(chips.getByRole('link', { name: 'TV Seasons' })).toHaveAttribute('href', '/retier/tv_seasons');
+    await userEvent.click(chips.getByRole('link', { name: 'Anime Seasons' }));
+    await screen.findByRole('heading', { name: 'Loved · 1' });
+    expect(screen.getByRole('heading', { name: 'Fine · 1' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Move Akira S2 to…' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Liked/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save (1 moved)' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/ratings/anime_seasons/save')).toBe(true));
+  });
+
+  it('an empty set says what to do; a load error offers Retry', async () => {
+    let fail = true;
+    mockApi(makeMe(), {
+      'GET /api/entries': () => ({ body: [] }),
+      'GET /api/ratings/:set': () => (fail ? { status: 500, body: { error: 'boom' } } : { body: { items: [], comparisons: [] } }),
+    });
+    renderApp('/retier/anime');
+    expect(await screen.findByText("Couldn't load your ratings")).toBeInTheDocument();
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Nothing to check yet')).toBeInTheDocument();
+    expect(screen.getByText(/Rate a few, then come back/)).toBeInTheDocument();
+  });
+
+  it('phone: after a move from the sheet, focus is on the row\'s Move button and the move is announced', async () => {
+    setup();
+    await screen.findByRole('heading', { name: 'Liked · 2' });
+    await userEvent.click(screen.getByRole('button', { name: 'Move Erased to…' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Fine/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move Erased to…' })).toHaveFocus());
+    expect(screen.getByText('Moved Erased to Fine.')).toHaveAttribute('role', 'status');
   });
 });

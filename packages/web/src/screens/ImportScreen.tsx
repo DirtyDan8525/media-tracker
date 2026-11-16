@@ -47,6 +47,9 @@ async function readBuffer(file: File): Promise<ArrayBuffer> {
   });
 }
 
+/** The first imported list that has a rated row: where "Check your tiers" goes (null when nothing was rated). */
+const firstRatedCategory = (p: ImportPreview): Category | null =>
+  LIST_ORDER.find((c) => p.rows.some((r) => r.category === c && r.rating !== null)) ?? null;
 const categoriesOf = (p: ImportPreview): Category[] => LIST_ORDER.filter((c) => (p.counts[c] ?? 0) > 0);
 
 function settingsLine(s: Partial<UserSettings>): string {
@@ -220,8 +223,8 @@ export function ImportScreen() {
               {undoError && <p role="alert" className="field-error">Couldn't undo. Try again.</p>}
               <div className="import__actions">
                 <Button onClick={() => void undo()} disabled={busy}>Undo import</Button>
-                {run.current && categoriesOf(run.current.preview)[0] && (
-                  <Link to={`/retier/${categoriesOf(run.current.preview)[0]}`} className="btn btn--primary">Check your tiers</Link>
+                {run.current && firstRatedCategory(run.current.preview) && (
+                  <Link to={`/retier/${firstRatedCategory(run.current.preview)}`} className="btn btn--primary">Check your tiers</Link>
                 )}
                 <Link to="/" className="btn btn--ghost">Go to my lists</Link>
               </div>

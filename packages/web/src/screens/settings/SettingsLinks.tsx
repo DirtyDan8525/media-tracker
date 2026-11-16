@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { Icon } from '../../design/components/Icon';
 import { COMPARE_ENABLED } from '../../features';
+import { enabledLists } from '../../nav';
 import { useSessionMe } from '../../shell/SessionGate';
 
 export const APPEARANCE_PATH = '/settings/appearance';
@@ -11,6 +12,7 @@ export const APPEARANCE_PATH = '/settings/appearance';
  */
 export function SettingsLinks() {
   const { settings } = useSessionMe();
+  const retier = enabledLists(settings)[0];
   return (
     <>
       <Link to={APPEARANCE_PATH} className="group__row">
@@ -20,9 +22,11 @@ export function SettingsLinks() {
           {settings.theme}
         </span>
       </Link>
-      <Link to="/retier/anime" className="group__row">
-        <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Re-tier review</span>
-      </Link>
+      {retier && (
+        <Link to={`/retier/${retier}`} className="group__row">
+          <span className="group__row-start"><span className="tile-icon"><Icon name="tiers" size={18} /></span>Re-tier review</span>
+        </Link>
+      )}
       {COMPARE_ENABLED && (
         <Link to={APPEARANCE_PATH} className="group__row">
           <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Comparing</span>{' '}

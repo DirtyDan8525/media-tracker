@@ -3,7 +3,7 @@ import {
 } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate, useBlocker, useParams } from 'react-router';
 import { ratingSetKey, saveRatingsResult, useRatingSet } from '../data/ratings';
 import { Button } from '../design/components/Button';
 import { CoverImage } from '../design/components/CoverImage';
@@ -30,7 +30,13 @@ const isSet = (s: string | undefined): s is RatingSet => RATING_SETS.includes(s 
 /** Re-tier review (route /retier/:set): move titles between tiers, then Save. Nothing is saved before that. */
 export function RetierScreen() {
   const { set } = useParams();
-  if (!isSet(set)) return <Navigate to="/retier/anime" replace />;
+  const me = useSessionMe();
+  const first = enabledLists(me.settings)[0];
+  const parent = isSet(set) ? (set === 'anime_seasons' ? 'anime' : set === 'tv_seasons' ? 'tv' : set) : null;
+  const allowed = parent !== null && enabledLists(me.settings).includes(parent)
+    && (parent === set || seasonsEnabled(me.settings, parent));
+  // An unknown or switched-off set goes to the first list that is on (Settings when none is).
+  if (!isSet(set) || !allowed) return <Navigate to={first ? `/retier/${first}` : '/settings'} replace />;
   // A new set starts with no moves: leaving a set discards them.
   return <Retier key={set} set={set} />;
 }
@@ -52,7 +58,9 @@ function Retier({ set }: { set: RatingSet }) {
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [overTier, setOverTier] = useState<Tier | null>(null);
-  const dragging = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  /** The save went through but the reload after it failed: the moves are already saved, so they stay on screen. */
+  const [reloadFailed, setReloadFailed] = useState(false);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const [focusId, setFocusId] = useState<string | null>(null);
 
@@ -89,7 +97,11 @@ function Retier({ set }: { set: RatingSet }) {
 
   const moved = moves.size;
 
+  // Unsaved moves are one tap from lost (a chip, Back, the nav): ask first.
+  const blocker = useBlocker(moved > 0 && !reloadFailed);
+
   function move(id: string, to: Tier) {
+    if (saving) return;
     const item = base.get(id);
     if (!item) return;
     const now = moves.get(id) ?? item.tier;
@@ -101,17 +113,29 @@ function Retier({ set }: { set: RatingSet }) {
     setFocusId(id);
   }
 
+  async function reload(): Promise<boolean> {
+    try {
+      await qc.refetchQueries({ queryKey: ratingSetKey(set) }, { throwOnError: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function save() {
-    if (!moved || saving) return;
+    if (!moved || saving || reloadFailed) return;
     setSaving(true);
     const result = await saveRatingsResult(qc, set, {
       picks: [], moves: [...moves].map(([id, tier]) => ({ id, tier })), done: [],
     });
     if (result === 'ok') {
       // The set reloads with the Worker's numbers; clear the moves only once it has, so no row jumps back.
-      try { await qc.refetchQueries({ queryKey: ratingSetKey(set) }); } catch { /* the cache reloads on its own */ }
-      setMoves(new Map());
-      toast.show(moved === 1 ? 'Saved. 1 title moved.' : `Saved. ${moved} titles moved.`);
+      if (await reload()) {
+        setMoves(new Map());
+        toast.show(moved === 1 ? 'Saved. 1 title moved.' : `Saved. ${moved} titles moved.`);
+      } else {
+        setReloadFailed(true);
+      }
     } else {
       toast.show(result === 'conflict'
         ? 'Your ratings changed elsewhere. Your moves are still here; check them and save again.'
@@ -120,15 +144,26 @@ function Retier({ set }: { set: RatingSet }) {
     setSaving(false);
   }
 
+  async function retryReload() {
+    setSaving(true);
+    if (await reload()) {
+      setMoves(new Map());
+      setReloadFailed(false);
+      toast.show(moved === 1 ? 'Saved. 1 title moved.' : `Saved. ${moved} titles moved.`);
+    }
+    setSaving(false);
+  }
+
   const onDragStart = (e: DragEvent, id: string) => {
-    dragging.current = id;
+    if (saving) { e.preventDefault(); return; }
+    setDraggingId(id);
     e.dataTransfer?.setData?.('text/plain', id);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   };
   const onDrop = (e: DragEvent, tier: Tier) => {
     e.preventDefault();
-    const id = dragging.current ?? e.dataTransfer?.getData?.('text/plain');
-    dragging.current = null;
+    const id = draggingId ?? e.dataTransfer?.getData?.('text/plain');
+    setDraggingId(null);
     setOverTier(null);
     if (id) move(id, tier);
   };
@@ -139,7 +174,7 @@ function Retier({ set }: { set: RatingSet }) {
     return s !== null && seasonsEnabled(me.settings, c) ? [c, s as RatingSet] : [c];
   });
   const saveButton = (
-    <Button variant="primary" disabled={!moved || saving} onClick={() => void save()}
+    <Button variant="primary" disabled={!moved || saving || reloadFailed} onClick={() => void save()}
       className={wide ? undefined : 'retier__save'}>
       Save ({moved} moved)
     </Button>
@@ -150,7 +185,7 @@ function Retier({ set }: { set: RatingSet }) {
 
   const body = (() => {
     if (data.isPending) return <div className="stack-10" aria-busy="true" aria-label="Loading"><Skeleton height={64} /><Skeleton height={64} /></div>;
-    if (data.isError) {
+    if (data.isError && !data.data) {
       return <EmptyState icon="info" title="Couldn't load your ratings" body="Check your connection and try again."
         actionLabel="Retry" onAction={() => void data.refetch()} />;
     }
@@ -171,10 +206,10 @@ function Retier({ set }: { set: RatingSet }) {
             </div>
             <ul className="retier__list">
               {rows.map(({ item, was }) => (
-                <li key={item.id} className={dragging.current === item.id ? 'retier__row is-dragging' : 'retier__row'}
-                  draggable={wide || undefined}
+                <li key={item.id} className={draggingId === item.id ? 'retier__row is-dragging' : 'retier__row'}
+                  draggable={wide ? !saving : undefined}
                   onDragStart={wide ? (e) => onDragStart(e, item.id) : undefined}
-                  onDragEnd={wide ? () => { dragging.current = null; setOverTier(null); } : undefined}>
+                  onDragEnd={wide ? () => { setDraggingId(null); setOverTier(null); } : undefined}>
                   <CoverImage src={item.cover} alt={`${item.title} cover`} square={item.square} width={wide ? 32 : 36} />
                   <div className="retier__meta">
                     <span className="retier__title">{item.title}</span>
@@ -184,7 +219,7 @@ function Retier({ set }: { set: RatingSet }) {
                   <div className="retier__move">
                     <button type="button" className="btn btn--compact retier__move-btn" aria-haspopup={wide ? 'menu' : 'dialog'}
                       aria-expanded={wide ? menuFor === item.id : undefined}
-                      aria-label={`Move ${item.title} to…`}
+                      aria-label={`Move ${item.title} to…`} disabled={saving}
                       ref={(el) => { if (el) buttons.current.set(item.id, el); else buttons.current.delete(item.id); }}
                       onClick={() => (wide ? setMenuFor(menuFor === item.id ? null : item.id) : setSheetFor(item.id))}>
                       Move to…
@@ -218,10 +253,23 @@ function Retier({ set }: { set: RatingSet }) {
             </Link>
           ))}
         </nav>
+        {reloadFailed && (
+          <div role="alert" className="field-error stack-10">
+            <span>Saved, but couldn't reload your ratings. Your moves are saved; the scores shown may be out of date.</span>
+            <Button onClick={() => void retryReload()} disabled={saving}>Reload</Button>
+          </div>
+        )}
         {body}
         <div role="status" className="sr-only">{announce}</div>
       </div>
       {!wide && <div className="retier__footer">{saveButton}</div>}
+      <Sheet open={blocker.state === 'blocked'} title="Discard your moves?" onClose={() => blocker.reset?.()}>
+        <p>{moved === 1 ? '1 title has moved' : `${moved} titles have moved`} but not been saved. Leaving now throws that away.</p>
+        <div className="import__actions">
+          <Button variant="primary" onClick={() => blocker.reset?.()}>Keep editing</Button>
+          <Button onClick={() => blocker.proceed?.()}>Discard moves</Button>
+        </div>
+      </Sheet>
       <Sheet open={sheetItem !== undefined} title={sheetItem ? `Move “${sheetItem.title}” to…` : 'Move to…'} onClose={() => setSheetFor(null)}>
         {sheetItem && (
           <TierPicker label="Tier" names={names} ranges={([0, 1, 2, 3] as Tier[]).map((t) => tierRange(tiers, t))}

@@ -2,7 +2,13 @@ import { DEFAULT_TIERS, type Entry, type SavePayload, type TierSet } from '@medi
 import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as entryCache from './entryCache';
+
+vi.mock('./entryCache', async (importOriginal) => {
+  const m = await importOriginal<typeof import('./entryCache')>();
+  return { ...m, writeEntry: vi.fn(m.writeEntry) };
+});
 import { localDb } from '../db/local';
 import { makeEntry } from '../test/fakeBackend';
 import { makeMe, mockFetch } from '../test/mockApi';
@@ -78,7 +84,7 @@ describe('saveRatings', () => {
       'GET /api/compare/queue': { body: { items: [] } },
     });
     expect(await saveRatings(qc, 'anime', payload)).toBe(true);
-    const order = calls.map((c) => `${c.method} ${c.path}`);
+    const order = calls.filter((c) => c.path.startsWith('/api/ratings/')).map((c) => `${c.method} ${c.path}`);
     expect(order.slice(0, 3)).toEqual(['POST /api/ratings/anime/save', 'GET /api/ratings/anime', 'POST /api/ratings/anime/save']);
     expect(posts).toBe(2);
   });
@@ -193,5 +199,81 @@ describe('retryOnConflict', () => {
     n = 0;
     await expect(retryOnConflict(async () => { n++; throw new ApiError(500, 'x'); })).rejects.toThrow(ApiError);
     expect(n).toBe(1);
+  });
+});
+
+describe('Task 10 review fixes', () => {
+  it('saveTiers on a list with seasons also reloads the seasons and the parent list (season averages)', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(ME_KEY, makeMe());
+    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'p', category: 'anime', seasonAvg: 9 })]);
+    qc.setQueryData(['seasons', 'p'], []);
+    const me = makeMe();
+    const calls = mockFetch({
+      'PUT /api/ratings/tiers/anime': { body: { settings: me.settings, entries: [] } },
+      'GET /api/entries': { body: [makeEntry({ id: 'p', category: 'anime', seasonAvg: 8.6 })] },
+    });
+    expect(await saveTiers(qc, 'anime', null)).toBe(true);
+    expect(qc.getQueryState(['seasons', 'p'])!.isInvalidated).toBe(true);
+    expect(calls.some((c) => c.path === '/api/entries?category=anime')).toBe(true);
+    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.seasonAvg).toBe(8.6);
+  });
+
+  it('saveTiers on a list without seasons leaves seasons alone', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(ME_KEY, makeMe());
+    qc.setQueryData(['seasons', 'x'], []);
+    const calls = mockFetch({ 'PUT /api/ratings/tiers/movies': { body: { settings: makeMe().settings, entries: [] } } });
+    expect(await saveTiers(qc, 'movies', null)).toBe(true);
+    expect(qc.getQueryState(['seasons', 'x'])!.isInvalidated).toBe(false);
+    expect(calls.some((c) => c.path.startsWith('/api/entries'))).toBe(false);
+  });
+
+  it('a 409 refreshes the list too, so rows changed on another device are not stale', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'other', category: 'anime', rating: 8 })]);
+    let posts = 0;
+    mockFetch({
+      'POST /api/ratings/anime/save': () => (++posts === 1 ? { status: 409, body: { error: 'conflict' } } : { body: { items: [], entries: [] } }),
+      'GET /api/ratings/anime': { body: setBody },
+      'GET /api/entries': { body: [makeEntry({ id: 'other', category: 'anime', rating: 8.4 })] },
+      'GET /api/compare/queue': { body: { items: [] } },
+    });
+    expect(await saveRatings(qc, 'anime', payload)).toBe(true);
+    await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.4));
+  });
+
+  it('a 409 that fails again still refreshes the list', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'other', category: 'anime', rating: 8 })]);
+    mockFetch({
+      'POST /api/ratings/anime/save': { status: 409, body: { error: 'conflict' } },
+      'GET /api/ratings/anime': { body: setBody },
+      'GET /api/entries': { body: [makeEntry({ id: 'other', category: 'anime', rating: 8.4 })] },
+    });
+    expect(await saveRatingsResult(qc, 'anime', payload)).toBe('conflict');
+    await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.4));
+  });
+
+  it('a season-set 409 refreshes the parent list', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('tv'), [makeEntry({ id: 'p', category: 'tv', seasonAvg: 9 })]);
+    mockFetch({
+      'POST /api/ratings/tv_seasons/save': { status: 409, body: { error: 'conflict' } },
+      'GET /api/ratings/tv_seasons': { body: setBody },
+      'GET /api/entries': { body: [makeEntry({ id: 'p', category: 'tv', seasonAvg: 7 })] },
+    });
+    expect(await saveRatingsResult(qc, 'tv_seasons', payload)).toBe('conflict');
+    await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('tv'))![0]!.seasonAvg).toBe(7));
+  });
+
+  it('a cache-write error after a successful save does not report failure', async () => {
+    const qc = makeQueryClient();
+    vi.mocked(entryCache.writeEntry).mockImplementationOnce(() => { throw new Error('cache'); });
+    mockFetch({
+      'POST /api/ratings/anime/save': { body: { items: [], entries: [makeEntry({ id: 'a', category: 'anime', rating: 9.2 })] } },
+      'GET /api/compare/queue': { body: { items: [] } },
+    });
+    expect(await saveRatingsResult(qc, 'anime', payload)).toBe('ok');
   });
 });

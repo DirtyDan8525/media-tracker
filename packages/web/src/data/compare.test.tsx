@@ -126,3 +126,34 @@ describe('queue invalidation after a rating save', () => {
     expect(calls.filter((c) => c.path === '/api/compare/queue').length).toBe(1);
   });
 });
+
+describe('saveEntryChange: a direct rating edit', () => {
+  it('reloads the list and the rating set: the Worker re-fitted the neighbours', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('anime'), [entry('e1'), entry('n', { rating: 9 })]);
+    qc.setQueryData(['rating-set', 'anime'], { items: [], comparisons: [] });
+    const calls = mockFetch({
+      'PATCH /api/entries/:id': (b) => ({ body: entry('e1', b as Partial<Entry>) }),
+      'GET /api/entries': { body: [entry('e1', { rating: 9.5 }), entry('n', { rating: 9.1 })] },
+    });
+    await saveEntryChange(qc, { id: 'e1', category: 'anime' }, { rating: 9.5 });
+    await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('anime'))!.find((e) => e.id === 'n')!.rating).toBe(9.1));
+    expect(calls.some((c) => c.path === '/api/entries?category=anime')).toBe(true);
+    expect(qc.getQueryState(['rating-set', 'anime'])!.isInvalidated).toBe(true);
+  });
+
+  it('tier and lock edits reload too; a notes edit does not', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(entriesKey('anime'), [entry('e1')]);
+    const calls = mockFetch({
+      'PATCH /api/entries/:id': (b) => ({ body: entry('e1', b as Partial<Entry>) }),
+      'GET /api/entries': { body: [entry('e1')] },
+    });
+    await saveEntryChange(qc, { id: 'e1', category: 'anime' }, { notes: 'hi' });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(calls.some((c) => c.method === 'GET')).toBe(false);
+    await saveEntryChange(qc, { id: 'e1', category: 'anime' }, { tier: 2 });
+    await saveEntryChange(qc, { id: 'e1', category: 'anime' }, { scoreLocked: true });
+    await waitFor(() => expect(calls.filter((c) => c.path === '/api/entries?category=anime').length).toBe(2));
+  });
+});

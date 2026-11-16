@@ -53,6 +53,8 @@ async function withConflictRetry<T>(qc: QueryClient, set: RatingSet, run: () => 
     return await run();
   } catch (err) {
     if (!isConflict(err)) throw err;
+    // Another device changed the set: its rows in the list are stale too, whatever the retry does.
+    void refreshCategories(qc, [listOfSet(set)]);
     try {
       await qc.fetchQuery({ queryKey: ratingSetKey(set), queryFn: () => loadSet(set), staleTime: 0 });
     } catch {
@@ -77,13 +79,15 @@ export type SaveResult = 'ok' | 'conflict' | 'failed';
  * entries are refetched for their season average). Reloads and retries once on a 409.
  */
 export async function saveRatingsResult(qc: QueryClient, set: RatingSet, payload: SavePayload): Promise<SaveResult> {
+  let res: { items: SetItem[]; entries: Entry[] };
   try {
-    const res = await withConflictRetry(qc, set, () =>
+    res = await withConflictRetry(qc, set, () =>
       api.post<{ items: SetItem[]; entries: Entry[] }>(`/api/ratings/${encodeURIComponent(set)}/save`, payload));
-    for (const e of res.entries) writeEntry(qc, e);
   } catch (err) {
     return isConflict(err) ? 'conflict' : 'failed';
   }
+  // Saved on the Worker: a cache write that throws must not report a failure (the reload below fixes the cache).
+  writeEntries(qc, res.entries, listOfSet(set));
   void qc.invalidateQueries({ queryKey: ratingSetKey(set) });
   void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
   if (isSeasons(set)) {
@@ -103,10 +107,15 @@ export async function saveRatings(qc: QueryClient, set: RatingSet, payload: Save
  * set and its seasons set reload. Reloads and retries once on a 409. False on failure.
  */
 export async function saveTiers(qc: QueryClient, list: Category, tiers: TierSet | null): Promise<boolean> {
+  let res: { settings: UserSettings; entries: Entry[] };
   try {
-    const res = await withConflictRetry(qc, list, () =>
+    res = await withConflictRetry(qc, list, () =>
       api.put<{ settings: UserSettings; entries: Entry[] }>(`/api/ratings/tiers/${encodeURIComponent(list)}`, { tiers }));
-    for (const e of res.entries) writeEntry(qc, e);
+  } catch {
+    return false;
+  }
+  writeEntries(qc, res.entries, list);
+  try {
     const prev = qc.getQueryData<Me>(ME_KEY);
     if (prev) {
       const next = normalizeMe({ ...prev, settings: res.settings });
@@ -116,12 +125,28 @@ export async function saveTiers(qc: QueryClient, list: Category, tiers: TierSet 
       void qc.invalidateQueries({ queryKey: ME_KEY });
     }
   } catch {
-    return false;
+    // Settings are saved on the Worker; a local cache write failing only leaves ME_KEY to refetch.
+    void qc.invalidateQueries({ queryKey: ME_KEY });
   }
   void qc.invalidateQueries({ queryKey: ratingSetKey(list) });
   const seasons = seasonSetOf(list);
-  if (seasons !== null) void qc.invalidateQueries({ queryKey: ratingSetKey(seasons) });
+  if (seasons !== null) {
+    // The Worker re-fitted the season tab too but returns no season rows: reload the seasons and
+    // the parent entries (their season averages).
+    void qc.invalidateQueries({ queryKey: ratingSetKey(seasons) });
+    void qc.invalidateQueries({ queryKey: ['seasons'] });
+    await refreshParents(qc, list);
+  }
   return true;
+}
+
+/** Writes returned rows to the caches; if that throws, the list is reloaded instead. */
+function writeEntries(qc: QueryClient, rows: Entry[], list: Category): void {
+  try {
+    for (const e of rows) writeEntry(qc, e);
+  } catch {
+    void qc.invalidateQueries({ queryKey: ['entries', list] });
+  }
 }
 
 export type DeletedRow = { kind: 'entry'; category: Category } | { kind: 'season'; category: Category; entryId: string };

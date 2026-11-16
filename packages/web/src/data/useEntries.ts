@@ -141,7 +141,7 @@ export function useListCounts() {
 export async function refreshCategories(qc: QueryClient, categories: Category[]): Promise<void> {
   await Promise.all(categories.map(async (c) => {
     try {
-      const rows = await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(c)}`);
+      const rows = (await api.get<Entry[]>(`/api/entries?category=${encodeURIComponent(c)}`)).map(normalizeEntry);
       await storeEntries(c, rows);
       qc.setQueryData(['entries', c], rows);
     } catch {

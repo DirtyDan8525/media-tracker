@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { localDb } from '../db/local';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
-import { useAllEntries, useEntries } from './useEntries';
+import { refreshCategories, useAllEntries, useEntries } from './useEntries';
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {
@@ -72,5 +72,16 @@ describe('useEntries', () => {
     const second = renderHook(() => useEntries('anime'), { wrapper });
     await waitFor(() => expect(second.result.current.data && !second.result.current.isPlaceholderData).toBeTruthy());
     expect(second.result.current.data![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+  });
+});
+
+describe('refreshCategories', () => {
+  it('normalizes the rows it stores (pre-3c rows read as unrated-tier)', async () => {
+    const { tier: _t, priorMean: _p, strength: _s, scoreLocked: _l, ...old } = entry('old', { rating: 8 });
+    mockFetch({ 'GET /api/entries': { body: [old] } });
+    const qc = makeQueryClient();
+    await refreshCategories(qc, ['anime']);
+    expect(qc.getQueryData<Entry[]>(['entries', 'anime'])![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+    expect((await localDb.entries.get('old'))).toMatchObject({ tier: null, scoreLocked: false });
   });
 });

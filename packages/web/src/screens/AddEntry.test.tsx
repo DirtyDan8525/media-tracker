@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Category, TierSet } from '@media-tracker/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fakeBackend, makeInfo } from '../test/fakeBackend';
+import { fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { setCompareEnabled } from '../test/flags';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
@@ -23,10 +23,31 @@ async function openAdd() {
 const posts = (calls: { method: string; path: string; body: unknown }[]) =>
   calls.filter((c) => c.method === 'POST' && c.path === '/api/entries').map((c) => c.body as Record<string, unknown>);
 const typeTitle = (d: HTMLElement, t = 'Frieren') => userEvent.type(within(d).getByRole('textbox', { name: 'Title' }), t);
-const numberBox = (d: HTMLElement) => within(d).getByRole('spinbutton', { name: 'Or type a number' });
+const numberBox = (d: HTMLElement) => within(d).getByRole('spinbutton', { name: 'or type a number' });
 const tierButtons = (d: HTMLElement) => within(within(d).getByRole('group', { name: 'Tier' })).getAllByRole('button');
 
 describe('the Add sheet: rate by tier', () => {
+  it('uses the board\'s copy and wires the hint to the number box', async () => {
+    fakeBackend({ me: meWith() });
+    renderApp('/list/anime');
+    const d = await openAdd();
+    expect(within(d).getByText('How much did you like it?')).toBeInTheDocument();
+    expect(within(d).getByText('or type a number')).toBeInTheDocument();
+    expect(numberBox(d)).toHaveAccessibleDescription(/Typing a number picks the tier/);
+  });
+
+  it('a tier-only add shows that tier\'s middle score (counts as rated) before the server answers', async () => {
+    fakeBackend({ me: meWith(), entries: [makeEntry({ id: 'x1', title: 'Existing', rating: 5 })], extra: { 'POST /api/entries': () => new Promise(() => {}) } });
+    renderApp('/list/anime');
+    await screen.findByText('Existing'); // the list is loaded, so the new row has somewhere to appear
+    const d = await openAdd();
+    await typeTitle(d);
+    await userEvent.click(within(d).getByRole('button', { name: 'Liked · 7.5–8.9' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
+    // The row is still "Looking it up…", but it already counts as rated (in the Worker's middle-of-the-tier score).
+    await waitFor(() => expect(screen.getByText('2 titles · 2 rated')).toBeInTheDocument());
+  });
+
   it('offers the list\'s four tiers, top first, and an "or type a number" box in place of the slider', async () => {
     fakeBackend({ me: meWith() });
     renderApp('/list/anime');

@@ -89,7 +89,7 @@ describe('adding an entry', () => {
     const d = await openAdd(/^Add album$/i);
     await userEvent.type(within(d).getByRole('textbox', { name: 'Album' }), 'Abbey Road');
     await userEvent.type(within(d).getByRole('textbox', { name: /^Artist/ }), 'The Beatles');
-    await userEvent.type(within(d).getByRole('spinbutton', { name: 'Or type a number' }), '9.5');
+    await userEvent.type(within(d).getByRole('spinbutton', { name: 'or type a number' }), '9.5');
     await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(calls.some((c) => c.path === '/api/lookup')).toBe(true));
     expect(calls.find((c) => c.path === '/api/entries')?.body).toMatchObject({ title: 'Abbey Road', creator: 'The Beatles', rating: 9.5 });

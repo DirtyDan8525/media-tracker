@@ -513,7 +513,28 @@ describe('entry details: tier and lock', () => {
     await userEvent.clear(rating);
     await userEvent.type(rating, '8.90');
     await userEvent.tab();
-    await new Promise((r) => setTimeout(r, 30));
-    expect(patches(calls)).toEqual([]);
+    // A later, real change is the barrier: handlers run in order, so if the unchanged number had posted, it would be first.
+    await userEvent.clear(rating);
+    await userEvent.type(rating, '7');
+    await userEvent.tab();
+    await waitFor(() => expect(patches(calls)).toEqual([{ rating: 7 }]));
+  });
+
+  it('typing a number moves the tier chip at once, before the server answers', async () => {
+    fakeBackend({ entries: [tiered({ rating: 9.5, tier: 3 })], extra: { 'PATCH /api/entries/:id': () => new Promise(() => {}) } });
+    renderApp('/entry/f1');
+    const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
+    await userEvent.clear(rating);
+    await userEvent.type(rating, '8');
+    await userEvent.tab();
+    await waitFor(() => expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false', 'false']));
+  });
+
+  it('a tier chip unlocks the score at once, before the server answers', async () => {
+    fakeBackend({ entries: [tiered({ rating: 9.5, tier: 3, scoreLocked: true })], extra: { 'PATCH /api/entries/:id': () => new Promise(() => {}) } });
+    renderApp('/entry/f1');
+    expect(await screen.findByRole('switch', { name: 'Lock score' })).toBeChecked();
+    await userEvent.click(chips()[1]!); // top first: Loved, Liked, Fine, Didn't like
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Lock score' })).not.toBeChecked());
   });
 });

@@ -31,7 +31,7 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
   const me = useSessionMe();
   const tiers = tiersFor(me.settings, category);
   const ranges = ([0, 1, 2, 3] as Tier[]).map((t) => tierRange(tiers, t));
-  const ids = { title: useId(), creator: useId(), rating: useId(), ratingErr: useId() };
+  const ids = { title: useId(), creator: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
   const [title, setTitle] = useState('');
   const [creator, setCreator] = useState('');
   /** A tapped tier (posts `tier`); cleared by typing a number. */
@@ -96,17 +96,17 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
         )}
 
         <div className="field">
-          <span className="field-label">Rating</span>
+          <span className="field-label">How much did you like it?</span>
           <TierPicker names={tiers.names} ranges={ranges} value={shownTier} label="Tier"
             onPick={(t) => { setTyped(''); setTapped(t === tapped && rating === null ? null : t); }} />
-          <label className="field-label" htmlFor={ids.rating}>Or type a number</label>
+          <label className="field-label" htmlFor={ids.rating}>or type a number</label>
           <input
             id={ids.rating} type="number" className="input" step="any" min={0} max={10} inputMode="decimal"
-            value={typed} aria-invalid={parsed.ok ? undefined : true} aria-describedby={parsed.ok ? undefined : ids.ratingErr}
+            value={typed} aria-invalid={parsed.ok ? undefined : true} aria-describedby={parsed.ok ? ids.ratingHint : ids.ratingErr}
             onChange={(e) => { setTyped(e.target.value); setTapped(null); }}
           />
           {parsed.ok
-            ? <span className="field-hint">Typing a number picks the tier it falls in. Or leave it unrated for now.</span>
+            ? <span id={ids.ratingHint} className="field-hint">Typing a number picks the tier it falls in. Or leave it unrated for now.</span>
             : <span id={ids.ratingErr} role="alert" className="field-error">{parsed.error}</span>}
         </div>
 

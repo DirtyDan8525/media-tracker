@@ -1,8 +1,9 @@
-import { CATEGORY_CONFIG, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status, type Tier } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, normTitle, round1, scoreOf, tierRange, similarity, type Category, type Entry, type LookupInfo, type Status, type Tier } from '@media-tracker/shared';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { COMPARE_QUEUE_KEY } from '../data/compare';
+import { cachedTiers } from '../data/entryMutations';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
 import { LIST_LABEL } from '../nav';
@@ -107,12 +108,15 @@ export function useAddEntry(category: Category) {
 
     // The row appears before anything comes back.
     const now = new Date().toISOString();
+    // A tapped tier starts in the middle of its range, as the Worker will place it.
+    const tierOnly = body.rating === undefined && input.tier !== undefined;
+    const tempRating = tierOnly ? round1(scoreOf(0, tierRange(cachedTiers(qc, category), input.tier!))) : null;
     const tempId = `tmp-${++tempCounter}`;
     const temp: Entry = {
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
-      rating: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: '',
+      rating: (body.rating as number | undefined) ?? tempRating, genres: '', creator, album: '', coverUrl: '', notes: '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
-      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: input.tier ?? null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
+      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: input.tier ?? null, priorMean: tierOnly ? 0 : null, strength: tierOnly ? 0 : null, scoreLocked: false, createdAt: now, updatedAt: now,
     };
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });

@@ -87,7 +87,7 @@ async function openTier(list: string, tier: string) {
 
 /** Fix my ratings on Anime · Loved: Bebop > Clannad, then Stop: the review. */
 async function fixToReview() {
-  await openTier('Anime (6)', 'Loved, 3 titles');
+  await openTier('Anime (6)', 'Loved 3 titles');
   await userEvent.click(await within(pair()).findByRole('button', { name: 'Bebop, now 9.5' }));
   await screen.findByText('Pick 2');
   await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
@@ -128,7 +128,7 @@ describe('Fix my ratings: home', () => {
     await userEvent.click(within(lists).getByRole('button', { name: 'Anime (6)' }));
     const tiers = await screen.findByRole('group', { name: 'Tiers' });
     expect(within(tiers).getAllByRole('button').map((b) => b.textContent)).toEqual(['All tiers', 'Loved 3', 'Liked 2', 'Fine 1', 'Didn\'t like 0']);
-    expect(within(tiers).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([null, 'Loved, 3 titles', 'Liked, 2 titles', 'Fine, 1 title', 'Didn\'t like, 0 titles']);
+    expect(within(tiers).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([null, 'Loved 3 titles', 'Liked 2 titles', 'Fine 1 title', 'Didn\'t like 0 titles']);
     expect(within(lists).getByRole('button', { name: 'Anime (6)' })).toHaveAttribute('aria-pressed', 'true');
 
     // a season tab has no count until opened; then its own tier counts
@@ -153,7 +153,7 @@ describe('Fix my ratings: home', () => {
 describe('Fix my ratings: a session', () => {
   it('fix: asks the two closest titles in the chosen tier; About the same, Skip, Stop, Back; review shows old → new; Save posts the payload', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     expect(await screen.findByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
     expect(screen.getByText('Anime · Loved')).toBeInTheDocument();
     expect(screen.getByText('Which do you like more? Tap it.')).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe('Fix my ratings: a session', () => {
 
   it('Belongs in another tier moves the title, the next question changes, and the review shows the tier change', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     await screen.findByText('Pick 1');
     const move = screen.getByRole('button', { name: 'Belongs in another tier: Clannad' });
     expect(move).toHaveAttribute('aria-expanded', 'false');
@@ -213,7 +213,7 @@ describe('Fix my ratings: a session', () => {
 
   it('the settledness bar shows checked of total and grows after a pick between neighbours', async () => {
     setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     const bar = await screen.findByRole('progressbar', { name: 'Neighbours checked' });
     expect(bar).toHaveAttribute('aria-valuenow', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '2');
@@ -225,7 +225,7 @@ describe('Fix my ratings: a session', () => {
 
   it('nothing left to ask: a one-title tier ends at once with the friendly line', async () => {
     const { calls } = setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Fine, 1 title');
+    await openTier('Anime (6)', 'Fine 1 title');
     expect(await screen.findByText('Nothing left to ask in Anime · Fine. Your order is as settled as your picks make it.')).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -263,7 +263,7 @@ describe('Fix my ratings: a session', () => {
 
   it('keys and swipe still answer (←, →, ↓, S, Backspace; ±80 px)', async () => {
     setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     await screen.findByText('Pick 1');
     fireEvent.keyDown(document, { key: 'Backspace' }); // nothing to go back to
     expect(screen.getByText('Pick 1')).toBeInTheDocument();
@@ -313,7 +313,7 @@ describe('Fix my ratings: more runs', () => {
     const rows = lovedAnime();
     const changed = rows.map((e) => (e.id === 'Clannad' ? rated('Clannad', 9.45) : e)); // changed on another device
     const { calls } = setup({ entries: rows, ratingSet: (_s, n) => setReply(n === 1 ? rows : changed) });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     await screen.findByText('Pick 1');
     expect(cardNames()).toEqual(['Bebop, now 9.5', 'Clannad, now 9.45']);
     expect(setGets(calls)).toBe(2);
@@ -337,7 +337,7 @@ describe('Fix my ratings: more runs', () => {
   it('a set that fails to load: a toast, and the list and its tiers stay for another try', async () => {
     const rows = lovedAnime();
     setup({ entries: rows, ratingSet: (_s, n) => (n === 1 ? setReply(rows) : { status: 500, body: { error: 'boom' } }) });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
     expect(await screen.findByRole('group', { name: 'Tiers' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
@@ -346,7 +346,7 @@ describe('Fix my ratings: more runs', () => {
   it('flipped cards: the left card is the question\'s second title, and it answers "b"', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // below .5: flip
     setup({ entries: lovedAnime() });
-    await openTier('Anime (6)', 'Loved, 3 titles');
+    await openTier('Anime (6)', 'Loved 3 titles');
     await screen.findByText('Pick 1');
     expect(cardNames()).toEqual(['Clannad, now 9.4', 'Bebop, now 9.5']); // question order is Bebop, Clannad
     fireEvent.keyDown(document, { key: 'ArrowLeft' }); // the left card: Clannad

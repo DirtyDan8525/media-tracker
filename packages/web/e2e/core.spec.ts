@@ -290,3 +290,17 @@ test('import the sample workbook: counts match the preview', async ({ page }) =>
   await page.getByRole('button', { name: `Import ${total} ${total === 1 ? 'title' : 'titles'}` }).click();
   await expect(page.getByRole('heading', { name: `Imported ${total} ${total === 1 ? 'title' : 'titles'}` })).toBeVisible();
 });
+
+test('Top 5: Share Anime Top 5 previews a 1080 × 1350 PNG and Save image downloads it', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/top5');
+  await page.getByRole('button', { name: 'Share Anime Top 5' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Share your Anime Top 5' });
+  const preview = sheet.getByRole('img', { name: 'Preview of your My Anime Top 5 image' });
+  await expect(preview).toBeVisible();
+  await expect.poll(() => preview.evaluate((img) => [(img as unknown as { naturalWidth: number }).naturalWidth, (img as unknown as { naturalHeight: number }).naturalHeight])).toEqual([1080, 1350]);
+  const download = page.waitForEvent('download');
+  await sheet.getByRole('button', { name: 'Save image' }).click();
+  expect((await download).suggestedFilename()).toBe('top5-anime.png');
+  await expect(page.getByText('Image saved')).toBeVisible();
+});

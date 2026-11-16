@@ -1,19 +1,31 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { topFive } from '../ratings/topFive';
+import { numberOnes, topFive } from '../ratings/topFive';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
+import { Icon } from '../design/components/Icon';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
+import { useCfSet, useThemeColors } from '../design/ThemeContext';
 import { enabledLists, LIST_LABEL } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
+import type { CardSpec } from '../share/shareImage';
+import { ShareSheet, type ShareRequest } from './top5/ShareSheet';
 import '../design/ratings.css';
+
+/** A card row for `e` (rated: topFive only returns rated rows). */
+function cardRow(e: Entry, rank: number, listLabel?: string): CardSpec['rows'][number] {
+  return {
+    rank, ...(listLabel ? { listLabel } : {}), title: e.title, creator: e.creator, rating: e.rating ?? 0,
+    square: CATEGORY_CONFIG[e.category].square, coverUrl: e.coverUrl,
+  };
+}
 
 /** The five best-rated titles of every list that is turned on (route /top5). */
 export function Top5Screen() {
@@ -21,6 +33,9 @@ export function Top5Screen() {
   const qc = useQueryClient();
   const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
   const { data, isPending, isError } = useAllEntries(lists);
+  const colors = useThemeColors();
+  const cf = useCfSet();
+  const [sharing, setSharing] = useState<ShareRequest | null>(null);
 
   const loaded = lists.filter((c) => data[c]).length;
   if (isError && loaded === 0) {
@@ -42,9 +57,29 @@ export function Top5Screen() {
       </div>
     );
   }
+  const ones = numberOnes(data, lists);
+  const theme = { username: me.username ?? '', colors, cf };
+  const shareOnes = () => setSharing({
+    sheetTitle: 'Share your #1s', filename: 'my-number-ones.png', shareTitle: 'My #1s',
+    card: { ...theme, kind: 'ones', heading: 'My #1s', rows: ones.map((e) => cardRow(e, 1, LIST_LABEL[e.category])) },
+  });
+  const shareList = (c: Category, top: Entry[]) => {
+    const heading = `My ${LIST_LABEL[c]} Top 5`;
+    setSharing({
+      sheetTitle: `Share your ${LIST_LABEL[c]} Top 5`, filename: `top5-${c}.png`, shareTitle: heading,
+      card: { ...theme, kind: 'top5', heading, rows: top.map((e, i) => cardRow(e, i + 1)) },
+    });
+  };
   return (
     <div className="screen">
-      <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile sub="Your highest rated in each list." />
+      <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile sub="Your highest rated in each list.">
+        {ones.length > 0 && (
+          <div className="top5__share-ones">
+            <Button onClick={shareOnes}><Icon name="share" size={18} />Share my #1s</Button>
+          </div>
+        )}
+      </PageHeader>
+      {sharing && <ShareSheet request={sharing} onClose={() => setSharing(null)} />}
       <div className="screen__body top5">
         {isError && (
           <div className="load-notice" role="status">
@@ -55,14 +90,18 @@ export function Top5Screen() {
         {lists.length === 0 && (
           <EmptyState icon="info" title="No lists are turned on" body="Turn a list on in Settings to see its Top 5." />
         )}
-        {lists.map((c) => <TopBlock key={c} category={c} rows={data[c]} />)}
+        {lists.map((c) => <TopBlock key={c} category={c} rows={data[c]} onShare={shareList} />)}
       </div>
     </div>
   );
 }
 
 /** `rows` is undefined when the list could not be loaded. */
-function TopBlock({ category, rows }: { category: Category; rows: Entry[] | undefined }) {
+function TopBlock({ category, rows, onShare }: {
+  category: Category;
+  rows: Entry[] | undefined;
+  onShare: (c: Category, top: Entry[]) => void;
+}) {
   const name = LIST_LABEL[category];
   const top = useMemo(() => topFive(rows ?? []), [rows]);
   const id = `top5-${category}`;
@@ -77,9 +116,14 @@ function TopBlock({ category, rows }: { category: Category; rows: Entry[] | unde
           <Link to={`/list/${category}`} className="btn btn--secondary top5__go">Go to {name}</Link>
         </div>
       ) : (
-        <ol className="top5__list">
-          {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} />)}
-        </ol>
+        <>
+          <ol className="top5__list">
+            {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} />)}
+          </ol>
+          <div className="top5__share">
+            <Button onClick={() => onShare(category, top)}><Icon name="share" size={18} />Share {name} Top 5</Button>
+          </div>
+        </>
       )}
     </section>
   );

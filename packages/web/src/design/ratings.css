@@ -120,3 +120,19 @@
 .stats__list-dl dt { font-size: var(--fs-pill); color: var(--muted-text); }
 .stats__list-dl dd { margin: 0; font-size: var(--fs-body); color: var(--bright-text); font-variant-numeric: tabular-nums; }
 .stats__more { align-self: flex-start; }
+
+/* ---------- Share (B17): "Share my #1s" under the header, "Share <List> Top 5" under each block ---------- */
+.top5__share-ones { display: flex; margin-top: var(--space-6); }
+.top5__share-ones .btn { flex: 1; }
+@media (min-width: 768px) { .top5__share-ones .btn { flex: none; } }
+.top5__share { display: flex; justify-content: flex-end; }
+.share-sheet__preview {
+  position: relative; width: min(100%, 300px); aspect-ratio: 1080 / 1350; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+.share-sheet__image {
+  display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--grid-line);
+}
+.share-sheet__making { position: absolute; margin: 0; color: var(--text); font-size: var(--fs-meta); }
+.share-sheet__actions { display: flex; gap: var(--space-5); }
+.share-sheet__actions .btn { flex: 1; }

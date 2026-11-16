@@ -5,22 +5,18 @@ import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
 describe('SettingsScreen', () => {
-  it('turning a list off removes it from the Lists menu', async () => {
+  it('turning a list off removes it from the list dropdown', async () => {
     const calls = mockApi(makeMe());
-    renderApp('/settings');
-    const listsButton = await screen.findByRole('button', { name: 'Lists' });
-    await userEvent.click(listsButton);
-    expect(within(screen.getByRole('navigation', { name: 'Lists' })).getByRole('link', { name: 'Albums' })).toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
-
-    await userEvent.click(screen.getByRole('switch', { name: 'Albums' }));
+    const { router } = renderApp('/settings');
+    await userEvent.click(await screen.findByRole('switch', { name: 'Albums' }));
     expect(screen.getByRole('switch', { name: 'Albums' })).not.toBeChecked();
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ settings: { tabs: { albums: false } } }));
 
-    await userEvent.click(listsButton);
-    const menu = screen.getByRole('navigation', { name: 'Lists' });
-    await waitFor(() => expect(within(menu).queryByRole('link', { name: 'Albums' })).not.toBeInTheDocument());
-    expect(within(menu).getByRole('link', { name: 'Songs' })).toBeInTheDocument();
+    await router.navigate('/list/anime');
+    await userEvent.click(await screen.findByRole('button', { name: 'Anime' }));
+    const menu = screen.getByRole('menu', { name: 'Switch list' });
+    expect(within(menu).queryByRole('menuitem', { name: /^Albums/ })).not.toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Songs/ })).toBeInTheDocument();
   });
 
   it('shows switches for every list and both season tabs', async () => {

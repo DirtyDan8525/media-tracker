@@ -1,9 +1,25 @@
 import type { Entry } from './types';
 
-/** The fixed reaction set (spec §5.4). */
+/** The quick set shown in the React popover (spec §5.4, amended by Phase 5: any single emoji is allowed too). */
 export const REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏'] as const;
-export type Reaction = (typeof REACTIONS)[number];
-export const isReaction = (v: unknown): v is Reaction => typeof v === 'string' && (REACTIONS as readonly string[]).includes(v);
+/** One emoji, as a string. */
+export type Reaction = string;
+export const REACTION_MAX_UNITS = 32;
+
+const segmenter = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+const EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+
+/** Exactly one emoji grapheme (a flag, a skin-toned hand and a ZWJ family each count as one); no text, digits or extras. */
+export const isReaction = (v: unknown): v is Reaction => {
+  if (typeof v !== 'string' || v.length === 0 || v.length > REACTION_MAX_UNITS) return false;
+  if (!EMOJI.test(v)) return false;
+  if (segmenter) {
+    let n = 0;
+    for (const _ of segmenter.segment(v)) if (++n > 1) return false;
+    return n === 1;
+  }
+  return false;
+};
 
 export const COMMENT_MAX = 500;
 /** Cloudflare Access free plan. */
@@ -39,7 +55,7 @@ export interface Comment {
 }
 
 export interface PostSocial {
-  reactions: Partial<Record<Reaction, number>>;
+  reactions: Record<string, number>;
   mine: Reaction[];
   comments: number;
 }

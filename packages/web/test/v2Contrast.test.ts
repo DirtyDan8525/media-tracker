@@ -7,7 +7,7 @@ import { barTextColor, contrast } from '../src/design/theme';
 // compositing, so these check the declared roles and the backdrop's worst case by arithmetic).
 const read = (f: string) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8');
 const tokens = read('tokens.css');
-const css = (['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css'].map(read).join('\n')).replace(/\/\*[\s\S]*?\*\//g, '');
+const css = (['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css', 'list-menu.css'].map(read).join('\n')).replace(/\/\*[\s\S]*?\*\//g, '');
 
 function decls(selector: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -125,49 +125,24 @@ describe('v2 contrast', () => {
     });
   });
 
-  // B5: the Lists menu is Cards at --see-through alpha over whatever is behind it (blurred). Its
-  // text must read over the worst cases: a pure white or pure black page under it.
-  describe('see-through Lists menu', () => {
-    const alpha = tokenNum('--see-through');
-    it('--see-through is 0.9 and the menu uses it on Cards, opaque Cards without color-mix()', () => {
-      expect(alpha).toBe(0.9);
-      expect(css).toMatch(/\.lists-menu\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--card\) calc\(var\(--see-through\) \* 100%\), transparent\)/);
-      expect(css).toMatch(/\.lists-menu\s*\{[^}]*background:\s*var\(--card\)/);
-      expect(css).toMatch(/@media \(prefers-reduced-transparency: reduce\)\s*\{\s*\.lists-menu\s*\{[^}]*background:\s*var\(--card\)/);
-    });
-
-    // Muted text cannot reach 4.5:1 here: over a black page at 0.9 it reads 3.6-4.0:1 on the five
-    // light themes (it is close to the limit on opaque Cards already). So the menu uses no Muted text.
-    it('menu rows use Text and Bright text (current) only; the counts are Text, not Muted text', () => {
-      expect(decls('.lists-menu__item').color).toBe('var(--text)');
-      expect(decls('.lists-menu__item[aria-current="page"]').color).toBe('var(--bright-text)');
-      expect(decls('.lists-menu__count').color).toBe('var(--text)');
-      const menuCss = css.match(/\.lists-menu[\w-]*[^{]*\{[^}]*\}/g)!.join('\n');
+  // Phase 5: the list dropdown (list title, "Add to") is an opaque Cards panel; the current row sits on Panels.
+  // Muted text is not used in it (it is near 4.5:1 on Cards already), so the counts are Text.
+  describe('list dropdown menu', () => {
+    it('rows and counts use Text on Cards; no Muted text in the menu', () => {
+      expect(decls('.list-menu__panel').background).toBe('var(--card)');
+      expect(decls('.list-menu__item').color).toBe('var(--text)');
+      expect(decls('.list-menu__count').color).toBe('var(--text)');
+      const menuCss = css.match(/\.list-menu__(?:panel|item|count|label|check)[^{]*\{[^}]*\}/g)!.join('\n');
       expect(menuCss).not.toMatch(/color:\s*var\(--muted-text\)/);
     });
 
-    it.each(NAMES)('%s: Text and Bright text on Cards at --see-through over #ffffff and #000000 are >= 4.5:1', (name) => {
+    it.each(NAMES)('%s: Text on Cards and on Panels (the current row) is >= 4.5:1; the check icon is >= 3:1 on both', (name) => {
       const t = THEMES[name]!;
-      for (const under of ['#ffffff', '#000000']) {
-        const shown = over(t.Cards!, alpha, under);
-        for (const role of ['Text', 'Bright text']) {
-          expect(contrast(t[role]!, shown), `${name} ${role} over ${under}`).toBeGreaterThanOrEqual(4.5);
-        }
+      for (const under of [t.Cards!, t.Panels!]) {
+        expect(contrast(t.Text!, under), `${name} Text on ${under}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t.Highlight!, under), `${name} Highlight on ${under}`).toBeGreaterThanOrEqual(3);
       }
-    });
-  });
-
-  // The current list's check icon (Highlight on the see-through menu) is non-text: >= 3:1 (WCAG 1.4.11).
-  describe('Lists menu check icon', () => {
-    const alpha = tokenNum('--see-through');
-    const ROLE: Record<string, string> = { text: 'Text', 'bright-text': 'Bright text', highlight: 'Highlight' };
-    it.each(NAMES)('%s: the check icon is >= 3:1 on Cards at --see-through over #ffffff and #000000, and on opaque Cards', (name) => {
-      const role = ROLE[/var\(--([\w-]+)\)/.exec(decls('.lists-menu__check').color ?? '')?.[1] ?? ''];
-      expect(role, 'check colour is a theme role').toBeDefined();
-      const t = THEMES[name]!;
-      for (const under of [t.Cards!, over(t.Cards!, alpha, '#ffffff'), over(t.Cards!, alpha, '#000000')]) {
-        expect(contrast(t[role!]!, under), `${name} ${role} on ${under}`).toBeGreaterThanOrEqual(3);
-      }
+      expect(decls('.list-menu__check').color).toBe('var(--highlight)');
     });
   });
 

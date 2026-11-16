@@ -55,3 +55,8 @@ export function addPath(c: Category, keep?: URLSearchParams | string): string {
 
 /** Global search (`/search?q=`). */
 export const SEARCH_PATH = '/search';
+
+/** The floating Add bubble shows on the lists, Activity and Search only: not on Profile, More, Compare, Settings (and their sub-pages), Admin, Friends, friend profiles, entries... */
+export function showsAddBubble(pathname: string): boolean {
+  return pathname.startsWith('/list/') || pathname === '/activity' || pathname === '/search';
+}

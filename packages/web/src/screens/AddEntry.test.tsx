@@ -15,10 +15,10 @@ function meWith(ask = 'Both', tiers?: Partial<Record<Category, TierSet>>) {
 
 async function openAdd() {
   // The phone's Add is the Main nav's (bottom bar's) Add link (B3).
-  const nav = await screen.findByRole('navigation', { name: 'Main' });
-  await userEvent.click(within(nav).getByRole('link', { name: 'Add anime' }));
+  await screen.findByRole('navigation', { name: 'Main' });
+  await userEvent.click(await screen.findByRole('link', { name: 'Add anime' }));
   await screen.findByRole('textbox', { name: 'Title' });
-  return screen.getByRole('dialog', { name: /^Add to / });
+  return screen.getByRole('dialog', { name: 'Add' });
 }
 const posts = (calls: { method: string; path: string; body: unknown }[]) =>
   calls.filter((c) => c.method === 'POST' && c.path === '/api/entries').map((c) => c.body as Record<string, unknown>);
@@ -240,5 +240,68 @@ describe('the Add sheet: Add and place it', () => {
     await userEvent.click(placeButton(d)!);
     expect(await screen.findByText("Couldn't save that. Check your connection and try again.")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/list/anime');
+  });
+});
+
+describe('the Add sheet: "Add to" list dropdown', () => {
+  const addTo = (d: HTMLElement) => within(d).getByRole('button', { name: /^Add to/ });
+
+  it('defaults to the current list, is a menu button, and lists every enabled list', async () => {
+    fakeBackend({ me: meWith() });
+    renderApp('/list/movies');
+    await screen.findByRole('navigation', { name: 'Main' });
+    await userEvent.click(await screen.findByRole('link', { name: 'Add movie' }));
+    const d = await screen.findByRole('dialog', { name: 'Add' });
+    const button = addTo(d);
+    expect(button).toHaveTextContent('Movies');
+    expect(button).toHaveAttribute('aria-haspopup', 'menu');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(button);
+    const items = within(screen.getByRole('menu', { name: 'Add to' })).getAllByRole('menuitemradio');
+    expect(items.map((i) => i.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books']);
+    expect(items.filter((i) => i.getAttribute('aria-checked') === 'true').map((i) => i.textContent)).toEqual(['Movies']);
+  });
+
+  it('Escape closes only the menu (the sheet stays) and focus returns to the "Add to" button', async () => {
+    fakeBackend({ me: meWith() });
+    renderApp('/list/anime');
+    const d = await openAdd();
+    await userEvent.click(addTo(d));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Add' })).toBeInTheDocument();
+    expect(addTo(d)).toHaveFocus();
+  });
+
+  it('choosing another list switches the field label and status words, and the title is added to that list', async () => {
+    const { calls } = fakeBackend({ me: meWith() });
+    renderApp('/list/anime');
+    const d = await openAdd();
+    await userEvent.click(within(d).getByRole('button', { name: 'Plan to watch' }));
+    await userEvent.click(addTo(d));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Games' }));
+    expect(addTo(d)).toHaveTextContent('Games');
+    expect(addTo(d)).toHaveFocus();
+    expect(within(d).getByRole('button', { name: 'Plan to play' })).toHaveAttribute('aria-pressed', 'false'); // status reset, Games wording
+    await typeTitle(d, 'Hades');
+    await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]).toMatchObject({ category: 'games', title: 'Hades' });
+    expect(await screen.findByText('Added to Games')).toBeInTheDocument();
+  });
+
+  it('a list with no status hides the status chips; adding to the default list sends no extra toast', async () => {
+    const { calls } = fakeBackend({ me: meWith() });
+    renderApp('/list/anime');
+    const d = await openAdd();
+    await userEvent.click(addTo(d));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Movies' }));
+    expect(within(d).queryByRole('button', { name: 'Completed' })).not.toBeInTheDocument();
+    await userEvent.click(addTo(d));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Anime' }));
+    await typeTitle(d, 'Frieren');
+    await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posts(calls)[0]).toMatchObject({ category: 'anime' }));
+    expect(screen.queryByText(/^Added to/)).not.toBeInTheDocument();
   });
 });

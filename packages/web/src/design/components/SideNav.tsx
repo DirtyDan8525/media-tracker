@@ -10,7 +10,7 @@ import { Icon } from './Icon';
 /**
  * PC side nav (B20/B21, SideNavPC board), `nav "Main"`: the profile row (32 px avatar + @username),
  * Add (a primary button-styled link to the current list's Add sheet; none while every list is off),
- * Search, Activity, Compare (with its waiting count), a divider, every
+ * Home (the last list shown), Search, Activity, Compare (with its waiting count), a divider, every
  * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats
  * and Settings are reached through Profile.
  */
@@ -37,6 +37,9 @@ export function SideNav({ lists, counts, compareCount = 0, activityCount = 0, cu
           <span>Add {ADD_NOUN[current]}</span>
         </Link>
       )}
+      <Link to="/" className="side-nav__link">
+        <span className="side-nav__link-start"><Icon name="home" size={18} />Home</span>
+      </Link>
       <NavLink to={SEARCH_PATH} className="side-nav__link">
         <span className="side-nav__link-start"><Icon name="search" size={18} />Search</span>
       </NavLink>

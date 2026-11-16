@@ -6,7 +6,8 @@ import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
 import { TierPicker } from '../design/components/TierPicker';
 import { parseRating } from '../lists/validate';
-import { LIST_LABEL } from '../nav';
+import { enabledLists, LIST_LABEL } from '../nav';
+import { ListMenu } from '../shell/ListMenu';
 import { useSessionMe } from '../shell/SessionGate';
 import type { AddInput } from '../hooks/useAddEntry';
 
@@ -25,9 +26,12 @@ const lower = (s: string) => s.toLowerCase();
  * number posts `rating` and the tier it falls in lights up. With Ask to compare on Both or Only for
  * new ratings, a rated title can also be added and placed (Q15, Q16).
  */
-export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
-  const cfg = CATEGORY_CONFIG[category];
+export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps) {
   const me = useSessionMe();
+  /** "Add to": starts on the current list; the field label, tiers and status words follow it. */
+  const [category, setCategory] = useState<Category>(initial);
+  const cfg = CATEGORY_CONFIG[category];
+  const lists = enabledLists(me.settings);
   const tiers = tiersFor(me.settings, category);
   const ranges = ([0, 1, 2, 3] as Tier[]).map((t) => tierRange(tiers, t));
   const ids = { title: useId(), creator: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
@@ -48,7 +52,7 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
 
   function submit(place = false) {
     if (!canAdd) return;
-    const input: AddInput = { title: title.trim(), creator: creator.trim(), status };
+    const input: AddInput = { title: title.trim(), creator: cfg.creatorLabel ? creator.trim() : '', status: cfg.hasStatus ? status : null, category };
     if (rating !== null) input.rating = rating;
     else if (tapped !== null) input.tier = tapped;
     onSubmit(input, place ? { place: true } : undefined);
@@ -59,7 +63,7 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
   return (
     <Sheet
       open
-      title={`Add to ${LIST_LABEL[category]}`}
+      title="Add"
       onClose={onClose}
       footer={(
         <div className="add-footer">
@@ -70,9 +74,19 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
     >
       <form id="add-entry-form" className="add-form" onSubmit={(e: FormEvent) => { e.preventDefault(); submit(); }}>
         <div className="field">
+          <span className="field-label">Add to</span>
+          <ListMenu
+            lists={lists.includes(category) ? lists : [category, ...lists]} value={category} menuLabel="Add to" triggerLabel={`Add to ${LIST_LABEL[category]}`}
+            onChoose={(c) => { setCategory(c); setStatus(null); }} field
+          >
+            {LIST_LABEL[category]}
+          </ListMenu>
+        </div>
+
+        <div className="field">
           <label className="field-label" htmlFor={ids.title}>{cfg.titleLabel}</label>
           <input
-            id={ids.title} className="input input--lg" value={title} maxLength={300} autoComplete="off"
+            id={ids.title} data-autofocus className="input input--lg" value={title} maxLength={300} autoComplete="off"
             onChange={(e) => setTitle(e.target.value)}
           />
           <span className="field-hint">

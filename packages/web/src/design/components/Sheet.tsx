@@ -16,7 +16,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 /**
  * A modal: a bottom sheet on phones, a centered dialog from 768 px (CSS decides the shape).
- * Escape and the backdrop close it; focus moves in on open, is trapped, and returns on close.
+ * Escape and the backdrop close it; focus moves in on open (to a `data-autofocus` element, else the first field), is trapped, and returns on close.
  */
 export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   const titleId = useId();
@@ -25,7 +25,7 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   useEffect(() => {
     if (!open) return;
     const returnTo = document.activeElement as HTMLElement | null;
-    const first = panel.current?.querySelector<HTMLElement>(`.sheet__body ${FOCUSABLE}`);
+    const first = panel.current?.querySelector<HTMLElement>('[data-autofocus]') ?? panel.current?.querySelector<HTMLElement>(`.sheet__body ${FOCUSABLE}`);
     (first ?? panel.current)?.focus();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';

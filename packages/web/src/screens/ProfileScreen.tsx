@@ -24,6 +24,7 @@ import { AvatarTooBigError, makeAvatar, readImage } from './profile/avatarImage'
 import { TierCounts } from './profile/TierCounts';
 import '../design/settings.css';
 import '../design/nav.css';
+import '../design/wide.css';
 
 const READ_ERROR = "Couldn't read that image. Try a JPEG or PNG.";
 const SAVE_ERROR = "Couldn't save your photo. Try again.";
@@ -155,6 +156,7 @@ export function ProfileScreen() {
           </Link>
         )}
 
+        <div className="profile__col">
         <section aria-labelledby="profile-ones" className="profile__ones">
           <h2 id="profile-ones" className="group__title">My #1s</h2>
           {ones.length === 0 ? (
@@ -174,7 +176,9 @@ export function ProfileScreen() {
         </section>
 
         <TierCounts />
+        </div>
 
+        <div className="profile__col">
         <div className="group__card">
           <Link to="/top5" className="group__row">
             <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>My Top 5</span>
@@ -192,6 +196,7 @@ export function ProfileScreen() {
 
         <div className="profile__logout">
           <Button className="profile__logout-btn" onClick={() => void logOut(qc)}><Icon name="logout" size={18} />Log out</Button>
+        </div>
         </div>
       </div>
 

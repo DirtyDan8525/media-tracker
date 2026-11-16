@@ -15,7 +15,9 @@ import { useCurrentList } from '../shell/currentList';
 import { useAddFriend } from '../shell/AddFriendHost';
 import { PageHeader } from '../shell/PageHeader';
 import { CommentsSheet } from './social/CommentsSheet';
-import { ReactionBar } from './social/ReactionBar';
+import { ReactButton, ReactionChips } from './social/ReactionBar';
+import { Avatar } from '../design/components/Avatar';
+import { RatingBadge } from '../design/components/RatingBadge';
 import { useSessionMe } from '../shell/SessionGate';
 import { dayLabel, timeAgo, type ActivityFilter } from './activity/format';
 import '../design/activity.css';
@@ -132,39 +134,38 @@ export function ActivityScreen() {
   );
 }
 
-/** One post: the line, then reactions and the comment count under it. `who` is null for your own. */
+/** One post (FeedV2.wf): avatar, the line with name and time, rating badge + reaction chips, the cover; React and Comment under it. `who` is null for your own. */
 function FeedPost({ line, now, social, who, onComments }: {
   line: ActivityLine; now: Date; social: PostSocial; who: PublicUser | null; onComments: () => void;
 }) {
   const react = useReact();
   const target = { activityId: line.key } as const;
   const n = social.comments;
+  const toggle = (emoji: Reaction) => react.mutate({ target, emoji });
   return (
     <li className="feed-post">
-      <ActivityRow line={line} now={now} who={who} />
-      <div className="feed-post__social">
-        <ReactionBar social={social} onToggle={(emoji: Reaction) => react.mutate({ target, emoji })} />
-        <button type="button" className="feed-post__comments" onClick={onComments}>
-          {n === 0 ? 'Comment' : n === 1 ? '1 comment' : `${n} comments`}
-        </button>
+      <ActivityRow line={line} now={now} who={who}>
+        {(line.rating || Object.keys(social.reactions).length > 0) && (
+          <div className="feed-post__chips">
+            {line.rating && <RatingBadge rating={line.rating.to} size="xs" />}
+            <ReactionChips social={social} onToggle={toggle} />
+          </div>
+        )}
+      </ActivityRow>
+      <div className="feed-post__actions">
+        <ReactButton mine={social.mine} onPick={toggle} />
+        <Button variant="secondary" className="feed-post__comment" onClick={onComments}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 5h16v11H9l-5 4z" />
+          </svg>
+          {n === 0 ? 'Comment' : `Comment (${n})`}
+        </Button>
       </div>
     </li>
   );
 }
 
-function PersonAvatar({ user }: { user: PublicUser }) {
-  const [failed, setFailed] = useState(false);
-  const initial = (user.displayName || user.username).charAt(0).toUpperCase();
-  return (
-    <span className="activity-line__avatar" aria-hidden="true">
-      {user.avatarAt && !failed
-        ? <img src={`/api/users/${encodeURIComponent(user.id)}/avatar?v=${encodeURIComponent(user.avatarAt)}`} alt="" width={40} height={40} decoding="async" onError={() => setFailed(true)} />
-        : initial}
-    </span>
-  );
-}
-
-function ActivityRow({ line, now, who }: { line: ActivityLine; now: Date; who: PublicUser | null }) {
+function ActivityRow({ line, now, who, children }: { line: ActivityLine; now: Date; who: PublicUser | null; children?: ReactNode }) {
   const me = useSessionMe();
   const own = who === null;
   const title = (
@@ -198,14 +199,15 @@ function ActivityRow({ line, now, who }: { line: ActivityLine; now: Date; who: P
   return (
     <div className="activity-line">
       {own
-        ? <span className="activity-line__avatar" aria-hidden="true">{(me.username ?? me.email).charAt(0).toUpperCase()}</span>
-        : <PersonAvatar user={who} />}
+        ? <Avatar me={me} size={44} className="activity-line__avatar" />
+        : <Avatar user={who} size={44} className="activity-line__avatar" />}
       <div className="activity-line__text">
         <span className="activity-line__sentence">{sentence}</span>
         <time className="activity-line__time" dateTime={line.at}>{timeAgo(line.at, now)}</time>
+        {children}
       </div>
       <span aria-hidden="true" className="activity-line__cover">
-        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={40} />
+        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={56} />
       </span>
     </div>
   );

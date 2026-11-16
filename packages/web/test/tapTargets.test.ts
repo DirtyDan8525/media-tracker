@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 // Spec section 6: every tap target is at least 44 px. jsdom does no layout, so this reads the
 // stylesheets: a control's effective hit height is its height / min-height / line-height plus
 // whatever its ::after hit area adds (inset: -Npx 0 adds N above and N below).
-const css = ['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css'].map((f) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8')).join('\n');
+const css = ['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css', 'list-menu.css'].map((f) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8')).join('\n');
 const tokens = readFileSync(new URL('../src/design/tokens.css', import.meta.url), 'utf8');
 const TAP = Number(/--tap:\s*(\d+)px/.exec(tokens)![1]);
 /** A px size token from tokens.css (e.g. --tap, --btn-h), or null. */
@@ -73,8 +73,9 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     ['.crop__viewport', 'height'],
     ['.bottom-tabs__item', 'min-height'],
     ['.bottom-tabs__search', 'min-height'],
-    ['.lists-fab', 'height'],
-    ['.lists-menu__item', 'min-height'],
+    ['.add-fab', 'height'],
+    ['.list-menu__trigger', 'min-height'],
+    ['.list-menu__item', 'min-height'],
     ['.profile-btn', 'height'],
   ] as const)('%s', (selector, prop) => {
     const props = prop === 'height' ? ['height', 'min-height'] : [prop];
@@ -102,7 +103,7 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     expect(size, `${row} is ${size}px`).toBeGreaterThanOrEqual(TAP);
   });
 
-  it.each(['.lists-fab', '.profile-btn'])('%s is also at least 44 px wide', (selector) => {
+  it.each(['.add-fab', '.profile-btn'])('%s is also at least 44 px wide', (selector) => {
     expect(declared(selector, ['width', 'min-width']) ?? 0).toBeGreaterThanOrEqual(TAP);
   });
 
@@ -121,8 +122,8 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
 // fixed nav pieces keep clear of them with the left/right safe-area insets.
 describe('phone nav keeps clear of the side safe areas', () => {
   const body = (sel: string) => rules(sel).join(';');
-  it('.lists-fab and .lists-menu add env(safe-area-inset-right) to right', () => {
-    for (const sel of ['.lists-fab', '.lists-menu']) {
+  it('.add-fab adds env(safe-area-inset-right) to right', () => {
+    for (const sel of ['.add-fab']) {
       expect(body(sel), sel).toMatch(/(?:^|;)\s*right:\s*calc\([^;]*env\(safe-area-inset-right\)/);
     }
   });
@@ -132,11 +133,11 @@ describe('phone nav keeps clear of the side safe areas', () => {
   });
 });
 
-// Task 7 review: toasts clear the 56 px Lists button only while it shows (ListsButton puts
-// .has-lists-fab on <html>); otherwise they sit just above the bottom bar.
-it('the toast region lifts above the Lists button only under .has-lists-fab', () => {
+// Task 7 review: toasts clear the 56 px Add bubble only while it shows (AddBubble puts
+// .has-add-fab on <html>); otherwise they sit just above the bottom bar.
+it('the toast region lifts above the Add bubble only under .has-add-fab', () => {
   const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const base = /(?:^|\})\s*\.toast-region\s*\{([^}]*)\}/.exec(plain)![1]!;
   expect(base).not.toMatch(/56px/);
-  expect(plain).toMatch(/\.has-lists-fab \.toast-region\s*\{[^}]*bottom:[^;}]*56px/);
+  expect(plain).toMatch(/\.has-add-fab \.toast-region\s*\{[^}]*bottom:[^;}]*56px/);
 });

@@ -13,14 +13,23 @@ describe('More (SettingsMore.v2)', () => {
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 
-  it('has the sections Ratings (Compare, Top 5, Stats), Your data and App (About), and nothing else', async () => {
+  it('has the sections Ratings (Compare, Top 5, Stats), Your data and App (What is new, Coming soon, About), and nothing else', async () => {
     mockApi(makeMe({ isAdmin: false }));
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
       .toEqual(['Ratings', 'Your data', 'App']);
     expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Compare', 'Top 5', 'Stats']);
-    expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['About Media Tracker']);
+    expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(["What's new", 'Coming soon', 'About Media Tracker']);
+  });
+
+  it('How to use the app re-opens the walkthrough', async () => {
+    mockApi(makeMe());
+    renderApp('/more');
+    await userEvent.click(await screen.findByRole('button', { name: 'How to use the app' }));
+    expect(screen.getByRole('dialog', { name: 'Your lists' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('has no Settings, Appearance, tier or Other lists rows (those live under Profile → Settings), even with lists beyond the fourth enabled', async () => {

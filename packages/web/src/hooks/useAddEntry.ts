@@ -19,6 +19,8 @@ export interface AddInput {
   /** A tapped tier, with no number (the title starts in the middle of it). */
   tier?: Tier;
   status?: Status | null;
+  /** The list to add to (the Add sheet's "Add to"); default: the list the hook was made for. */
+  category?: Category;
 }
 
 export type AddState = 'idle' | 'looking' | 'choose' | 'saved';
@@ -48,7 +50,7 @@ let tempCounter = 0;
  * several open the picker (`state === 'choose'`), none leaves it "Couldn't find it". retry(),
  * choose(), keepTyped() and search() continue from there.
  */
-export function useAddEntry(category: Category) {
+export function useAddEntry(defaultCategory: Category) {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(0);
@@ -98,6 +100,7 @@ export function useAddEntry(category: Category) {
   const add = useCallback(async (input: AddInput): Promise<Entry | null> => {
     const title = input.title.trim();
     if (!title) return null;
+    const category = input.category ?? defaultCategory;
     const cfg = CATEGORY_CONFIG[category];
     const creator = cfg.creatorLabel ? (input.creator ?? '').trim() : '';
     const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: 'pending' };
@@ -139,7 +142,7 @@ export function useAddEntry(category: Category) {
     }
     await resolve(entry, title, lookup);
     return entry;
-  }, [category, qc, toast, resolve]);
+  }, [defaultCategory, qc, toast, resolve]);
 
   /** Look an entry up again (Retry), with its own title or `term`. */
   const retry = useCallback(async (entry: Entry, term?: string): Promise<void> => {

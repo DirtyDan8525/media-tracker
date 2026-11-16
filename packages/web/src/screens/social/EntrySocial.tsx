@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEntrySocial, useReact } from '../../data/feed';
-import { ReactionBar } from './ReactionBar';
+import { Button } from '../../design/components/Button';
+import { ReactButton, ReactionChips } from './ReactionBar';
 import { CommentsSheet } from './CommentsSheet';
 import '../../design/feed.css';
 
@@ -20,10 +21,13 @@ export function EntrySocial({ entryId, ownerId }: { entryId: string; ownerId: st
   const target = { entryId } as const;
   return (
     <section className="entry-social" aria-label="Reactions and comments">
-      <ReactionBar social={s} onToggle={(emoji) => react.mutate({ target, emoji })} />
-      <button type="button" className="entry-social__comments" onClick={() => setOpen(true)}>
-        {s.comments === 0 ? 'Comment' : s.comments === 1 ? '1 comment' : `${s.comments} comments`}
-      </button>
+      <ReactionChips social={s} onToggle={(emoji) => react.mutate({ target, emoji })} />
+      <div className="entry-social__actions">
+        <ReactButton mine={s.mine} onPick={(emoji) => react.mutate({ target, emoji })} />
+        <Button variant="secondary" className="entry-social__comments" onClick={() => setOpen(true)}>
+          {s.comments === 0 ? 'Comment' : `Comment (${s.comments})`}
+        </Button>
+      </div>
       <CommentsSheet target={target} open={open} onClose={() => setOpen(false)} />
     </section>
   );

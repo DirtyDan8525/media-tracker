@@ -1,30 +1,56 @@
 /* Feed reactions, comments, unread badge and privacy rows (Feed.wf, EntryPrivacy.wf; calm v2 look). */
 .reactions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.reactions__btn {
-  all: unset; box-sizing: border-box; min-width: var(--tap); height: var(--tap); padding: 0 var(--space-3); border-radius: 22px;
-  border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  font: 500 var(--fs-meta) var(--font); color: var(--text); font-variant-numeric: tabular-nums; cursor: pointer;
+/* Summary chip: 28 px to look at, the tap area stretched to 44 px. */
+.reactions__chip {
+  all: unset; box-sizing: border-box; position: relative; min-height: 28px; padding: 0 var(--space-4); border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--grid-line); display: inline-flex; align-items: center; gap: var(--space-2);
+  font: 600 var(--fs-meta) var(--font); color: var(--text); font-variant-numeric: tabular-nums; cursor: pointer;
 }
-.reactions__btn:hover { background: var(--panel); }
-.reactions__btn[aria-pressed='true'] { border-color: var(--highlight); background: var(--panel); color: var(--highlight); font-weight: 700; }
-.reactions__btn:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
-.reactions__btn:disabled { opacity: 0.6; cursor: default; }
+.reactions__chip::after { content: ''; position: absolute; inset: -8px -2px; }
+.reactions__chip[aria-pressed='true'] { border-color: var(--highlight); color: var(--highlight); font-weight: 700; }
+.reactions__chip:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.reactions__chip:disabled { opacity: 0.6; cursor: default; }
 
-.entry-social { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-6) 0; }
-.entry-social__comments, .feed-post__comments {
-  all: unset; box-sizing: border-box; min-height: var(--tap); display: inline-flex; align-items: center; align-self: flex-start;
-  padding: 0 var(--space-4); border-radius: var(--radius-chip); color: var(--muted-text); font: 500 var(--fs-meta) var(--font); cursor: pointer;
+.entry-social { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6) 0; }
+.entry-social__actions, .feed-post__actions { display: flex; gap: var(--space-4); }
+.entry-social__actions > *, .feed-post__actions > * { flex: 1; }
+.feed-post__actions .btn, .entry-social__actions .btn { width: 100%; min-height: var(--tap); gap: var(--space-3); }
+
+/* React popover: the six quick emojis and "+", or the text field. */
+.react { position: relative; display: block; }
+.react__pop {
+  position: absolute; z-index: 20; bottom: calc(100% + var(--space-2)); left: 0; max-width: calc(100vw - 32px);
+  display: flex; flex-wrap: wrap; justify-content: space-between; padding: var(--space-2); border-radius: 26px;
+  background: var(--card); border: 1px solid var(--grid-line); box-shadow: 0 6px 18px rgb(0 0 0 / 0.3);
 }
-.entry-social__comments:hover, .feed-post__comments:hover { color: var(--text); background: var(--panel); }
-.entry-social__comments:focus-visible, .feed-post__comments:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.react__emoji {
+  all: unset; box-sizing: border-box; width: var(--tap); height: var(--tap); border-radius: 22px; display: flex; align-items: center;
+  justify-content: center; font-size: 22px; cursor: pointer;
+}
+.react__emoji:hover { background: var(--panel); }
+.react__emoji[aria-pressed='true'] { background: var(--panel); outline: 1px solid var(--highlight); }
+.react__plus { border: 1px dashed var(--muted-text); color: var(--highlight); font-weight: 600; }
+.react__emoji:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.react__form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2); min-width: 260px; }
+.react__input {
+  box-sizing: border-box; flex: 1; min-width: 0; min-height: var(--tap); padding: 0 var(--space-5); border-radius: 12px;
+  border: 1px solid var(--grid-line); background: var(--bg); color: var(--bright-text); font: 400 var(--fs-body) var(--font);
+}
+.react__input[aria-invalid='true'] { border-color: var(--highlight); }
+.react__error { flex-basis: 100%; margin: 0; font-size: var(--fs-meta); color: var(--bright-text); }
+@media (prefers-reduced-motion: no-preference) {
+  .react__pop { animation: react-pop 0.14s ease-out; }
+  @keyframes react-pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
 
-/* A feed post: the line, then reactions + comments under it, all on one card. */
-.feed-post { display: flex; flex-direction: column; border-radius: var(--radius-xl); background: var(--card); }
-.feed-post .activity-line { background: none; }
-.feed-post__social { display: flex; flex-direction: column; padding: 0 var(--space-4) var(--space-3) var(--space-6); }
+/* A feed post: avatar, text, cover on top; React + Comment under it, all on one card. */
+.feed-post { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-5) var(--space-4); border-radius: var(--radius-xl); background: var(--card); }
+.feed-post .activity-line { background: none; padding: 0; align-items: flex-start; min-height: 0; }
+.feed-post__chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-height: 28px; }
 .activity-line__avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .activity-line__name { color: var(--bright-text); font-weight: 700; text-decoration: none; position: relative; z-index: 1; }
 .activity-line__name:hover { text-decoration: underline; }
+.feed-post__chips .reactions__chip, .feed-post__chips .rating { position: relative; z-index: 1; }
 
 .comment-list { display: flex; flex-direction: column; gap: var(--space-6); }
 .comment { display: flex; flex-direction: column; gap: var(--space-2); }

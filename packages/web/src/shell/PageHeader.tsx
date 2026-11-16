@@ -25,14 +25,16 @@ export interface PageHeaderProps {
    * actions and (phone) the profile button; the sub-line and children follow it on Background.
    */
   icon?: IconName;
+  /** Replaces the h1 (the list screens' title dropdown holds its own h1). */
+  titleSlot?: ReactNode;
   /** B9: the profile button at the top right (phone only; main screens). */
   profile?: boolean;
 }
 
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
-export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef, className, icon, profile }: PageHeaderProps) {
+export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef, className, icon, profile, titleSlot }: PageHeaderProps) {
   const wide = useIsWide();
-  const h1 = <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="page-title">{title}</h1>;
+  const h1 = titleSlot ?? <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="page-title">{title}</h1>;
   // ProfileButton is phone-only: on PC a header with no other actions gets no (empty) actions box.
   const showProfile = profile && !wide;
   const end = (actions || showProfile) && (

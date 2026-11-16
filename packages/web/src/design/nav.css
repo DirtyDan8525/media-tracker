@@ -124,45 +124,6 @@
 .bottom-tabs__count { position: absolute; top: -8px; left: 14px; min-width: 18px; height: 18px; padding: 0 4px; font-size: var(--fs-tab); }
 .bottom-tabs__empty { display: block; }
 
-/* ---------- Lists button and its see-through menu (B5, ListsMenu board) ---------- */
-.lists-fab {
-  position: fixed; right: calc(var(--space-8) + env(safe-area-inset-right)); z-index: 46;
-  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + env(safe-area-inset-bottom));
-  box-sizing: border-box; width: 56px; height: 56px; padding: 0; border-radius: var(--radius-fab);
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  background: var(--card); border: 1px solid var(--grid-line); color: var(--highlight); box-shadow: var(--shadow-float);
-}
-.lists-fab[aria-expanded="true"] { background: var(--panel); }
-.lists-backdrop { position: fixed; inset: 0; z-index: 45; background: rgba(0, 0, 0, 0.4); }
-@supports (background: color-mix(in srgb, red, blue)) {
-  .lists-backdrop { background: color-mix(in srgb, var(--header-row) 70%, transparent); }
-}
-/* Cards at --see-through over a blur: the contrast test checks its text over a white and a black page.
-   Opaque Cards where color-mix() is missing or less transparency is asked for. */
-.lists-menu {
-  position: fixed; right: calc(var(--space-8) + env(safe-area-inset-right)); z-index: 47;
-  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + 56px + var(--space-4) + env(safe-area-inset-bottom));
-  width: min(260px, calc(100vw - 2 * var(--space-8) - env(safe-area-inset-left) - env(safe-area-inset-right))); max-height: 60vh; overflow-y: auto; overscroll-behavior: contain;
-  padding: var(--space-2) 0; border-radius: 16px; border: 1px solid var(--grid-line);
-  background: var(--card);
-  background: color-mix(in srgb, var(--card) calc(var(--see-through) * 100%), transparent);
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-float); transform-origin: bottom right;
-}
-@media (prefers-reduced-transparency: reduce) {
-  .lists-menu { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
-.lists-menu__item {
-  display: flex; align-items: center; gap: var(--space-6); min-height: var(--btn-h); padding: 0 var(--space-7);
-  color: var(--text); text-decoration: none; font-size: var(--fs-body); font-weight: 500;
-}
-.lists-menu__item:hover { background: var(--card); }
-.lists-menu__item:focus-visible { outline-offset: -2px; border-radius: var(--radius-md); }
-.lists-menu__item[aria-current="page"] { color: var(--bright-text); font-weight: 700; }
-.lists-menu__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lists-menu__count { color: var(--text); font-size: var(--fs-meta); font-weight: 400; font-variant-numeric: tabular-nums; }
-.lists-menu__check { flex: none; width: 20px; display: flex; color: var(--highlight); }
-
 /* ---------- Profile button (B9): 44 px round, the avatar inside ---------- */
 .profile-btn {
   box-sizing: border-box; flex: none; width: var(--tap); height: var(--tap); border-radius: 50%;
@@ -183,11 +144,6 @@
 .page-header__below .page-sub { color: var(--text); }
 .frame--wide .page-header--bar { padding: var(--space-10) var(--space-16); }
 .frame--wide .page-header__below { padding: var(--space-6) var(--space-16) var(--space-6); }
-
-@media (prefers-reduced-motion: no-preference) {
-  .lists-menu { animation: lists-pop var(--dur-fast) var(--ease-out) both; }
-  @keyframes lists-pop { from { transform: scale(0.96); } }
-}
 
 /* Friends tile: the count links to /friends; "N friend requests" under the tiles. */
 .profile-tile__link { display: flex; align-items: center; justify-content: center; min-height: var(--tap); color: inherit; text-decoration: none; border-radius: var(--radius-md); }

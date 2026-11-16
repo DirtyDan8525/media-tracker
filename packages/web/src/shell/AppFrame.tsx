@@ -10,12 +10,12 @@ import { waitingCount } from '../screens/CompareBanner';
 import { enabledLists } from '../nav';
 import { useCurrentList } from './currentList';
 import { AddFriendProvider } from './AddFriendHost';
-import { ListsButton } from './ListsButton';
+import { AddBubble } from './AddBubble';
 import { useSessionMe } from './SessionGate';
 import '../design/nav.css';
 
 /**
- * Nav + content. Phone (< 768 px): content above the bottom bar, with the floating Lists button.
+ * Nav + content. Phone (< 768 px): content above the bottom bar, with the floating Add bubble.
  * PC: side nav beside the content.
  */
 export function AppFrame() {
@@ -51,8 +51,8 @@ function FrameLayout() {
       <main className="frame__main">
         <Outlet />
       </main>
-      <ListsButton lists={lists} current={current} counts={counts} />
-      <BottomTabs current={current} compareCount={compareCount} activityCount={activityCount} />
+      <AddBubble current={current} />
+      <BottomTabs compareCount={compareCount} activityCount={activityCount} />
     </div>
   );
 }

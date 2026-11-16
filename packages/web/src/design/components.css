@@ -118,15 +118,15 @@
   bottom: calc(var(--bottom-tabs-h) + var(--space-8) + env(safe-area-inset-bottom));
   display: flex; justify-content: center; padding: 0 var(--space-8);
 }
-/* and above the 56 px Lists button while it shows (ListsButton sets the class on <html>) */
-.has-lists-fab .toast-region { bottom: calc(var(--bottom-tabs-h) + var(--space-8) + 56px + var(--space-4) + env(safe-area-inset-bottom)); }
+/* and above the 56 px Add bubble while it shows (AddBubble sets the class on <html>) */
+.has-add-fab .toast-region { bottom: calc(var(--bottom-tabs-h) + var(--space-8) + 56px + var(--space-4) + env(safe-area-inset-bottom)); }
 .toast {
   pointer-events: auto; max-width: 420px;
   padding: var(--space-6) var(--space-8); border-radius: var(--radius-lg);
   background: var(--panel); color: var(--bright-text); border: 1px solid var(--grid-line);
   box-shadow: var(--shadow-float); font-size: var(--fs-sm);
 }
-@media (min-width: 768px) { .toast-region, .has-lists-fab .toast-region { bottom: var(--space-12); } }
+@media (min-width: 768px) { .toast-region, .has-add-fab .toast-region { bottom: var(--space-12); } }
 
 /* ---------- Sheet ---------- */
 .sheet-layer { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; }

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
-import { useEntries } from '../data/useEntries';
+import { useEntries, useListCounts } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { CountUp } from '../design/components/CountUp';
 import { EmptyState } from '../design/components/EmptyState';
@@ -16,8 +16,9 @@ import { useIsWide } from '../hooks';
 import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
 import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
-import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
+import { ADD_NOUN, enabledLists, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { rememberList } from '../shell/currentList';
+import { ListMenu } from '../shell/ListMenu';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CompareBanner } from './CompareBanner';
@@ -56,6 +57,7 @@ function ListBody({ category }: { category: Category }) {
   const me = useSessionMe();
   const wide = useIsWide();
   const { data, isPending, isError } = useEntries(category);
+  const counts = useListCounts().data ?? {};
   const add = useAddEntry(category);
   useEffect(() => rememberList(category), [category]);
   const [sort, setSort] = useState<SortKey>('rating');
@@ -68,6 +70,7 @@ function ListBody({ category }: { category: Category }) {
   }, [placeId, add.state, navigate]);
   const submitAdd = async (input: AddInput, opts?: { place?: boolean }) => {
     const entry = await add.add(input);
+    if (entry && input.category && input.category !== category) toast.show(`Added to ${LIST_LABEL[input.category]}`);
     if (entry && opts?.place) setPlaceId(entry.id);
   };
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
@@ -129,7 +132,7 @@ function ListBody({ category }: { category: Category }) {
   const label = `${LIST_LABEL[category]} list`;
   const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;
   const addLabel = `Add ${ADD_NOUN[category]}`;
-  // PC only: on the phone, Add is in the bottom bar.
+  // PC only: on the phone, Add is the floating bubble.
   const addButton = (
     <Button variant="primary" className="btn--add" aria-label={addLabel} onClick={() => setAddOpen(true)}>
       <Icon name="plus" size={20} />{addLabel}
@@ -175,6 +178,11 @@ function ListBody({ category }: { category: Category }) {
     <div className="screen">
       <PageHeader
         title={LIST_LABEL[category]} sub={sub} icon={category} profile
+        titleSlot={(
+          <ListMenu lists={enabledLists(me.settings)} value={category} counts={counts} menuLabel="Switch list" to={(c) => `/list/${c}`} heading>
+            {LIST_LABEL[category]}
+          </ListMenu>
+        )}
         actions={wide ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} />}{addButton}</> : undefined}
       >
         {total > 0 && (
@@ -194,14 +202,14 @@ function ListBody({ category }: { category: Category }) {
       <div className="screen__body list"><CompareBanner />{body}</div>
 
       {addOpen && (
-        <Suspense fallback={<SheetFallback title={`Add to ${LIST_LABEL[category]}`} onClose={() => setAddOpen(false)} />}>
+        <Suspense fallback={<SheetFallback title="Add" onClose={() => setAddOpen(false)} />}>
           <AddEntry category={category} onSubmit={(input, opts) => void submitAdd(input, opts)} onClose={() => setAddOpen(false)} />
         </Suspense>
       )}
       {add.state === 'choose' && add.pickTarget && (
         <Suspense fallback={<SheetFallback title="Which one did you mean?" onClose={() => void add.keepTyped()} />}>
           <PickerSheet
-            category={category} typed={add.pickTarget.typed} choices={add.choices}
+            category={add.pickTarget.entry.category} typed={add.pickTarget.typed} choices={add.choices}
             onChoose={(info) => void add.choose(info)} onKeepTyped={() => void add.keepTyped()} onSearch={add.search}
           />
         </Suspense>

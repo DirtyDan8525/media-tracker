@@ -79,9 +79,27 @@ describe('reactions', () => {
     expect(await res.json()).toEqual({ reactions: { '❤️': 1, '🔥': 2 }, mine: ['❤️'], comments: 0 });
   });
 
-  it('400 for an emoji outside REACTIONS', async () => {
-    expect((await react('F', post, '💩')).status).toBe(400);
-    expect((await react('F', post, 5)).status).toBe(400);
+  it('400 for anything that is not exactly one emoji', async () => {
+    for (const bad of ['a', '1', '❤️❤️', '', 'hi 👍', 'x'.repeat(40), 5, null]) {
+      expect((await react('F', post, bad)).status, JSON.stringify(bad)).toBe(400);
+    }
+  });
+
+  it('accepts any single emoji, stores it, and dedupes per user + emoji', async () => {
+    for (const e of ['💩', '👍🏽', '🏳️‍🌈', '🇯🇵']) {
+      expect((await react('F', post, e)).status, e).toBe(200);
+    }
+    const res = await as('G', '/api/reactions?activityId=postPub');
+    expect(await res.json()).toEqual({ reactions: { '💩': 1, '👍🏽': 1, '🏳️‍🌈': 1, '🇯🇵': 1 }, mine: [], comments: 0 });
+    // The same emoji again toggles it off (one row per user + emoji); a second user adds to the count.
+    await react('G', post, '💩');
+    expect(await (await as('G', '/api/reactions?activityId=postPub')).json()).toMatchObject({ reactions: { '💩': 2 }, mine: ['💩'] });
+    await react('F', post, '💩');
+    const rows = await env.DB.prepare("SELECT COUNT(*) AS n FROM reactions WHERE emoji = '💩'").first<{ n: number }>();
+    expect(rows!.n).toBe(1);
+    await expect(
+      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('dup', 'postPub', 'uG', '💩', ?)").bind(now).run(),
+    ).rejects.toThrow();
   });
 
   it('400 when both or neither target is given', async () => {

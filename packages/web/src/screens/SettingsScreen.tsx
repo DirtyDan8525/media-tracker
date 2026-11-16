@@ -14,6 +14,7 @@ import { UsernameForm } from './UsernameForm';
 import { SegRadio } from '../design/components/SegRadio';
 import '../design/search.css';
 import '../design/settings.css';
+import '../design/wide.css';
 
 /**
  * Settings: tab switches, "Fill in details", "Export my data", username, and links to the Appearance page
@@ -32,7 +33,7 @@ export function SettingsScreen() {
   return (
     <div className="screen">
       <PageHeader title="Settings" backTo="/profile" backUsesHistory />
-      <div className="screen__body stack-18">
+      <div className="screen__body stack-18 wide-cols">
         <section aria-labelledby="set-tabs" className="group">
           <h2 id="set-tabs" className="group__title">Tabs</h2>
           <div className="group__card switch-grid">

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { useCompareQueue } from '../data/compare';
 import { useUnread } from '../data/feed';
@@ -5,8 +6,10 @@ import { Icon } from '../design/components/Icon';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { waitingCount } from './CompareBanner';
+import { Walkthrough } from './onboarding/Walkthrough';
 import { ExportRow } from './settings/ExportRow';
 import '../design/settings.css';
+import '../design/wide.css';
 
 /** Phone "More" (B20): Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings (with the rating tier links) is under Profile. */
 export function MoreScreen() {
@@ -14,10 +17,11 @@ export function MoreScreen() {
   // The same count as the Profile dot; for the admin it includes people waiting for approval.
   const requests = useUnread().data?.requests ?? 0;
   const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);
+  const [tour, setTour] = useState(false);
   return (
     <div className="screen">
       <PageHeader title="More" profile />
-      <div className="screen__body stack-18">
+      <div className="screen__body stack-18 wide-cols">
         <section aria-labelledby="more-ratings" className="group">
           <h2 id="more-ratings" className="group__title">Ratings</h2>
           <div className="group__card">
@@ -58,10 +62,14 @@ export function MoreScreen() {
         <section aria-labelledby="more-app" className="group">
           <h2 id="more-app" className="group__title">App</h2>
           <div className="group__card">
+            <button type="button" className="group__row" onClick={() => setTour(true)}>How to use the app</button>
+            <Link to="/whats-new" className="group__row">What's new</Link>
+            <Link to="/whats-new" className="group__row">Coming soon</Link>
             <Link to="/about" className="group__row">About Media Tracker</Link>
           </div>
         </section>
       </div>
+      {tour && <Walkthrough onDone={() => setTour(false)} />}
     </div>
   );
 }

@@ -15,13 +15,13 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('the Main nav\'s links read Add, Activity, Search, Compare, More (slot 4 is always Compare), Compare named "Compare, 2 waiting"', async () => {
+    it('the Main nav\'s links read Home, Activity, Search, Compare, More (slot 4 is always Compare), Compare named "Compare, 2 waiting"', async () => {
       mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
       renderApp('/list/anime');
       const nav = await mainNav();
       const compare = await within(nav).findByRole('link', { name: 'Compare, 2 waiting' });
       expect(compare).toHaveAttribute('href', '/compare');
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Add', 'Activity', 'Search', 'Compare', 'More']);
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Compare', 'More']);
       expect(compare.querySelector('.count-pill')).toHaveTextContent('2');
       const cells = Array.from(nav.children);
       expect(cells).toHaveLength(5);
@@ -62,13 +62,13 @@ describe('app shell', () => {
       expect(profile.querySelector('.nav-dot')).not.toBeNull();
     });
 
-    it('Add on /activity navigates to /list/<current> and opens "Add to Anime"', async () => {
+    it('Add on /activity navigates to /list/<current> and opens the Add sheet', async () => {
       fakeBackend({ extra: { 'GET /api/activity': { body: { items: [], next: null } } } });
       const { router } = renderApp('/activity');
-      const add = within(await mainNav()).getByRole('link', { name: 'Add anime' });
+      const add = (await screen.findByRole('link', { name: 'Add anime' }));
       expect(add).toHaveAttribute('href', '/list/anime?add=1');
       await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add to Anime' })).toBeInTheDocument();
+      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
       await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
       expect(router.state.location.search).toBe('');
     });
@@ -77,10 +77,10 @@ describe('app shell', () => {
       fakeBackend({ entries: [makeEntry({ title: 'Frieren', status: 'Completed', genres: 'Fantasy' })] });
       const { router } = renderApp('/list/anime?status=Completed&genre=Fantasy');
       await screen.findByText('Frieren');
-      const add = within(await mainNav()).getByRole('link', { name: 'Add anime' });
+      const add = (await screen.findByRole('link', { name: 'Add anime' }));
       expect(add).toHaveAttribute('href', '/list/anime?status=Completed&genre=Fantasy&add=1');
       await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add to Anime' })).toBeInTheDocument();
+      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
       await waitFor(() => expect(router.state.location.search).toBe('?status=Completed&genre=Fantasy'));
     });
 
@@ -90,7 +90,7 @@ describe('app shell', () => {
       await screen.findByRole('heading', { level: 1, name: 'Anime' });
       await router.navigate('/activity?show=you');
       await screen.findByRole('heading', { level: 1, name: 'Activity' });
-      expect(within(await mainNav()).getByRole('link', { name: 'Add anime' })).toHaveAttribute('href', '/list/anime?add=1');
+      expect((await screen.findByRole('link', { name: 'Add anime' }))).toHaveAttribute('href', '/list/anime?add=1');
     });
 
     it('Add\'s name follows the current list ("Add movie" after visiting /list/movies)', async () => {
@@ -98,27 +98,26 @@ describe('app shell', () => {
       const { router } = renderApp('/list/movies');
       await screen.findByRole('heading', { level: 1, name: 'Movies' });
       await router.navigate('/activity');
-      const add = within(await mainNav()).getByRole('link', { name: 'Add movie' });
+      const add = (await screen.findByRole('link', { name: 'Add movie' }));
       expect(add).toHaveAttribute('href', '/list/movies?add=1');
-      expect(add).toHaveTextContent(/^Add$/);
+      expect(add).toHaveClass('add-fab');
     });
 
     it('a stored list that is turned off falls back to the first enabled list', async () => {
       localStorage.setItem('mt-current-list', 'anime');
       mockApi(makeMe({}, { anime: false }));
       renderApp('/activity');
-      expect(within(await mainNav()).getByRole('link', { name: 'Add movie' })).toHaveAttribute('href', '/list/movies?add=1');
+      expect((await screen.findByRole('link', { name: 'Add movie' }))).toHaveAttribute('href', '/list/movies?add=1');
     });
 
-    it('all lists off → no Add, no Lists button', async () => {
+    it('all lists off → no Add bubble (Home still shows)', async () => {
       const off = Object.fromEntries(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books'].map((c) => [c, false]));
       mockApi(makeMe({}, off));
       renderApp('/activity');
       const nav = await mainNav();
-      expect(within(nav).queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Activity', 'Search', 'Compare', 'More']);
+      expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
+      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Compare', 'More']);
       expect(nav.children).toHaveLength(5);
-      expect(screen.queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -137,11 +136,11 @@ describe('app shell', () => {
       expect(current.map((a) => a.textContent?.replace(/(?<=[^\s\d])\d+$/, '').trim())).toEqual([tab]);
     });
 
-    it('on a list screen no tab is current', async () => {
+    it('on a list screen only Home is current', async () => {
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await mainNav();
-      expect(within(nav).getAllByRole('link').filter((a) => a.hasAttribute('aria-current'))).toEqual([]);
+      expect(within(nav).getAllByRole('link').filter((a) => a.hasAttribute('aria-current')).map((a) => a.textContent)).toEqual(['Home']);
     });
 
     it('on /compare the Compare tab is current', async () => {
@@ -151,14 +150,13 @@ describe('app shell', () => {
       expect(within(nav).getByRole('link', { name: /^Compare/ })).toHaveAttribute('aria-current', 'page');
     });
 
-    it.each(['/list/anime', '/search', '/activity', '/more', '/top5'])('the profile button and the Lists button are on %s', async (path) => {
+    it.each(['/list/anime', '/search', '/activity', '/more', '/top5'])('the profile button is on %s', async (path) => {
       mockApi(makeMe(), { 'GET /api/activity': { body: { items: [], next: null } } });
       renderApp(path);
       const profile = await screen.findByRole('link', { name: 'Profile' });
       expect(profile).toHaveAttribute('href', '/profile');
       expect(profile).toHaveClass('profile-btn');
       expect(profile.closest('header')).not.toBeNull();
-      expect(screen.getByRole('button', { name: 'Lists' })).toBeInTheDocument();
     });
 
     it.each(['/compare', '/retier/anime'])('B9: the profile button is in the header on %s (phone)', async (path) => {
@@ -172,12 +170,11 @@ describe('app shell', () => {
       expect(profile.closest('header')).not.toBeNull();
     });
 
-    it.each(['/settings', '/profile'])('the profile button is not on %s (the Lists button is)', async (path) => {
+    it.each(['/settings', '/profile'])('the profile button is not on %s', async (path) => {
       mockApi(makeMe());
       renderApp(path);
       await screen.findByRole('heading', { level: 1 });
       expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Lists' })).toBeInTheDocument();
     });
 
     it('the profile button shows the photo when there is one', async () => {
@@ -214,7 +211,6 @@ describe('app shell', () => {
       expect(screen.getAllByRole('link', { name: /^Profile/ })).toHaveLength(1);
       // PC: the header renders no empty actions box for the (phone-only) profile button
       expect(bar.querySelector('.page-header__actions:empty')).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument();
       expect(document.querySelector('.bottom-tabs')).toBeNull();
       expect(screen.getByRole('button', { name: 'Add anime' })).toBeInTheDocument();
     });
@@ -239,7 +235,7 @@ describe('app shell', () => {
       // every row, in document order: links and the Export button
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile, @dan', 'Add anime', 'Search', 'Activity', 'Compare',
+        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity', 'Compare',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books',
         'Import', 'Export my data', 'About',
       ]);
@@ -284,7 +280,7 @@ describe('app shell', () => {
       expect(add).toHaveAttribute('href', '/list/movies?add=1');
       expect(add).toHaveClass('btn', 'btn--primary');
       await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add to Movies' })).toBeInTheDocument();
+      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
       expect(router.state.location.search).toBe('');
     });
 
@@ -296,7 +292,7 @@ describe('app shell', () => {
       const add = within(await sideNav()).getByRole('link', { name: 'Add anime' });
       expect(add).toHaveAttribute('href', '/list/anime?status=Completed&genre=Fantasy&add=1');
       await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add to Anime' })).toBeInTheDocument();
+      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
       await waitFor(() => expect(router.state.location.search).toBe('?status=Completed&genre=Fantasy'));
     });
 
@@ -344,7 +340,7 @@ describe('app shell', () => {
       expect(link).toHaveAttribute('href', '/compare');
       expect(link.querySelector('.count-pill')).toHaveTextContent('2');
       expect(link.querySelector('svg')).not.toBeNull();
-      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Search', 'Activity', 'Compare', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'About']);
+      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Compare', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'About']);
       expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
     });
 
@@ -354,7 +350,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(5 + 7 + 2); // Profile, Add, Search, Activity, Compare + 7 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(6 + 7 + 2); // Profile, Add, Home, Search, Activity, Compare + 7 lists + Import, About
     });
   });
 
@@ -377,7 +373,7 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(linkNames(main)).toEqual(['Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Compare', 'Top 5', 'Stats', 'Import from Google Sheets', "What's new", 'Coming soon', 'About Media Tracker']);
     expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
     const tabs = screen.getByRole('navigation', { name: 'Main' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');

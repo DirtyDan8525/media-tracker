@@ -301,14 +301,47 @@ describe('ActivityScreen: friends, reactions, comments', () => {
     await waitFor(() => expect(calls.filter((c) => c.path === '/api/activity/seen')).toHaveLength(2));
   });
 
-  it('"2 comments" opens the thread sheet for that post', async () => {
+  it('"Comment (2)" opens the thread sheet for that post', async () => {
     const { calls } = fakeBackend({ extra: {
       'GET /api/activity': { body: renPage({ 'p-fr': { reactions: {}, mine: [], comments: 2 } }) },
       'GET /api/comments': { body: [] },
     } });
     renderApp('/activity');
-    await userEvent.click(await screen.findByRole('button', { name: '2 comments' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Comment (2)' }));
     expect(await screen.findByRole('dialog', { name: 'Comments' })).toBeInTheDocument();
     expect(calls.some((c) => c.path === '/api/comments?activityId=p-fr')).toBe(true);
+  });
+
+  it('a post carries a rating badge, only the reaction chips that exist, and React + Comment buttons', async () => {
+    fakeBackend({ extra: { 'GET /api/activity': { body: renPage({ 'p-fr': { reactions: { '❤️': 3, '🇯🇵': 1 }, mine: [], comments: 0 } }) } } });
+    renderApp('/activity');
+    const row = (await screen.findByRole('link', { name: 'Frieren' })).closest('li')!;
+    expect(within(row).getByLabelText('Rating 9.0')).toBeInTheDocument();
+    expect(within(row).getAllByRole('button', { pressed: false }).map((b) => b.getAttribute('aria-label')).filter(Boolean)).toEqual(['❤️ 3', '🇯🇵 1']);
+    expect(within(row).getByRole('button', { name: 'React' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Comment' })).toBeInTheDocument();
+  });
+
+  it('a post with no reactions shows no chips; your own post has your avatar', async () => {
+    const { container } = (fakeBackend({ extra: { 'GET /api/activity': { body: page([item({ type: 'added', title: 'Bleach' })]) } } }), renderApp('/activity'));
+    const row = (await screen.findByRole('link', { name: 'Bleach' })).closest('li')!;
+    expect(within(row).queryByRole('group', { name: 'Reactions' })).not.toBeInTheDocument();
+    expect(container.querySelector('.feed-post .avatar')).toHaveTextContent('D');
+  });
+
+  it('React > 😮 and React > + > typed emoji both POST the emoji for that post', async () => {
+    const { calls } = fakeBackend({ extra: {
+      'GET /api/activity': { body: renPage() },
+      'POST /api/reactions': { body: { reactions: { '😮': 1 }, mine: ['😮'], comments: 0 } },
+    } });
+    renderApp('/activity');
+    await userEvent.click(await screen.findByRole('button', { name: 'React' }));
+    await userEvent.click(screen.getByRole('button', { name: '😮' }));
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More emojis' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Type any emoji' }), '🎉');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/reactions').map((c) => c.body))
+      .toEqual([{ activityId: 'p-fr', emoji: '😮' }, { activityId: 'p-fr', emoji: '🎉' }]));
   });
 });

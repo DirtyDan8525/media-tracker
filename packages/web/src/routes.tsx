@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
+import { WhatsNewScreen } from './screens/WhatsNewScreen';
 import { AddByCodeScreen } from './screens/social/AddByCodeScreen';
 import { FriendEntryDetail } from './screens/social/FriendEntryDetail';
 import { FriendProfile } from './screens/social/FriendProfile';
@@ -121,6 +122,7 @@ export const routes: RouteObject[] = [
           { path: 'settings/appearance', element: <AppearanceScreen /> },
           { path: 'settings/tiers', element: <TierEditor /> },
           { path: 'about', element: <AboutScreen /> },
+          { path: 'whats-new', element: <WhatsNewScreen /> },
           { path: 'more', element: <MoreScreen /> },
           { path: 'admin', element: <AdminRoute /> },
           { path: '*', element: <Navigate to="/" replace /> },

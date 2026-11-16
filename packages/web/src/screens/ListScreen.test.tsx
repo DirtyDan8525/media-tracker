@@ -16,14 +16,14 @@ async function sheet(field: { role: 'textbox'; name: string | RegExp }, dialogNa
   await screen.findByRole(field.role, { name: field.name });
   return screen.getByRole('dialog', { name: dialogName });
 }
-const findAddSheet = () => sheet({ role: 'textbox', name: /^(Title|Album|Song)$/ }, /^Add to /);
+const findAddSheet = () => sheet({ role: 'textbox', name: /^(Title|Album|Song)$/ }, /^Add$/);
 const findPicker = () => sheet({ role: 'textbox', name: 'Search again' }, 'Which one did you mean?');
 const findPaste = () => sheet({ role: 'textbox', name: 'Image link' }, 'Paste image link');
 
-/** Phone: Add is in the bottom bar (a link to `?add=1`). */
+/** Phone: Add is the floating bubble (a link to `?add=1`). */
 async function openAdd(label = /^Add anime$/i) {
   await screen.findByRole('heading', { level: 1 });
-  await userEvent.click(within(await screen.findByRole('navigation', { name: 'Main' })).getByRole('link', { name: label }));
+  await userEvent.click(await screen.findByRole('link', { name: label }));
   return findAddSheet();
 }
 
@@ -143,10 +143,10 @@ describe('adding an entry', () => {
     expect(screen.getByRole('link', { name: /^Add anime$/i })).toHaveFocus();
   });
 
-  it('?add=1 opens "Add to Anime" and leaves the URL without add (by replace)', async () => {
+  it('?add=1 opens the Add sheet and leaves the URL without add (by replace)', async () => {
     fakeBackend();
     const { router } = renderApp('/list/anime?add=1&keep=1');
-    expect(await findAddSheet()).toHaveAccessibleName('Add to Anime');
+    expect(await findAddSheet()).toHaveAccessibleName('Add');
     await waitFor(() => expect(router.state.location.search).toBe('?keep=1'));
     expect(router.state.historyAction).toBe('REPLACE');
   });
@@ -158,7 +158,7 @@ describe('adding an entry', () => {
     await userEvent.click(within(d).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     // reopening works the same way
-    expect(await openAdd()).toHaveAccessibleName('Add to Anime');
+    expect(await openAdd()).toHaveAccessibleName('Add');
   });
 
   it('the phone list has no floating Add button (Add is in the bottom bar); PC keeps its header button', async () => {

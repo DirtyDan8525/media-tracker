@@ -1,7 +1,8 @@
 import { Navigate } from 'react-router';
-import { homePath } from '../nav';
-import { useSessionMe } from './SessionGate';
+import { useCurrentList } from './currentList';
 
+/** Home (`/`): the list last shown (default: the first enabled list, Anime); Settings when every list is off. */
 export function HomeRedirect() {
-  return <Navigate to={homePath(useSessionMe().settings)} replace />;
+  const current = useCurrentList();
+  return <Navigate to={current ? `/list/${current}` : '/settings'} replace />;
 }

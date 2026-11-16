@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
-/** Opens the Add sheet for anime: the Add link in the Main nav (the phone's bottom bar, the PC's side nav). */
+/** Opens the Add sheet for anime: the floating Add bubble (phone) or the side nav's Add link (PC). */
 async function openAddAnime(page: Page) {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Add anime' }).click();
-  await expect(page.getByRole('dialog', { name: 'Add to Anime' })).toBeVisible();
+  await page.getByRole('link', { name: 'Add anime' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add' })).toBeVisible();
 }
 
 const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', import.meta.url));
@@ -163,35 +163,46 @@ test('search finds Frieren: the phone\'s bottom-bar Search, the PC list\'s filte
   await expect(page.getByRole('link', { name: /Bleach|Naruto|Trigun/i })).toHaveCount(0);
 });
 
-test('phone shell: Lists button picks a list, Add from Activity opens that list\'s sheet, profile button opens Profile', async ({ page }) => {
-  test.skip((page.viewportSize()?.width ?? 0) >= 768, 'the bottom bar, Lists button and profile button are phone-only');
+test('phone shell: the title dropdown picks a list, Home returns to it, Add (bubble) takes an "Add to" list, profile button opens Profile', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 768, 'the bottom bar, Add bubble and profile button are phone-only');
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/list/anime');
   await expect(page.getByRole('heading', { level: 1, name: 'Anime' })).toBeVisible();
 
-  // Lists: the see-through menu above the button; pick Movies.
-  const lists = page.getByRole('button', { name: 'Lists' });
-  await lists.click();
-  const menu = page.getByRole('navigation', { name: 'Lists' });
-  await expect(menu.getByRole('link', { name: /^Anime/ })).toHaveAttribute('aria-current', 'page');
-  await menu.getByRole('link', { name: /^Movies/ }).click();
+  // The list title is a dropdown: pick Movies.
+  const title = page.getByRole('heading', { level: 1 }).getByRole('button');
+  await title.click();
+  const menu = page.getByRole('menu', { name: 'Switch list' });
+  await expect(menu.getByRole('menuitem', { name: /^Anime/ })).toHaveAttribute('aria-current', 'true');
+  await menu.getByRole('menuitem', { name: /^Movies/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Movies' })).toBeVisible();
   await expect(menu).toBeHidden();
-  await expect(lists).toBeFocused();
 
-  // Escape closes it too.
-  await lists.click();
-  await expect(menu).toBeVisible();
+  // Escape closes it too, and focus returns to the title button.
+  await page.getByRole('heading', { level: 1 }).getByRole('button').click();
+  await expect(page.getByRole('menu', { name: 'Switch list' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
+  await expect(page.getByRole('menu', { name: 'Switch list' })).toBeHidden();
+  await expect(page.getByRole('heading', { level: 1 }).getByRole('button')).toBeFocused();
 
-  // Activity, then Add: back on Movies with its Add sheet open, and no ?add=1 left in the URL.
+  // Activity, then Home: back on Movies (the last list). The bubble is there, but not on More.
   const bar = page.getByRole('navigation', { name: 'Main' });
   await bar.getByRole('link', { name: 'Activity' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
-  await bar.getByRole('link', { name: 'Add movie' }).click();
-  await expect(page.getByRole('dialog', { name: 'Add to Movies' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add movie' })).toBeVisible();
+  await bar.getByRole('link', { name: 'More' }).click();
+  await expect(page.getByRole('link', { name: 'Add movie' })).toHaveCount(0);
+  await bar.getByRole('link', { name: 'Home' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Movies' })).toBeVisible();
+
+  // Add: the sheet defaults to Movies; "Add to" can pick another list.
+  await page.getByRole('link', { name: 'Add movie' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add' });
+  await expect(sheet.getByRole('button', { name: 'Add to Movies' })).toBeVisible();
   await expect(page).toHaveURL(/\/list\/movies$/);
+  await sheet.getByRole('button', { name: 'Add to Movies' }).click();
+  await page.getByRole('menuitemradio', { name: 'Anime' }).click();
+  await expect(sheet.getByRole('button', { name: 'Add to Anime' })).toBeFocused();
   await page.getByRole('button', { name: 'Close' }).click();
 
   // The profile button on the themed bar opens Profile.

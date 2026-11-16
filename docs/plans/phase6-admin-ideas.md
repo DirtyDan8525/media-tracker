@@ -1,4 +1,4 @@
-# Phase 6 ideas: Admin powers (Dan, 2026-11-16) — suggestions, not decided
+# Phase 6: Admin powers (Dan, 2026-11-16) — all 10 approved ("the more the better")
 
 Goal: Dan changes the app himself from Admin instead of asking for code changes.
 

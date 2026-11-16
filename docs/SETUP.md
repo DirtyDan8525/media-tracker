@@ -156,7 +156,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    ```
    npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --command "EXPLAIN UPDATE entries SET rating = j.t FROM (SELECT 1 AS t, 'x' AS id) j WHERE entries.id = j.id"
    ```
-   **Success:** the first prints `"two_decimals_ok": 1` and `"long_decimals_ok": 1`; the second prints a table of steps (a long list of `opcode` rows) and no error. `EXPLAIN` only describes what the command would do; it does not run it. If either command fails or shows a 0, stop and tell me before going on. It touches only columns that already exist, so it works before the update in step 5.
+   **Success:** the first prints a small table where both `two_decimals_ok` and `long_decimals_ok` show 1; the second prints a table of steps (a long list of `opcode` rows) and no error. `EXPLAIN` only describes what the command would do; it does not run it. If either command fails or shows a 0, stop and tell me before going on. It touches only columns that already exist, so it works before the update in step 5.
 5. Update the database tables. This is the same command as in section 6, "Create the tables":
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production

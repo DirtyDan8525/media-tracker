@@ -4,3 +4,4 @@ export * from './score';
 export * from './fit';
 export * from './shown';
 export * from './questions';
+export * from './session';

@@ -145,4 +145,20 @@ describe('Settings: Export my data', () => {
     expect(await screen.findByRole('button', { name: 'Export my data' })).toBeEnabled();
     expect(anchors).toHaveLength(0);
   });
+
+  it('Search setting: a real radio group, defaults to All lists, saves "Only the current list", arrow keys move it', async () => {
+    const calls = mockApi(makeMe());
+    renderApp('/settings');
+    const group = await screen.findByRole('radiogroup', { name: 'Where Search looks' });
+    const all = within(group).getByRole('radio', { name: 'All lists' });
+    expect(all.tagName).toBe('INPUT');
+    expect(all).toBeChecked();
+    await userEvent.click(within(group).getByRole('radio', { name: 'Only the current list' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ settings: { searchScope: 'current' } }));
+    expect(within(group).getByRole('radio', { name: 'Only the current list' })).toBeChecked();
+    within(group).getByRole('radio', { name: 'Only the current list' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(within(group).getByRole('radio', { name: 'All lists' })).toBeChecked();
+    await waitFor(() => expect(calls.filter((c) => c.method === 'PUT').at(-1)?.body).toEqual({ settings: { searchScope: 'all' } }));
+  });
 });

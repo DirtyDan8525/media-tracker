@@ -94,4 +94,38 @@ describe('SearchScreen', () => {
     await screen.findByRole('link', { name: /Frieren/ });
     expect(screen.queryByRole('link', { name: /Friday/ })).not.toBeInTheDocument();
   });
+
+  it('the scope toggle is a real radio group: arrow keys move the choice', async () => {
+    const { calls } = fakeBackend({ entries: sample() });
+    renderApp('/search?q=fri');
+    await screen.findByRole('link', { name: /Frieren/ });
+    const group = screen.getByRole('radiogroup', { name: 'Search in' });
+    const all = within(group).getByRole('radio', { name: 'All lists' });
+    expect(all.tagName).toBe('INPUT');
+    expect(all).toHaveAttribute('type', 'radio');
+    all.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(within(group).getByRole('radio', { name: 'Anime' })).toBeChecked();
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT' && c.path === '/api/me/settings')?.body).toEqual({ settings: { searchScope: 'current' } }));
+  });
+
+  it('announces the result count politely, and "No matches" when there are none', async () => {
+    fakeBackend({ entries: sample() });
+    renderApp('/search');
+    const input = await screen.findByRole('searchbox', { name: 'Search your lists' });
+    await userEvent.type(input, 'fri');
+    const live = await screen.findByText('2 results', { selector: '[role="status"]' });
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'zzz');
+    expect(await screen.findByText('No matches', { selector: '[role="status"]' })).toBeInTheDocument();
+  });
+
+  it('the loading placeholder has no aria-label on a role-less element', async () => {
+    fakeBackend({ entries: sample(), extra: { 'GET /api/entries': () => new Promise(() => {}) } });
+    const { container } = renderApp('/search?q=fri');
+    await screen.findByRole('searchbox', { name: 'Search your lists' });
+    await waitFor(() => expect(container.querySelector('.screen__body [aria-busy="true"]')).not.toBeNull());
+    expect(container.querySelectorAll('.screen__body div[aria-label]:not([role])')).toHaveLength(0);
+  });
 });

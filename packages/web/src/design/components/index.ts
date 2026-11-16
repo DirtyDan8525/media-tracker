@@ -7,6 +7,7 @@ export { EmptyState } from './EmptyState';
 export { Icon } from './Icon';
 export { IconButton } from './IconButton';
 export { RatingBadge } from './RatingBadge';
+export { SegRadio } from './SegRadio';
 export { Sheet } from './Sheet';
 export { SideNav } from './SideNav';
 export { Skeleton, SkeletonRow } from './Skeleton';

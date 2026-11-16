@@ -7,7 +7,7 @@ import { contrast } from '../src/design/theme';
 // compositing, so these check the declared roles and the backdrop's worst case by arithmetic).
 const read = (f: string) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8');
 const tokens = read('tokens.css');
-const css = (read('components.css') + '\n' + read('lists.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+const css = (['components.css', 'lists.css', 'search.css'].map(read).join('\n')).replace(/\/\*[\s\S]*?\*\//g, '');
 
 function decls(selector: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -41,6 +41,17 @@ describe('v2 contrast', () => {
     const t = THEMES[name]!;
     expect(contrast(t['Muted text']!, t.Background!)).toBeGreaterThanOrEqual(3);
   });
+
+  // Selected segment / filter chips sit on Panels: whatever colour role their text uses must read there on every theme.
+  const ROLE_OF_VAR: Record<string, string> = { text: 'Text', 'bright-text': 'Bright text', 'muted-text': 'Muted text', highlight: 'Highlight' };
+  it.each(NAMES.flatMap((n) => ['.seg__opt--on'].map((sel) => [n, sel] as const)))(
+    '%s: %s text is >= 4.5:1 on Panels', (name, selector) => {
+      const color = decls(selector).color ?? '';
+      const role = ROLE_OF_VAR[/var\(--([\w-]+)\)/.exec(color)?.[1] ?? ''];
+      expect(role, `${selector} color is ${color}`).toBeDefined();
+      const t = THEMES[name]!;
+      expect(contrast(t[role!]!, t.Panels!), `${name} ${role} on Panels`).toBeGreaterThanOrEqual(4.5);
+    });
 
   it('the backdrop is hidden where color-mix() (its scrim) is unsupported', () => {
     expect(css).toMatch(/@supports not \(background: color-mix\(in srgb, red, blue\)\)\s*\{\s*\.backdrop\s*\{\s*display:\s*none;?\s*\}/);

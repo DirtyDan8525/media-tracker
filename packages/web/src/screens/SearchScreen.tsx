@@ -1,12 +1,13 @@
 import { CATEGORY_CONFIG, SEARCH_SCOPE, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useAllEntries } from '../data/useEntries';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
+import { SegRadio } from '../design/components/SegRadio';
 import { Icon } from '../design/components/Icon';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { SkeletonRow } from '../design/components/Skeleton';
@@ -29,6 +30,8 @@ export function SearchScreen() {
   const { text, setText, clear } = useUrlText('q');
   const current = useCurrentList();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Typing stays instant; the folding and the up-to-350 rows follow when the device has a moment.
+  const deferred = useDeferredValue(text);
   const [expanded, setExpanded] = useState<ReadonlySet<Category>>(new Set());
 
   const scope = current !== null && me.settings.searchScope === 'current' ? 'current' : 'all';
@@ -41,15 +44,17 @@ export function SearchScreen() {
   const { data, isPending, isError } = useAllEntries(lists);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => { setExpanded(new Set()); }, [text, scope]);
+  useEffect(() => { setExpanded(new Set()); }, [deferred, scope]);
 
-  const q = text.trim();
-  const groups = useMemo(() => searchEntries(data, lists, text), [data, lists, text]);
+  const q = deferred.trim();
+  const groups = useMemo(() => searchEntries(data, lists, deferred), [data, lists, deferred]);
   const loaded = lists.filter((c) => data[c]).length;
 
   const setScope = (v: (typeof SEARCH_SCOPE)[number]) => { if (me.settings.searchScope !== v) save.mutate({ searchScope: v }); };
 
   let body: ReactNode;
+  // Spoken politely when the result changes; empty while there is nothing to say yet.
+  let announce = '';
   if (!q) {
     body = <p className="search-hint">Search titles, creators, albums and genres.</p>;
   } else if (isError && loaded === 0) {
@@ -58,8 +63,9 @@ export function SearchScreen() {
         actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
     );
   } else if (isPending && groups.length === 0 && lists.some((c) => !data[c])) {
-    body = <div aria-busy="true" aria-label="Searching" className="stack-10"><SkeletonRow /><SkeletonRow /></div>;
+    body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /></div>;
   } else if (groups.length === 0) {
+    announce = 'No matches';
     body = (
       <EmptyState
         icon="search" title={`No matches for “${q}”.`}
@@ -71,6 +77,8 @@ export function SearchScreen() {
       />
     );
   } else {
+    const total = groups.reduce((n, g) => n + g.rows.length, 0);
+    announce = `${total} ${total === 1 ? 'result' : 'results'}`;
     body = (
       <div className="search-screen__results">
         {isError && <div className="load-notice" role="status"><span>Couldn't load some lists.</span></div>}
@@ -116,16 +124,16 @@ export function SearchScreen() {
             )}
           </div>
           {current && (
-            <div role="radiogroup" aria-label="Search in" className="seg">
-              <button type="button" role="radio" aria-checked={scope === 'all'}
-                className={scope === 'all' ? 'seg__opt seg__opt--on' : 'seg__opt'} onClick={() => setScope('all')}>All lists</button>
-              <button type="button" role="radio" aria-checked={scope === 'current'}
-                className={scope === 'current' ? 'seg__opt seg__opt--on' : 'seg__opt'} onClick={() => setScope('current')}>{LIST_LABEL[current]}</button>
-            </div>
+            <SegRadio label="Search in" value={scope}
+              options={[{ value: 'all', label: 'All lists' }, { value: 'current', label: LIST_LABEL[current] }]}
+              onChange={setScope} />
           )}
         </div>
       </PageHeader>
-      <div className="screen__body">{body}</div>
+      <div className="screen__body">
+        <p role="status" aria-live="polite" className="sr-only">{announce}</p>
+        {body}
+      </div>
     </div>
   );
 }

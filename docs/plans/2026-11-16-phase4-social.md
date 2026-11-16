@@ -323,3 +323,10 @@ No code. Learns the Phase 5 risk before the UI is done.
 1. Should Admin also be able to **remove** someone (take their email off the policy and delete their account)? Planned: no; you'd do it in the dashboard.
 2. Group Top 5 needs **at least 2 people** to have rated a title. Fine, or count single ratings too?
 3. An invite link adds the friend **straight away** (no accept step), while a username request needs accepting. OK?
+
+---
+
+## Dan's answers (2026-11-16)
+1. Admin **can remove access**: add a Remove button on the Admin screen (Task 7 API: read policy, drop the email rule, PUT back; Task 12 UI with a confirm). Removing access also ends their friendships' visibility only via Access — their data stays.
+2. Group Top 5 counts a title only when **at least 2 people** rated it.
+3. Invite link = instant friendship; username request needs acceptance.

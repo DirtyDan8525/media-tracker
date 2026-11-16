@@ -51,3 +51,7 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 
 ## Profile bio (Dan, 2026-11-16)
 17. A short **bio** on profiles (like Instagram): plain text, up to 150 characters, line breaks and emoji allowed, no links. Edit it from your Profile; friends see it under your name on your profile.
+
+## Header (Dan, 2026-11-16)
+18. Top-left: the small Media Tracker **star logo**; tapping it opens **About**. The list dropdown moves to the **centre** of the top bar (or just below on narrow phones), between logo and profile.
+19. **About text editable by Dan** in Admin (goes with Phase 6 item 5, app text).

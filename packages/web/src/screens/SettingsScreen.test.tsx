@@ -6,18 +6,22 @@ import { setCompareEnabled } from '../test/flags';
 import { renderApp } from '../test/renderApp';
 
 describe('SettingsScreen', () => {
-  it('turning a tab off removes it from BottomTabs', async () => {
+  it('turning a list off removes it from the Lists menu', async () => {
     const calls = mockApi(makeMe());
     renderApp('/settings');
-    const tabs = await screen.findByRole('navigation', { name: 'Lists' });
-    expect(within(tabs).getByRole('link', { name: 'Albums' })).toBeInTheDocument();
+    const listsButton = await screen.findByRole('button', { name: 'Lists' });
+    await userEvent.click(listsButton);
+    expect(within(screen.getByRole('navigation', { name: 'Lists' })).getByRole('link', { name: 'Albums' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('switch', { name: 'Albums' }));
-
-    await waitFor(() => expect(within(tabs).queryByRole('link', { name: 'Albums' })).not.toBeInTheDocument());
-    expect(within(tabs).getByRole('link', { name: 'Songs' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Albums' })).not.toBeChecked();
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ settings: { tabs: { albums: false } } }));
+
+    await userEvent.click(listsButton);
+    const menu = screen.getByRole('navigation', { name: 'Lists' });
+    await waitFor(() => expect(within(menu).queryByRole('link', { name: 'Albums' })).not.toBeInTheDocument());
+    expect(within(menu).getByRole('link', { name: 'Songs' })).toBeInTheDocument();
   });
 
   it('shows switches for every list and both season tabs', async () => {

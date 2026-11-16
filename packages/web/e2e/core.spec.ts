@@ -2,6 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { COMPARE_ENABLED } from '../src/features';
 
+/** Opens the Add sheet for anime: the bottom bar's Add on the phone, the list header's button on PC. */
+async function openAddAnime(page: Page) {
+  const add = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Add anime' })
+    .or(page.getByRole('button', { name: 'Add anime' }));
+  await add.click();
+  await expect(page.getByRole('dialog', { name: 'Add to Anime' })).toBeVisible();
+}
+
 const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', import.meta.url));
 
 // Each project's server has one fixed dev user, so the first test to run does the username setup
@@ -9,7 +17,8 @@ const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', imp
 async function signInAndSetUsername(page: Page, username: string) {
   await page.goto('/');
   const field = page.getByLabel('Username');
-  const nav = page.getByRole('navigation', { name: 'Lists' }).or(page.getByRole('link', { name: 'Anime' }).first());
+  // Phone: the bottom bar (navigation "Main"). PC: its side nav, whose first list link is Anime.
+  const nav = page.getByRole('navigation', { name: 'Main' }).or(page.getByRole('link', { name: 'Anime' }).first());
   await expect(field.or(nav).first()).toBeVisible();
   if (await field.isVisible()) {
     await field.fill(username);
@@ -29,7 +38,7 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
   await expect(page.getByText('No anime yet')).toBeVisible();
 
   // Add Frieren.
-  await page.getByRole('button', { name: 'Add anime' }).click();
+  await openAddAnime(page);
   await page.getByLabel('Title').fill('frieren');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
@@ -55,7 +64,7 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
 // the compare queue).
 async function addRatedAnime(page: Page, title: string, rating: string) {
   await page.goto('/list/anime');
-  await page.getByRole('button', { name: 'Add anime' }).click();
+  await openAddAnime(page);
   await page.getByLabel('Title').fill(title);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('link', { name: new RegExp(title, 'i') }).first().click();
@@ -163,20 +172,62 @@ test('new ratings: banner, Compare places them, banner clears; Stop then Don\'t 
   expect(await ratingsOf()).toEqual(listBefore);
 });
 
-test('search narrows the list to Frieren', async ({ page }) => {
+test('search finds Frieren: the phone\'s bottom-bar Search, the PC list\'s filter box', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await ensureAnime(page, 'Frieren');
   await ensureAnime(page, 'Bleach');
   await page.goto('/list/anime');
   await expect(page.getByRole('link', { name: /Bleach/i }).first()).toBeVisible();
 
-  // Phone: the header's Search button opens the box; PC: the filter box is always there.
-  const toggle = page.getByRole('button', { name: 'Search', exact: true });
-  if (await toggle.isVisible()) await toggle.click();
-  await page.locator('input[type=search]').fill('fri');
-
+  const bar = page.getByRole('navigation', { name: 'Main' });
+  if (await bar.isVisible()) {
+    // Phone (B6): no search in the list header; the raised Search opens the global Search screen.
+    await expect(page.getByRole('button', { name: 'Search', exact: true })).toHaveCount(0);
+    await bar.getByRole('link', { name: 'Search' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Search' })).toBeVisible();
+    await page.getByRole('searchbox').fill('fri');
+    await expect(page).toHaveURL(/\/search\?q=fri/);
+  } else {
+    await page.getByRole('searchbox', { name: 'Filter Anime' }).fill('fri');
+  }
   await expect(page.getByRole('link', { name: /Frieren/ }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /Bleach|Naruto|Trigun/i })).toHaveCount(0);
+});
+
+test('phone shell: Lists button picks a list, Add from Activity opens that list\'s sheet, profile button opens Profile', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 768, 'the bottom bar, Lists button and profile button are phone-only');
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/list/anime');
+  await expect(page.getByRole('heading', { level: 1, name: 'Anime' })).toBeVisible();
+
+  // Lists: the see-through menu above the button; pick Movies.
+  const lists = page.getByRole('button', { name: 'Lists' });
+  await lists.click();
+  const menu = page.getByRole('navigation', { name: 'Lists' });
+  await expect(menu.getByRole('link', { name: /^Anime/ })).toHaveAttribute('aria-current', 'page');
+  await menu.getByRole('link', { name: /^Movies/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Movies' })).toBeVisible();
+  await expect(menu).toBeHidden();
+  await expect(lists).toBeFocused();
+
+  // Escape closes it too.
+  await lists.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  // Activity, then Add: back on Movies with its Add sheet open, and no ?add=1 left in the URL.
+  const bar = page.getByRole('navigation', { name: 'Main' });
+  await bar.getByRole('link', { name: 'Activity' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
+  await bar.getByRole('link', { name: 'Add movie' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add to Movies' })).toBeVisible();
+  await expect(page).toHaveURL(/\/list\/movies$/);
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  // The profile button on the themed bar opens Profile.
+  await page.locator('.page-header--bar').getByRole('link', { name: 'Profile' }).click();
+  await expect(page.getByText('@e2e_user')).toBeVisible();
 });
 
 test('Settings → Appearance → Sakura sets the page background', async ({ page }) => {

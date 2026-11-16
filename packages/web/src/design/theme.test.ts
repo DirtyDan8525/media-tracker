@@ -1,6 +1,6 @@
 import { DEFAULT_USER_SETTINGS, THEMES } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
-import { applyTheme, CF_VARS, contrast, contrastWarnings, ROLE_VARS } from './theme';
+import { applyTheme, barTextColor, CF_VARS, contrast, contrastWarnings, ROLE_VARS } from './theme';
 
 const css = (name: string) => document.documentElement.style.getPropertyValue(name);
 
@@ -86,5 +86,20 @@ describe('contrastWarnings', () => {
     const w = contrastWarnings({ ...THEMES.Midnight!, Text: '#333333' });
     expect(w.map((x) => [x.role, x.surface])).toEqual([['Text', 'Background'], ['Text', 'Cards']]);
     expect(w[0]!.ratio).toBeCloseTo(contrast('#333333', '#1b1b25'), 5);
+  });
+});
+
+describe('barTextColor (B22)', () => {
+  it('picks whichever of Bright text and Text has more contrast on Header row', () => {
+    const colors = { ...THEMES.Midnight!, 'Header row': '#f0f0f0', 'Bright text': '#ffffff', Text: '#222222' };
+    expect(barTextColor(colors)).toBe('#222222');
+    expect(barTextColor({ ...colors, 'Header row': '#101010' })).toBe('#ffffff');
+  });
+
+  it('applyTheme sets --bar-text from it', () => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Sakura' });
+    expect(css('--bar-text')).toBe(barTextColor(THEMES.Sakura!));
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Custom', colors: { 'Header row': '#fafafa', Text: '#111111', 'Bright text': '#ffffff' } });
+    expect(css('--bar-text')).toBe('#111111');
   });
 });

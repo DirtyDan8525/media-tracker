@@ -1,6 +1,6 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntries } from '../data/useEntries';
@@ -23,7 +23,7 @@ import { useSessionMe } from '../shell/SessionGate';
 import { CompareBanner } from './CompareBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
-import { FilterChips, SearchBox, SearchToggle, useSearchOpen } from './list/ListFilters';
+import { FilterChips, SearchBox } from './list/ListFilters';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));
@@ -63,6 +63,17 @@ function ListBody({ category }: { category: Category }) {
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
 
   const [params, setParams] = useSearchParams();
+  // B3: the bottom bar's Add arrives as ?add=1: open the sheet, then drop `add` from the URL.
+  const addRequested = params.get('add') === '1';
+  useEffect(() => {
+    if (!addRequested) return;
+    setAddOpen(true);
+    setParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.delete('add');
+      return p;
+    }, { replace: true });
+  }, [addRequested, setParams]);
   const urlFilter = useMemo(() => readFilter(params), [params]);
   const genres = useMemo(() => genreOptions(data ?? []), [data]);
   // Until the rows load nothing can be judged invalid, so the URL's values stand.
@@ -76,9 +87,8 @@ function ListBody({ category }: { category: Category }) {
     if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre)) return;
     setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre }, prev), { replace: true });
   }, [data, clean, urlFilter.status, urlFilter.genre, setParams]);
-  const filter: ListFilter = { ...clean, q: qText };
-  const [searchOpen, setSearchOpen] = useSearchOpen(qText);
-  const toggleWrap = useRef<HTMLSpanElement>(null);
+  // B6: only the PC list filters by text (its "/" box); a `q` in a phone list URL is ignored.
+  const filter: ListFilter = { ...clean, q: wide ? qText : '' };
   const changeFilter = (next: Partial<ListFilter>) => {
     const { q, ...rest } = next;
     if (q !== undefined) setQ(q);
@@ -106,17 +116,13 @@ function ListBody({ category }: { category: Category }) {
       </>
     )
     : undefined;
-  // v2 header backdrop: the highest-rated title that has a cover, whatever the chosen sort.
-  const backdrop = useMemo(
-    () => sortEntries(data ?? [], 'rating').find((e) => e.rating !== null && e.coverUrl)?.coverUrl ?? null,
-    [data],
-  );
   const label = `${LIST_LABEL[category]} list`;
   const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;
   const addLabel = `Add ${ADD_NOUN[category]}`;
+  // PC only: on the phone, Add is in the bottom bar.
   const addButton = (
-    <Button variant="primary" className={wide ? 'btn--add' : 'fab'} aria-label={addLabel} onClick={() => setAddOpen(true)}>
-      <Icon name="plus" size={20} />{wide ? addLabel : 'Add'}
+    <Button variant="primary" className="btn--add" aria-label={addLabel} onClick={() => setAddOpen(true)}>
+      <Icon name="plus" size={20} />{addLabel}
     </Button>
   );
 
@@ -158,14 +164,9 @@ function ListBody({ category }: { category: Category }) {
   return (
     <div className="screen">
       <PageHeader
-        title={LIST_LABEL[category]} sub={sub} backdrop={backdrop}
-        actions={wide
-          ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} wide open onClose={() => {}} />}{addButton}</>
-          : total > 0 ? <span ref={toggleWrap}><SearchToggle open={searchOpen} onClick={() => setSearchOpen(!searchOpen)} /></span> : undefined}
+        title={LIST_LABEL[category]} sub={sub} icon={category} profile
+        actions={wide ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} />}{addButton}</> : undefined}
       >
-        {total > 0 && !wide && (
-          <SearchBox category={category} filter={filter} onChange={changeFilter} wide={false} open={searchOpen} onClose={() => { setSearchOpen(false); toggleWrap.current?.querySelector('button')?.focus(); }} />
-        )}
         {total > 0 && (
           <FilterChips
             category={category} filter={filter} onChange={changeFilter} genres={genres}
@@ -181,7 +182,6 @@ function ListBody({ category }: { category: Category }) {
         )}
       </PageHeader>
       <div className="screen__body list"><CompareBanner />{body}</div>
-      {!wide && addButton}
 
       {addOpen && (
         <Suspense fallback={<SheetFallback title={`Add to ${LIST_LABEL[category]}`} onClose={() => setAddOpen(false)} />}>

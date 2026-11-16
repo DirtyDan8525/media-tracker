@@ -105,7 +105,7 @@ export function ActivityScreen() {
 
   return (
     <div className="screen">
-      <PageHeader title="Activity">
+      <PageHeader title="Activity" profile>
         <SegRadio block="activity-filter" label="Show" value={filter} options={FILTERS} onChange={setFilter} />
       </PageHeader>
       <div className="screen__body">{body}</div>

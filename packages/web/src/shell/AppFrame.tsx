@@ -6,10 +6,16 @@ import { BottomTabs } from '../design/components/BottomTabs';
 import { SideNav } from '../design/components/SideNav';
 import { useIsWide } from '../hooks';
 import { waitingCount } from '../screens/CompareBanner';
-import { enabledLists, splitForPhone } from '../nav';
+import { enabledLists } from '../nav';
+import { useCurrentList } from './currentList';
+import { ListsButton } from './ListsButton';
 import { useSessionMe } from './SessionGate';
+import '../design/nav.css';
 
-/** Nav + content. Phone (< 768 px): content above the bottom tabs. PC: side nav beside the content. */
+/**
+ * Nav + content. Phone (< 768 px): content above the bottom bar, with the floating Lists button.
+ * PC: side nav beside the content.
+ */
 export function AppFrame() {
   return (
     <BackfillProvider>
@@ -24,6 +30,7 @@ function FrameLayout() {
   const counts = useListCounts().data ?? {};
   const lists = enabledLists(me.settings);
   const compareCount = waitingCount(useCompareQueue().data ?? [], me.settings);
+  const current = useCurrentList();
   if (wide) {
     return (
       <div className="frame frame--wide">
@@ -39,7 +46,8 @@ function FrameLayout() {
       <main className="frame__main">
         <Outlet />
       </main>
-      <BottomTabs lists={splitForPhone(lists).tabs} />
+      <ListsButton lists={lists} current={current} counts={counts} />
+      <BottomTabs current={current} compareCount={compareCount} />
     </div>
   );
 }

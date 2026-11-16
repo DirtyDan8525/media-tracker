@@ -1,5 +1,6 @@
-/* Navigation and profile (Phase 3b). Profile / PhotoCrop boards in the calm v2 look. Task 6 holds the
-   avatar, the Profile screen and the photo crop sheet; Task 7 adds the bottom bar, Lists button and themed bar below. */
+/* Navigation and profile (Phase 3b), in the calm v2 look: the phone bottom bar, the Lists button and
+   its see-through menu, the profile button and the themed list bar (NavBar / ListsMenu boards, Task 7);
+   the avatar, the Profile screen and the photo crop sheet (Profile / PhotoCrop boards, Task 6). */
 
 /* ---------- Avatar: the photo, or the initial on Highlight ---------- */
 .avatar {
@@ -90,3 +91,95 @@
 .crop__actions .btn { flex: 1; }
 .photo-preview { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-10) var(--space-6); }
 .photo-preview__img { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--panel); }
+
+/* ---------- Phone bottom bar (B2, NavBar board): Add, Activity, raised Search, Compare, More ---------- */
+.bottom-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: calc(var(--bottom-tabs-h) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--header-row); border-top: 1px solid var(--grid-line);
+}
+.bottom-tabs__item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
+  min-width: 0; min-height: var(--tap); color: var(--muted-text); text-decoration: none;
+  font-size: var(--fs-tab); font-weight: 500;
+}
+.bottom-tabs__item > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.bottom-tabs__item.active { color: var(--highlight); font-weight: 600; }
+.bottom-tabs__item:focus-visible { outline-offset: -2px; border-radius: var(--radius-md); }
+/* Search: a 56 px Highlight circle standing 16 px above the bar, "Search" under it. */
+.bottom-tabs__search { justify-content: flex-start; min-height: var(--tap); }
+.bottom-tabs__search-circle {
+  flex: none; width: 56px; height: 56px; margin-top: -16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--highlight); color: var(--on-highlight); box-shadow: 0 0 0 4px var(--header-row);
+}
+.bottom-tabs__icon { position: relative; display: flex; }
+.bottom-tabs__count { position: absolute; top: -8px; left: 14px; min-width: 18px; height: 18px; padding: 0 4px; font-size: var(--fs-tab); }
+.bottom-tabs__empty { display: block; }
+
+/* ---------- Lists button and its see-through menu (B5, ListsMenu board) ---------- */
+.lists-fab {
+  position: fixed; right: var(--space-8); z-index: 46;
+  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + env(safe-area-inset-bottom));
+  box-sizing: border-box; width: 56px; height: 56px; padding: 0; border-radius: var(--radius-fab);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: var(--card); border: 1px solid var(--grid-line); color: var(--highlight); box-shadow: var(--shadow-float);
+}
+.lists-fab[aria-expanded="true"] { background: var(--panel); }
+.lists-backdrop { position: fixed; inset: 0; z-index: 45; background: rgba(0, 0, 0, 0.4); }
+@supports (background: color-mix(in srgb, red, blue)) {
+  .lists-backdrop { background: color-mix(in srgb, var(--header-row) 70%, transparent); }
+}
+/* Cards at --see-through over a blur: the contrast test checks its text over a white and a black page.
+   Opaque Cards where color-mix() is missing or less transparency is asked for. */
+.lists-menu {
+  position: fixed; right: var(--space-8); z-index: 47;
+  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + 56px + var(--space-4) + env(safe-area-inset-bottom));
+  width: min(260px, calc(100vw - 2 * var(--space-8))); max-height: 60vh; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-2) 0; border-radius: 16px; border: 1px solid var(--grid-line);
+  background: var(--card);
+  background: color-mix(in srgb, var(--card) calc(var(--see-through) * 100%), transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-float); transform-origin: bottom right;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lists-menu { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.lists-menu__item {
+  display: flex; align-items: center; gap: var(--space-6); min-height: var(--btn-h); padding: 0 var(--space-7);
+  color: var(--text); text-decoration: none; font-size: var(--fs-body); font-weight: 500;
+}
+.lists-menu__item:hover { background: var(--card); }
+.lists-menu__item:focus-visible { outline-offset: -2px; border-radius: var(--radius-md); }
+.lists-menu__item[aria-current="page"] { color: var(--bright-text); font-weight: 700; }
+.lists-menu__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lists-menu__count { color: var(--text); font-size: var(--fs-meta); font-weight: 400; font-variant-numeric: tabular-nums; }
+.lists-menu__check { flex: none; width: 20px; display: flex; color: var(--highlight); }
+
+/* ---------- Profile button (B9): 44 px round, the avatar inside ---------- */
+.profile-btn {
+  box-sizing: border-box; flex: none; width: var(--tap); height: var(--tap); border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+}
+.profile-btn:focus-visible { outline-offset: 0; }
+
+/* ---------- Themed list bar (B22): a Header row band with the list icon, title and profile button ---------- */
+.page-header--bar {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-6);
+  padding: var(--space-7) var(--space-8); background: var(--header-row); border-bottom: 1px solid var(--grid-line);
+}
+.page-header__titles--bar { flex-direction: row; align-items: center; gap: var(--space-5); }
+.page-header--bar .page-title { color: var(--bar-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-header__icon { flex: none; display: flex; color: var(--bar-text); }
+/* the sub-line and chips sit below the band, on Background */
+.page-header__below { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-5) var(--space-10) var(--space-4); }
+.page-header__below .page-sub { color: var(--text); }
+.frame--wide .page-header--bar { padding: var(--space-10) var(--space-16); }
+.frame--wide .page-header__below { padding: var(--space-6) var(--space-16) var(--space-6); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lists-menu { animation: lists-pop var(--dur-fast) var(--ease-out) both; }
+  @keyframes lists-pop { from { transform: scale(0.96); } }
+}

@@ -108,7 +108,7 @@ export function SearchScreen() {
 
   return (
     <div className="screen">
-      <PageHeader title="Search">
+      <PageHeader title="Search" profile>
         <div className="search-screen__controls">
           <div className="search">
             <label htmlFor="search-q" className="sr-only">Search your lists</label>

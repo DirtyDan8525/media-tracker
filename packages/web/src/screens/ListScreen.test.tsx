@@ -1,16 +1,15 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Entry, LookupInfo } from '@media-tracker/shared';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 import { setViewportWidth } from '../test/viewport';
 
+/** Titles in order, from the phone cards or the PC table. */
 const titles = () =>
-  within(screen.getByRole('list', { name: /list$/i }))
-    .getAllByRole('listitem')
-    .map((li) => li.querySelector('[data-role="title"]')?.textContent);
+  Array.from(document.querySelectorAll('[aria-label$=" list"] [data-role="title"]')).map((t) => t.textContent);
 
 /** Sheets load lazily: wait for a field inside, not just the dialog frame (which shows skeletons first). */
 async function sheet(field: { role: 'textbox'; name: string | RegExp }, dialogName: string | RegExp) {
@@ -21,8 +20,10 @@ const findAddSheet = () => sheet({ role: 'textbox', name: /^(Title|Album|Song)$/
 const findPicker = () => sheet({ role: 'textbox', name: 'Search again' }, 'Which one did you mean?');
 const findPaste = () => sheet({ role: 'textbox', name: 'Image link' }, 'Paste image link');
 
+/** Phone: Add is in the bottom bar (a link to `?add=1`). */
 async function openAdd(label = /^Add anime$/i) {
-  await userEvent.click(await screen.findByRole('button', { name: label }));
+  await screen.findByRole('heading', { level: 1 });
+  await userEvent.click(within(await screen.findByRole('navigation', { name: 'Main' })).getByRole('link', { name: label }));
   return findAddSheet();
 }
 
@@ -142,7 +143,33 @@ describe('adding an entry', () => {
     const d = await openAdd();
     await userEvent.click(within(d).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /^Add anime$/i })).toHaveFocus();
+    expect(screen.getByRole('link', { name: /^Add anime$/i })).toHaveFocus();
+  });
+
+  it('?add=1 opens "Add to Anime" and leaves the URL without add (by replace)', async () => {
+    fakeBackend();
+    const { router } = renderApp('/list/anime?add=1&keep=1');
+    expect(await findAddSheet()).toHaveAccessibleName('Add to Anime');
+    await waitFor(() => expect(router.state.location.search).toBe('?keep=1'));
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('Add from another list\'s screen opens that list\'s sheet once', async () => {
+    fakeBackend();
+    renderApp('/list/anime');
+    const d = await openAdd();
+    await userEvent.click(within(d).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // reopening works the same way
+    expect(await openAdd()).toHaveAccessibleName('Add to Anime');
+  });
+
+  it('the phone list has no floating Add button (Add is in the bottom bar); PC keeps its header button', async () => {
+    fakeBackend();
+    renderApp('/list/anime');
+    await screen.findByText('No anime yet');
+    expect(screen.queryByRole('button', { name: /^Add anime$/i })).not.toBeInTheDocument();
+    expect(document.querySelector('.fab')).toBeNull();
   });
 
   it('does not add a blank title', async () => {
@@ -461,37 +488,13 @@ describe('list basics', () => {
 });
 
 describe('v2 look', () => {
-  const headerBackdrop = () => document.querySelector<HTMLImageElement>('.page-header .backdrop img');
-
-  it("the list header's backdrop is the highest-rated title's cover", async () => {
-    fakeBackend({ entries: [
-      makeEntry({ title: 'Seven', rating: 7, coverUrl: 'https://img.example/seven.jpg' }),
-      makeEntry({ title: 'Best', rating: 9.5, coverUrl: 'https://img.example/best.jpg' }),
-      makeEntry({ title: 'Unrated', rating: null, coverUrl: 'https://img.example/none.jpg' }),
-    ] });
+  // B22 (Amendments): the themed bar replaced the list header's cover backdrop.
+  it('the list header has no cover backdrop, even with a rated cover', async () => {
+    fakeBackend({ entries: [makeEntry({ title: 'Best', rating: 9.5, coverUrl: 'https://img.example/best.jpg' })] });
     renderApp('/list/anime');
     await screen.findByText('Best');
-    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/best.jpg');
-    // the sort chosen doesn't change it
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
-    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/best.jpg');
-  });
-
-  it('skips a top-rated title that has no cover', async () => {
-    fakeBackend({ entries: [
-      makeEntry({ title: 'Top', rating: 10, coverUrl: '' }),
-      makeEntry({ title: 'Next', rating: 8, coverUrl: 'https://img.example/next.jpg' }),
-    ] });
-    renderApp('/list/anime');
-    await screen.findByText('Top');
-    expect(headerBackdrop()).toHaveAttribute('src', 'https://img.example/next.jpg');
-  });
-
-  it('no rated titles: no backdrop', async () => {
-    fakeBackend({ entries: [makeEntry({ title: 'Plain', rating: null, coverUrl: 'https://img.example/p.jpg' })] });
-    renderApp('/list/anime');
-    await screen.findByText('Plain');
-    expect(document.querySelector('.backdrop')).not.toBeInTheDocument();
+    expect(document.querySelector('.page-header .backdrop')).toBeNull();
+    expect(document.querySelector('.page-header--bar')).not.toBeNull();
   });
 
   it('phone list covers are the v2 size (56 px posters, 56 px squares)', async () => {
@@ -523,7 +526,28 @@ describe('search and filters', () => {
     makeEntry({ title: 'Pokémon', rating: 7, status: 'On Hold', genres: 'Adventure' }),
     makeEntry({ title: 'Bleach', rating: 8, status: 'Dropped', genres: 'Action' }),
   ] });
-  const openSearch = async () => { await userEvent.click(await screen.findByRole('button', { name: 'Search' })); return screen.findByRole('searchbox', { name: 'Search Anime' }); };
+  // B6: only the PC list has a filter box (the phone uses the global Search screen).
+  const openSearch = () => screen.findByRole('searchbox', { name: 'Filter Anime' });
+  beforeEach(() => setViewportWidth(1200));
+
+  it('phone: no Search button or field in the list header, and a ?q= is ignored', async () => {
+    setViewportWidth(390);
+    three();
+    renderApp('/list/anime?q=bleach');
+    await screen.findByText('Frieren');
+    expect(titles()).toEqual(['Frieren', 'Bleach', 'Pokémon']);
+    expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.getByText('3 titles · 3 rated')).toBeInTheDocument();
+  });
+
+  it('PC still filters with ?q=', async () => {
+    three();
+    renderApp('/list/anime?q=bleach');
+    await screen.findByText('Bleach');
+    expect(titles()).toEqual(['Bleach']);
+    expect(screen.getByRole('searchbox', { name: 'Filter Anime' })).toHaveValue('bleach');
+  });
 
   it('typing filters, updates the URL with replace, and shows "1 of 3 titles"', async () => {
     three();
@@ -541,7 +565,7 @@ describe('search and filters', () => {
     renderApp('/list/anime?q=POKEMON');
     await screen.findByText('Pokémon');
     expect(titles()).toEqual(['Pokémon']);
-    expect(screen.getByRole('searchbox', { name: 'Search Anime' })).toHaveValue('POKEMON');
+    expect(screen.getByRole('searchbox', { name: 'Filter Anime' })).toHaveValue('POKEMON');
   });
 
   it('Status filter narrows, and is absent on Movies', async () => {
@@ -638,7 +662,7 @@ describe('search and filters', () => {
     await waitFor(() => expect(titles()).toEqual(['Pokémon']));
     await router.navigate(-1);
     await waitFor(() => expect(titles()).toEqual(['Bleach']));
-    expect(screen.getByRole('searchbox', { name: 'Search Anime' })).toHaveValue('bleach');
+    expect(screen.getByRole('searchbox', { name: 'Filter Anime' })).toHaveValue('bleach');
   });
 
   it('keeps unrelated query params', async () => {
@@ -658,13 +682,13 @@ describe('search and filters', () => {
     expect(router.state.location.search).toBe('');
   });
 
-  it('Escape clears and closes the phone search', async () => {
+  it('Escape clears the PC filter box and keeps focus in it', async () => {
     three();
     renderApp('/list/anime');
     const box = await openSearch();
     await userEvent.type(box, 'bl{Escape}');
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Search' })).toHaveFocus();
+    expect(box).toHaveValue('');
+    expect(box).toHaveFocus();
     expect(titles()).toHaveLength(3);
   });
 

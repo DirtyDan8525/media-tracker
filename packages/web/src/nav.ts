@@ -53,5 +53,10 @@ export const ADD_NOUN: Record<Category, string> = {
   anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book',
 };
 
+/** B3: the bottom bar's Add opens the current list's Add sheet through this URL (ListScreen strips `add`). */
+export function addPath(c: Category): string {
+  return `/list/${c}?add=1`;
+}
+
 /** Global search (`/search?q=`). */
 export const SEARCH_PATH = '/search';

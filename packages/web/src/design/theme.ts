@@ -79,6 +79,17 @@ export function labelColorOn(fill: string, colors: ThemeColors): string {
     ?? roles.reduce((best, c) => (contrast(c, fill) > contrast(best, fill) ? c : best));
 }
 
+/**
+ * B22: title and icon colour on the themed list bar (a Header row band): whichever of Bright text
+ * and Text has more contrast there. Applied as `--bar-text`.
+ */
+export function barTextColor(colors: ThemeColors): string {
+  const bar = colors['Header row'] ?? MIDNIGHT['Header row']!;
+  const bright = colors['Bright text'] ?? MIDNIGHT['Bright text']!;
+  const text = colors.Text ?? MIDNIGHT.Text!;
+  return contrast(text, bar) > contrast(bright, bar) ? text : bright;
+}
+
 /** The CF set for a theme. A Custom theme gets the light set when its Background is light. */
 export function cfFor(s: Pick<UserSettings, 'theme' | 'colors'>): CfSet {
   if (s.theme === 'Custom') return cfSetFor(luminance(themeColors(s).Background!) > 0.5 ? 'Light' : 'Midnight');
@@ -104,6 +115,7 @@ export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTML
   const small = [onHl, '#000000', '#ffffff'].find((c) => contrast(c, hl) >= 4.5)
     ?? [onHl, '#000000', '#ffffff'].reduce((b, c) => (contrast(c, hl) > contrast(b, hl) ? c : b));
   root.style.setProperty('--on-highlight-small', small);
+  root.style.setProperty('--bar-text', barTextColor(colors));
 
   const bgLight = luminance(colors.Background!) > 0.5;
   root.style.colorScheme = bgLight ? 'light' : 'dark';

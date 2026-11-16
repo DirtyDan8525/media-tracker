@@ -19,7 +19,7 @@ export function MoreScreen() {
   const { more } = splitForPhone(enabledLists(me.settings));
   return (
     <div className="screen">
-      <PageHeader title="More" />
+      <PageHeader title="More" profile />
       <div className="screen__body stack-18">
         {more.length > 0 && (
           <section aria-labelledby="more-lists" className="group">

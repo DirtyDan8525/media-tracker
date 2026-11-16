@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { THEMES } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
-import { contrast } from '../src/design/theme';
+import { barTextColor, contrast } from '../src/design/theme';
 
 // Contrast rules the v2 refresh lives by, read from the stylesheets (jsdom does no layout or
 // compositing, so these check the declared roles and the backdrop's worst case by arithmetic).
@@ -122,6 +122,54 @@ describe('v2 contrast', () => {
       expect(decls('.avatar').color).toBe('var(--on-highlight)');
       expect(decls('.avatar').background).toBe('var(--highlight)');
       expect(name).toBeTruthy(); // the --on-highlight pairing is asserted for every theme in theme.test.ts
+    });
+  });
+
+  // B5: the Lists menu is Cards at --see-through alpha over whatever is behind it (blurred). Its
+  // text must read over the worst cases: a pure white or pure black page under it.
+  describe('see-through Lists menu', () => {
+    const alpha = tokenNum('--see-through');
+    it('--see-through is 0.9 and the menu uses it on Cards, opaque Cards without color-mix()', () => {
+      expect(alpha).toBe(0.9);
+      expect(css).toMatch(/\.lists-menu\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--card\) calc\(var\(--see-through\) \* 100%\), transparent\)/);
+      expect(css).toMatch(/\.lists-menu\s*\{[^}]*background:\s*var\(--card\)/);
+      expect(css).toMatch(/@media \(prefers-reduced-transparency: reduce\)\s*\{\s*\.lists-menu\s*\{[^}]*background:\s*var\(--card\)/);
+    });
+
+    // Muted text cannot reach 4.5:1 here: over a black page at 0.9 it reads 3.6-4.0:1 on the five
+    // light themes (it is close to the limit on opaque Cards already). So the menu uses no Muted text.
+    it('menu rows use Text and Bright text (current) only; the counts are Text, not Muted text', () => {
+      expect(decls('.lists-menu__item').color).toBe('var(--text)');
+      expect(decls('.lists-menu__item[aria-current="page"]').color).toBe('var(--bright-text)');
+      expect(decls('.lists-menu__count').color).toBe('var(--text)');
+      const menuCss = css.match(/\.lists-menu[\w-]*[^{]*\{[^}]*\}/g)!.join('\n');
+      expect(menuCss).not.toMatch(/color:\s*var\(--muted-text\)/);
+    });
+
+    it.each(NAMES)('%s: Text and Bright text on Cards at --see-through over #ffffff and #000000 are >= 4.5:1', (name) => {
+      const t = THEMES[name]!;
+      for (const under of ['#ffffff', '#000000']) {
+        const shown = over(t.Cards!, alpha, under);
+        for (const role of ['Text', 'Bright text']) {
+          expect(contrast(t[role]!, shown), `${name} ${role} over ${under}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    });
+  });
+
+  // B22: the themed bar is Header row; its title and icon use barTextColor (CSS: --bar-text).
+  describe('themed list bar', () => {
+    it('the bar is Header row and its title and icon use --bar-text', () => {
+      expect(decls('.page-header--bar').background).toBe('var(--header-row)');
+      expect(decls('.page-header--bar .page-title').color).toBe('var(--bar-text)');
+      expect(decls('.page-header__icon').color).toBe('var(--bar-text)');
+    });
+
+    it.each(NAMES)('%s: barTextColor on Header row is >= 4.5:1', (name) => {
+      const t = THEMES[name]!;
+      const c = barTextColor(t);
+      expect([t.Text, t['Bright text']]).toContain(c);
+      expect(contrast(c, t['Header row']!), `${name} ${c} on Header row`).toBeGreaterThanOrEqual(4.5);
     });
   });
 });

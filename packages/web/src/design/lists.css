@@ -3,8 +3,8 @@
 .muted { color: var(--muted-text); }
 .btn--block { width: 100%; min-height: 56px; font-size: 17px; border-radius: var(--radius-xl); }
 
-/* v2 list header: the list's highest-rated cover blurred behind it (PageHeader backdrop). Only
-   Text / Bright text on it, so the sub-line and Sort label move from Muted text to Text. */
+/* A header over a blurred cover (PageHeader backdrop; the Profile banner). Only Text / Bright text
+   on it, so the sub-line and Sort label move from Muted text to Text. (List screens use the themed bar, nav.css.) */
 .page-header.has-backdrop { padding-top: 22px; padding-bottom: var(--space-7); border-bottom: 1px solid var(--grid-line); }
 .page-header.has-backdrop .backdrop::after {
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 55%, transparent), var(--bg) 92%);
@@ -25,12 +25,7 @@
 /* PC: Text on Panels (Highlight on Panels is under 4.5:1 on light themes); the Highlight border stays as the cue */
 .frame--wide .select-chip { border-radius: var(--radius-lg); color: var(--text); }
 
-/* add button: floating on phones, in the header on PC */
-.fab {
-  position: fixed; right: var(--space-9); z-index: 30; min-height: 56px; padding: 0 22px; border-radius: var(--radius-fab);
-  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + env(safe-area-inset-bottom));
-  font-size: var(--fs-lg); box-shadow: var(--shadow-float);
-}
+/* add button in the PC list header (the phone's Add is in the bottom bar) */
 .btn--add { min-height: var(--tap); border-radius: var(--radius-md); font-size: var(--fs-sm); }
 
 /* phone cards (v2: 56 × 84 covers, tighter left padding so the cover leads) */

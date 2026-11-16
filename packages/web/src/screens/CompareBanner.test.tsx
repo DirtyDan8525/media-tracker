@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { THEMES } from '@media-tracker/shared';
 import { applyTheme, contrast } from '../design/theme';
@@ -103,7 +103,9 @@ describe('waiting pill', () => {
   it('renders the count in a filled Highlight pill in More', async () => {
     mockApi(makeMe(), { 'GET /api/compare/queue': { body: queue(3) } });
     renderApp('/more');
-    const link = await screen.findByRole('link', { name: 'Compare, 3 waiting' });
+    await screen.findByRole('heading', { level: 1, name: 'More' });
+    const body = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
+    const link = await within(body).findByRole('link', { name: 'Compare, 3 waiting' });
     const pill = link.querySelector('.count-pill')!;
     expect(pill).toHaveTextContent('3');
   });

@@ -70,6 +70,11 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     ['.profile__strip-link', 'min-height'],
     ['.crop__slider', 'height'],
     ['.crop__viewport', 'height'],
+    ['.bottom-tabs__item', 'min-height'],
+    ['.bottom-tabs__search', 'min-height'],
+    ['.lists-fab', 'height'],
+    ['.lists-menu__item', 'min-height'],
+    ['.profile-btn', 'height'],
   ] as const)('%s', (selector, prop) => {
     const props = prop === 'height' ? ['height', 'min-height'] : [prop];
     const size = hit(selector, props);
@@ -94,6 +99,10 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     expect(rules(row).join(';'), `${row} needs position: relative`).toMatch(/position:\s*relative/);
     const size = declared(row, ['height', 'min-height']) ?? 0;
     expect(size, `${row} is ${size}px`).toBeGreaterThanOrEqual(TAP);
+  });
+
+  it.each(['.lists-fab', '.profile-btn'])('%s is also at least 44 px wide', (selector) => {
+    expect(declared(selector, ['width', 'min-width']) ?? 0).toBeGreaterThanOrEqual(TAP);
   });
 
   it('the cell button is also at least 44 px wide, and hit areas sit on positioned controls', () => {

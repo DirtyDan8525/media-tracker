@@ -29,6 +29,7 @@
   --grid-line: #2e2e3e;
   --highlight: #ffd166;
   --on-highlight: #13131c;
+  --bar-text: #ffffff;   /* themed list bar title/icon: barTextColor() */
 
   --cf-low: #6b2a35;
   --cf-mid: #6b5a22;
@@ -61,7 +62,7 @@
   --radius-lg: 12px;     /* icon buttons, buttons, inputs, picker covers */
   --radius-xl: 14px;     /* cards, grouped rows */
   --radius-chip: 22px;   /* chips (44 px tall) */
-  --radius-fab: 28px;    /* Add button */
+  --radius-fab: 28px;    /* Lists button (56 px round) */
 
   /* type */
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -81,6 +82,7 @@
   --bottom-tabs-h: 76px;
   --side-nav-w: 240px;
   --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --see-through: 0.9;    /* Lists menu: Cards at this alpha over a blur (B5) */
 
   /* cover backdrop: a blurred, scaled cover under a Background/Cards scrim (v2 boards' .bd) */
   --backdrop-blur: 38px;

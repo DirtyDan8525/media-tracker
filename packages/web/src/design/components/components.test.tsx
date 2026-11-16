@@ -106,17 +106,18 @@ describe('design components: accessible names', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
   });
 
-  it('BottomTabs: a named nav whose links are named', () => {
+  it('BottomTabs: the Main nav, its links named; Add goes to the current list\'s Add sheet', () => {
     render(
-      <MemoryRouter initialEntries={['/list/movies']}>
-        <BottomTabs lists={['anime', 'movies', 'tv', 'albums']} />
+      <MemoryRouter initialEntries={['/activity']}>
+        <BottomTabs current="movies" compareCount={0} />
       </MemoryRouter>,
     );
-    const nav = screen.getByRole('navigation', { name: 'Lists' });
-    for (const name of ['Anime', 'Movies', 'TV', 'Albums', 'More']) {
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    for (const name of ['Add movie', 'Activity', 'Search', 'More']) {
       expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
     }
-    expect(within(nav).getByRole('link', { name: 'Movies' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: 'Add movie' })).toHaveAttribute('href', '/list/movies?add=1');
+    expect(within(nav).getByRole('link', { name: 'Activity' })).toHaveAttribute('aria-current', 'page');
   });
 });
 

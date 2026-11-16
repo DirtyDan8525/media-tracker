@@ -18,8 +18,6 @@ describe('wrangler.toml production vars', () => {
 
   it('has a production vars section with ENVIRONMENT = "prod"', () => {
     expect(prod).toMatch(/ENVIRONMENT\s*=\s*"prod"/);
-    expect(prod).toMatch(/ACCESS_TEAM_DOMAIN/);
-    expect(prod).toMatch(/ACCESS_AUD/);
     expect(prod).toMatch(/ADMIN_EMAIL/);
   });
 
@@ -48,11 +46,8 @@ describe('wrangler.toml production vars', () => {
     expect(section('vars')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
   });
 
-  it('never holds the Cloudflare API token, and declares the two ids', () => {
-    expect(toml).not.toMatch(/CF_API_TOKEN/);
-    expect(section('vars')).toMatch(/CF_ACCOUNT_ID/);
-    expect(section('vars')).toMatch(/ACCESS_POLICY_ID/);
-    expect(prod).toMatch(/CF_ACCOUNT_ID/);
-    expect(prod).toMatch(/ACCESS_POLICY_ID/);
+  it('has no Cloudflare Access or Cloudflare API settings left (Phase 4b: own sign-in)', () => {
+    const vars = toml.split('\n').map((l) => l.replace(/#.*$/, '')).join('\n');
+    expect(vars).not.toMatch(/CF_API_TOKEN|CF_ACCOUNT_ID|ACCESS_POLICY_ID|ACCESS_AUD|ACCESS_TEAM_DOMAIN/);
   });
 });

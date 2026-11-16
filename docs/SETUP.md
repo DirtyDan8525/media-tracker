@@ -1,6 +1,6 @@
 # Setting up Media Tracker (for Dan, on Windows)
 
-You will put the app on Cloudflare (free plan), lock it so only your email can open it, install it on your PC and phone, and import your Google Sheet. Allow about an hour. Each step ends with what success looks like.
+You will put the app on Cloudflare (free plan), create your account (the first account is the admin; everyone after waits for you to approve them), install it on your PC and phone, and import your Google Sheet. Allow about an hour. Each step ends with what success looks like.
 
 Commands go in **PowerShell**: press the Windows key, type `PowerShell`, press Enter. Run them one at a time from the project folder (see step 3).
 
@@ -72,7 +72,7 @@ Type `y` when asked.
 npm run deploy
 ```
 
-**Success:** it ends with a line like `https://media-tracker.<your-subdomain>.workers.dev`. Copy that address. Don't treat the app as ready yet: until step 9 is done, the app's pages load but every `/api` request is refused (that is intended).
+**Success:** it ends with a line like `https://media-tracker.<your-subdomain>.workers.dev`. Copy that address.
 
 Production uses `ENVIRONMENT = "prod"` (already set in `wrangler.toml`). **Never add `DEV_EMAIL` (or `LOOKUP_FAKE`) to the production settings.** `DEV_EMAIL` is a sign-in shortcut for testing on your own PC and would let anyone in. A test fails if it ever appears there.
 
@@ -86,33 +86,23 @@ npm exec -w packages/worker -- wrangler secret put IGDB_ID --env production
 npm exec -w packages/worker -- wrangler secret put IGDB_SECRET --env production
 ```
 
-The Worker exists now (step 7), so these attach to it. Secrets take effect right away; the redeploy in step 9 picks up everything else.
+The Worker exists now (step 7), so these attach to it. Secrets take effect right away.
 
 **Success:** each command prints `Success! Uploaded secret ...`.
 
-## 9. Lock it with Cloudflare Access
+## 9. Create your account
 
-Menu names in the dashboard can differ slightly from what is written here; look for the words in bold.
+1. Open your workers.dev address in a browser.
+2. On **Create account**, choose a username and a password (8 to 128 characters). Write the password down somewhere private.
 
-1. In the Cloudflare dashboard open **Zero Trust**. If asked, pick a team name (this becomes your team domain) and choose the **Free** plan.
-2. Find **Access** > **Applications** and add an application of type **Self-hosted**.
-3. For the application domain enter your whole workers.dev host, `media-tracker.<your-subdomain>.workers.dev`, with no path. One application covering the whole host is what you want: it protects the pages, `/api/*`, `/api/auth/reauth` and `/cdn-cgi/*` together.
-4. Add a policy: name `Dan only`, action **Allow**, under **Include** choose **Emails** and enter your email address. Add nothing else.
-5. Save, then open the application's overview or settings and copy the **Application Audience (AUD) tag** (a long string). The **team domain**, `<team>.cloudflareaccess.com`, is shown in the Zero Trust settings.
-6. In `packages/worker/wrangler.toml`, under `[env.production.vars]`, set:
-   - `ACCESS_AUD` = the AUD tag
-   - `ACCESS_TEAM_DOMAIN` = the team domain (no `https://`)
-   - `ADMIN_EMAIL` = your email (the one in the policy)
-7. Deploy again: `npm run deploy`. (`wrangler.toml` already turns off Preview URLs for the Worker with `preview_urls = false`, so no second address bypasses the lock.)
+The first account on a new database is the admin and is let in straight away. (If you already used the app before Phase 4b, do not do this: follow "Switching to the app's own sign-in" below instead.)
 
-**Success:** opening your workers.dev address in a private window first shows a Cloudflare sign-in page asking for your email. Only a code sent to your allowed email gets through.
+**Success:** the app opens on the Anime list, and the menu has **Admin**.
 
 ## 10. Open it and install the app
 
-- **Windows (Edge or Chrome):** open the address, sign in with the emailed code, then click the install icon at the right of the address bar (or the three dots > **Apps** > **Install this site as an app**).
+- **Windows (Edge or Chrome):** open the address, sign in with your username and password, then click the install icon at the right of the address bar (or the three dots > **Apps** > **Install this site as an app**).
 - **Android (Chrome):** open the address, sign in, tap the three dots > **Install app** (or **Add to Home screen**).
-
-Choose a username when the app asks.
 
 **Success:** the app opens in its own window, or from an icon on your phone, and shows the Anime list.
 
@@ -124,33 +114,29 @@ Choose a username when the app asks.
 
 **Success:** "Imported N titles" appears and your lists fill up. Undo is available right after if something looks wrong.
 
-## 12. Let friends in (admin invites)
+## 12. Sign-in and approving friends
 
-This lets you approve a friend's email from the app (More > **Admin**) instead of editing the Access policy by hand. The app edits the policy for you, using a token that can do only that. Skip this section if you would rather add emails in the dashboard yourself.
+Everyone signs in with a username and a password. Nobody gets in until you say so.
 
-1. In the Cloudflare dashboard click your profile icon > **My Profile** > **API Tokens** > **Create Token** > **Create Custom Token**. Name it `media-tracker access`. Under Permissions choose **Account** · **Access: Apps and Policies** · **Edit**. Under Account Resources choose **Include** · your account. Add no other permissions. Create the token and copy it (it is shown only once).
-   **Success:** you see the token on screen and a "Create another token" or "View all tokens" button.
-2. Store it as a secret (paste the token when asked):
-   ```
-   npm exec -w packages/worker -- wrangler secret put CF_API_TOKEN --env production
-   ```
-   **Success:** `Success! Uploaded secret CF_API_TOKEN`.
-3. Find your Account ID: in the dashboard open **Workers & Pages**; **Account ID** is on the right side. In `packages/worker/wrangler.toml`, under `[env.production.vars]`, set `CF_ACCOUNT_ID` to it (keep the quotes).
-   **Success:** the line reads `CF_ACCOUNT_ID = "<32 letters and numbers>"`.
-4. Find the policy ID: **Zero Trust** > **Access** > **Policies**, then open "Dan only" (rename it "Friends" if you like). The policy ID is in the address bar after `/policies/`. Put it in `[env.production.vars]` as `ACCESS_POLICY_ID`. If the policy is not listed there, create one on that page (action **Allow**, **Include** > **Emails** = your email), attach it to the Media Tracker application, and remove the old one from the application.
-   **Success:** `ACCESS_POLICY_ID = "<the id>"` is saved, and the policy is attached to the application.
-5. Check it before you deploy (PowerShell; put your token, account ID and policy ID in place of the `<...>` parts):
-   ```
-   curl.exe -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/accounts/<account id>/access/policies/<policy id>
-   ```
-   **Success:** the reply contains `"success":true` and your email address. If it says `Authentication error`, the token or its permission is wrong (go back to step 1).
-6. Deploy:
-   ```
-   npm run deploy
-   ```
-   **Success:** More > **Admin** > approve a test email shows an invite link. Send that link to your friend: they sign in with the email you approved, pick a username, and are offered "Add @you".
+1. Send a friend the app's address (your workers.dev address).
+   **Success:** they see **Sign in / Create account**.
+2. They choose **Create account**, pick a username and a password. They then see "Waiting for Dan to approve".
+   **Success:** in your app, More > **Admin** lists them under **Requests**.
+3. Press **Approve** (or **Decline** if you don't know them; that deletes the request).
+   **Success:** within a minute their screen opens the app. They can now add you with your username or your invite link.
+4. To take someone's access away, press **Remove access** next to them under **Members**. They are signed out everywhere at once and cannot sign in again. Their lists stay in the database but nobody sees them. **Restore** under **Removed** lets them back in with their old password.
+   **Success:** they move to **Removed**.
+5. If a friend forgets their password, press **Reset link** next to them and send them the link. It works once, for 24 hours, and signs them out on every other device.
+   **Success:** they open the link, choose a new password and are signed in.
 
-To take someone's access away, press **Remove** next to their email in Admin. The app drops their email from the policy (it refuses to remove your own email or the last email on the policy). Their lists and ratings stay in the database; they just cannot sign in any more.
+If you forget your own password, run this in the Codespace terminal or PowerShell (after logging in to Cloudflare as in "Updating to a new version", step 3), with your username in place of `dan`:
+```
+npm run set-password -w packages/worker -- dan
+```
+Type the new password twice when asked (nothing shows as you type; that is on purpose).
+**Success:** it prints `Done: @dan has a new password and is active.`
+
+Ten wrong passwords for one username within 15 minutes lock that username for 15 minutes ("Too many attempts"). Waiting is the fix.
 
 ---
 
@@ -193,7 +179,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0003_activity.sql`: the `activity` table (the Activity screen), with one "added" line for each title you already have.
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
-   - `0006_social.sql`: friends, invite links, reactions, comments and the list of approved emails (Phase 4). Apply it **before** deploying: the new app reads these tables.
+   - `0006_social.sql`: friends, invite links, reactions, comments, and the app's own sign-in (passwords, sessions, approvals) (Phase 4). Apply it **before** deploying: the new app reads these tables. Coming from a version before Phase 4b, do the whole update with "Switching to the app's own sign-in" below instead.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:
@@ -205,11 +191,44 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
 
 Do not copy `DEV_EMAIL` or `LOOKUP_FAKE` into `wrangler.toml` for production. They exist only for local development and the end-to-end test, and the Worker ignores them unless `ENVIRONMENT` is `dev`.
 
+## Switching to the app's own sign-in (one time, Phase 4b)
+
+Until now Cloudflare Access (the emailed code) guarded the app. From Phase 4b the app has its own **Sign in / Create account** screen and you approve friends inside the app, so Access goes away. Do this once, in this order, only with the version I tell you has the sign-in screen. Your lists, ratings and username stay as they are. Run the commands one at a time in the Codespace terminal (or PowerShell on your PC), from the `media-tracker` folder.
+
+1. Get the new code and log in to Cloudflare: do steps 1, 2 and 3 of "Updating to a new version" above.
+   **Success:** `git branch --show-current` prints the branch I gave you, and `npm exec -w packages/worker -- wrangler whoami` shows your account.
+2. Update the database tables (the new app needs them; the version online now ignores them, so nothing breaks in between):
+   ```
+   npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
+   ```
+   Type `y` when asked.
+   **Success:** it lists `0006_social.sql` with a green check (and any older ones you were missing).
+3. Give your account a password. Put your username in place of `dan` (it is the name the app shows as `@dan`):
+   ```
+   npm run set-password -w packages/worker -- dan
+   ```
+   Type a new password (8 to 128 characters), press Enter, type it again. Nothing shows as you type; that is on purpose. Write it down somewhere private.
+   **Success:** it prints `Done: @dan has a new password and is active.` If it says `There is no account called @dan`, check the spelling: the message shows a command that lists the usernames.
+4. Put the new app online:
+   ```
+   npm run deploy
+   ```
+   **Success:** it ends with a `Deployed` message and your workers.dev address.
+5. Sign in. Open your workers.dev address. Cloudflare Access still asks for the emailed code first (one last time); then the app shows **Sign in**. Sign in with your username and the password from step 3.
+   **Success:** your lists appear, and More > **Admin** opens. If the password is refused, run step 3 again.
+6. Delete the Access application. In the Cloudflare dashboard open **Zero Trust** > **Access** > **Applications**, find the Media Tracker application (your workers.dev address), open its **⋯** menu (or **Configure**) and choose **Delete**, then confirm. Menu names can differ slightly; look for the words in bold.
+   **Success:** in a private (incognito) window your address goes straight to the app's **Sign in** screen, with no Cloudflare page in front.
+7. Tidy up (optional): on **Zero Trust** > **Access** > **Policies** delete the "Dan only" (or "Friends") policy, and if you made the `media-tracker access` API token for the old admin invites, delete it under your profile icon > **My Profile** > **API Tokens**.
+   **Success:** neither is listed any more.
+8. Reinstall the app on your phone if it keeps showing a Cloudflare page: remove the home-screen icon, open the address in the browser, sign in, and install again (step 10).
+   **Success:** the icon opens the app signed in.
+9. Tell your friends the address. They create an account and you approve them (section 12).
+
 ## The three most likely problems
 
 1. **`npm ci` fails or crashes, or says the engine is not supported.** You have an old Node. Run `node -v`; if it is not 24, reinstall Node.js 24 LTS (step 2), reopen PowerShell, and run `npm ci` again.
 2. **Wrangler says "Authentication error" or `No such database` / a database id error.** Run `npm exec -w packages/worker -- wrangler login` again, and re-check that the `database_id` in the `[env.production]` section matches the one `d1 create` printed (`npm exec -w packages/worker -- wrangler d1 list` shows it).
-3. **After deploy you see a blank "Signed out" page or sign-in loops.** `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match Access exactly (no `https://`, no spaces), or the Access application doesn't cover the whole workers.dev host. Fix `wrangler.toml` or the application's hostname and run `npm run deploy` again. Check that the application's host is exactly your workers.dev host.
+3. **Your password is refused, or it says "Too many attempts".** Check the username (no `@`). After ten wrong tries, wait 15 minutes. To set a new password, run `npm run set-password -w packages/worker -- <your username>` (section 12). A friend who forgot theirs gets a **Reset link** from you in Admin.
 
 ## Good to know
 

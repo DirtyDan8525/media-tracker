@@ -1,44 +1,12 @@
 import { env } from 'cloudflare:workers';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
+import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
-
-const TEAM = 'team.example.cloudflareaccess.com';
-const AUD = 'test-aud-tag';
-const KID = 'test-key';
 
 const call = (path: string, overrides: Partial<Env> = {}, headers: Record<string, string> = {}) =>
   app.fetch(new Request(`https://app.test${path}`, { headers }), { ...env, ...overrides } as Env);
 
-const prod: Partial<Env> = { ENVIRONMENT: 'prod', ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD };
-
-let goodKey: CryptoKeyPair;
-let wrongKey: CryptoKeyPair;
-
-async function sign(key: CryptoKey, claims: Record<string, unknown> = { email: 'dan@example.com' }, opts: { iss?: string; aud?: string } = {}) {
-  return new SignJWT(claims)
-    .setProtectedHeader({ alg: 'RS256', kid: KID })
-    .setIssuer(opts.iss ?? `https://${TEAM}`)
-    .setAudience(opts.aud ?? AUD)
-    .setIssuedAt()
-    .setExpirationTime('5m')
-    .sign(key);
-}
-
-beforeAll(async () => {
-  goodKey = (await generateKeyPair('RS256', { extractable: true })) as CryptoKeyPair;
-  wrongKey = (await generateKeyPair('RS256', { extractable: true })) as CryptoKeyPair;
-  const jwk: JWK = { ...(await exportJWK(goodKey.publicKey)), kid: KID, alg: 'RS256', use: 'sig' };
-  const realFetch = globalThis.fetch;
-  // The Worker runs in the same isolate as the tests, so a global stub also
-  // serves the Access certs URL to the Worker's jose JWKS fetch.
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-    const url = new Request(input as RequestInfo).url;
-    if (url === `https://${TEAM}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
-    return realFetch(input, init);
-  });
-});
+const prod: Partial<Env> = { ENVIRONMENT: 'prod' };
 
 afterEach(async () => {
   await env.DB.exec('DELETE FROM users');
@@ -101,74 +69,19 @@ describe('dev bypass', () => {
   });
 });
 
-describe('Access JWT', () => {
-  it('401 with no header in prod', async () => {
+describe('no session', () => {
+  it('401 with no cookie in prod', async () => {
     const res = await call('/api/me', prod);
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized' });
   });
 
-  it('accepts a correctly signed token', async () => {
-    const token = await sign(goodKey.privateKey);
-    const res = await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': token });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ email: 'dan@example.com', isAdmin: false });
-  });
-
-  it('rejects a token signed by the wrong key', async () => {
-    const token = await sign(wrongKey.privateKey);
-    expect((await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': token })).status).toBe(401);
-  });
-
-  it('rejects the wrong audience and the wrong issuer', async () => {
-    const badAud = await sign(goodKey.privateKey, undefined, { aud: 'other' });
-    const badIss = await sign(goodKey.privateKey, undefined, { iss: 'https://evil.example.com' });
-    expect((await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': badAud })).status).toBe(401);
-    expect((await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': badIss })).status).toBe(401);
-  });
-
-  it('rejects a valid token that has no email claim', async () => {
-    const token = await sign(goodKey.privateKey, { sub: 'service-token' });
-    expect((await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': token })).status).toBe(401);
-  });
-});
-
-describe('Access JWT hardening', () => {
-  const send = (token: string, overrides: Partial<Env> = prod) => call('/api/me', overrides, { 'Cf-Access-Jwt-Assertion': token });
-
-  it('rejects an HS256 token (algorithm pinned to RS256)', async () => {
-    const token = await new SignJWT({ email: 'dan@example.com' })
-      .setProtectedHeader({ alg: 'HS256', kid: KID })
-      .setIssuer(`https://${TEAM}`).setAudience(AUD).setIssuedAt().setExpirationTime('5m')
-      .sign(new TextEncoder().encode('a-shared-secret-of-sufficient-length-1234'));
-    expect((await send(token)).status).toBe(401);
-  });
-
-  it('rejects a correctly signed token that has no exp', async () => {
-    const token = await new SignJWT({ email: 'dan@example.com' })
-      .setProtectedHeader({ alg: 'RS256', kid: KID }).setIssuer(`https://${TEAM}`).setAudience(AUD).setIssuedAt()
-      .sign(goodKey.privateKey);
-    expect((await send(token)).status).toBe(401);
-  });
-
-  it('rejects an expired token', async () => {
-    const token = await new SignJWT({ email: 'dan@example.com' })
-      .setProtectedHeader({ alg: 'RS256', kid: KID }).setIssuer(`https://${TEAM}`).setAudience(AUD)
-      .setIssuedAt(Math.floor(Date.now() / 1000) - 600).setExpirationTime(Math.floor(Date.now() / 1000) - 300)
-      .sign(goodKey.privateKey);
-    expect((await send(token)).status).toBe(401);
-  });
-
-  it('prod with an empty ACCESS_AUD or ACCESS_TEAM_DOMAIN refuses even a valid-looking token', async () => {
-    const token = await sign(goodKey.privateKey);
-    expect((await send(token, { ...prod, ACCESS_AUD: '' })).status).toBe(401);
-    expect((await send(token, { ...prod, ACCESS_TEAM_DOMAIN: '' })).status).toBe(401);
-    const users = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
-    expect(users?.n).toBe(0);
+  it('an old Cloudflare Access header signs nobody in', async () => {
+    expect((await call('/api/me', prod, { 'Cf-Access-Jwt-Assertion': 'x.y.z' })).status).toBe(401);
   });
 
   it('ENVIRONMENT unset plus DEV_EMAIL does not bypass auth', async () => {
-    const res = await call('/api/me', { ENVIRONMENT: undefined, DEV_EMAIL: 'dan@example.com', ACCESS_TEAM_DOMAIN: '', ACCESS_AUD: '' } as Partial<Env>);
+    const res = await call('/api/me', { ENVIRONMENT: undefined, DEV_EMAIL: 'dan@example.com' } as Partial<Env>);
     expect(res.status).toBe(401);
   });
 

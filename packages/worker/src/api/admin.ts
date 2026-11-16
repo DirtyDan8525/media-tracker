@@ -1,98 +1,76 @@
+/**
+ * /api/admin/* (Phase 4b, A7): Dan approves sign-ups, declines them, removes and restores people,
+ * and makes password-reset links. Only the admin reaches these routes.
+ */
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
-import { ACCESS_SEATS, type PublicUser } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
-import { allowEmail, CloudflareError, LastRule, NotConfigured, removeEmail } from '../cloudflare/access';
-import { ensureInviteCode } from '../social/inviteCode';
-import { publicUser, PUBLIC_USER_COLS } from '../social/visibility';
+import type { PublicUser } from '@media-tracker/shared';
+import type { AppEnv } from '../auth/user';
+import { publicUser, PUBLIC_USER_COLS, type PublicUserRow } from '../social/visibility';
+import { createResetLink } from './auth';
 
 export const admin = new Hono<AppEnv>();
 
-/** Only users.is_admin reaches /api/admin/*. */
+/** Only the admin (users.is_admin, or the ADMIN_EMAIL row) reaches /api/admin/*. */
 export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!c.get('user').isAdmin) return c.json({ error: 'forbidden' }, 403);
   await next();
 };
 admin.use('*', requireAdmin);
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const cleanEmail = (v: unknown): string | null => {
-  if (typeof v !== 'string') return null;
-  const e = v.trim().toLowerCase();
-  return e.length <= 254 && EMAIL_RE.test(e) ? e : null;
-};
+const notFound = { error: 'not_found' } as const;
 
-/** Cloudflare failures become 502 { error: 'cloudflare', message }; missing config 503; anything else rethrows. */
-function failure(c: { json: (b: unknown, s: 400 | 502 | 503) => Response }, e: unknown): Response {
-  if (e instanceof NotConfigured) return c.json({ error: 'not_configured' }, 503);
-  if (e instanceof CloudflareError) return c.json({ error: 'cloudflare', message: e.message }, 502);
-  if (e instanceof LastRule) return c.json({ error: 'last_rule' }, 400);
-  throw e;
+export interface AdminLists {
+  pending: (PublicUser & { requestedAt: string })[];
+  active: (PublicUser & { joinedAt: string | null; isAdmin: boolean })[];
+  removed: PublicUser[];
 }
 
-/** GET /api/admin: 3 queries. */
+// GET /api/admin: 1 query (+ sign-in). Pending oldest first (the order they asked), the rest by join date.
 admin.get('/', async (c) => {
-  const db = c.env.DB;
-  const [inv, usr, count] = await db.batch([
-    db.prepare(
-      `SELECT i.email, i.created_at, ${PUBLIC_USER_COLS.split(', ').map((k) => `u.${k} AS u_${k}`).join(', ')}
-       FROM invites i LEFT JOIN users u ON u.email = i.email ORDER BY i.created_at DESC`,
-    ),
-    db.prepare(`SELECT ${PUBLIC_USER_COLS}, email, created_at FROM users WHERE access_removed_at IS NULL ORDER BY created_at`),
-    db.prepare('SELECT COUNT(*) AS n FROM users WHERE access_removed_at IS NULL'),
-  ]);
-  const invites = (inv!.results as Record<string, string | null>[]).map((r) => ({
-    email: r.email as string,
-    invitedAt: r.created_at as string,
-    joined: r.u_id
-      ? publicUser({ id: r.u_id, username: r.u_username ?? null, display_name: r.u_display_name ?? null, avatar_at: r.u_avatar_at ?? null })
-      : null,
-  }));
-  const users: (PublicUser & { email: string; joinedAt: string | null })[] = (usr!.results as Record<string, string | null>[]).map((r) => ({
-    ...publicUser({ id: r.id as string, username: r.username ?? null, display_name: r.display_name ?? null, avatar_at: r.avatar_at ?? null }),
-    email: r.email as string,
-    joinedAt: r.created_at ?? null,
-  }));
-  const used = (count!.results[0] as { n: number }).n;
-  return c.json({ seats: { used, total: ACCESS_SEATS }, invites, users });
+  const { results } = await c.env.DB.prepare(
+    `SELECT ${PUBLIC_USER_COLS}, status, is_admin, email, created_at FROM users ORDER BY created_at, id`,
+  ).all<PublicUserRow & { status: string; is_admin: number; email: string; created_at: string | null }>();
+  const adminEmail = (c.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+  const body: AdminLists = { pending: [], active: [], removed: [] };
+  for (const r of results) {
+    const u = publicUser(r);
+    if (r.status === 'pending') body.pending.push({ ...u, requestedAt: r.created_at ?? '' });
+    else if (r.status === 'removed') body.removed.push(u);
+    else body.active.push({ ...u, joinedAt: r.created_at, isAdmin: r.is_admin === 1 || (adminEmail !== '' && r.email.toLowerCase() === adminEmail) });
+  }
+  return c.json(body);
 });
 
-/** POST /api/admin/invites { email }: Cloudflare GET (+PUT), then 2 writes + invite code (<= 4 queries). Nothing is recorded if Cloudflare fails. */
-admin.post('/invites', async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const email = cleanEmail((body as { email?: unknown } | null)?.email);
-  if (!email) return c.json({ error: 'bad_email' }, 400);
-  let added: boolean;
-  try {
-    ({ added } = await allowEmail(c.env, email));
-  } catch (e) {
-    return failure(c, e);
-  }
-  await c.env.DB.batch([
-    c.env.DB.prepare('INSERT OR IGNORE INTO invites (email, created_at) VALUES (?, ?)').bind(email, new Date().toISOString()),
-    c.env.DB.prepare('UPDATE users SET access_removed_at = NULL WHERE email = ?').bind(email),
-  ]);
-  const code = await ensureInviteCode(c.env.DB, c.get('user').id);
-  return c.json({ email, link: `${new URL(c.req.url).origin}/add/${code}`, alreadyAllowed: !added });
+// POST /api/admin/users/:id/approve: pending or removed -> active. 1 query (+ sign-in). 404 otherwise.
+admin.post('/users/:id/approve', async (c) => {
+  const res = await c.env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ? AND status IN ('pending', 'removed')")
+    .bind(c.req.param('id'))
+    .run();
+  return res.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
 });
 
-/**
- * DELETE /api/admin/invites/:email: takes the email off the Access policy and deletes its invites row and marks the user removed (2 queries).
- * The person's data is not deleted. Refuses the admin's own email (400 self) and the last include rule (400 last_rule).
- */
-admin.delete('/invites/:email', async (c) => {
-  const email = cleanEmail(c.req.param('email'));
-  if (!email) return c.json({ error: 'bad_email' }, 400);
-  if (email === c.get('user').email.trim().toLowerCase()) return c.json({ error: 'self' }, 400);
-  let removed: boolean;
-  try {
-    ({ removed } = await removeEmail(c.env, email));
-  } catch (e) {
-    return failure(c, e);
-  }
-  await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM invites WHERE email = ?').bind(email),
-    c.env.DB.prepare('UPDATE users SET access_removed_at = ? WHERE email = ?').bind(new Date().toISOString(), email),
+// POST /api/admin/users/:id/decline: deletes a pending sign-up (sessions go with it). 1 query (+ sign-in).
+admin.post('/users/:id/decline', async (c) => {
+  const res = await c.env.DB.prepare("DELETE FROM users WHERE id = ? AND status = 'pending'").bind(c.req.param('id')).run();
+  return res.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
+});
+
+// POST /api/admin/users/:id/remove: active -> removed and every session deleted; data stays. Never yourself.
+// 2 queries (+ sign-in).
+admin.post('/users/:id/remove', async (c) => {
+  const id = c.req.param('id');
+  if (id === c.get('user').id) return c.json({ error: 'self' }, 400);
+  const [res] = await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE users SET status = 'removed' WHERE id = ? AND status = 'active'").bind(id),
+    // Only when the row really is removed now (a pending person keeps their session).
+    c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?1 AND (SELECT status FROM users WHERE id = ?1) = 'removed'").bind(id),
   ]);
-  return c.json({ removed });
+  return res!.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
+});
+
+// POST /api/admin/users/:id/reset-link -> { link }: one-time, 24 h, replaces any earlier link. 2 queries (+ sign-in).
+admin.post('/users/:id/reset-link', async (c) => {
+  const link = await createResetLink(c.env.DB, c.req.param('id'), new URL(c.req.url).origin);
+  return link ? c.json({ link }) : c.json(notFound, 404);
 });

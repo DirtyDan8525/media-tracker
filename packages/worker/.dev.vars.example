@@ -6,7 +6,4 @@ DEV_EMAIL=dan@example.com
 # IGDB_SECRET=
 # Only for recording the Spotify fixture (npm run record): a Spotify album link for Clairo – Live at Electric Lady.
 # SPOTIFY_ALBUM_URL=
-# Admin invites call the real Cloudflare API; leave these unset locally (Admin answers 503 not_configured).
-# CF_API_TOKEN=
-# CF_ACCOUNT_ID=
-# ACCESS_POLICY_ID=
+# Leave DEV_EMAIL out to try the real sign-in screen locally (sign up; the first account is the admin).

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { CATEGORY_CONFIG, type FriendEntry, type PublicUser, type Relation } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import { ENTRY_SELECT, type EntryRow } from './entries';
 import {
   PUBLIC_USER_COLS,
@@ -33,7 +33,7 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 const userByUsername = (db: D1Database, username: string) =>
   db
-    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at FROM users WHERE username = ?`)
+    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at FROM users WHERE username = ? AND status = 'active'`)
     .bind(username.toLowerCase())
     .first<PublicUserRow & { created_at: string | null }>();
 
@@ -47,7 +47,7 @@ friends.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT f.status, f.requested_by, f.created_at AS f_created, f.accepted_at, u.id, u.username, u.display_name, u.avatar_at
      FROM friendships f JOIN users u ON u.id = CASE WHEN f.user_a = ?1 THEN f.user_b ELSE f.user_a END
-     WHERE f.user_a = ?1 OR f.user_b = ?1 ORDER BY u.username`,
+     WHERE (f.user_a = ?1 OR f.user_b = ?1) AND u.status = 'active' ORDER BY u.username`,
   )
     .bind(me)
     .all<PublicUserRow & { status: string; requested_by: string; f_created: string; accepted_at: string | null }>();
@@ -87,7 +87,7 @@ friends.get('/entries', async (c) => {
 friends.get('/code/:code', async (c) => {
   const code = c.req.param('code');
   if (!CODE_RE.test(code)) return c.json(notFound, 404);
-  const row = await c.env.DB.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE invite_code = ?`).bind(code).first<PublicUserRow>();
+  const row = await c.env.DB.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE invite_code = ? AND status = 'active'`).bind(code).first<PublicUserRow>();
   if (!row) return c.json(notFound, 404);
   if (row.id === c.var.user.id) return c.json({ error: 'self' }, 400);
   return c.json(publicUser(row));
@@ -97,7 +97,7 @@ friends.get('/code/:code', async (c) => {
 friends.post('/add/:code', async (c) => {
   const code = c.req.param('code');
   if (!CODE_RE.test(code)) return c.json(notFound, 404);
-  const row = await c.env.DB.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE invite_code = ?`).bind(code).first<PublicUserRow>();
+  const row = await c.env.DB.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE invite_code = ? AND status = 'active'`).bind(code).first<PublicUserRow>();
   if (!row) return c.json(notFound, 404);
   const me = c.var.user.id;
   if (row.id === me) return c.json({ error: 'self' }, 400);
@@ -156,7 +156,7 @@ users.get('/search', async (c) => {
   const q = (c.req.query('q') ?? '').toLowerCase();
   if (!USERNAME_Q_RE.test(q)) return c.json(invalid, 400);
   const { results } = await c.env.DB.prepare(
-    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND id <> ?1 AND substr(username, 1, ?2) = ?3 ORDER BY username LIMIT 10`,
+    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND status = 'active' AND id <> ?1 AND substr(username, 1, ?2) = ?3 ORDER BY username LIMIT 10`,
   )
     .bind(c.var.user.id, q.length, q)
     .all<PublicUserRow>();

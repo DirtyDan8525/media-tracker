@@ -18,23 +18,19 @@ migrations_dir = "migrations"
 
 [vars]
 ENVIRONMENT = "dev"
-ACCESS_TEAM_DOMAIN = ""
-ACCESS_AUD = ""
 ADMIN_EMAIL = ""
-CF_ACCOUNT_ID = ""      # admin invites (docs/SETUP.md section 12); the API token is a secret, never put it here
-ACCESS_POLICY_ID = ""
 # DEV_EMAIL and LOOKUP_FAKE live in .dev.vars (gitignored); see .dev.vars.example.
 
 # ---------------------------------------------------------------------------
 # PRODUCTION  (deployed with `npm run deploy`, i.e. `wrangler deploy --env production`)
-# Fill in the three REPLACE_ME values following docs/SETUP.md.
+# Fill in the values following docs/SETUP.md.
 # NEVER add DEV_EMAIL or LOOKUP_FAKE here: they switch off sign-in checks / real lookups.
 # (A test fails if they appear.)
 # ---------------------------------------------------------------------------
 [env.production]
 name = "media-tracker"
 workers_dev = true
-preview_urls = false # preview URLs would bypass the Access application
+preview_urls = false # no second address for the app
 
 [env.production.assets]
 directory = "../web/dist"
@@ -50,8 +46,4 @@ migrations_dir = "migrations"
 
 [env.production.vars]
 ENVIRONMENT = "prod"
-ACCESS_TEAM_DOMAIN = "withered-sound-6d85.cloudflareaccess.com" # e.g. yourteam.cloudflareaccess.com
-ACCESS_AUD = "79feeb37bf33c7031fed39f6cafd36c3e331dc275d745f7831f9da4091df54a5"          # the Access application's Audience (AUD) tag
-ADMIN_EMAIL = "daniellromanski@yahoo.com"         # your sign-in email
-CF_ACCOUNT_ID = ""        # docs/SETUP.md section 12: your Cloudflare Account ID
-ACCESS_POLICY_ID = ""     # the Access policy that lets people in
+ADMIN_EMAIL = "daniellromanski@yahoo.com"         # the email of your existing account: that account is the admin

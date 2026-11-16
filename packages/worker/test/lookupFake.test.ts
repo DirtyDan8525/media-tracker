@@ -1,8 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
+import { sha256Hex } from '../src/auth/session';
 
 const call = (vars: Partial<Env>, path: string, body: unknown) =>
   app.fetch(
@@ -46,28 +46,26 @@ describe('LOOKUP_FAKE', () => {
   });
 
   it('in prod the fake is NOT used even with LOOKUP_FAKE=1 (authenticated request reaches the real chain)', async () => {
-    const TEAM = 'team.example.cloudflareaccess.com';
-    const AUD = 'test-aud-tag';
-    const key = (await generateKeyPair('RS256', { extractable: true })) as CryptoKeyPair;
-    const jwk: JWK = { ...(await exportJWK(key.publicKey)), kid: 'k', alg: 'RS256', use: 'sig' };
-    const jwt = await new SignJWT({ email: 'dan@example.com' })
-      .setProtectedHeader({ alg: 'RS256', kid: 'k' })
-      .setIssuer(`https://${TEAM}`).setAudience(AUD).setIssuedAt().setExpirationTime('5m')
-      .sign(key.privateKey);
+    // A real signed-in production user: a session row and its cookie.
+    const token = 'tokentokentokentokentokentokentokentokentok'; // 43 chars, like a real one
+    const now = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO users (id, email, username, settings_json, is_admin, created_at) VALUES ('u1', 'dan@example.com', 'dan', '{}', 0, ?)").bind(now),
+      env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_used_at) VALUES (?, 'u1', ?, ?, ?)")
+        .bind(await sha256Hex(token), now, new Date(Date.now() + 86_400_000).toISOString(), now),
+    ]);
     const sourceCalls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = new Request(input as RequestInfo).url;
-      if (url === `https://${TEAM}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
-      sourceCalls.push(url);
+      sourceCalls.push(new Request(input as RequestInfo).url);
       return new Response('{}', { status: 500 });
     });
     const res = await app.fetch(
       new Request('https://app.test/api/lookup', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'cf-access-jwt-assertion': jwt },
+        headers: { 'content-type': 'application/json', cookie: `mt_session=${token}` },
         body: JSON.stringify({ category: 'anime', term: 'frieren' }),
       }),
-      { ...env, ENVIRONMENT: 'prod', DEV_EMAIL: undefined, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, LOOKUP_FAKE: '1' } as Env,
+      { ...env, ENVIRONMENT: 'prod', DEV_EMAIL: undefined, LOOKUP_FAKE: '1' } as Env,
     );
     expect(res.status).toBe(200);
     // The real chain ran against the failing stub, so it found nothing; the canned match must not appear.

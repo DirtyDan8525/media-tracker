@@ -11,7 +11,7 @@ import {
   type Tier,
   type UserSettings,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import {
   applyRatingEdit, loadSet, loadSets, planEdit, planRemove, ratedFields, rowToComparison, runBatch, setWriteStatements,
   tierFieldsFor, type LoadedItem, type RatingEdit,

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { requireUser, type AppEnv } from './auth/access';
+import { requireUser, type AppEnv } from './auth/user';
+import { auth } from './api/auth';
 import { me } from './api/me';
 import { friends, users } from './api/friends';
 import { entries } from './api/entries';
@@ -13,13 +14,15 @@ import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
 import { admin } from './api/admin';
 
-export type { AppUser, AppEnv } from './auth/access';
+export type { AppUser, AppEnv } from './auth/user';
 export type { Env } from './env';
 
 export const app = new Hono<AppEnv>();
 
 // CSRF hardening for the cookie-authenticated API. Every mutation the web client makes is a
 // same-origin fetch with a JSON body, so anything else is refused before auth and handlers run:
+//  - A4: the Origin header must be this request's own origin (403 bad_origin). Browsers send it on
+//    every non-GET fetch, same-origin included; SameSite=Lax on the session cookie is the second wall;
 //  - Sec-Fetch-Site: cross-site is never ours (403);
 //  - a body-carrying mutation must be application/json (415), which a cross-site <form> cannot send
 //    without a CORS preflight. A DELETE has no body, so it may omit Content-Type when the browser
@@ -28,6 +31,7 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 app.use('/api/*', async (c, next) => {
   const method = c.req.method;
   if (!MUTATING.has(method)) return next();
+  if (c.req.header('Origin') !== new URL(c.req.url).origin) return c.json({ error: 'bad_origin' }, 403);
   const site = c.req.header('Sec-Fetch-Site');
   if (site === 'cross-site') return c.json({ error: 'forbidden' }, 403);
   const type = c.req.header('Content-Type');
@@ -42,11 +46,13 @@ app.use('/api/*', async (c, next) => {
 // Unauthenticated.
 app.get('/api/health', (c) => c.json({ ok: true }));
 
-// Re-auth hop for the web app: a top-level navigation here (which the service worker
-// never answers) lets Cloudflare Access show its sign-in when the session has expired;
-// once signed in, Access returns here and we send the user home. Returns no data.
+// Re-auth hop the current web app navigates to when signed out: it sends the user home, where
+// the sign-in screen (Phase 4b, B2) takes over. Returns no data.
 app.get('/api/auth/reauth', () =>
   new Response(null, { status: 302, headers: { Location: '/', 'Cache-Control': 'no-store' } }));
+
+// Sign up, sign in, sign out, password reset: answered for signed-out callers (A1-A7).
+app.route('/api/auth', auth);
 
 // Everything else under /api requires a signed-in user. Later tasks mount
 // their routers here: api.route('/entries', entries), etc.

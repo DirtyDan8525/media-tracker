@@ -8,14 +8,9 @@ export interface Env {
   DEV_EMAIL?: string;
   /** '1' makes /api/lookup return canned results; honored only when ENVIRONMENT is 'dev' (e2e tests). */
   LOOKUP_FAKE?: string;
-  ACCESS_TEAM_DOMAIN: string;
-  ACCESS_AUD: string;
+  /** The admin's email (Dan's row from before Phase 4b). Empty on a fresh install: the first sign-up is the admin. */
   ADMIN_EMAIL: string;
   TMDB_KEY?: string;
   IGDB_ID?: string;
   IGDB_SECRET?: string;
-  /** Admin invites (S1): Cloudflare API token with Access: Apps and Policies Edit. Secret. */
-  CF_API_TOKEN?: string;
-  CF_ACCOUNT_ID?: string;
-  ACCESS_POLICY_ID?: string;
 }

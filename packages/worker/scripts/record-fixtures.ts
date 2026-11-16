@@ -34,8 +34,6 @@ function envFrom(vars: Record<string, string>): Env {
   return {
     DB: memoryD1(),
     ENVIRONMENT: 'dev',
-    ACCESS_TEAM_DOMAIN: '',
-    ACCESS_AUD: '',
     ADMIN_EMAIL: '',
     TMDB_KEY: vars.TMDB_KEY || undefined,
     IGDB_ID: vars.IGDB_ID || undefined,

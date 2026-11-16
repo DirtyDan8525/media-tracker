@@ -7,7 +7,7 @@ import {
   type Reaction,
   type Target,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import { canView, publicUser, relationOf } from '../social/visibility';
 
 export const social = new Hono<AppEnv>();
@@ -67,14 +67,17 @@ export async function resolveTarget(
   return { ownerId: row.user_id, entryId: row.id };
 }
 
+/** A8: written by a user who is active (pending and removed users' rows stay, unseen). */
+const BY_ACTIVE = `user_id IN (SELECT id FROM users WHERE status = 'active')`;
+
 /** 1 query: reaction counts per emoji, my emoji, and the live comment count (a '#comments' row). */
 async function socialOf(db: D1Database, viewerId: string, target: Target): Promise<PostSocial> {
   const c = col(target);
   const { results } = await db
     .prepare(
-      `SELECT emoji, COUNT(*) AS n, MAX(user_id = ?1) AS mine FROM reactions WHERE ${c} = ?2 GROUP BY emoji
+      `SELECT emoji, COUNT(*) AS n, MAX(user_id = ?1) AS mine FROM reactions WHERE ${c} = ?2 AND ${BY_ACTIVE} GROUP BY emoji
        UNION ALL
-       SELECT '#comments', COUNT(*), 0 FROM comments WHERE ${c} = ?2 AND deleted_at IS NULL`,
+       SELECT '#comments', COUNT(*), 0 FROM comments WHERE ${c} = ?2 AND deleted_at IS NULL AND ${BY_ACTIVE}`,
     )
     .bind(viewerId, idOf(target))
     .all<{ emoji: string; n: number; mine: number }>();
@@ -144,7 +147,7 @@ social.get('/comments', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT c.id, c.body, c.created_at, c.user_id, u.id AS u_id, u.username, u.display_name, u.avatar_at
      FROM comments c JOIN users u ON u.id = c.user_id
-     WHERE c.${col(target)} = ? AND c.deleted_at IS NULL
+     WHERE c.${col(target)} = ? AND c.deleted_at IS NULL AND u.status = 'active'
      ORDER BY c.created_at, c.id LIMIT ${COMMENTS_MAX_LIST}`,
   )
     .bind(idOf(target))

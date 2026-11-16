@@ -8,13 +8,12 @@ import {
   THEMES,
   type UserSettings,
 } from '@media-tracker/shared';
-import type { AppEnv, AppUser } from '../auth/access';
+import { USERNAME_RE, type AppEnv, type AppUser } from '../auth/user';
 import { ensureTiers } from '../ratings/store';
 import { ensureInviteCode, newInviteCode } from '../social/inviteCode';
 
 export const me = new Hono<AppEnv>();
 
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 
 const ROLE_KEYS = Object.keys(THEMES.Midnight!);
@@ -83,10 +82,18 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
+/** S14: trimmed, 1-40 characters, or null to clear. undefined = invalid. */
+export function cleanDisplayName(raw: unknown): string | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw !== 'string') return undefined;
+  const name = raw.trim();
+  return name.length < 1 || [...name].length > 40 ? undefined : name;
+}
+
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName } = user;
-  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName };
+  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, status } = user;
+  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, status };
 }
 
 // 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10). The backfill is
@@ -236,13 +243,8 @@ me.post('/invite', async (c) => {
 me.put('/display-name', async (c) => {
   const body = await readJson(c.req.raw);
   if (!body || !('displayName' in body)) return c.json(invalid, 400);
-  const raw = body.displayName;
-  let displayName: string | null;
-  if (raw === null) displayName = null;
-  else if (typeof raw === 'string') {
-    displayName = raw.trim();
-    if (displayName.length < 1 || [...displayName].length > 40) return c.json(invalid, 400);
-  } else return c.json(invalid, 400);
+  const displayName = cleanDisplayName(body.displayName);
+  if (displayName === undefined) return c.json(invalid, 400);
   await c.env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?').bind(displayName, c.var.user.id).run();
   return c.json(meBody({ ...c.var.user, displayName }));
 });

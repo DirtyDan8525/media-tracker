@@ -1,0 +1,195 @@
+/**
+ * /api/auth/*: sign up, sign in, sign out and password reset (Phase 4b, A1-A7). Mounted before
+ * requireUser, so these answer signed-out callers. The Origin check in index.ts still applies.
+ */
+import { Hono } from 'hono';
+import { DEFAULT_USER_SETTINGS } from '@media-tracker/shared';
+import { USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
+import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
+import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
+import { cleanDisplayName, meBody } from './me';
+
+export const auth = new Hono<AppEnv>();
+
+const invalid = { error: 'invalid' } as const;
+const badCredentials = { error: 'bad_credentials' } as const;
+const notFound = { error: 'not_found' } as const;
+
+/** A5: 10 failures for one username within 15 minutes lock it for 15 minutes. */
+export const LOGIN_MAX_FAILURES = 10;
+export const LOGIN_WINDOW_MS = 15 * 60_000;
+export const LOGIN_LOCK_MS = 15 * 60_000;
+
+type UserRow = Parameters<typeof toAppUser>[0];
+
+async function readJson(req: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await req.json();
+    return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A fresh session: its token's hash, timestamps and the cookie that carries the token. */
+async function freshSession() {
+  const token = newToken();
+  const now = Date.now();
+  return { hash: await sha256Hex(token), created: new Date(now).toISOString(), expires: expiryFrom(now), cookie: sessionCookie(token) };
+}
+
+const INSERT_SESSION = 'INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_used_at)';
+
+// POST /api/auth/signup { username, password, displayName? } -> 201 Me + cookie. 3 queries (one batch).
+// The first account on an empty database is the active admin; everyone after waits for approval.
+auth.post('/signup', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body || typeof body.username !== 'string') return c.json(invalid, 400);
+  const username = body.username.toLowerCase();
+  if (!USERNAME_RE.test(username) || !validPassword(body.password)) return c.json(invalid, 400);
+  const displayName = body.displayName === undefined ? null : cleanDisplayName(body.displayName);
+  if (displayName === undefined) return c.json(invalid, 400);
+
+  const db = c.env.DB;
+  const id = crypto.randomUUID();
+  const passwordHash = await hashPassword(body.password);
+  const s = await freshSession();
+  let created: UserRow | undefined;
+  try {
+    const [, , sel] = await db.batch([
+      db.prepare(
+        `INSERT INTO users (id, email, username, display_name, settings_json, is_admin, status, password_hash, created_at)
+         SELECT ?1, 'u:' || ?1, ?2, ?3, ?4, f.first, CASE WHEN f.first = 1 THEN 'active' ELSE 'pending' END, ?5, ?6
+           FROM (SELECT NOT EXISTS (SELECT 1 FROM users) AS first) f`,
+      ).bind(id, username, displayName, JSON.stringify(DEFAULT_USER_SETTINGS), passwordHash, s.created),
+      db.prepare(`${INSERT_SESSION} VALUES (?, ?, ?, ?, ?)`).bind(s.hash, id, s.created, s.expires, s.created),
+      db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).bind(id),
+    ]);
+    created = sel!.results[0] as UserRow | undefined;
+  } catch (err) {
+    // The UNIQUE (NOCASE) index on username is the guard; the whole batch rolled back.
+    if (/UNIQUE/i.test(String(err instanceof Error ? err.message : err))) return c.json({ error: 'taken' }, 409);
+    throw err;
+  }
+  if (!created) throw new Error('signup: user not created');
+  return c.json(meBody(toAppUser(created, c.env.ADMIN_EMAIL)), 201, { 'Set-Cookie': s.cookie });
+});
+
+/** True when the last 10 failures fell within 15 minutes and the newest is under 15 minutes old. */
+function locked(failures: string[], now: number): boolean {
+  if (failures.length < LOGIN_MAX_FAILURES) return false;
+  const newest = Date.parse(failures[0]!);
+  const tenth = Date.parse(failures[LOGIN_MAX_FAILURES - 1]!);
+  return newest - tenth <= LOGIN_WINDOW_MS && now - newest < LOGIN_LOCK_MS;
+}
+
+// POST /api/auth/login { username, password } -> Me + cookie. 4 queries at most (two batches of 2).
+// Wrong password and unknown username are the same 401 bad_credentials, each after one hash.
+auth.post('/login', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body || typeof body.username !== 'string' || typeof body.password !== 'string') return c.json(invalid, 400);
+  const password = body.password;
+  if (password.length < 1 || [...password].length > PASSWORD_MAX) return c.json(invalid, 400);
+  const username = body.username.trim().toLowerCase();
+  if (!USERNAME_RE.test(username)) {
+    await verifyPassword(password, null); // no such account can exist; same cost and answer anyway
+    return c.json(badCredentials, 401);
+  }
+
+  const db = c.env.DB;
+  const now = Date.now();
+  const [userRes, failRes] = await db.batch([
+    db.prepare(`SELECT ${USER_COLS}, password_hash FROM users WHERE username = ?`).bind(username),
+    db.prepare(`SELECT at FROM login_failures WHERE username = ? ORDER BY at DESC LIMIT ${LOGIN_MAX_FAILURES}`).bind(username),
+  ]);
+  if (locked((failRes!.results as { at: string }[]).map((r) => r.at), now)) return c.json({ error: 'too_many_attempts' }, 429);
+
+  const row = userRes!.results[0] as (UserRow & { password_hash: string | null }) | undefined;
+  const ok = await verifyPassword(password, row?.password_hash);
+  if (!row || !ok) {
+    // Old rows are pruned as we go: the lock never looks further back than two windows.
+    await db.batch([
+      db.prepare('INSERT INTO login_failures (username, at) VALUES (?, ?)').bind(username, new Date(now).toISOString()),
+      db.prepare('DELETE FROM login_failures WHERE username = ? AND at < ?').bind(username, new Date(now - LOGIN_WINDOW_MS - LOGIN_LOCK_MS).toISOString()),
+    ]);
+    return c.json(badCredentials, 401);
+  }
+  if (row.status === 'removed') return c.json({ error: 'removed' }, 403);
+
+  const s = await freshSession();
+  await db.batch([
+    db.prepare('DELETE FROM login_failures WHERE username = ?').bind(username),
+    db.prepare(`${INSERT_SESSION} VALUES (?, ?, ?, ?, ?)`).bind(s.hash, row.id, s.created, s.expires, s.created),
+  ]);
+  return c.json(meBody(toAppUser(row, c.env.ADMIN_EMAIL)), 200, { 'Set-Cookie': s.cookie });
+});
+
+// POST /api/auth/logout -> 204, cookie cleared. 0-1 query. Signs out this device only.
+auth.post('/logout', async (c) => {
+  const token = readSessionToken(c.req.header('Cookie'));
+  if (token) await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256Hex(token)).run();
+  return c.body(null, 204, { 'Set-Cookie': clearedCookie() });
+});
+
+/** A live reset link's user (never a removed one). 1 query. */
+async function resetUser(db: D1Database, tokenHash: string, now: number) {
+  return db
+    .prepare(
+      `SELECT ${USER_COLS.split(', ').map((k) => `u.${k}`).join(', ')} FROM password_resets r JOIN users u ON u.id = r.user_id
+       WHERE r.token_hash = ? AND r.expires_at > ? AND u.status <> 'removed'`,
+    )
+    .bind(tokenHash, new Date(now).toISOString())
+    .first<UserRow>();
+}
+
+// GET /api/auth/reset/:token -> { username } for the reset page, or 404 when the link is used, expired or unknown. 1 query.
+auth.get('/reset/:token', async (c) => {
+  const token = c.req.param('token');
+  if (!isToken(token)) return c.json(notFound, 404);
+  const user = await resetUser(c.env.DB, await sha256Hex(token), Date.now());
+  if (!user) return c.json(notFound, 404);
+  return c.json({ username: user.username });
+});
+
+// POST /api/auth/reset { token, password } -> Me + cookie. 6 queries (1 + a batch of 5).
+// Sets the password, signs out every other session, signs this device in and uses the link up.
+auth.post('/reset', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body || !isToken(body.token) || !validPassword(body.password)) return c.json(invalid, 400);
+  const db = c.env.DB;
+  const now = Date.now();
+  const tokenHash = await sha256Hex(body.token);
+  const row = await resetUser(db, tokenHash, now);
+  if (!row) return c.json(notFound, 404);
+
+  const passwordHash = await hashPassword(body.password);
+  const s = await freshSession();
+  // Every write is conditional on the link still being live inside this transaction, so two
+  // racing uses cannot both succeed.
+  const live = `EXISTS (SELECT 1 FROM password_resets WHERE token_hash = ?3 AND expires_at > ?4)`;
+  const nowIso = new Date(now).toISOString();
+  const [updated] = await db.batch([
+    db.prepare(`UPDATE users SET password_hash = ?2 WHERE id = ?1 AND ${live}`).bind(row.id, passwordHash, tokenHash, nowIso),
+    db.prepare(`DELETE FROM sessions WHERE user_id = ?1 AND ${live}`).bind(row.id, null, tokenHash, nowIso),
+    db.prepare(`${INSERT_SESSION} SELECT ?2, ?1, ?5, ?6, ?5 WHERE ${live}`).bind(row.id, s.hash, tokenHash, nowIso, s.created, s.expires),
+    db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(row.id),
+    db.prepare('DELETE FROM login_failures WHERE username = ?').bind(row.username),
+  ]);
+  if (!updated!.meta.changes) return c.json(notFound, 404);
+  const user: AppUser = toAppUser(row, c.env.ADMIN_EMAIL);
+  return c.json(meBody(user), 200, { 'Set-Cookie': s.cookie });
+});
+
+/** A7: a one-time reset link for `userId` (not removed); replaces any earlier link. 2 queries. Null when no such user. */
+export async function createResetLink(db: D1Database, userId: string, origin: string): Promise<string | null> {
+  const token = newToken();
+  const now = Date.now();
+  const [, inserted] = await db.batch([
+    db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(userId),
+    db.prepare(
+      `INSERT INTO password_resets (token_hash, user_id, created_at, expires_at)
+       SELECT ?2, id, ?3, ?4 FROM users WHERE id = ?1 AND status <> 'removed'`,
+    ).bind(userId, await sha256Hex(token), new Date(now).toISOString(), new Date(now + RESET_TTL_MS).toISOString()),
+  ]);
+  return inserted!.meta.changes ? `${origin}/reset/${token}` : null;
+}

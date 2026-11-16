@@ -1,7 +1,7 @@
 // POST /api/lookup and POST /api/lookup/details (mounted on the authed api router).
 import { Hono } from 'hono';
 import type { Category, Details, LookupInfo, SourceId } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import type { Env } from '../env';
 import { CATEGORIES } from '../api/entryValidation';
 import { getCached, putCached } from './cache';

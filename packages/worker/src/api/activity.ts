@@ -3,7 +3,7 @@ import {
   ACTIVITY_MERGE_MS, FEED_SCOPES, isReaction,
   type ActivityItem, type ActivityPage, type ActivityType, type Category, type FeedScope, type PostSocial, type PublicUser, type Reaction,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, publicUser, visibleEntrySql, type PublicUserRow } from '../social/visibility';
 
 export const activity = new Hono<AppEnv>();
@@ -216,11 +216,11 @@ activity.get('/', async (c) => {
     db.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE id IN (SELECT value FROM json_each(?1))`).bind(userIds),
     db.prepare(
       `SELECT activity_id, emoji, COUNT(*) AS n, SUM(user_id = ?1) AS mine FROM reactions
-        WHERE activity_id IN (SELECT value FROM json_each(?2)) GROUP BY activity_id, emoji`,
+        WHERE activity_id IN (SELECT value FROM json_each(?2)) AND ${BY_ACTIVE('reactions')} GROUP BY activity_id, emoji`,
     ).bind(viewer, postIds),
     db.prepare(
       `SELECT activity_id, COUNT(*) AS n FROM comments
-        WHERE activity_id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NULL GROUP BY activity_id`,
+        WHERE activity_id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NULL AND ${BY_ACTIVE('comments')} GROUP BY activity_id`,
     ).bind(postIds),
   ]);
 
@@ -259,12 +259,16 @@ activity.get('/', async (c) => {
   return c.json(body);
 });
 
+/** A8: the row aliased `t` (a comment or reaction) was written by a user who is active. */
+const BY_ACTIVE = (t: string) => `EXISTS (SELECT 1 FROM users bu WHERE bu.id = ${t}.user_id AND bu.status = 'active')`;
+
 /** Counts at most UNREAD_CAP rows of `sql`. */
 const capped = (sql: string) => `(SELECT COUNT(*) FROM (${sql} LIMIT ${UNREAD_CAP}))`;
 
 // 1 query, plus sign-in (1-3). S8: friends' visible posts, plus others' live comments and
 // reactions on your posts and entries, newer than feed_seen_at (never seen = all), capped at 99;
-// requests = incoming pending friend requests.
+// requests = incoming pending friend requests, plus (A7) pending sign-ups for the admin.
+// A8: nothing from pending or removed users counts.
 activity.get('/unread', async (c) => {
   const seen = `COALESCE((SELECT feed_seen_at FROM users WHERE id = ?1), '')`;
   const onMine = (t: string) => `(${t}.entry_id IN (SELECT id FROM entries WHERE user_id = ?1)
@@ -272,13 +276,14 @@ activity.get('/unread', async (c) => {
   const posts = `SELECT 1 FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
       WHERE a.post_id IS NULL AND ${OTHERS_POSTS} AND a.created_at > ${seen}`;
   const comments = `SELECT 1 FROM comments k WHERE k.user_id <> ?1 AND k.deleted_at IS NULL
-      AND k.created_at > ${seen} AND ${onMine('k')}`;
-  const reactions = `SELECT 1 FROM reactions r WHERE r.user_id <> ?1 AND r.created_at > ${seen} AND ${onMine('r')}`;
+      AND k.created_at > ${seen} AND ${onMine('k')} AND ${BY_ACTIVE('k')}`;
+  const reactions = `SELECT 1 FROM reactions r WHERE r.user_id <> ?1 AND r.created_at > ${seen} AND ${onMine('r')} AND ${BY_ACTIVE('r')}`;
   const row = await c.env.DB.prepare(
     `SELECT MIN(${UNREAD_CAP}, ${capped(posts)} + ${capped(comments)} + ${capped(reactions)}) AS feed,
-            (SELECT COUNT(*) FROM friendships f WHERE (f.user_a = ?1 OR f.user_b = ?1)
-                AND f.status = 'pending' AND f.requested_by <> ?1) AS requests`,
-  ).bind(c.var.user.id).first<{ feed: number; requests: number }>();
+            (SELECT COUNT(*) FROM friendships f JOIN users ru ON ru.id = f.requested_by AND ru.status = 'active'
+              WHERE (f.user_a = ?1 OR f.user_b = ?1) AND f.status = 'pending' AND f.requested_by <> ?1)
+            + CASE WHEN ?2 = 1 THEN (SELECT COUNT(*) FROM users WHERE status = 'pending') ELSE 0 END AS requests`,
+  ).bind(c.var.user.id, c.var.user.isAdmin ? 1 : 0).first<{ feed: number; requests: number }>();
   return c.json({ feed: row?.feed ?? 0, requests: row?.requests ?? 0 });
 });
 

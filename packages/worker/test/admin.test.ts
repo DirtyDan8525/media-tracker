@@ -1,277 +1,218 @@
 import { env } from 'cloudflare:workers';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
+import { sha256Hex } from '../src/auth/session';
+import { spyD1 } from './d1spy';
 
+// A7: Dan approves, declines, removes and restores people, and makes reset links.
 const ADMIN = 'dan@x.com';
-const BASE = 'https://api.cloudflare.com/client/v4/accounts/acc/access/policies/pol';
-const CF = { CF_API_TOKEN: 'tok', CF_ACCOUNT_ID: 'acc', ACCESS_POLICY_ID: 'pol' };
+const PW = 'correct horse';
 
-const as = (email: string, path: string, method = 'GET', body?: unknown, over: Partial<Env> = {}) =>
+/** As the admin (DEV_EMAIL bypass). */
+const asAdmin = (path: string, method = 'GET', db?: D1Database) =>
+  app.fetch(
+    new Request(`https://app.test${path}`, { method, headers: { 'content-type': 'application/json' }, body: method === 'GET' ? undefined : '{}' }),
+    { ...env, ...(db ? { DB: db } : {}), ENVIRONMENT: 'dev', DEV_EMAIL: ADMIN, ADMIN_EMAIL: ADMIN } as Env,
+  );
+/** With a session cookie (no bypass). */
+const asCookie = (token: string | null, path: string, method = 'GET', body?: unknown) =>
   app.fetch(
     new Request(`https://app.test${path}`, {
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { 'content-type': 'application/json', ...(token ? { cookie: `mt_session=${token}` } : {}) },
+      body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
     }),
-    { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: email, ADMIN_EMAIL: ADMIN, ...CF, ...over } as Env,
+    { ...env, ENVIRONMENT: 'prod', DEV_EMAIL: undefined, ADMIN_EMAIL: ADMIN } as Env,
   );
+const json = async <T = any>(res: Response) => (await res.json()) as T;
+const cookieOf = (res: Response) => /mt_session=([^;]*)/.exec(res.headers.get('set-cookie') ?? '')?.[1] ?? null;
+const signup = async (username: string) => {
+  const res = await asCookie(null, '/api/auth/signup', 'POST', { username, password: PW });
+  expect(res.status).toBe(201);
+  const me = await json<{ id: string }>(res);
+  return { id: me.id, token: cookieOf(res)! };
+};
+const statusOf = async (id: string) => (await env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(id).first<{ status: string }>())?.status ?? null;
+const sessionsOf = async (id: string) => (await env.DB.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').bind(id).first<{ n: number }>())!.n;
 
-const policy = (include: unknown[]) => ({
-  success: true,
-  errors: [],
-  result: {
-    id: 'pol',
-    name: 'Friends',
-    decision: 'allow',
-    include,
-    exclude: [{ ip: { ip: '1.2.3.4/32' } }],
-    require: [{ everyone: {} }],
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-02T00:00:00Z',
-    app_count: 1,
-    reusable: true,
-  },
+let adminId: string;
+beforeEach(async () => {
+  // Dan first, so later signups are pending.
+  const me = await json<{ id: string; isAdmin: boolean }>(await asAdmin('/api/me'));
+  expect(me.isAdmin).toBe(true);
+  adminId = me.id;
+  await env.DB.prepare("UPDATE users SET username = 'dan' WHERE id = ?").bind(adminId).run();
 });
-
-/** Stubs fetch: GET answers `get`, PUT answers `put`. Returns the recorded calls. */
-function stubCf(get: object | { status: number; body: string }, put: object = { success: true, errors: [], result: {} }) {
-  const calls: { method: string; url: string; headers: Headers; body: unknown }[] = [];
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-    const method = init?.method ?? 'GET';
-    calls.push({
-      method,
-      url: String(input),
-      headers: new Headers(init?.headers),
-      body: init?.body ? JSON.parse(String(init.body)) : undefined,
-    });
-    const v = method === 'PUT' ? put : get;
-    if ('status' in v && 'body' in v) return new Response(String(v.body), { status: Number(v.status) });
-    return new Response(JSON.stringify(v), { status: 200 });
-  });
-  return calls;
-}
-
-const cfError = { status: 403, body: JSON.stringify({ success: false, errors: [{ message: 'Authentication error' }] }) };
-const invitesCount = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM invites').first<{ n: number }>())!.n;
-
 afterEach(async () => {
-  vi.restoreAllMocks();
-  await env.DB.exec('DELETE FROM invites');
-  await env.DB.exec('DELETE FROM users');
+  await env.DB.exec('DELETE FROM users; DELETE FROM login_failures');
 });
 
 describe('admin guard', () => {
-  it('non-admin gets 403 and Cloudflare is never called', async () => {
-    const spy = vi.spyOn(globalThis, 'fetch');
-    expect((await as('ren@x.com', '/api/admin')).status).toBe(403);
-    const res = await as('ren@x.com', '/api/admin/invites', 'POST', { email: 'a@b.co' });
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'forbidden' });
-    expect((await as('ren@x.com', '/api/admin/invites/a%40b.co', 'DELETE')).status).toBe(403);
-    expect(spy).not.toHaveBeenCalled();
-  });
-});
-
-describe('POST /api/admin/invites', () => {
-  it('adds an email: GET then PUT, Bearer header, full-replace body', async () => {
-    const calls = stubCf(policy([{ email: { email: 'dan@x.com' } }]));
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: '  Ren@X.com ' });
-    expect(res.status).toBe(200);
-    expect(calls.map((c) => c.method)).toEqual(['GET', 'PUT']);
-    expect(calls.every((c) => c.url === BASE)).toBe(true);
-    expect(calls.every((c) => c.headers.get('authorization') === 'Bearer tok')).toBe(true);
-    expect(calls[1]!.headers.get('content-type')).toBe('application/json');
-    expect(calls[1]!.body).toEqual({
-      name: 'Friends',
-      decision: 'allow',
-      include: [{ email: { email: 'dan@x.com' } }, { email: { email: 'ren@x.com' } }],
-      exclude: [{ ip: { ip: '1.2.3.4/32' } }],
-      require: [{ everyone: {} }],
-    });
-    const body = (await res.json()) as { email: string; alreadyAllowed: boolean };
-    expect(body).toMatchObject({ email: 'ren@x.com', alreadyAllowed: false });
-    expect(await invitesCount()).toBe(1);
-  });
-
-  it('email already in include (different case): no PUT, alreadyAllowed true', async () => {
-    const calls = stubCf(policy([{ email: { email: 'Ren@X.com' } }]));
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as { alreadyAllowed: boolean }).alreadyAllowed).toBe(true);
-    expect(calls.map((c) => c.method)).toEqual(['GET']);
-  });
-
-  it('rejects a bad email with 400 and no Cloudflare call', async () => {
-    const spy = vi.spyOn(globalThis, 'fetch');
-    for (const email of ['not an email', '', 5, `${'a'.repeat(250)}@x.co`]) {
-      expect((await as(ADMIN, '/api/admin/invites', 'POST', { email })).status).toBe(400);
+  it('a non-admin gets 403 forbidden on every admin route', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
+    for (const [method, path] of [['GET', '/api/admin'], ['POST', `/api/admin/users/${adminId}/remove`], ['POST', `/api/admin/users/${ren.id}/approve`], ['POST', `/api/admin/users/${adminId}/reset-link`]] as const) {
+      const res = await asCookie(ren.token, path, method);
+      expect(res.status, path).toBe(403);
+      expect(await json(res)).toEqual({ error: 'forbidden' });
     }
-    expect(spy).not.toHaveBeenCalled();
+    expect(await statusOf(adminId)).toBe('active');
   });
 
-  it('Cloudflare 403 -> 502 with its message, nothing recorded', async () => {
-    stubCf(cfError);
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: 'cloudflare', message: 'Authentication error' });
-    expect(await invitesCount()).toBe(0);
-  });
-
-  it('a failing PUT -> 502 and nothing recorded', async () => {
-    stubCf(policy([]), cfError);
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    expect(res.status).toBe(502);
-    expect(await invitesCount()).toBe(0);
-  });
-
-  it('HTTP 200 with success:false is a failure too', async () => {
-    stubCf({ success: false, errors: [{ message: 'Nope' }] });
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    expect(res.status).toBe(502);
-    expect(((await res.json()) as { message: string }).message).toBe('Nope');
-  });
-
-  it('timeout -> 502', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new DOMException('timed out', 'TimeoutError'));
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    expect(res.status).toBe(502);
-    expect(((await res.json()) as { error: string }).error).toBe('cloudflare');
-    expect(await invitesCount()).toBe(0);
-  });
-
-  it('missing CF_API_TOKEN (or ids) -> 503 not_configured', async () => {
-    const spy = vi.spyOn(globalThis, 'fetch');
-    for (const over of [{ CF_API_TOKEN: '' }, { CF_ACCOUNT_ID: '' }, { ACCESS_POLICY_ID: undefined }]) {
-      const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' }, over);
-      expect(res.status).toBe(503);
-      expect(await res.json()).toEqual({ error: 'not_configured' });
-    }
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  it("link is <origin>/add/<admin's code>", async () => {
-    stubCf(policy([]));
-    const res = await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    const { link } = (await res.json()) as { link: string };
-    const code = (await env.DB.prepare('SELECT invite_code FROM users WHERE email = ?').bind(ADMIN).first<{ invite_code: string }>())!.invite_code;
-    expect(code).toMatch(/^[a-z0-9]{12}$/);
-    expect(link).toBe(`https://app.test/add/${code}`);
-  });
-});
-
-describe('DELETE /api/admin/invites/:email', () => {
-  it('drops the matching rule (case-insensitive): GET then PUT without it, deletes the invites row', async () => {
-    await env.DB.prepare('INSERT INTO invites (email, created_at) VALUES (?, ?)').bind('ren@x.com', '2026-11-16T10:00:00Z').run();
-    const calls = stubCf(policy([{ email: { email: 'dan@x.com' } }, { email: { email: 'Ren@X.com' } }, { email_domain: { domain: 'x.org' } }]));
-    const res = await as(ADMIN, '/api/admin/invites/Ren%40x.com', 'DELETE');
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ removed: true });
-    expect(calls.map((c) => c.method)).toEqual(['GET', 'PUT']);
-    expect(calls[1]!.headers.get('authorization')).toBe('Bearer tok');
-    expect(calls[1]!.body).toEqual({
-      name: 'Friends',
-      decision: 'allow',
-      include: [{ email: { email: 'dan@x.com' } }, { email_domain: { domain: 'x.org' } }],
-      exclude: [{ ip: { ip: '1.2.3.4/32' } }],
-      require: [{ everyone: {} }],
-    });
-    expect(await invitesCount()).toBe(0);
-  });
-
-  it('absent from the policy: no PUT, removed false, invites row still deleted', async () => {
-    await env.DB.prepare('INSERT INTO invites (email, created_at) VALUES (?, ?)').bind('ren@x.com', '2026-11-16T10:00:00Z').run();
-    const calls = stubCf(policy([{ email: { email: 'dan@x.com' } }]));
-    const res = await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE');
-    expect(await res.json()).toEqual({ removed: false });
-    expect(calls.map((c) => c.method)).toEqual(['GET']);
-    expect(await invitesCount()).toBe(0);
-  });
-
-  it('refuses to empty include: 400 last_rule, no PUT, row kept', async () => {
-    await env.DB.prepare('INSERT INTO invites (email, created_at) VALUES (?, ?)').bind('ren@x.com', '2026-11-16T10:00:00Z').run();
-    const calls = stubCf(policy([{ email: { email: 'ren@x.com' } }]));
-    const res = await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE');
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'last_rule' });
-    expect(calls.map((c) => c.method)).toEqual(['GET']);
-    expect(await invitesCount()).toBe(1);
-  });
-
-  it("refuses the admin's own email: 400 self, Cloudflare never called", async () => {
-    const spy = vi.spyOn(globalThis, 'fetch');
-    const res = await as(ADMIN, '/api/admin/invites/DAN%40x.com', 'DELETE');
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'self' });
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  it('Cloudflare error -> 502 and the invites row stays', async () => {
-    await env.DB.prepare('INSERT INTO invites (email, created_at) VALUES (?, ?)').bind('ren@x.com', '2026-11-16T10:00:00Z').run();
-    stubCf(cfError);
-    const res = await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE');
-    expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: 'cloudflare', message: 'Authentication error' });
-    expect(await invitesCount()).toBe(1);
-  });
-
-  it('failing PUT -> 502 and the invites row stays', async () => {
-    await env.DB.prepare('INSERT INTO invites (email, created_at) VALUES (?, ?)').bind('ren@x.com', '2026-11-16T10:00:00Z').run();
-    stubCf(policy([{ email: { email: 'dan@x.com' } }, { email: { email: 'ren@x.com' } }]), cfError);
-    expect((await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE')).status).toBe(502);
-    expect(await invitesCount()).toBe(1);
-  });
-
-  it('bad email -> 400; missing config -> 503; user data is not deleted', async () => {
-    expect((await as(ADMIN, '/api/admin/invites/nope', 'DELETE')).status).toBe(400);
-    expect((await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE', undefined, { CF_API_TOKEN: '' })).status).toBe(503);
-    await as('ren@x.com', '/api/me'); // creates Ren
-    stubCf(policy([{ email: { email: 'dan@x.com' } }, { email: { email: 'ren@x.com' } }]));
-    await as(ADMIN, '/api/admin/invites/ren%40x.com', 'DELETE');
-    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'ren@x.com'").first<{ n: number }>();
-    expect(n!.n).toBe(1);
+  it('the old invite routes are gone', async () => {
+    expect((await asAdmin('/api/admin/invites', 'POST')).status).toBe(404);
   });
 });
 
 describe('GET /api/admin', () => {
-  it('lists invites with the joined user once that email signs in; seats.used counts users', async () => {
-    await as(ADMIN, '/api/me'); // admin user
-    const calls = stubCf(policy([]));
-    await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    await as(ADMIN, '/api/admin/invites', 'POST', { email: 'vance@x.com' });
-    expect(calls.length).toBeGreaterThan(0);
+  it('lists pending (with requestedAt), active (with joinedAt, isAdmin) and removed people (1 query)', async () => {
+    const ren = await signup('ren');
+    const vance = await signup('vance');
+    const al = await signup('alberto');
+    await env.DB.prepare("UPDATE users SET status = 'active', display_name = 'Vance' WHERE id = ?").bind(vance.id).run();
+    await env.DB.prepare("UPDATE users SET status = 'removed' WHERE id = ?").bind(al.id).run();
+    const spy = spyD1(env.DB);
+    const res = await asAdmin('/api/admin', 'GET', spy.db);
+    expect(res.status).toBe(200);
+    expect(spy.queries).toBe(2); // sign-in + 1
+    const body = await json(res);
+    expect(Object.keys(body).sort()).toEqual(['active', 'pending', 'removed']);
+    expect(body.pending).toEqual([{ id: ren.id, username: 'ren', displayName: null, avatarAt: null, requestedAt: expect.stringMatching(/^\d{4}-/) }]);
+    expect(body.active.map((u: { username: string }) => u.username)).toEqual(['dan', 'vance']);
+    expect(body.active[0]).toMatchObject({ id: adminId, isAdmin: true, joinedAt: expect.any(String) });
+    expect(body.active[1]).toEqual({ id: vance.id, username: 'vance', displayName: 'Vance', avatarAt: null, isAdmin: false, joinedAt: expect.any(String) });
+    expect(body.removed).toEqual([{ id: al.id, username: 'alberto', displayName: null, avatarAt: null }]);
+    expect(JSON.stringify(body)).not.toMatch(/password|email|u:/);
+  });
+});
 
-    let body = (await (await as(ADMIN, '/api/admin')).json()) as {
-      seats: { used: number; total: number };
-      invites: { email: string; invitedAt: string; joined: { username: string } | null }[];
-      users: { email: string; joinedAt: string | null }[];
-    };
-    expect(body.seats).toEqual({ used: 1, total: 50 });
-    expect(body.invites.map((i) => i.email).sort()).toEqual(['ren@x.com', 'vance@x.com']);
-    expect(body.invites.every((i) => i.joined === null && typeof i.invitedAt === 'string')).toBe(true);
-
-    await as('ren@x.com', '/api/me');
-    await as('ren@x.com', '/api/me/username', 'PUT', { username: 'ren' });
-    body = (await (await as(ADMIN, '/api/admin')).json()) as typeof body;
-    expect(body.seats.used).toBe(2);
-    expect(body.invites.find((i) => i.email === 'ren@x.com')!.joined).toMatchObject({ username: 'ren' });
-    expect(body.invites.find((i) => i.email === 'vance@x.com')!.joined).toBeNull();
-    expect(body.users.map((u) => u.email).sort()).toEqual([ADMIN, 'ren@x.com']);
-    expect(body.users[0]).toHaveProperty('joinedAt');
+describe('approve', () => {
+  it('pending -> active; the person can use the app at once (2 queries)', async () => {
+    const ren = await signup('ren');
+    expect((await asCookie(ren.token, '/api/entries')).status).toBe(403);
+    const spy = spyD1(env.DB);
+    expect((await asAdmin(`/api/admin/users/${ren.id}/approve`, 'POST', spy.db)).status).toBe(204);
+    expect(spy.queries).toBeLessThanOrEqual(2);
+    expect(await statusOf(ren.id)).toBe('active');
+    expect((await asCookie(ren.token, '/api/entries')).status).toBe(200);
   });
 
-  it('a removed person drops out of users and seats; approving again brings them back', async () => {
-    await as(ADMIN, '/api/me');
-    await as('ren@x.com', '/api/me');
-    stubCf(policy([{ email: { email: ADMIN } }, { email: { email: 'ren@x.com' } }]));
-    expect((await as(ADMIN, '/api/admin/invites/ren@x.com', 'DELETE')).status).toBe(200);
-    let body = (await (await as(ADMIN, '/api/admin')).json()) as { seats: { used: number }; users: { email: string }[] };
-    expect(body.seats.used).toBe(1);
-    expect(body.users.map((u) => u.email)).toEqual([ADMIN]);
-    vi.restoreAllMocks();
-    stubCf(policy([{ email: { email: ADMIN } }]));
-    await as(ADMIN, '/api/admin/invites', 'POST', { email: 'ren@x.com' });
-    body = (await (await as(ADMIN, '/api/admin')).json()) as typeof body;
-    expect(body.seats.used).toBe(2);
+  it('removed -> active (restore); they sign in again with their password', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'removed' WHERE id = ?").bind(ren.id).run();
+    expect((await asAdmin(`/api/admin/users/${ren.id}/approve`, 'POST')).status).toBe(204);
+    expect(await statusOf(ren.id)).toBe('active');
+    expect((await asCookie(null, '/api/auth/login', 'POST', { username: 'ren', password: PW })).status).toBe(200);
+  });
+
+  it('active or unknown -> 404', async () => {
+    expect((await asAdmin(`/api/admin/users/${adminId}/approve`, 'POST')).status).toBe(404);
+    expect((await asAdmin('/api/admin/users/nope/approve', 'POST')).status).toBe(404);
+  });
+});
+
+describe('decline', () => {
+  it('deletes a pending person and their sessions (1 query)', async () => {
+    const ren = await signup('ren');
+    const spy = spyD1(env.DB);
+    expect((await asAdmin(`/api/admin/users/${ren.id}/decline`, 'POST', spy.db)).status).toBe(204);
+    expect(spy.queries).toBeLessThanOrEqual(2);
+    expect(await statusOf(ren.id)).toBeNull();
+    expect(await sessionsOf(ren.id)).toBe(0);
+    expect((await asCookie(ren.token, '/api/me')).status).toBe(401);
+    // the username is free again
+    expect((await asCookie(null, '/api/auth/signup', 'POST', { username: 'ren', password: PW })).status).toBe(201);
+  });
+
+  it('refuses anyone who is not pending (404), keeping their data', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
+    expect((await asAdmin(`/api/admin/users/${ren.id}/decline`, 'POST')).status).toBe(404);
+    expect((await asAdmin(`/api/admin/users/${adminId}/decline`, 'POST')).status).toBe(404);
+    expect(await statusOf(ren.id)).toBe('active');
+  });
+});
+
+describe('remove', () => {
+  it('active -> removed, every session deleted, data kept (2 queries)', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
+    expect((await asCookie(ren.token, '/api/entries', 'POST', { category: 'anime', title: 'Frieren' })).status).toBe(201);
+    const spy = spyD1(env.DB);
+    expect((await asAdmin(`/api/admin/users/${ren.id}/remove`, 'POST', spy.db)).status).toBe(204);
+    expect(spy.queries).toBeLessThanOrEqual(3);
+    expect(await statusOf(ren.id)).toBe('removed');
+    expect(await sessionsOf(ren.id)).toBe(0);
+    expect((await asCookie(ren.token, '/api/me')).status).toBe(401);
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM entries WHERE user_id = ?').bind(ren.id).first<{ n: number }>();
+    expect(n!.n).toBe(1);
+  });
+
+  it('never removes yourself (400 self)', async () => {
+    const res = await asAdmin(`/api/admin/users/${adminId}/remove`, 'POST');
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: 'self' });
+    expect(await statusOf(adminId)).toBe('active');
+  });
+
+  it('pending, removed or unknown -> 404, and a pending person keeps their session', async () => {
+    const ren = await signup('ren');
+    expect((await asAdmin(`/api/admin/users/${ren.id}/remove`, 'POST')).status).toBe(404);
+    expect(await statusOf(ren.id)).toBe('pending');
+    expect(await sessionsOf(ren.id)).toBe(1);
+    expect((await asAdmin('/api/admin/users/nope/remove', 'POST')).status).toBe(404);
+  });
+});
+
+describe('reset-link', () => {
+  it('returns <origin>/reset/<token>; only the hash is stored, valid 24 h (2 queries)', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
+    const spy = spyD1(env.DB);
+    const res = await asAdmin(`/api/admin/users/${ren.id}/reset-link`, 'POST', spy.db);
+    expect(res.status).toBe(200);
+    expect(spy.queries).toBeLessThanOrEqual(3);
+    const { link } = await json<{ link: string }>(res);
+    const m = /^https:\/\/app\.test\/reset\/([A-Za-z0-9_-]{43})$/.exec(link);
+    expect(m).not.toBeNull();
+    const r = await env.DB.prepare('SELECT * FROM password_resets').first<Record<string, string>>();
+    expect(r!.token_hash).toBe(await sha256Hex(m![1]!));
+    expect(Object.values(r!)).not.toContain(m![1]);
+    expect(r!.user_id).toBe(ren.id);
+    expect((Date.parse(r!.expires_at!) - Date.parse(r!.created_at!)) / 3_600_000).toBeCloseTo(24, 3);
+    // the link works once, and kills the other sessions
+    const done = await asCookie(null, '/api/auth/reset', 'POST', { token: m![1], password: 'brand new pass' });
+    expect(done.status).toBe(200);
+    expect((await asCookie(ren.token, '/api/me')).status).toBe(401);
+  });
+
+  it('a new link replaces the previous one', async () => {
+    const ren = await signup('ren');
+    const first = (await json<{ link: string }>(await asAdmin(`/api/admin/users/${ren.id}/reset-link`, 'POST'))).link.split('/').pop()!;
+    await asAdmin(`/api/admin/users/${ren.id}/reset-link`, 'POST');
+    expect((await asCookie(null, `/api/auth/reset/${first}`)).status).toBe(404);
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM password_resets').first<{ n: number }>();
+    expect(n!.n).toBe(1);
+  });
+
+  it('removed or unknown -> 404', async () => {
+    const ren = await signup('ren');
+    await env.DB.prepare("UPDATE users SET status = 'removed' WHERE id = ?").bind(ren.id).run();
+    expect((await asAdmin(`/api/admin/users/${ren.id}/reset-link`, 'POST')).status).toBe(404);
+    expect((await asAdmin('/api/admin/users/nope/reset-link', 'POST')).status).toBe(404);
+  });
+});
+
+describe('unread requests count pending signups for the admin (A7)', () => {
+  it('admin: friend requests + pending signups; others: friend requests only', async () => {
+    const ren = await signup('ren');
+    await signup('vance');
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2 });
+    await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 1 });
+    expect(await json(await asCookie(ren.token, '/api/activity/unread'))).toEqual({ feed: 0, requests: 0 });
+    expect((await asCookie(ren.token, '/api/friends/requests', 'POST', { username: 'dan' })).status).toBe(200);
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2 });
   });
 });

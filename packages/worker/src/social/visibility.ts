@@ -15,13 +15,19 @@ export function pair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-/** One query (none when viewer = owner). */
+/**
+ * One query (none when viewer = owner). A8: an owner who is not active (pending or removed) is a
+ * stranger to everyone else, whatever the friendships table says.
+ */
 export async function relationOf(db: D1Database, viewerId: string, ownerId: string): Promise<Relation> {
   if (viewerId === ownerId) return 'self';
   const [a, b] = pair(viewerId, ownerId);
   const row = await db
-    .prepare('SELECT status, requested_by FROM friendships WHERE user_a = ? AND user_b = ?')
-    .bind(a, b)
+    .prepare(
+      `SELECT f.status, f.requested_by FROM users u JOIN friendships f ON f.user_a = ?1 AND f.user_b = ?2
+       WHERE u.id = ?3 AND u.status = 'active'`,
+    )
+    .bind(a, b, ownerId)
     .first<{ status: 'pending' | 'accepted'; requested_by: string }>();
   if (!row) return 'none';
   if (row.status === 'accepted') return 'friend';
@@ -38,9 +44,10 @@ export function canEdit(viewerId: string, ownerId: string): boolean {
   return viewerId === ownerId;
 }
 
-/** Accepted friends' ids of the user bound at `param` (e.g. '?1'). */
+/** Accepted friends' ids of the user bound at `param` (e.g. '?1'). A8: active friends only. */
 export function FRIEND_IDS_SQL(param: string): string {
-  return `SELECT CASE WHEN f.user_a = ${param} THEN f.user_b ELSE f.user_a END FROM friendships f WHERE (f.user_a = ${param} OR f.user_b = ${param}) AND f.status = 'accepted'`;
+  return `SELECT fu.id FROM friendships f JOIN users fu ON fu.id = CASE WHEN f.user_a = ${param} THEN f.user_b ELSE f.user_a END
+    WHERE (f.user_a = ${param} OR f.user_b = ${param}) AND f.status = 'accepted' AND fu.status = 'active'`;
 }
 
 /** SQL twin of `canView` for the entries row aliased `alias`, viewer bound at `viewerParam`. */

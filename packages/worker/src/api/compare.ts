@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Category } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 
 export const compare = new Hono<AppEnv>();
 

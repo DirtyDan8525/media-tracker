@@ -14,7 +14,7 @@ import {
   type RatingSet,
   type ImportRow,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import { loadSets, planRemove, runBatch, setWriteStatements, tierFieldsFor } from '../ratings/store';
 import { CATEGORIES, validateEntryInput, validateSeasonInput } from './entryValidation';
 

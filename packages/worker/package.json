@@ -7,7 +7,8 @@
     "test": "vitest run",
     "dev": "wrangler dev",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p scripts",
-    "record": "tsx scripts/record-fixtures.ts"
+    "record": "tsx scripts/record-fixtures.ts",
+    "set-password": "tsx scripts/set-password.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.7.0",
@@ -19,7 +20,6 @@
     "wrangler": "4.160.0"
   },
   "dependencies": {
-    "hono": "4.13.17",
-    "jose": "6.2.17"
+    "hono": "4.13.17"
   }
 }

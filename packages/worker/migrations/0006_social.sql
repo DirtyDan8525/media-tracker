@@ -1,9 +1,39 @@
--- Phase 4 (social). See docs/plans/2026-11-16-phase4-social.md (S3–S9).
+-- Phase 4 (social) and 4b (own sign-in). See docs/plans/2026-11-16-phase4-social.md (S3–S9)
+-- and docs/plans/2026-11-16-phase4b-own-signin.md (A1–A8).
 ALTER TABLE users ADD COLUMN invite_code TEXT;
 ALTER TABLE users ADD COLUMN feed_seen_at TEXT;
--- Set when the admin takes the email off the Access policy; cleared when approved again. Data stays.
-ALTER TABLE users ADD COLUMN access_removed_at TEXT;
 CREATE UNIQUE INDEX idx_users_invite ON users(invite_code);
+
+-- A1/A2/A6: password sign-in with approval. Rows from before (Dan) stay 'active' and have no
+-- password until `npm run set-password` gives them one. Password-only users get email 'u:<id>'.
+ALTER TABLE users ADD COLUMN password_hash TEXT;
+ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active', 'removed'));
+
+-- A3: only the SHA-256 of the cookie token is stored.
+CREATE TABLE sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  last_used_at TEXT NOT NULL
+);
+CREATE INDEX idx_sessions_user ON sessions(user_id);
+
+-- A5: failed sign-ins per (lowercased) username, existing or not.
+CREATE TABLE login_failures (
+  username TEXT NOT NULL,
+  at TEXT NOT NULL
+);
+CREATE INDEX idx_login_failures ON login_failures(username, at);
+
+-- A7: one-time reset links (24 h), stored hashed.
+CREATE TABLE password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX idx_password_resets_user ON password_resets(user_id);
 
 -- S5: a post's id is its anchor row's id; later rows within 10 minutes point at the anchor.
 ALTER TABLE activity ADD COLUMN post_id TEXT;
@@ -48,9 +78,3 @@ CREATE TABLE comments (
 );
 CREATE INDEX idx_comments_post ON comments(activity_id, created_at);
 CREATE INDEX idx_comments_entry ON comments(entry_id, created_at);
-
--- S2: emails Dan approved, so Admin can list approved-but-not-joined people.
-CREATE TABLE invites (
-  email TEXT PRIMARY KEY,
-  created_at TEXT NOT NULL
-);

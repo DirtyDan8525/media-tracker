@@ -18,7 +18,7 @@ import {
   type TierSet,
   type UserSettings,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import {
   changedOf, isSeasonSet, loadSet, loadSets, planSave, refitTouched, runBatch, setWriteStatements, toSetItem,
 } from '../ratings/store';

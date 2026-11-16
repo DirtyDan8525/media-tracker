@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { AppEnv } from '../auth/access';
+import type { AppEnv } from '../auth/user';
 import { getCached, putCached } from '../lookup/cache';
 import { searchKitsu } from '../lookup/sources/kitsu';
 import type { LookupDeps } from '../lookup/sources/index';

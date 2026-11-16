@@ -14,7 +14,9 @@ function meWith(ask = 'Both', tiers?: Partial<Record<Category, TierSet>>) {
 }
 
 async function openAdd() {
-  await userEvent.click(await screen.findByRole('button', { name: /^Add anime$/i }));
+  // The phone's Add is the Main nav's (bottom bar's) Add link (B3).
+  const nav = await screen.findByRole('navigation', { name: 'Main' });
+  await userEvent.click(within(nav).getByRole('link', { name: 'Add anime' }));
   await screen.findByRole('textbox', { name: 'Title' });
   return screen.getByRole('dialog', { name: /^Add to / });
 }

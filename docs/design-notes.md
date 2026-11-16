@@ -23,3 +23,9 @@
 - Applies to the whole app: Phase 1–2 screens get the same refresh (plan Task 14).
 - Dan kept the list-header backdrop as the top-rated title (offered "most recently added"; declined).
 - Assumptions in the orange "Phase 3" canvas note stand (PC Status/Genre buttons, 44 px chips, etc.).
+
+## Navigation, profile and tier-rating wireframes — approved 2026-11-15
+- Approved: docs/design/mockups/*.wf.dc.html (after one revision round). Decisions: docs/specs/decisions-2026-11-15.md incl. "Amendments".
+- Wireframe level: build to the calm v2 visual language (approved *.v2 boards) with these layouts.
+- Every main screen, Activity included, keeps the profile button and the Lists button (the Activity board omitted them only for room).
+- Medal colours for Share images: gold #f2c14e, silver #c9cfd9, bronze #e0925a (checked ≥4.5:1 on the card surface).

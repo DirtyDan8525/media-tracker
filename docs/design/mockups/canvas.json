@@ -318,6 +318,136 @@
       "h": 900,
       "title": "Anime list (PC) · side nav · v2",
       "expand": "fill"
+    },
+    "NavBar.wf.dc.html": {
+      "x": 0,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Anime list, new bottom bar"
+    },
+    "ListsMenu.wf.dc.html": {
+      "x": 470,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Lists menu open"
+    },
+    "Profile.wf.dc.html": {
+      "x": 940,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Profile"
+    },
+    "PhotoCrop.wf.dc.html": {
+      "x": 1410,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Photo crop sheet"
+    },
+    "Search.wf.dc.html": {
+      "x": 1880,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Search, grouped results"
+    },
+    "SearchNoMatch.wf.dc.html": {
+      "x": 2350,
+      "y": 10500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Search, no match"
+    },
+    "Activity.wf.dc.html": {
+      "x": 0,
+      "y": 11600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Activity"
+    },
+    "ActivityEmpty.wf.dc.html": {
+      "x": 470,
+      "y": 11600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Activity, empty"
+    },
+    "ShareTop5.wf.dc.html": {
+      "x": 940,
+      "y": 11600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Share Top 5 preview"
+    },
+    "ShareNumberOnes.wf.dc.html": {
+      "x": 1410,
+      "y": 11600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Share My #1s preview"
+    },
+    "TierPicker.wf.dc.html": {
+      "x": 0,
+      "y": 12700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Add sheet with tier buttons"
+    },
+    "FixRatings.wf.dc.html": {
+      "x": 470,
+      "y": 12700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Fix my ratings, question"
+    },
+    "ReTier.wf.dc.html": {
+      "x": 940,
+      "y": 12700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Re-tier review, Move to… sheet"
+    },
+    "TierEditor.wf.dc.html": {
+      "x": 1410,
+      "y": 12700,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Settings, Rating tiers"
+    },
+    "SideNavPC.wf.dc.html": {
+      "x": 0,
+      "y": 13800,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · PC side nav + Anime list",
+      "expand": "fill"
+    },
+    "SearchPC.wf.dc.html": {
+      "x": 1520,
+      "y": 13800,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · PC Search",
+      "expand": "fill"
+    },
+    "FixRatingsPC.wf.dc.html": {
+      "x": 0,
+      "y": 15000,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · PC Fix my ratings (+ home inset)",
+      "expand": "fill"
+    },
+    "ReTierPC.wf.dc.html": {
+      "x": 1520,
+      "y": 15000,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · PC Re-tier, four columns",
+      "expand": "fill"
     }
   },
   "order": [
@@ -363,7 +493,25 @@
     "ListSearch.v2.dc.html",
     "ComparePC.v2.dc.html",
     "StatsPC.v2.dc.html",
-    "ListPCNav.v2.dc.html"
+    "ListPCNav.v2.dc.html",
+    "NavBar.wf.dc.html",
+    "ListsMenu.wf.dc.html",
+    "Profile.wf.dc.html",
+    "PhotoCrop.wf.dc.html",
+    "Search.wf.dc.html",
+    "SearchNoMatch.wf.dc.html",
+    "Activity.wf.dc.html",
+    "ActivityEmpty.wf.dc.html",
+    "ShareTop5.wf.dc.html",
+    "ShareNumberOnes.wf.dc.html",
+    "TierPicker.wf.dc.html",
+    "FixRatings.wf.dc.html",
+    "ReTier.wf.dc.html",
+    "TierEditor.wf.dc.html",
+    "SideNavPC.wf.dc.html",
+    "SearchPC.wf.dc.html",
+    "FixRatingsPC.wf.dc.html",
+    "ReTierPC.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -584,6 +732,19 @@
       "y": 10024,
       "w": 640,
       "text": "Motion: the banner drops in with one sweep; the side-nav Highlight bar slides to the clicked item; rows rise in."
+    },
+    "wf1": {
+      "x": 0,
+      "y": 10300,
+      "text": "Wireframes — navigation, profile and tier ratings (for Dan's review)",
+      "kind": "title1",
+      "maxW": 3000
+    },
+    "wf2": {
+      "x": 2820,
+      "y": 11600,
+      "w": 380,
+      "text": "Assumptions: Midnight and Inter, grey placeholder covers (blurred for the cover backdrops), no motion. Bottom bar slot 4 is Compare (with its waiting count); Top 5 is reached from Profile and More. List heading is a Header-colour band with icon, title and profile button. Tier ranges use the plan's defaults (Loved 9–10, Liked 7.5–8.9, Fine 6–7.4, Didn't like 0–5.9). Medal colours: gold #f2c14e, silver #c9cfd9, bronze #e0925a (contrast on cards 8.4, 9.0, 5.6 to 1). Share previews are the 1080×1350 card scaled down; the #1s card uses example titles for non-anime lists. Activity shows friends' lines with an Everyone / Friends / You filter; until Phase 4 it shows only your own. Friends count, Add friend and the Re-tier / empty-state wording are drafts."
     }
   },
   "designSystems": [],
@@ -622,6 +783,8 @@
     "m19",
     "m20",
     "m21",
-    "m22"
+    "m22",
+    "wf1",
+    "wf2"
   ]
 }

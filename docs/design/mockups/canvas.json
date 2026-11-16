@@ -567,6 +567,27 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Entry: stacked Rating and Status"
+    },
+    "RateClose.wf.dc.html": {
+      "x": 0,
+      "y": 19000,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Rating: close call"
+    },
+    "AddRate.wf.dc.html": {
+      "x": 470,
+      "y": 19000,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Add: number-first rating"
+    },
+    "Sharpen.wf.dc.html": {
+      "x": 940,
+      "y": 19000,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Sharpen my ratings"
     }
   },
   "order": [
@@ -647,7 +668,10 @@
     "Walkthrough.wf.dc.html",
     "FeedV2.wf.dc.html",
     "ProfilePC.wf.dc.html",
-    "EntryTiles.wf.dc.html"
+    "EntryTiles.wf.dc.html",
+    "RateClose.wf.dc.html",
+    "AddRate.wf.dc.html",
+    "Sharpen.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -902,6 +926,13 @@
       "text": "Wireframes — Phase 5 (for Dan's review)",
       "kind": "title1",
       "maxW": 3000
+    },
+    "wfp5r": {
+      "x": 0,
+      "y": 18800,
+      "text": "Wireframes — number-first rating (for Dan's review)",
+      "kind": "title1",
+      "maxW": 1400
     }
   },
   "designSystems": [],
@@ -945,6 +976,7 @@
     "wf2",
     "wfp4",
     "wfp4b",
-    "wfp5"
+    "wfp5",
+    "wfp5r"
   ]
 }

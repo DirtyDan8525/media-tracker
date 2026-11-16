@@ -20,6 +20,7 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 
 ## Friends
 11. **Messages** from a friend's profile (later; bigger feature).
+    - **Recommendations (built with Messages):** a small **Share** button on any title's page → pick one or more friends → sends a recommendation into your chat with them. In a chat, a **Recommend** button picks a title from your lists. The message shows as a card: cover, title, list, your rating and an optional note, with **Add to mine** (and "On your list" if they have it). Lists of what friends recommended you, for later.
 
 ## More tab
 13. **What's new / Coming soon** list in More, updated with every release (static list in the app; each future update adds its new features and moves items from Coming soon).

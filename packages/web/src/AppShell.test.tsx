@@ -79,7 +79,7 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Top 5', 'Stats', 'Import from Google Sheets', 'Appearance Midnight', 'Settings', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Top 5', 'Stats', 'Import from Google Sheets', 'Appearance Midnight', 'Re-tier review', 'Settings', 'About Media Tracker']);
   });
 
   it('with Compare enabled, More lists the other enabled lists, then Compare, Top 5, Stats, Import, Appearance, Comparing, Settings and About', async () => {
@@ -88,7 +88,7 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'Appearance Midnight', 'Comparing Ask: Both', 'Settings', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Songs', 'Games', 'Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'Appearance Midnight', 'Re-tier review', 'Comparing Ask: Both', 'Settings', 'About Media Tracker']);
     expect(within(main).getByRole('heading', { name: 'Ratings' })).toBeInTheDocument();
     const tabs = screen.getByRole('navigation', { name: 'Lists' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');

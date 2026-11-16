@@ -252,6 +252,15 @@ describe('ImportScreen', () => {
     await waitFor(() => expect(calls.map((c) => c.path)).toContain('/api/entries?category=games'));
   });
 
+  it('Import done offers Check your tiers, linking to the first imported list', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies', rating: 8 }), row(2, { category: 'games', rating: 7 })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/movies');
+  });
+
   it('the done screen offers to fill in details; Start runs the backfill, Not now dismisses', async () => {
     const entries = [makeEntry({ id: 'a1', title: 'Frieren', category: 'anime', creator: '' })];
     const { calls } = fakeBackend({

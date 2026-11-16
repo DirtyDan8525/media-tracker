@@ -21,7 +21,7 @@ describe('More (SettingsMore.v2)', () => {
     const ratings = await screen.findByRole('region', { name: 'Ratings' });
     expect(within(ratings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Top 5', 'Stats']);
     const settings = screen.getByRole('region', { name: 'Settings' });
-    expect(within(settings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Appearance Sakura']);
+    expect(within(settings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Appearance Sakura', 'Re-tier review']);
     expect(screen.queryByText(/Ask:/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
     await userEvent.click(within(settings).getByRole('link', { name: 'Appearance Sakura' }));

@@ -220,6 +220,9 @@ export function ImportScreen() {
               {undoError && <p role="alert" className="field-error">Couldn't undo. Try again.</p>}
               <div className="import__actions">
                 <Button onClick={() => void undo()} disabled={busy}>Undo import</Button>
+                {run.current && categoriesOf(run.current.preview)[0] && (
+                  <Link to={`/retier/${categoriesOf(run.current.preview)[0]}`} className="btn btn--primary">Check your tiers</Link>
+                )}
                 <Link to="/" className="btn btn--ghost">Go to my lists</Link>
               </div>
             </div>

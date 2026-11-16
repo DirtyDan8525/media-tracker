@@ -23,6 +23,21 @@ const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ 
 // Compare (and the shared engine it runs) only loads when opened.
 const CompareScreen = lazy(() => import('./screens/CompareScreen').then((m) => ({ default: m.CompareScreen })));
 
+// Re-tier review loads on demand too.
+const RetierScreen = lazy(() => import('./screens/RetierScreen').then((m) => ({ default: m.RetierScreen })));
+
+function RetierRoute() {
+  return (
+    <Suspense fallback={
+      <div className="screen" aria-busy="true" aria-label="Loading">
+        <div className="screen__body"><Skeleton height={80} /></div>
+      </div>
+    }>
+      <RetierScreen />
+    </Suspense>
+  );
+}
+
 function CompareRoute() {
   if (!COMPARE_ENABLED) return <Navigate to="/" replace />;
   return (
@@ -77,6 +92,7 @@ export const routes: RouteObject[] = [
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
           { path: 'compare', element: <CompareRoute /> },
+          { path: 'retier/:set', element: <RetierRoute /> },
           { path: 'top5', element: <Top5Screen /> },
           { path: 'stats', element: <StatsScreen /> },
           { path: 'settings', element: <SettingsScreen /> },

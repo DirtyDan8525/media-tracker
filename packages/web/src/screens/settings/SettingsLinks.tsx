@@ -20,6 +20,9 @@ export function SettingsLinks() {
           {settings.theme}
         </span>
       </Link>
+      <Link to="/retier/anime" className="group__row">
+        <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Re-tier review</span>
+      </Link>
       {COMPARE_ENABLED && (
         <Link to={APPEARANCE_PATH} className="group__row">
           <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Comparing</span>{' '}

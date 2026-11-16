@@ -92,7 +92,7 @@ async function main() {
 
   const hash = await hashPassword(password);
   // Both values are safe inside single quotes: the username is [a-z0-9_] and the hash is
-  // "pbkdf2$100000$" plus base64 ([A-Za-z0-9+/=]) and "$".
+  // "pbkdf2$<iterations>$" plus base64 ([A-Za-z0-9+/=]) and "$".
   if (!/^pbkdf2\$\d+\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$/.test(hash)) fail('Unexpected hash format. Nothing was changed.');
   const sql =
     `UPDATE users SET password_hash = '${hash}', status = 'active' WHERE username = '${username}'; ` +

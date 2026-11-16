@@ -49,10 +49,10 @@ afterEach(async () => {
 });
 
 describe('passwords (A2)', () => {
-  it('stores pbkdf2$100000$<16-byte salt>$<32-byte hash> and verifies only the right password', async () => {
-    expect(PBKDF2_ITERATIONS).toBe(100_000);
+  it('stores pbkdf2$30000$<16-byte salt>$<32-byte hash> and verifies only the right password', async () => {
+    expect(PBKDF2_ITERATIONS).toBe(30_000);
     const stored = await hashPassword('hunter2hunter2');
-    expect(stored).toMatch(/^pbkdf2\$100000\$[A-Za-z0-9+/]{22}==\$[A-Za-z0-9+/]{43}=$/);
+    expect(stored).toMatch(/^pbkdf2\$30000\$[A-Za-z0-9+/]{22}==\$[A-Za-z0-9+/]{43}=$/);
     expect(stored).not.toContain('hunter2');
     expect(await verifyPassword('hunter2hunter2', stored)).toBe(true);
     expect(await verifyPassword('hunter2hunter3', stored)).toBe(false);
@@ -65,16 +65,26 @@ describe('passwords (A2)', () => {
 
   it('refuses malformed stored values and iteration counts over the Workers cap', async () => {
     const good = await hashPassword('abcdefgh');
-    for (const bad of ['', 'nope', good.replace('pbkdf2$', 'sha1$'), good.replace('$100000$', '$100001$'), good.replace('$100000$', '$0$'), `${good}$x`]) {
+    for (const bad of ['', 'nope', good.replace('pbkdf2$', 'sha1$'), good.replace('$30000$', '$100001$'), good.replace('$30000$', '$9999$'), good.replace('$30000$', '$0$'), `${good}$x`]) {
       expect(await verifyPassword('abcdefgh', bad)).toBe(false);
     }
   });
 
-  it('uses crypto.subtle PBKDF2 with SHA-256 and 100000 iterations', async () => {
+  it('verifies a hash made with another allowed iteration count (raising the count later needs no resets)', async () => {
+    const salt = new Uint8Array(16);
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('abcdefgh'), 'PBKDF2', false, ['deriveBits']);
+    const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100_000 }, key, 256));
+    const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
+    const stored = `pbkdf2$100000$${b64(salt)}$${b64(bits)}`;
+    expect(await verifyPassword('abcdefgh', stored)).toBe(true);
+    expect(await verifyPassword('abcdefgx', stored)).toBe(false);
+  });
+
+  it('uses crypto.subtle PBKDF2 with SHA-256 and 30000 iterations', async () => {
     const spy = vi.spyOn(crypto.subtle, 'deriveBits');
     await hashPassword('abcdefgh');
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0]![0]).toMatchObject({ name: 'PBKDF2', hash: 'SHA-256', iterations: 100_000 });
+    expect(spy.mock.calls[0]![0]).toMatchObject({ name: 'PBKDF2', hash: 'SHA-256', iterations: 30_000 });
     expect(spy.mock.calls[0]![2]).toBe(256);
   });
 });

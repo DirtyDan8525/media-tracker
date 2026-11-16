@@ -1,9 +1,13 @@
 /**
- * A2: PBKDF2-SHA256 via WebCrypto, 100,000 iterations (the most Workers allows), 16-byte salt,
- * stored as `pbkdf2$100000$<salt b64>$<hash b64>`. Runs in the Worker and, unchanged, in Node
+ * A2: PBKDF2-SHA256 via WebCrypto, 16-byte salt, stored as `pbkdf2$<iterations>$<salt b64>$<hash b64>`.
+ * New hashes use 30,000 iterations so a sign-in fits the Workers Free plan's 10 ms CPU budget
+ * (Dan, 2026-11-16: stay on Free; ~6 ms measured in Node). Verification uses the count stored in the
+ * hash (10,000-100,000, Workers' cap), so the count can be raised later without resetting anyone. Runs in the Worker and, unchanged, in Node
  * (scripts/set-password.ts), so both hash the same way.
  */
-export const PBKDF2_ITERATIONS = 100_000;
+export const PBKDF2_ITERATIONS = 30_000;
+const MIN_ITERATIONS = 10_000;
+const MAX_ITERATIONS = 100_000;
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 
@@ -55,10 +59,11 @@ const DUMMY = `pbkdf2$${PBKDF2_ITERATIONS}$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAA
  */
 export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
   const parts = (stored ?? '').split('$');
+  const iterations = /^\d{5,6}$/.test(parts[1] ?? '') ? Number(parts[1]) : NaN;
   const ok =
-    parts.length === 4 && parts[0] === 'pbkdf2' && parts[1] === String(PBKDF2_ITERATIONS) && unb64(parts[2]!)?.length === SALT_BYTES
-      && unb64(parts[3]!)?.length === HASH_BITS / 8;
+    parts.length === 4 && parts[0] === 'pbkdf2' && iterations >= MIN_ITERATIONS && iterations <= MAX_ITERATIONS
+      && unb64(parts[2]!)?.length === SALT_BYTES && unb64(parts[3]!)?.length === HASH_BITS / 8;
   const [, , saltB64, hashB64] = (ok ? stored! : DUMMY).split('$');
-  const actual = await derive(password, unb64(saltB64!)!, PBKDF2_ITERATIONS);
+  const actual = await derive(password, unb64(saltB64!)!, ok ? iterations : PBKDF2_ITERATIONS);
   return timingSafeEqual(actual, unb64(hashB64!)!) && ok;
 }

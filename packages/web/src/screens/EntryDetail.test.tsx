@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Entry, Season } from '@media-tracker/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { COMPARE_QUEUE_KEY } from '../data/compare';
+import { ratingSetKey } from '../data/ratings';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
@@ -198,6 +199,46 @@ describe('seasons', () => {
   });
 });
 
+describe('seasons: ratings are re-fitted by the Worker', () => {
+  it('a season rating change reloads the seasons and the season set (the Worker re-fits the others)', async () => {
+    const { calls } = fakeBackend({ entries: [frieren()], seasons: [season({ id: 's1', label: 'Season 1', rating: 9.5 }), season({ id: 's2', label: 'Season 2', rating: 9 })] });
+    const { queryClient } = renderApp('/entry/f1');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /^Seasons/ })).toHaveTextContent('avg 9.25'));
+    queryClient.setQueryData(ratingSetKey('anime_seasons'), { items: [], comparisons: [] });
+    const before = calls.length;
+    const r = screen.getByRole('spinbutton', { name: 'Season 2 rating' });
+    await userEvent.clear(r);
+    await userEvent.type(r, '8');
+    await userEvent.tab();
+    await waitFor(() => expect(calls.slice(before).some((c) => c.method === 'GET' && c.path === '/api/entries/f1/seasons')).toBe(true));
+    expect(queryClient.getQueryState(ratingSetKey('anime_seasons'))!.isInvalidated).toBe(true);
+  });
+
+  it('removing a season reloads the season set and the parent list', async () => {
+    const { calls } = fakeBackend({ entries: [frieren()], seasons: [season({ id: 's1', label: 'Season 1', rating: 9.5 }), season({ id: 's2', label: 'Season 2', rating: 9 })] });
+    const { queryClient } = renderApp('/entry/f1');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /^Seasons/ })).toHaveTextContent('avg 9.25'));
+    queryClient.setQueryData(ratingSetKey('anime_seasons'), { items: [], comparisons: [] });
+    const before = calls.length;
+    await userEvent.click(screen.getByRole('button', { name: 'Remove season 1' }));
+    await waitFor(() => expect(calls.slice(before).some((c) => c.method === 'GET' && c.path === '/api/entries?category=anime')).toBe(true));
+    expect(queryClient.getQueryState(ratingSetKey('anime_seasons'))!.isInvalidated).toBe(true);
+  });
+
+  it('a season delete that conflicts (409) is tried once more', async () => {
+    let n = 0;
+    const { seasons } = fakeBackend({
+      entries: [frieren()], seasons: [season({ id: 's1', label: 'Season 1', rating: 9.5 })],
+      extra: { 'DELETE /api/seasons/:id': () => (++n === 1 ? { status: 409, body: { error: 'conflict' } } : { status: 204 }) },
+    });
+    renderApp('/entry/f1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove season 1' }));
+    await waitFor(() => expect(n).toBe(2));
+    expect(screen.queryByText("Couldn't save that change")).not.toBeInTheDocument();
+    expect(seasons).toHaveLength(1); // the extra handler stands in for the fake's own delete
+  });
+});
+
 describe('Back and delete', () => {
   it('Back returns to the list with its search kept when there is in-app history', async () => {
     fakeBackend({ entries: [frieren()] });
@@ -223,6 +264,32 @@ describe('Back and delete', () => {
     const d = await screen.findByRole('dialog', { name: 'Delete this entry?' });
     await userEvent.click(within(d).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: COMPARE_QUEUE_KEY }));
+  });
+
+  it('deleting an entry reloads its rating sets (the Worker re-fits its neighbours)', async () => {
+    fakeBackend({ entries: [frieren()] });
+    const { queryClient } = renderApp('/entry/f1');
+    await screen.findByRole('heading', { level: 1 });
+    queryClient.setQueryData(ratingSetKey('anime'), { items: [], comparisons: [] });
+    queryClient.setQueryData(ratingSetKey('anime_seasons'), { items: [], comparisons: [] });
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const d = await screen.findByRole('dialog', { name: 'Delete this entry?' });
+    await userEvent.click(within(d).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(queryClient.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true));
+    expect(queryClient.getQueryState(ratingSetKey('anime_seasons'))!.isInvalidated).toBe(true);
+  });
+
+  it('a delete that conflicts (409) is tried once more', async () => {
+    let n = 0;
+    const { router } = (() => {
+      fakeBackend({ entries: [frieren()], extra: { 'DELETE /api/entries/:id': () => (++n === 1 ? { status: 409, body: { error: 'conflict' } } : { status: 204 }) } });
+      return renderApp('/entry/f1');
+    })();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const d = await screen.findByRole('dialog', { name: 'Delete this entry?' });
+    await userEvent.click(within(d).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(n).toBe(2);
   });
 });
 

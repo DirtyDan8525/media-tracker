@@ -3,6 +3,7 @@ import { formatRating, type Season } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { entriesKey, entryKey } from '../../data/entryCache';
+import { refetchAfterDelete, refetchAfterSeasonWrite, retryOnConflict } from '../../data/ratings';
 import { Button } from '../../design/components/Button';
 import { IconButton } from '../../design/components/IconButton';
 import { Skeleton } from '../../design/components/Skeleton';
@@ -45,12 +46,19 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
   async function patch(s: Season, body: Partial<Pick<Season, 'label' | 'rating' | 'notes'>>) {
     const before = qc.getQueryData<Season[]>(key) ?? [];
     set(before.map((x) => (x.id === s.id ? { ...x, ...body } : x)));
-    try { await api.patch<Season>(`/api/seasons/${s.id}`, body); } catch { set(before); fail(); }
+    try {
+      await retryOnConflict(() => api.patch<Season>(`/api/seasons/${s.id}`, body));
+    } catch { set(before); fail(); return; }
+    // A rating write re-fits the season set on the Worker: the other seasons' scores may move too.
+    if ('rating' in body) void refetchAfterSeasonWrite(qc, entry.category, entry.id);
   }
   async function remove(s: Season) {
     const before = qc.getQueryData<Season[]>(key) ?? [];
     set(before.filter((x) => x.id !== s.id));
-    try { await api.del(`/api/seasons/${s.id}`); } catch { set(before); fail(); }
+    try {
+      await retryOnConflict(() => api.del(`/api/seasons/${s.id}`));
+    } catch { set(before); fail(); return; }
+    void refetchAfterDelete(qc, { kind: 'season', category: entry.category, entryId: entry.id });
   }
 
   const avg = averageOf(seasons);

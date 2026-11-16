@@ -412,3 +412,15 @@ a.group__row:focus-visible { outline-offset: -2px; }
   font-size: var(--fs-meta); font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
 }
 .group__chev { display: flex; color: var(--muted-text); }
+
+/* Tier picker (TierPicker.wf): four large buttons, top tier first, name left and range right. */
+.tier-picker { display: flex; flex-direction: column; gap: var(--space-4); }
+.tier-btn {
+  min-height: 56px; padding: 0 var(--space-8); border-radius: var(--radius-xl); border: 1px solid var(--grid-line);
+  background: var(--bg); color: var(--bright-text); font: inherit; font-size: var(--fs-lg); font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); cursor: pointer; text-align: left;
+}
+.tier-btn:hover { background: var(--panel); }
+.tier-btn__range { font-size: var(--fs-sm); font-weight: 400; color: var(--muted-text); font-variant-numeric: tabular-nums; }
+.tier-btn.is-on { border-color: var(--highlight); background: var(--panel); }
+.tier-btn.is-on .tier-btn__range { color: var(--highlight); }

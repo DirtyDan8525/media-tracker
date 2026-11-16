@@ -1,49 +1,67 @@
-import type { Category } from '@media-tracker/shared';
+import type { Category, RatingSet, Tier } from '@media-tracker/shared';
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { Link } from 'react-router';
+import { Button } from '../../design/components/Button';
 import { Icon } from '../../design/components/Icon';
+import { Skeleton } from '../../design/components/Skeleton';
+import { TIERS_TOP_FIRST } from '../../design/components/TierPicker';
 import { LIST_LABEL } from '../../nav';
 import { PageHeader } from '../../shell/PageHeader';
-import type { ListCount } from './useCompareFlow';
+
+/** A list (or season tab) Fix my ratings is offered for; season tabs have no count until opened. */
+export interface HomeList { set: RatingSet; label: string; icon: Category; count: number | null }
+export interface ListCount { category: Category; count: number }
+
+/** The chosen list's tier chips: counts once its set has loaded. */
+export interface TierChips { names: readonly string[]; counts: readonly number[] | null; failed: boolean }
 
 export interface CompareHomeProps {
   afterQueue: boolean;
-  lists: ListCount[];
+  lists: HomeList[];
   unrated: ListCount[];
   onlyNew: boolean;
-  /** compareWindow, shown as set. */
-  window: number;
-  onList(c: Category): void;
+  chosen: RatingSet | null;
+  tiers: TierChips | null;
+  onList(set: RatingSet): void;
+  onTier(t: Tier | null): void;
+  onRetryTiers(): void;
   onUnrated(c: Category): void;
   /** Back from a run: focus goes to the heading so screen readers announce the home. */
   focusHeading?: boolean;
 }
 
+export const HOME_TITLE = 'Fix my ratings';
 const ONLY_NEW = ' Settings → “Ask to compare” is set to only check new ratings.';
+const PICK_A_LIST = 'Pick a list. The app asks about the two closest titles in a tier; stop any time.';
 
-/** The Compare home: a full pass per list (2+ rated), and the finished titles with no rating, by list. */
-export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onList, onUnrated, focusHeading }: CompareHomeProps) {
+/** The Fix my ratings home: lists (2+ rated) and season tabs, then the chosen list's tiers; finished titles with no score by list. */
+export function CompareHome({
+  afterQueue, lists, unrated, onlyNew, chosen, tiers, onList, onTier, onRetryTiers, onUnrated, focusHeading,
+}: CompareHomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (focusHeading) heading.current?.focus(); }, [focusHeading]);
   const sub = onlyNew
     ? (afterQueue ? 'All new ratings are placed.' : 'Nothing is waiting.') + ONLY_NEW
-    : (afterQueue ? 'New ratings are placed. ' : '')
-      + `Pick a list to go through. You only compare things rated within ${window} of each other, and you can stop any time.`;
+    : (afterQueue ? 'New ratings are placed. ' : '') + PICK_A_LIST;
   const empty = !onlyNew && !lists.length && !unrated.length;
 
   return (
     <div className="screen compare-home">
-      <PageHeader title="Compare ratings" sub={sub} backTo="/more" titleRef={heading} />
+      <PageHeader title={HOME_TITLE} sub={sub} backTo="/more" titleRef={heading} />
       <div className="screen__body stack-18">
         {!onlyNew && lists.length > 0 && (
-          <div role="group" aria-label="Lists" className="cmp-tiles">
-            {lists.map(({ category, count }, i) => (
-              <button key={category} type="button" className="cmp-tile rise-in" style={{ '--i': i } as CSSProperties}
-                aria-label={`${LIST_LABEL[category]} (${count})`} onClick={() => onList(category)}>
-                <span className="tile-icon"><Icon name={category} size={18} /></span>
-                <span className="cmp-tile__name">{LIST_LABEL[category]} <small>({count})</small></span>
-              </button>
-            ))}
+          <div className="stack-10">
+            <div role="group" aria-label="Lists" className="cmp-tiles">
+              {lists.map(({ set, label, icon, count }, i) => (
+                <button key={set} type="button" className={chosen === set ? 'cmp-tile rise-in is-on' : 'cmp-tile rise-in'}
+                  style={{ '--i': i } as CSSProperties} aria-pressed={chosen === set}
+                  aria-label={count === null ? label : `${label} (${count})`} onClick={() => onList(set)}>
+                  <span className="tile-icon"><Icon name={icon} size={18} /></span>
+                  <span className="cmp-tile__name">{label}{count !== null && <> <small>({count})</small></>}</span>
+                </button>
+              ))}
+            </div>
+            {chosen !== null && tiers && <TierChipRow tiers={tiers} onTier={onTier} onRetry={onRetryTiers} />}
           </div>
         )}
         {empty && (
@@ -54,9 +72,9 @@ export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onLis
         {unrated.length > 0 && (
           <section aria-labelledby="cmp-unrated" className="stack-10">
             <div className="compare__head">
-              <h2 id="cmp-unrated" className="cmp-h2">Rate finished things with no rating</h2>
+              <h2 id="cmp-unrated" className="cmp-h2">Rate finished things with no score</h2>
               <span className="compare__sub">
-                Completed titles with no score yet. Lists without a Status (Movies, Albums, Songs) count everything as finished. A few picks each.
+                Completed titles with no score yet. Lists without a Status (Movies, Albums, Songs) count everything as finished. Pick a tier for each, then a few picks place it.
               </span>
             </div>
             <div role="group" aria-label="Unrated lists" className="cmp-tiles">
@@ -72,6 +90,26 @@ export function CompareHome({ afterQueue, lists, unrated, onlyNew, window, onLis
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+function TierChipRow({ tiers, onTier, onRetry }: { tiers: TierChips; onTier(t: Tier | null): void; onRetry(): void }) {
+  if (tiers.failed) {
+    return (
+      <p className="compare__sub" role="alert">
+        Couldn't load this list's ratings. Check your connection. <Button variant="ghost" compact onClick={onRetry}>Retry</Button>
+      </p>
+    );
+  }
+  if (tiers.counts === null) return <div aria-busy="true" aria-label="Loading tiers"><Skeleton height={44} /></div>;
+  const counts = tiers.counts;
+  return (
+    <div role="group" aria-label="Tiers" className="cmp-chips">
+      <Button variant="chip" onClick={() => onTier(null)}>All tiers</Button>
+      {TIERS_TOP_FIRST.map((t) => (
+        <Button key={t} variant="chip" onClick={() => onTier(t)}>{tiers.names[t]} {counts[t]}</Button>
+      ))}
     </div>
   );
 }

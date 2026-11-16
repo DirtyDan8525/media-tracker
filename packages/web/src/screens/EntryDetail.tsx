@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { removeEntryFromCache } from '../data/entryCache';
+import { refetchAfterDelete, retryOnConflict } from '../data/ratings';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntry } from '../data/useEntry';
 import { Button } from '../design/components/Button';
@@ -192,6 +193,8 @@ function DetailBody({ entry }: { entry: Entry }) {
             removeEntryFromCache(qc, entry);
             // A deleted entry leaves the compare queue on the server; refresh the banner and nav counts now.
             void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
+            // The Worker re-fitted the titles left in its tier: their scores may have moved.
+            void refetchAfterDelete(qc, { kind: 'entry', category: entry.category });
             toast.show(`Deleted ${entry.title}`);
           }}
         />
@@ -297,7 +300,7 @@ function DeleteSheet({ entry, onClose, onDeleted }: { entry: Entry; onClose: () 
   async function remove() {
     setBusy(true);
     try {
-      await api.del(`/api/entries/${entry.id}`);
+      await retryOnConflict(() => api.del(`/api/entries/${entry.id}`));
       onDeleted();
     } catch (err) {
       setBusy(false);

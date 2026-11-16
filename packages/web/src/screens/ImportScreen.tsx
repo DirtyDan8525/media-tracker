@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { useBackfill } from '../backfill/useBackfill';
 import { refreshCategories } from '../data/useEntries';
+import { refetchAfterDelete, retryOnConflict } from '../data/ratings';
 import { useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
@@ -142,12 +143,13 @@ export function ImportScreen() {
     try {
       let removed = 0;
       try {
-        removed = (await api.del<{ deleted: number }>(`/api/import/${r.importId}`))?.deleted ?? 0;
+        removed = (await retryOnConflict(() => api.del<{ deleted: number }>(`/api/import/${r.importId}`)))?.deleted ?? 0;
       } catch (err) {
         // 404: nothing of this import reached the server (the first chunk failed), so there is nothing to remove.
         if (!(err instanceof ApiError && err.status === 404)) throw err;
       }
-      await refreshCategories(qc, categoriesOf(r.preview));
+      // Lists and rating sets both reload: the Worker re-fitted what the import left behind.
+      await Promise.all(categoriesOf(r.preview).map((category) => refetchAfterDelete(qc, { kind: 'entry', category })));
       setStage({ k: 'undone', removed });
     } catch {
       setUndoError(true);

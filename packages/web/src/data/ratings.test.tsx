@@ -9,7 +9,8 @@ import { makeMe, mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
 import { COMPARE_QUEUE_KEY } from './compare';
 import { entriesKey, entryKey } from './entryCache';
-import { ratingSetKey, refetchAfterDelete, saveRatings, saveTiers, useRatingSet } from './ratings';
+import { ratingSetKey, refetchAfterDelete, retryOnConflict, saveRatings, saveRatingsResult, saveTiers, useRatingSet } from './ratings';
+import { ApiError } from '../api/client';
 import { ME_KEY } from './useMe';
 
 const payload: SavePayload = { picks: [{ winnerId: 'a', loserId: 'b', isTie: false, undone: false }], moves: [], done: ['a'] };
@@ -145,6 +146,14 @@ describe('refetchAfterDelete', () => {
     expect(qc.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true);
   });
 
+  it('an entry delete also takes its seasons with it: the season set reloads', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(ratingSetKey('anime_seasons'), setBody);
+    mockFetch({ 'GET /api/entries': { body: [] } });
+    await refetchAfterDelete(qc, { kind: 'entry', category: 'anime' });
+    expect(qc.getQueryState(ratingSetKey('anime_seasons'))!.isInvalidated).toBe(true);
+  });
+
   it('a season delete refetches the season set, seasons and the parent entry average', async () => {
     const qc = makeQueryClient();
     qc.setQueryData(entriesKey('tv'), [makeEntry({ id: 'p', category: 'tv', seasonAvg: 9 })]);
@@ -158,5 +167,31 @@ describe('refetchAfterDelete', () => {
     expect(qc.getQueryState(ratingSetKey('tv_seasons'))!.isInvalidated).toBe(true);
     expect(qc.getQueryState(['seasons', 'p'])!.isInvalidated).toBe(true);
     expect(qc.getQueryState(entryKey('p'))!.isInvalidated).toBe(true);
+  });
+});
+
+describe('saveRatingsResult', () => {
+  it('tells a conflict that survived the retry apart from other failures', async () => {
+    const qc = makeQueryClient();
+    mockFetch({
+      'POST /api/ratings/anime/save': { status: 409, body: { error: 'conflict' } },
+      'GET /api/ratings/anime': { body: setBody },
+    });
+    expect(await saveRatingsResult(qc, 'anime', payload)).toBe('conflict');
+    mockFetch({ 'POST /api/ratings/anime/save': { status: 500, body: { error: 'x' } } });
+    expect(await saveRatingsResult(qc, 'anime', payload)).toBe('failed');
+    mockFetch({ 'POST /api/ratings/anime/save': { body: { items: [], entries: [] } }, 'GET /api/compare/queue': { body: { items: [] } } });
+    expect(await saveRatingsResult(qc, 'anime', payload)).toBe('ok');
+  });
+});
+
+describe('retryOnConflict', () => {
+  it('runs a write once more after a 409, and passes other errors through', async () => {
+    let n = 0;
+    expect(await retryOnConflict(async () => { if (++n === 1) throw new ApiError(409, 'conflict'); return 'done'; })).toBe('done');
+    expect(n).toBe(2);
+    n = 0;
+    await expect(retryOnConflict(async () => { n++; throw new ApiError(500, 'x'); })).rejects.toThrow(ApiError);
+    expect(n).toBe(1);
   });
 });

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseWorkbook } from '../import/parseWorkbook';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { renderApp } from '../test/renderApp';
+import { ratingSetKey } from '../data/ratings';
 import { toArrayBuffer } from '../../test/helpers/buildWorkbook';
 
 vi.mock('../import/parseWorkbook', async (importOriginal) => {
@@ -221,7 +222,9 @@ describe('ImportScreen', () => {
 
   it('Undo on the done screen deletes the import and refreshes the lists', async () => {
     const { calls } = importBackend();
-    renderApp('/import');
+    const { queryClient } = renderApp('/import');
+    queryClient.setQueryData(ratingSetKey('anime'), { items: [], comparisons: [] });
+    queryClient.setQueryData(ratingSetKey('movies'), { items: [], comparisons: [] });
     await chooseMock(preview([row(1), row(2, { category: 'movies' })]));
     await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
     await screen.findByText('Imported 2 titles');
@@ -235,6 +238,9 @@ describe('ImportScreen', () => {
       expect(gets).toContain('/api/entries?category=anime');
       expect(gets).toContain('/api/entries?category=movies');
     });
+    // the Worker re-fitted what was left: the rating sets reload too
+    expect(queryClient.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(ratingSetKey('movies'))!.isInvalidated).toBe(true);
   });
 
   it('refreshes the lists of the imported categories after a successful import', async () => {

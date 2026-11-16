@@ -52,11 +52,11 @@ describe('More (SettingsMore.v2)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
   });
 
-  it('Back on Appearance opened directly falls back to More', async () => {
+  it('Back on Appearance opened directly falls back to Settings', async () => {
     mockApi(makeMe());
     const { router } = renderApp('/settings/appearance');
     await screen.findByRole('radiogroup', { name: 'Theme' });
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/more'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
   });
 });

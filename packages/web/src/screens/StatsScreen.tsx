@@ -36,7 +36,7 @@ export function StatsScreen() {
   if (isError && loaded === 0) {
     return (
       <div className="screen">
-        <PageHeader title="Stats" backTo="/more" />
+        <PageHeader title="Stats" backTo="/profile" backUsesHistory />
         <div className="screen__body">
           <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
             actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
@@ -47,7 +47,7 @@ export function StatsScreen() {
   if (isPending && !isError && lists.some((c) => !data[c])) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
-        <PageHeader title="Stats" backTo="/more" />
+        <PageHeader title="Stats" backTo="/profile" backUsesHistory />
         <div className="screen__body stack-10"><Skeleton height={140} /><Skeleton height={100} /><Skeleton height={160} /></div>
       </div>
     );
@@ -56,7 +56,7 @@ export function StatsScreen() {
   if (lists.length === 0 || all.entries === 0) {
     return (
       <div className="screen">
-        <PageHeader title="Stats" backTo="/more" />
+        <PageHeader title="Stats" backTo="/profile" backUsesHistory />
         <div className="screen__body">
           <EmptyState icon="info" title="Nothing to count yet"
             body={lists.length === 0 ? 'Turn a list on in Settings, then add some titles.' : 'Add some titles to a list and rate them to see your stats here.'} />
@@ -70,7 +70,7 @@ export function StatsScreen() {
 
   return (
     <div className="screen">
-      <PageHeader title="Stats" backTo="/more" sub="Your lists that are turned on. Completed shows “—” for lists without a Status." />
+      <PageHeader title="Stats" backTo="/profile" backUsesHistory sub="Your lists that are turned on. Completed shows “—” for lists without a Status." />
       <div className="screen__body stats">
         {isError && (
           <div className="load-notice" role="status">

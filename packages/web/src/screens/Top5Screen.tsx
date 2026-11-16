@@ -26,7 +26,7 @@ export function Top5Screen() {
   if (isError && loaded === 0) {
     return (
       <div className="screen">
-        <PageHeader title="Top 5" backTo="/more" />
+        <PageHeader title="Top 5" backTo="/profile" backUsesHistory />
         <div className="screen__body">
           <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
             actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
@@ -37,14 +37,14 @@ export function Top5Screen() {
   if (isPending && !isError && lists.some((c) => !data[c])) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
-        <PageHeader title="Top 5" backTo="/more" />
+        <PageHeader title="Top 5" backTo="/profile" backUsesHistory />
         <div className="screen__body stack-10"><Skeleton height={144} /><Skeleton height={56} /><Skeleton height={56} /></div>
       </div>
     );
   }
   return (
     <div className="screen">
-      <PageHeader title="Top 5" backTo="/more" sub="Your highest rated in each list." />
+      <PageHeader title="Top 5" backTo="/profile" backUsesHistory sub="Your highest rated in each list." />
       <div className="screen__body top5">
         {isError && (
           <div className="load-notice" role="status">

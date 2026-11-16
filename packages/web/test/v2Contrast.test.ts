@@ -7,7 +7,7 @@ import { contrast } from '../src/design/theme';
 // compositing, so these check the declared roles and the backdrop's worst case by arithmetic).
 const read = (f: string) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8');
 const tokens = read('tokens.css');
-const css = (['components.css', 'lists.css', 'search.css', 'activity.css'].map(read).join('\n')).replace(/\/\*[\s\S]*?\*\//g, '');
+const css = (['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css'].map(read).join('\n')).replace(/\/\*[\s\S]*?\*\//g, '');
 
 function decls(selector: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -71,5 +71,45 @@ describe('v2 contrast', () => {
         }
       }
     }
+  });
+
+  // Profile (B12): the banner holds Text / Bright text only, on its scrim over a cover, or on Header row with no cover.
+  describe('profile banner', () => {
+    const ROLE: Record<string, string> = { text: 'Text', 'bright-text': 'Bright text' };
+    const roleOf = (value: string | undefined) => ROLE[/var\(--([\w-]+)\)/.exec(value ?? '')?.[1] ?? ''];
+    const scrim = decls('.page-header.has-backdrop.profile__banner .backdrop::after').background ?? '';
+    const top = Number(/color-mix\(in srgb, var\(--bg\) (\d+)%, transparent\)\s*0%/.exec(scrim)?.[1]) / 100;
+
+    it('the scrim is declared (a lighter one would let a bright cover through)', () => {
+      expect(top, `scrim is ${scrim}`).toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('the banner text uses Text or Bright text only', () => {
+      for (const sel of ['.profile__banner .page-title', '.profile__banner .page-sub']) {
+        expect(roleOf(decls(sel).color), `${sel} color is ${decls(sel).color}`).toBeDefined();
+      }
+    });
+
+    it.each(NAMES)('%s: Text and Bright text stay >= 4.5:1 on the banner (white or black cover under the scrim, or Header row)', (name) => {
+      const t = THEMES[name]!;
+      for (const opacity of [tokenNum('--backdrop-opacity'), tokenNum('--backdrop-opacity-wide')]) {
+        for (const cover of ['#ffffff', '#000000']) {
+          const shown = over(t.Background!, top, over(cover, opacity, t.Background!));
+          for (const role of ['Text', 'Bright text']) {
+            expect(contrast(t[role]!, shown), `${name} ${role} on ${cover} @ ${opacity}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+      expect(decls('.profile__banner').background).toBe('var(--header-row)');
+      for (const role of ['Text', 'Bright text']) {
+        expect(contrast(t[role]!, t['Header row']!), `${name} ${role} on Header row`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it.each(NAMES)('%s: the initial on an empty avatar reads on Highlight', (name) => {
+      expect(decls('.avatar').color).toBe('var(--on-highlight)');
+      expect(decls('.avatar').background).toBe('var(--highlight)');
+      expect(name).toBeTruthy(); // the --on-highlight pairing is asserted for every theme in theme.test.ts
+    });
   });
 });

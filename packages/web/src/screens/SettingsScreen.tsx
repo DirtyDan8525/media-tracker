@@ -30,7 +30,7 @@ export function SettingsScreen() {
 
   return (
     <div className="screen">
-      <PageHeader title="Settings" backTo="/more" />
+      <PageHeader title="Settings" backTo="/profile" backUsesHistory />
       <div className="screen__body stack-18">
         <section aria-labelledby="set-tabs" className="group">
           <h2 id="set-tabs" className="group__title">Tabs</h2>

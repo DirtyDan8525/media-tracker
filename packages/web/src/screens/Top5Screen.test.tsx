@@ -97,4 +97,15 @@ describe('Top 5 screen', () => {
     await waitFor(() => expect(screen.queryByText("Couldn't load some lists.")).not.toBeInTheDocument());
     expect(await within(await screen.findByRole('region', { name: 'Movies' })).findByRole('link', { name: /Heat/ })).toBeInTheDocument();
   });
+
+  it('Back goes to Profile (B20), also when you came from there', async () => {
+    fakeBackend({ entries: [makeEntry({ category: 'anime', rating: 8 })] });
+    const { router } = renderApp('/top5');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+    await userEvent.click(await screen.findByRole('link', { name: 'My Top 5' }));
+    await screen.findByRole('heading', { level: 1, name: 'Top 5' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+  });
 });

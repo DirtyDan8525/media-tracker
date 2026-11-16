@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
-import { topFive } from './topFive';
+import { numberOnes, topFive } from './topFive';
 
 describe('topFive', () => {
   it('keeps the five best rated rows, ties in title order, no unrated', () => {
@@ -34,5 +34,16 @@ describe('topFive', () => {
     const rows = [makeEntry({ title: 'B', rating: 1 }), makeEntry({ title: 'A', rating: 2 })];
     topFive(rows);
     expect(rows.map((e) => e.title)).toEqual(['B', 'A']);
+  });
+});
+
+describe('numberOnes', () => {
+  it('is the first of topFive per list, lists with nothing rated skipped, in the order given', () => {
+    const anime = [makeEntry({ id: 'a1', category: 'anime', title: 'Low', rating: 6 }), makeEntry({ id: 'a2', category: 'anime', title: 'High', rating: 9 })];
+    const movies = [makeEntry({ id: 'm1', category: 'movies', title: 'Unrated', rating: null })];
+    const books = [makeEntry({ id: 'b1', category: 'books', title: 'Book', rating: 7 })];
+    expect(numberOnes({ books, anime, movies }, ['anime', 'movies', 'books']).map((e) => e.id)).toEqual(['a2', 'b1']);
+    expect(numberOnes({ anime }, ['movies', 'anime']).map((e) => e.id)).toEqual(['a2']);
+    expect(numberOnes({}, ['anime'])).toEqual([]);
   });
 });

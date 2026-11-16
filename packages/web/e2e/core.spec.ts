@@ -186,6 +186,45 @@ test('Settings → Appearance → Sakura sets the page background', async ({ pag
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 247, 249)');
 });
 
+test('Profile: pick a photo, crop it with the keyboard, save, and it survives a reload', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/profile');
+  await expect(page.getByText('@e2e_user')).toBeVisible();
+
+  // A real 600 x 400 PNG made in the browser (the crop, resize and WebP/JPEG encode all run for real).
+  const b64 = await page.evaluate<string>(`(async () => {
+    const c = document.createElement('canvas');
+    c.width = 600; c.height = 400;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#3366cc'; ctx.fillRect(0, 0, 600, 400);
+    ctx.fillStyle = '#ffcc00'; ctx.fillRect(200, 100, 200, 200);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    return btoa(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer())));
+  })()`);
+
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') });
+
+  const crop = page.getByRole('dialog', { name: 'Crop photo' });
+  await expect(crop).toBeVisible();
+  await crop.getByRole('slider', { name: 'Zoom' }).fill('2');
+  await crop.getByRole('group', { name: /Photo crop area/ }).press('ArrowLeft');
+  await crop.getByRole('button', { name: 'Use photo' }).click();
+
+  const preview = page.getByRole('dialog', { name: 'Your new photo' });
+  await expect(preview.getByRole('img', { name: 'Preview of your new photo' })).toBeVisible();
+  await preview.getByRole('button', { name: 'Save' }).click();
+
+  const avatar = page.locator('.profile__photo img');
+  await expect(avatar).toBeVisible();
+  await expect(avatar).toHaveAttribute('src', /^\/api\/me\/avatar\?v=/);
+  await expect.poll(() => page.evaluate<number>("document.querySelector('.profile__photo img').naturalWidth")).toBe(256);
+
+  await page.reload();
+  await expect(page.locator('.profile__photo img')).toBeVisible();
+  await page.getByRole('button', { name: 'Remove photo' }).click();
+  await expect(page.locator('.profile__photo img')).toHaveCount(0);
+});
+
 test('import the sample workbook: counts match the preview', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_import');
 

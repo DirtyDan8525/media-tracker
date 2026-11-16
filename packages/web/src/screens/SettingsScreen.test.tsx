@@ -161,4 +161,20 @@ describe('Settings: Export my data', () => {
     expect(within(group).getByRole('radio', { name: 'All lists' })).toBeChecked();
     await waitFor(() => expect(calls.filter((c) => c.method === 'PUT').at(-1)?.body).toEqual({ settings: { searchScope: 'all' } }));
   });
+
+  it('Back (phone) goes to /profile', async () => {
+    mockApi(makeMe());
+    const { router } = renderApp('/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+  });
+
+  it('Back returns to the previous screen when you came from Profile', async () => {
+    mockApi(makeMe());
+    const { router } = renderApp('/profile');
+    await userEvent.click(await screen.findByRole('link', { name: 'Settings' }));
+    await screen.findByRole('heading', { level: 1, name: 'Settings' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+  });
 });

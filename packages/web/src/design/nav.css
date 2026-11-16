@@ -1,0 +1,92 @@
+/* Navigation and profile (Phase 3b). Profile / PhotoCrop boards in the calm v2 look. Task 6 holds the
+   avatar, the Profile screen and the photo crop sheet; Task 7 adds the bottom bar, Lists button and themed bar below. */
+
+/* ---------- Avatar: the photo, or the initial on Highlight ---------- */
+.avatar {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden; line-height: 1; font-weight: 700; user-select: none;
+  background: var(--highlight); color: var(--on-highlight);
+}
+.avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- Profile ---------- */
+/* Banner: the blurred cover of the highest-rated title under the usual scrim; plain Header row with none.
+   Only Text / Bright text sit on it (v2Contrast checks the scrim's lightest stop). */
+.profile__banner { min-height: 120px; padding-bottom: var(--space-16); background: var(--header-row); border-bottom: none; }
+.page-header.has-backdrop.profile__banner { padding-bottom: var(--space-16); border-bottom: none; }
+.profile__banner .page-title { font-size: 20px; color: var(--bright-text); }
+.profile__banner .page-sub { color: var(--text); }
+.page-header.has-backdrop.profile__banner .backdrop::after {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 60%, transparent) 0%, color-mix(in srgb, var(--bg) 78%, transparent) 60%, var(--bg) 100%);
+}
+
+.profile__body { display: flex; flex-direction: column; gap: var(--space-6); position: relative; z-index: 1; padding-top: 0; }
+.frame--wide .profile__body { max-width: 560px; }
+
+/* The photo overlaps the banner by half its height. */
+.profile__id { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); margin-top: -48px; text-align: center; }
+.profile__photo .avatar { width: 96px; height: 96px; border: 4px solid var(--bg); }
+.profile__photo-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+.profile__photo-actions .btn { border-color: transparent; font-weight: 600; }
+.profile__name { margin: 0; font-size: 18px; font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
+.profile__since { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); }
+
+.profile__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.7fr); gap: var(--space-4); }
+.profile-tile {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--space-4); min-width: 0;
+  padding: var(--space-5); border-radius: var(--radius-xl); background: var(--card);
+}
+.profile-stat { margin: 0; }
+.profile-stat > div { display: flex; flex-direction: column-reverse; align-items: center; gap: var(--space-1); }
+.profile-tile--wide .profile-stat > div { flex-direction: row-reverse; justify-content: center; align-items: baseline; gap: var(--space-3); }
+.profile-stat dd { margin: 0; font-size: var(--fs-title); font-weight: 700; line-height: 1.1; color: var(--bright-text); font-variant-numeric: tabular-nums; }
+.profile-tile--wide .profile-stat dd { font-size: 22px; }
+.profile-stat dt { font-size: var(--fs-pill); color: var(--muted-text); }
+.profile__add-friend { width: 100%; padding: 0 var(--space-3); font-size: var(--fs-meta); }
+
+.profile__ones { display: flex; flex-direction: column; gap: var(--space-4); }
+.profile__empty { margin: 0; padding: var(--space-6) var(--space-7); border-radius: var(--radius-xl); background: var(--card); color: var(--text); font-size: var(--fs-sm); }
+.profile__strip { display: flex; gap: var(--space-6); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; }
+.profile__strip > li { flex: none; }
+.profile__strip-link {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  min-height: var(--tap); min-width: 64px; color: var(--text); text-decoration: none; border-radius: var(--radius-md);
+}
+.profile__strip-link:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.profile__strip-label { font-size: var(--fs-tab); font-weight: 500; color: var(--muted-text); max-width: 72px; text-align: center; }
+
+/* Clear of the Lists button (56 px, bottom right) on the phone. */
+.profile__logout { padding-right: 72px; }
+.frame--wide .profile__logout { padding-right: 0; }
+.profile__logout-btn { width: 100%; color: var(--bright-text); }
+
+/* ---------- Photo crop sheet (PhotoCrop board) ---------- */
+.crop { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); padding: var(--space-2) var(--space-10) var(--space-6); }
+/* A fixed 280 px square; the photo is a canvas moved and scaled by transform. */
+.crop__viewport {
+  position: relative; box-sizing: border-box; width: 280px; height: 280px; max-width: 100%; overflow: hidden; flex: none;
+  background: var(--panel); border-radius: 4px; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none;
+}
+.crop__viewport:active { cursor: grabbing; }
+.crop__viewport:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.crop__photo { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; pointer-events: none; }
+/* The circle the round avatar will show; everything outside it is dimmed. */
+.crop__ring {
+  position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--highlight); pointer-events: none;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.5);
+}
+@supports (background: color-mix(in srgb, red, blue)) {
+  .crop__ring { box-shadow: 0 0 0 999px color-mix(in srgb, var(--bg) 55%, transparent); }
+}
+.crop__hint { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); text-align: center; }
+.crop__preview { display: flex; align-items: center; gap: var(--space-6); align-self: stretch; }
+.crop__preview-dot { width: 48px; height: 48px; flex: none; border-radius: 50%; overflow: hidden; background: var(--panel); }
+.crop__preview-dot canvas { display: block; width: 48px; height: 48px; }
+.crop__preview-text { flex: 1; font-size: var(--fs-meta); color: var(--muted-text); }
+.crop__zoom { display: flex; align-items: center; gap: var(--space-5); align-self: stretch; font-size: var(--fs-sm); color: var(--text); }
+.crop__slider { flex: 1; min-width: 0; height: var(--tap); margin: 0; accent-color: var(--highlight); cursor: pointer; }
+.crop__zoom-value { min-width: 34px; text-align: right; font-size: var(--fs-meta); color: var(--muted-text); font-variant-numeric: tabular-nums; }
+.crop__actions { display: flex; gap: var(--space-5); }
+.crop__actions .btn { flex: 1; }
+.photo-preview { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-10) var(--space-6); }
+.photo-preview__img { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--panel); }

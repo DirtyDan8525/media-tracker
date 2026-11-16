@@ -15,12 +15,14 @@ export interface PageHeaderProps {
   backdrop?: string | null;
   /** Given: the title can take focus from script (tabIndex -1), e.g. to announce a screen change. */
   titleRef?: Ref<HTMLHeadingElement>;
+  /** Extra class on the header (a screen's own banner styling). */
+  className?: string;
 }
 
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
-export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef }: PageHeaderProps) {
+export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef, className }: PageHeaderProps) {
   return (
-    <header className={backdrop ? 'page-header has-backdrop' : 'page-header'}>
+    <header className={['page-header', backdrop && 'has-backdrop', className].filter(Boolean).join(' ')}>
       <CoverBackdrop src={backdrop} />
       {backTo && <BackButton to={backTo} useHistory={backUsesHistory} />}
       <div className="page-header__row">

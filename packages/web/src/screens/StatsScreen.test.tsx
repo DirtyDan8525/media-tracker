@@ -151,4 +151,15 @@ describe('Stats screen', () => {
     await screen.findByRole('table', { name: 'Anime by genre' });
     expect(screen.queryByRole('button', { name: /genres$/ })).not.toBeInTheDocument();
   });
+
+  it('Back goes to Profile (B20), also when you came from there', async () => {
+    fakeBackend({ entries: [makeEntry({ category: 'anime', rating: 8 })] });
+    const { router } = renderApp('/stats');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+    await userEvent.click(await screen.findByRole('link', { name: 'Stats' }));
+    await screen.findByRole('heading', { level: 1, name: 'Stats' });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+  });
 });

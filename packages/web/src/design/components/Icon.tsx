@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { Category } from '@media-tracker/shared';
 
 export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download';
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -31,6 +31,8 @@ const PATHS: Record<IconName, ReactElement> = {
   check: <path d="M5 12l5 5 9-10" />,
   warning: <><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18v.5" /></>,
   download: <path d="M12 4v12M7 11l5 5 5-5M4 20h16" />,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+  logout: <path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9" />,
 };
 
 /** A decorative icon (always aria-hidden: the control around it carries the name). */

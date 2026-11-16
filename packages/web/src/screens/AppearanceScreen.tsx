@@ -12,7 +12,7 @@ export function AppearanceScreen() {
   const me = useSessionMe();
   return (
     <div className="screen">
-      <PageHeader title="Settings" backTo="/more" backUsesHistory />
+      <PageHeader title="Settings" backTo="/settings" backUsesHistory />
       <div className="screen__body stack-18">
         <section aria-labelledby="set-look" className="group">
           <h2 id="set-look" className="group__title">Appearance</h2>

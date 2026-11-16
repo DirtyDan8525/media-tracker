@@ -1,14 +1,17 @@
 import { Hono } from 'hono';
 import { requireUser, type AppEnv } from './auth/access';
 import { me } from './api/me';
+import { friends, users } from './api/friends';
 import { entries } from './api/entries';
 import { compare } from './api/compare';
 import { activity } from './api/activity';
 import { cover } from './api/cover';
 import { importApi } from './api/import';
 import { ratings } from './api/ratings';
+import { social } from './api/social';
 import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
+import { admin } from './api/admin';
 
 export type { AppUser, AppEnv } from './auth/access';
 export type { Env } from './env';
@@ -50,6 +53,8 @@ app.get('/api/auth/reauth', () =>
 export const api = new Hono<AppEnv>();
 api.use('*', requireUser);
 api.route('/me', me);
+api.route('/friends', friends);
+api.route('/users', users);
 api.route('/lookup', lookup);
 api.route('/', entries);
 api.route('/import', importApi);
@@ -57,6 +62,8 @@ api.route('/compare', compare);
 api.route('/activity', activity);
 api.route('/cover', cover);
 api.route('/ratings', ratings);
+api.route('/', social);
+api.route('/admin', admin);
 app.route('/api', api);
 
 app.notFound((c) => {

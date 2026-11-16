@@ -10,6 +10,7 @@ import {
 } from '@media-tracker/shared';
 import type { AppEnv, AppUser } from '../auth/access';
 import { ensureTiers } from '../ratings/store';
+import { ensureInviteCode, newInviteCode } from '../social/inviteCode';
 
 export const me = new Hono<AppEnv>();
 
@@ -84,8 +85,8 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, avatarAt, createdAt } = user;
-  return { id, email, username, isAdmin, settings, avatarAt, createdAt };
+  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName } = user;
+  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName };
 }
 
 // 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10). The backfill is
@@ -211,4 +212,37 @@ me.delete('/avatar', async (c) => {
     c.env.DB.prepare('UPDATE users SET avatar_at = NULL WHERE id = ?').bind(user.id),
   ]);
   return c.json(meBody({ ...user, avatarAt: null }));
+});
+
+// 1 query when the code exists, 2-4 on first use (read, write, read; once more after a unique clash). (+ sign-in)
+me.get('/invite', async (c) => c.json({ code: await ensureInviteCode(c.env.DB, c.var.user.id) }));
+
+// 1 query, 2 after a unique clash (+ sign-in). The old link stops working at once.
+me.post('/invite', async (c) => {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const code = newInviteCode();
+    try {
+      await c.env.DB.prepare('UPDATE users SET invite_code = ? WHERE id = ?').bind(code, c.var.user.id).run();
+      return c.json({ code });
+    } catch (err) {
+      if (attempt === 0 && /UNIQUE/i.test(String(err instanceof Error ? err.message : err))) continue;
+      throw err;
+    }
+  }
+  throw new Error('could not create invite code');
+});
+
+// 1 query (+ sign-in)
+me.put('/display-name', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body || !('displayName' in body)) return c.json(invalid, 400);
+  const raw = body.displayName;
+  let displayName: string | null;
+  if (raw === null) displayName = null;
+  else if (typeof raw === 'string') {
+    displayName = raw.trim();
+    if (displayName.length < 1 || [...displayName].length > 40) return c.json(invalid, 400);
+  } else return c.json(invalid, 400);
+  await c.env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?').bind(displayName, c.var.user.id).run();
+  return c.json(meBody({ ...c.var.user, displayName }));
 });

@@ -339,3 +339,48 @@ describe('GET /api/cover Kitsu fallback', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('GET /api/cover for friends (S13)', () => {
+  const befriend = async () => {
+    for (const [e, n] of [[A, 'dan'], [B, 'ren']] as const) await app.fetch(new Request('https://app.test/api/me/username', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: n }) }), { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: e } as Env);
+    const req = (e: string, path: string, body?: unknown) => app.fetch(new Request(`https://app.test${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }), { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: e } as Env);
+    await req(A, '/api/friends/requests', { username: 'ren' });
+    const me = (await (await call(A, '/api/me')).json()) as { id: string };
+    expect((await req(B, `/api/friends/${me.id}/accept`)).status).toBe(204);
+  };
+  const mkPrivate = async (email: string, coverUrl: string) => {
+    const res = await app.fetch(
+      new Request('https://app.test/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ category: 'movies', title: 'P', coverUrl, isPrivate: true }) }),
+      { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env,
+    );
+    expect(res.status).toBe(201);
+  };
+
+  it("a friend's public cover is 200", async () => {
+    await mk(B, COVER);
+    await befriend();
+    upstream(() => new Response(IMG, { headers: { 'content-type': 'image/jpeg' } }));
+    const res = await proxy(A, COVER);
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a friend's private-entry cover is 404 and fetch is never called", async () => {
+    await mkPrivate(B, COVER);
+    await befriend();
+    upstream(() => new Response(IMG, { headers: { 'content-type': 'image/jpeg' } }));
+    expect((await proxy(A, COVER)).status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((await proxy(B, COVER)).status).toBe(200); // the owner still gets it
+  });
+
+  it("a stranger's and a pending friend's cover is 404", async () => {
+    await mk(B, COVER);
+    upstream(() => new Response(IMG, { headers: { 'content-type': 'image/jpeg' } }));
+    expect((await proxy(A, COVER)).status).toBe(404);
+    for (const [e, n] of [[A, 'dan'], [B, 'ren']] as const) await app.fetch(new Request('https://app.test/api/me/username', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: n }) }), { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: e } as Env);
+    await app.fetch(new Request('https://app.test/api/friends/requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'ren' }) }), { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env);
+    expect((await proxy(A, COVER)).status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});

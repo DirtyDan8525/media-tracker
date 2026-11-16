@@ -3,6 +3,7 @@ import type { AppEnv } from '../auth/access';
 import { getCached, putCached } from '../lookup/cache';
 import { searchKitsu } from '../lookup/sources/kitsu';
 import type { LookupDeps } from '../lookup/sources/index';
+import { visibleEntrySql } from '../social/visibility';
 
 export const cover = new Hono<AppEnv>();
 
@@ -152,11 +153,11 @@ async function kitsuPoster(db: D1Database, coverUrl: string, title: string, sign
   return poster;
 }
 
-// D1: 1 ownership query, plus on an anime fallback 1 cache read and (on a miss) 1 cache write; 3 at most.
+// D1: 1 visibility query (own entry, or a friend's non-private one), plus on an anime fallback 1 cache read and (on a miss) 1 cache write; 3 at most.
 // Outbound: the cover fetch (one request and at most 3 redirect hops); if that fails for an anime entry,
 // at most 1 Kitsu search (none when the mapping is cached) plus the poster fetch (one request and at most
 // 3 redirect hops). All of it shares one COVER_TIMEOUT_MS limit, so the device's single 10 s wait still covers it.
-// Sign-in is required and the url must equal the cover_url of one of the caller's own entries, so
+// Sign-in is required and the url must equal the cover_url of an entry the caller can see (own, or an accepted friend's non-private one; S13), so
 // it is not an anonymous proxy. But cover_url is user-set (any http(s) URL), so in effect a signed-in
 // user can have the Worker fetch any public http(s) image of up to COVER_MAX_BYTES (B18); the size,
 // time, type and host limits above and below are what bound that. The ownership check compares the
@@ -170,7 +171,8 @@ cover.get('/', async (c) => {
   const first = parseHttpUrl(raw);
   if (!first) return c.json(invalid, 400);
 
-  const own = await c.env.DB.prepare('SELECT title, category FROM entries WHERE user_id = ? AND cover_url = ? LIMIT 1')
+  // Own entries, or an accepted friend's non-private ones (S13): the same rule as every friend read.
+  const own = await c.env.DB.prepare(`SELECT e.title, e.category FROM entries e WHERE e.cover_url = ?2 AND ${visibleEntrySql('e', '?1')} LIMIT 1`)
     .bind(c.var.user.id, raw)
     .first<{ title: string; category: string }>();
   if (!own) return c.json({ error: 'not_found' }, 404);

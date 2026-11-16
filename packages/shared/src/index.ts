@@ -12,3 +12,4 @@ export * from './activity';
 export * from './avatar';
 export * from './ratings';
 export * from './social';
+export * from './compareFriends';

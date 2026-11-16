@@ -7,7 +7,7 @@ export const ACTIVITY_KEY = ['activity'] as const;
 type Cursor = NonNullable<ActivityPage['next']>;
 
 /**
- * Your activity, newest first, 50 rows a page (B16). Online only: no on-device copy, and it
+ * Your own posts (`show=you`; the friends' feed is Task 11), newest first, 30 posts a page (S6). Online only: no on-device copy, and it
  * refetches on every visit (staleTime 0), so no mutation needs to invalidate it.
  */
 export function useActivity(enabled = true) {
@@ -19,8 +19,8 @@ export function useActivity(enabled = true) {
     queryFn: ({ pageParam }) =>
       api.get<ActivityPage>(
         pageParam
-          ? `/api/activity?before=${encodeURIComponent(pageParam.before)}&beforeId=${encodeURIComponent(pageParam.beforeId)}`
-          : '/api/activity',
+          ? `/api/activity?show=you&before=${encodeURIComponent(pageParam.before)}&beforeId=${encodeURIComponent(pageParam.beforeId)}`
+          : '/api/activity?show=you',
       ),
     getNextPageParam: (last) => last.next,
   });

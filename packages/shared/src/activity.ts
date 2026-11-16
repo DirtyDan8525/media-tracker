@@ -1,10 +1,18 @@
 import type { Category } from './types';
+import type { PostSocial, PublicUser } from './social';
 
 export const ACTIVITY_TYPES = ['added', 'rated', 're-rated', 'status'] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
+/** Which posts `GET /api/activity?show=` returns (S6). */
+export type FeedScope = 'you' | 'friends' | 'everyone';
+export const FEED_SCOPES: readonly FeedScope[] = ['you', 'friends', 'everyone'];
+
 export interface ActivityItem {
   id: string;
+  /** The post this row belongs to: its anchor row's id (the anchor's own id for the anchor). S5. */
+  postId: string;
+  userId: string;
   type: ActivityType;
   entryId: string;
   category: Category;
@@ -20,14 +28,19 @@ export interface ActivityItem {
   createdAt: string;
 }
 
+/** Every row of up to 30 posts, plus their authors and their reactions / comment counts by post id. */
 export interface ActivityPage {
   items: ActivityItem[];
+  users: Record<string, PublicUser>;
+  social: Record<string, PostSocial>;
   next: { before: string; beforeId: string } | null;
 }
 
-/** One displayed line: every row of one entry inside the merge window folded together. */
+/** One displayed line: one post (every row sharing a post id) folded together. */
 export interface ActivityLine {
+  /** The post id. */
   key: string;
+  userId: string;
   entryId: string;
   category: Category;
   title: string;
@@ -38,38 +51,31 @@ export interface ActivityLine {
   status: { from: string | null; to: string } | null;
 }
 
+/** A post takes a user's changes to one entry within this long of the post's first change (S5). */
 export const ACTIVITY_MERGE_MS = 600_000;
 
 const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+const newerFirst = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
+  a.createdAt === b.createdAt ? (a.id < b.id ? 1 : a.id > b.id ? -1 : 0) : a.createdAt < b.createdAt ? 1 : -1;
 
 /**
- * Folds activity rows (newest first) into lines (B15). A row joins its entry's open group when
- * the group's newest time minus the row's time is within `windowMs`. Within a group the first
- * `from` and the last `to` win; a change that ends where it began (7 to 8 to 7) shows nothing,
- * and a group with nothing left to show is dropped. Lines come out ordered by newest `at`.
+ * Folds activity rows into lines, one per post id (S5, amends B15: the server groups rows into
+ * posts when it writes them). Within a post the first `from` and the last `to` win; a change that
+ * ends where it began (7 to 8 to 7) shows nothing, and a post with nothing left to show is
+ * dropped. Lines come out newest first, by each post's newest row.
  */
-export function mergeActivity(items: ActivityItem[], windowMs: number = ACTIVITY_MERGE_MS): ActivityLine[] {
-  interface Group {
-    newest: ActivityItem;
-    rows: ActivityItem[]; // newest first
-  }
-  const groups: Group[] = [];
-  const open = new Map<string, Group>();
+export function foldPosts(items: ActivityItem[]): ActivityLine[] {
+  const posts = new Map<string, ActivityItem[]>();
   for (const row of items) {
-    const g = open.get(row.entryId);
-    if (g && Date.parse(g.newest.createdAt) - Date.parse(row.createdAt) <= windowMs) {
-      g.rows.push(row);
-    } else {
-      const fresh: Group = { newest: row, rows: [row] };
-      groups.push(fresh);
-      open.set(row.entryId, fresh);
-    }
+    const rows = posts.get(row.postId);
+    if (rows) rows.push(row);
+    else posts.set(row.postId, [row]);
   }
 
-  const lines: ActivityLine[] = [];
-  for (const g of groups) {
-    const oldestFirst = [...g.rows].reverse();
+  const lines: { line: ActivityLine; newest: ActivityItem }[] = [];
+  for (const [postId, rows] of posts) {
+    const oldestFirst = [...rows].sort(newerFirst).reverse();
     let added = false;
     let ratingFrom: number | null | undefined;
     let ratingTo: number | null = null;
@@ -100,18 +106,22 @@ export function mergeActivity(items: ActivityItem[], windowMs: number = ACTIVITY
     const status =
       statusTo !== null && statusFrom !== undefined && statusFrom !== statusTo ? { from: statusFrom, to: statusTo } : null;
     if (!added && !rating && !status) continue;
-    const n = g.newest;
+    const n = oldestFirst[oldestFirst.length - 1]!;
     lines.push({
-      key: n.id,
-      entryId: n.entryId,
-      category: n.category,
-      title: n.title,
-      coverUrl: n.coverUrl,
-      at: n.createdAt,
-      added,
-      rating,
-      status,
+      newest: n,
+      line: {
+        key: postId,
+        userId: n.userId,
+        entryId: n.entryId,
+        category: n.category,
+        title: n.title,
+        coverUrl: n.coverUrl,
+        at: n.createdAt,
+        added,
+        rating,
+        status,
+      },
     });
   }
-  return lines;
+  return lines.sort((a, b) => newerFirst(a.newest, b.newest)).map((l) => l.line);
 }

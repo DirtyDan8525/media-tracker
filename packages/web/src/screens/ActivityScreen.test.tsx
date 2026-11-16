@@ -12,9 +12,10 @@ const yesterday = new Date(2026, 10, 14, 21, 40).toISOString();
 let n = 0;
 function item(over: Partial<ActivityItem> & Pick<ActivityItem, 'type' | 'title'>): ActivityItem {
   n++;
-  return { id: `a${n}`, entryId: `e-${over.title}`, category: 'anime', coverUrl: '', payload: {}, createdAt: ago(1), ...over };
+  // Each row is its own post unless the test names one.
+  return { id: `a${n}`, postId: `a${n}`, userId: 'u-dan', entryId: `e-${over.title}`, category: 'anime', coverUrl: '', payload: {}, createdAt: ago(1), ...over };
 }
-const page = (items: ActivityItem[], next: ActivityPage['next'] = null): ActivityPage => ({ items, next });
+const page = (items: ActivityItem[], next: ActivityPage['next'] = null): ActivityPage => ({ items, users: {}, social: {}, next });
 
 beforeEach(() => {
   localStorage.clear();
@@ -36,8 +37,8 @@ describe('ActivityScreen', () => {
 
   it('shows a merged rating and status as "You rated Frieren 9.5 · marked Completed"', async () => {
     fakeBackend({ extra: { 'GET /api/activity': { body: page([
-      item({ type: 'status', title: 'Frieren', payload: { from: 'Watching / In Progress', to: 'Completed' }, createdAt: ago(1) }),
-      item({ type: 'rated', title: 'Frieren', payload: { from: null, to: 9.5 }, createdAt: ago(3) }),
+      item({ type: 'status', title: 'Frieren', payload: { from: 'Watching / In Progress', to: 'Completed' }, createdAt: ago(1), postId: 'p-frieren' }),
+      item({ type: 'rated', title: 'Frieren', payload: { from: null, to: 9.5 }, createdAt: ago(3), id: 'p-frieren', postId: 'p-frieren' }),
     ]) } } });
     renderApp('/activity');
     const row = (await screen.findByRole('link', { name: 'Frieren' })).closest('li')!;
@@ -126,22 +127,24 @@ describe('ActivityScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
     expect(await screen.findByRole('link', { name: 'Older' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Newer' })).toBeInTheDocument();
+    expect(activityCalls(calls)[0]!.path).toBe('/api/activity?show=you');
     const second = activityCalls(calls)[1]!.path;
+    expect(second).toContain('show=you');
     expect(second).toContain(`before=${encodeURIComponent(ago(2))}`);
     expect(second).toContain('beforeId=a-last');
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
   });
 
-  it('merges across the pages together: one line for edits split over two pages, none for a change and back', async () => {
+  it('folds posts across the pages together: one line for a post split over two pages, none for a change and back', async () => {
     fakeBackend({ extra: { 'GET /api/activity': (_b, url) => ({
       body: url.searchParams.get('before')
         ? page([
-            item({ type: 're-rated', title: 'Frieren', payload: { from: 7, to: 8 }, createdAt: ago(21) }),
-            item({ type: 're-rated', title: 'Bleach', payload: { from: 6, to: 7 }, createdAt: ago(30) }),
+            item({ type: 're-rated', title: 'Frieren', payload: { from: 7, to: 8 }, createdAt: ago(21), postId: 'p-f' }),
+            item({ type: 're-rated', title: 'Bleach', payload: { from: 6, to: 7 }, createdAt: ago(30), postId: 'p-b' }),
           ])
         : page([
-            item({ type: 're-rated', title: 'Frieren', payload: { from: 8, to: 9 }, createdAt: ago(20) }),
-            item({ type: 're-rated', title: 'Bleach', payload: { from: 7, to: 6 }, createdAt: ago(25) }),
+            item({ type: 're-rated', title: 'Frieren', payload: { from: 8, to: 9 }, createdAt: ago(20), postId: 'p-f' }),
+            item({ type: 're-rated', title: 'Bleach', payload: { from: 7, to: 6 }, createdAt: ago(25), postId: 'p-b' }),
           ], { before: ago(20), beforeId: 'x' }),
     }) } });
     renderApp('/activity');

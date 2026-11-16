@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, formatRating, statusLabel, mergeActivity, type ActivityLine, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, formatRating, statusLabel, foldPosts, type ActivityLine, type Status } from '@media-tracker/shared';
 import { useMemo, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useActivity } from '../data/useActivity';
@@ -44,9 +44,8 @@ export function ActivityScreen() {
   const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
     useActivity(filter === 'you');
 
-  // B15 / review focus 4: merge over every loaded page at once, so edits that straddle a page
-  // boundary still fold into one line.
-  const lines = useMemo(() => mergeActivity(data?.pages.flatMap((p) => p.items) ?? []), [data]);
+  // S5: the server groups rows into posts; fold over every loaded page at once.
+  const lines = useMemo(() => foldPosts(data?.pages.flatMap((p) => p.items) ?? []), [data]);
   const initial = (me.username ?? me.email).charAt(0).toUpperCase();
   // Ticks once a minute while the screen is visible, so "5 min ago" keeps up.
   const now = useNow();

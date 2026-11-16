@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { mergeActivity, type ActivityItem, type ActivityType } from '../src/activity';
+import * as shared from '../src/activity';
+import { foldPosts, type ActivityItem, type ActivityType } from '../src/activity';
 
 const T0 = Date.parse('2026-11-15T12:00:00.000Z');
 let n = 0;
+/** A row of post `postId` (pass its own id as postId for the anchor). */
 const row = (
+  postId: string,
   entryId: string,
   type: ActivityType,
   payload: ActivityItem['payload'],
   minutesAgo: number,
+  over: Partial<ActivityItem> = {},
 ): ActivityItem => ({
   id: `r${++n}`,
+  postId,
+  userId: 'u1',
   type,
   entryId,
   category: 'anime',
@@ -17,73 +23,64 @@ const row = (
   coverUrl: '',
   payload,
   createdAt: new Date(T0 - minutesAgo * 60_000).toISOString(),
+  ...over,
 });
 
-describe('mergeActivity', () => {
-  it('merges five re-rated rows within 4 minutes into one line, first from to last to', () => {
+describe('foldPosts', () => {
+  it('folds the rows of one post to the first from and the last to, keyed by the post id', () => {
     const items = [
-      row('a', 're-rated', { from: 5, to: 6 }, 0),
-      row('a', 're-rated', { from: 4, to: 5 }, 1),
-      row('a', 're-rated', { from: 3, to: 4 }, 2),
-      row('a', 're-rated', { from: 2, to: 3 }, 3),
-      row('a', 're-rated', { from: 1, to: 2 }, 4),
+      row('p1', 'a', 're-rated', { from: 8, to: 9 }, 0),
+      row('p1', 'a', 're-rated', { from: 7, to: 8 }, 8, { id: 'p1' }),
     ];
-    const lines = mergeActivity(items);
+    const lines = foldPosts(items);
     expect(lines).toHaveLength(1);
-    expect(lines[0]!.rating).toEqual({ from: 1, to: 6 });
-    expect(lines[0]!.key).toBe(items[0]!.id);
+    expect(lines[0]).toMatchObject({ key: 'p1', entryId: 'a', userId: 'u1', rating: { from: 7, to: 9 }, at: items[0]!.createdAt });
   });
 
-  it('shows nothing when a rating ends where it began (7 to 8 to 7)', () => {
-    const items = [row('a', 're-rated', { from: 8, to: 7 }, 0), row('a', 're-rated', { from: 7, to: 8 }, 1)];
-    expect(mergeActivity(items)).toEqual([]);
+  it('drops a post whose rating ends where it began (7 to 8 to 7)', () => {
+    const items = [row('p1', 'a', 're-rated', { from: 8, to: 7 }, 0), row('p1', 'a', 're-rated', { from: 7, to: 8 }, 1, { id: 'p1' })];
+    expect(foldPosts(items)).toEqual([]);
   });
 
-  it('keeps rows 11 minutes apart as two lines', () => {
-    const items = [row('a', 're-rated', { from: 8, to: 9 }, 0), row('a', 're-rated', { from: 7, to: 8 }, 11)];
-    expect(mergeActivity(items)).toHaveLength(2);
+  it('two post ids for one entry give two lines, even when the rows are close in time', () => {
+    const items = [row('p2', 'a', 're-rated', { from: 8, to: 9 }, 0, { id: 'p2' }), row('p1', 'a', 're-rated', { from: 7, to: 8 }, 1, { id: 'p1' })];
+    const lines = foldPosts(items);
+    expect(lines.map((l) => l.key)).toEqual(['p2', 'p1']);
   });
 
-  it('merges interleaved A, B, A into one line each, ordered by newest at', () => {
-    const items = [
-      row('a', 'rated', { from: null, to: 8 }, 0),
-      row('b', 'rated', { from: null, to: 6 }, 1),
-      row('a', 're-rated', { from: 7, to: 8 }, 2),
-    ];
-    const lines = mergeActivity(items);
-    expect(lines.map((l) => l.entryId)).toEqual(['a', 'b']);
-    expect(lines[0]!.rating).toEqual({ from: 7, to: 8 });
+  it('does not merge rows of one entry by time alone (rows 2 minutes apart in different posts stay apart)', () => {
+    const items = [row('p2', 'a', 'rated', { from: null, to: 8 }, 0, { id: 'p2' }), row('p1', 'a', 'added', {}, 2, { id: 'p1' })];
+    expect(foldPosts(items)).toHaveLength(2);
   });
 
-  it('merges added + rated into added: true, rating from null', () => {
-    const items = [row('a', 'rated', { from: null, to: 9 }, 0), row('a', 'added', {}, 2)];
-    const [line] = mergeActivity(items);
-    expect(line).toMatchObject({ added: true, rating: { from: null, to: 9 }, status: null });
+  it('a rating and a status in one post read as one line; added + rated is added with rating from null', () => {
+    const [line] = foldPosts([
+      row('p1', 'a', 'status', { from: 'Watching', to: 'Completed' }, 0),
+      row('p1', 'a', 'rated', { from: null, to: 9 }, 1),
+      row('p1', 'a', 'added', {}, 2, { id: 'p1' }),
+    ]);
+    expect(line).toMatchObject({ added: true, rating: { from: null, to: 9 }, status: { from: 'Watching', to: 'Completed' } });
   });
 
   it('shows an added row with its own rating and status', () => {
-    const [line] = mergeActivity([row('a', 'added', { rating: 8, status: 'Completed' }, 0)]);
+    const [line] = foldPosts([row('p1', 'a', 'added', { rating: 8, status: 'Completed' }, 0, { id: 'p1' })]);
     expect(line).toMatchObject({ added: true, rating: { from: null, to: 8 }, status: { from: null, to: 'Completed' } });
   });
 
-  it('keeps the first from and last to for status rows', () => {
+  it('orders posts newest first by their newest row, whatever order the rows come in, across users', () => {
     const items = [
-      row('a', 'status', { from: 'Watching', to: 'Completed' }, 0),
-      row('a', 'status', { from: 'Plan to watch', to: 'Watching' }, 3),
+      row('p1', 'a', 'rated', { from: null, to: 5 }, 30, { id: 'p1' }),
+      row('p2', 'b', 'rated', { from: null, to: 6 }, 10, { id: 'p2', userId: 'u2' }),
+      row('p1', 'a', 're-rated', { from: 5, to: 7 }, 25),
+      row('p3', 'c', 'rated', { from: null, to: 4 }, 20, { id: 'p3' }),
     ];
-    const [line] = mergeActivity(items);
-    expect(line!.status).toEqual({ from: 'Plan to watch', to: 'Completed' });
+    const lines = foldPosts(items);
+    expect(lines.map((l) => l.key)).toEqual(['p2', 'p3', 'p1']);
+    expect(lines[0]!.userId).toBe('u2');
+    expect(lines[2]!.rating).toEqual({ from: null, to: 7 });
   });
 
-  it('uses the newest row id as key and its time as at', () => {
-    const items = [row('a', 'rated', { from: null, to: 5 }, 0), row('a', 'added', {}, 1)];
-    const [line] = mergeActivity(items);
-    expect(line!.key).toBe(items[0]!.id);
-    expect(line!.at).toBe(items[0]!.createdAt);
-  });
-
-  it('honours a custom window', () => {
-    const items = [row('a', 'rated', { from: null, to: 5 }, 0), row('a', 'added', {}, 1)];
-    expect(mergeActivity(items, 30_000)).toHaveLength(2);
+  it('mergeActivity is gone', () => {
+    expect('mergeActivity' in shared).toBe(false);
   });
 });

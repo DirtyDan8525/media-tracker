@@ -3,11 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
 import type { ActivityPage, Entry, SavePayload, Tier } from '@media-tracker/shared';
-import { ratingsSaveActivityRows } from '../src/api/activity';
+import { activityForPatch, ratingsSaveActivityRows } from '../src/api/activity';
+import { pair } from '../src/social/visibility';
 import { spyD1 } from './d1spy';
 
 const A = 'a@example.com';
 const B = 'b@example.com';
+const C = 'c@example.com';
 
 const as = (email: string, path: string, method = 'GET', body?: unknown) =>
   app.fetch(
@@ -28,14 +30,15 @@ const patch = async (email: string, id: string, body: unknown) => {
   const res = await as(email, `/api/entries/${id}`, 'PATCH', body);
   expect(res.status).toBe(200);
 };
-const feed = async (email: string, qs = '') => {
+/** Your own posts (show=you) unless `qs` says otherwise. */
+const feed = async (email: string, qs = '?show=you') => {
   const res = await as(email, `/api/activity${qs}`);
   expect(res.status).toBe(200);
   return (await res.json()) as ActivityPage;
 };
 
 afterEach(async () => {
-  await env.DB.exec('DELETE FROM users');
+  await env.DB.exec('DELETE FROM friendships; DELETE FROM users;');
 });
 
 describe('activity writes', () => {
@@ -111,7 +114,7 @@ describe('activity writes', () => {
 });
 
 describe('GET /api/activity', () => {
-  it('pages 120 rows sharing one created_at in 50/50/20 with no duplicates', async () => {
+  it('120 posts sharing one created_at page 30/30/30/30 with no duplicates', async () => {
     const e = await mk(A, { title: 'X' });
     const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(A).first<{ id: string }>();
     await env.DB.exec('DELETE FROM activity');
@@ -128,27 +131,27 @@ describe('GET /api/activity', () => {
 
     const seen: string[] = [];
     const sizes: number[] = [];
-    let qs = '';
-    for (let guard = 0; guard < 5; guard++) {
+    let qs = '?show=you';
+    for (let guard = 0; guard < 6; guard++) {
       const page = await feed(A, qs);
       sizes.push(page.items.length);
       seen.push(...page.items.map((i) => i.id));
       if (!page.next) break;
-      qs = `?before=${encodeURIComponent(page.next.before)}&beforeId=${encodeURIComponent(page.next.beforeId)}`;
+      qs = `?show=you&before=${encodeURIComponent(page.next.before)}&beforeId=${encodeURIComponent(page.next.beforeId)}`;
     }
-    expect(sizes).toEqual([50, 50, 20]);
+    expect(sizes).toEqual([30, 30, 30, 30]);
     expect(new Set(seen).size).toBe(120);
     expect(seen).toEqual([...seen].sort().reverse());
   });
 
-  it('pages rows with mixed created_at values across page boundaries without gaps or duplicates', async () => {
+  it('pages posts with mixed created_at values across page boundaries without gaps or duplicates', async () => {
     const e = await mk(A, { title: 'X' });
     const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(A).first<{ id: string }>();
     await env.DB.exec('DELETE FROM activity');
     const stmts: D1PreparedStatement[] = [];
     const expected: { id: string; at: string }[] = [];
     for (let i = 0; i < 130; i++) {
-      // groups of 7 share a timestamp, so page edges (50, 100) fall mid-group; ids run against time order
+      // groups of 7 share a timestamp, so page edges (30, 60, …) fall mid-group; ids run against time order
       const at = new Date(Date.UTC(2026, 10, 15, 10, 0, 0) + Math.floor(i / 7) * 1000).toISOString();
       const id = `m${String(999 - i).padStart(4, '0')}`;
       expected.push({ id, at });
@@ -162,12 +165,12 @@ describe('GET /api/activity', () => {
     expected.sort((x, y) => (x.at === y.at ? (x.id < y.id ? 1 : -1) : x.at < y.at ? 1 : -1));
 
     const seen: string[] = [];
-    let qs = '';
-    for (let guard = 0; guard < 6; guard++) {
+    let qs = '?show=you';
+    for (let guard = 0; guard < 7; guard++) {
       const page = await feed(A, qs);
       seen.push(...page.items.map((i) => i.id));
       if (!page.next) break;
-      qs = `?before=${encodeURIComponent(page.next.before)}&beforeId=${encodeURIComponent(page.next.beforeId)}`;
+      qs = `?show=you&before=${encodeURIComponent(page.next.before)}&beforeId=${encodeURIComponent(page.next.beforeId)}`;
     }
     expect(seen).toEqual(expected.map((x) => x.id));
   });
@@ -368,5 +371,247 @@ describe('ratingsSaveActivityRows', () => {
   it('a 0.5 drop counts like a 0.5 rise, despite float error', () => {
     const b = new Map([['x', st('x', 8.3, 2)]]);
     expect(ratingsSaveActivityRows(b, [st('x', 7.8, 2)], new Set(['x']))).toEqual([{ id: 'x', rating: 7.8 }]);
+  });
+});
+
+// ---- Phase 4: posts (S5), scoped feed (S6), social counts, unread (S8) ----
+
+const idOf = async (email: string) => {
+  await as(email, '/api/me');
+  return (await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>())!.id;
+};
+const befriend = async (x: string, y: string, status: 'accepted' | 'pending' = 'accepted') => {
+  const [a, b] = pair(await idOf(x), await idOf(y));
+  await env.DB.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(a, b, status, await idOf(x), '2026-11-01T00:00:00.000Z').run();
+};
+const rows = async (entryId: string) =>
+  (await env.DB.prepare('SELECT id, post_id, type FROM activity WHERE entry_id = ? ORDER BY created_at, rowid').bind(entryId)
+    .all<{ id: string; post_id: string | null; type: string }>()).results;
+const postOf = (r: { id: string; post_id: string | null }) => r.post_id ?? r.id;
+const T = Date.parse('2026-11-16T12:00:00.000Z');
+const at = (min: number) => new Date(T + min * 60_000).toISOString();
+/** A rating change written by the PATCH builder at a chosen time, then the stored row updated. */
+const rateAt = async (userId: string, entryId: string, rating: number, now: string) => {
+  await env.DB.batch([
+    ...activityForPatch(env.DB, userId, entryId, { rating }, now),
+    env.DB.prepare('UPDATE entries SET rating = ? WHERE id = ?').bind(rating, entryId),
+  ]);
+};
+
+describe('posts (S5): post_id written at insert time', () => {
+  it('7→8 at t and 8→9 at t+8 min share one post; a change at t+11 min starts a new post (review focus 4)', async () => {
+    const e = await mk(A, { title: 'X', rating: 7 });
+    const a = await idOf(A);
+    await env.DB.exec('DELETE FROM activity'); // start clean: 7 is the stored value
+    await rateAt(a, e.id, 8, at(0));
+    await rateAt(a, e.id, 9, at(8));
+    await rateAt(a, e.id, 10, at(11));
+    const r = await rows(e.id);
+    expect(r).toHaveLength(3);
+    expect(r[0]!.post_id).toBeNull(); // the anchor
+    expect(postOf(r[1]!)).toBe(r[0]!.id);
+    expect(r[2]!.post_id).toBeNull(); // 11 min after the anchor: a new post, though only 3 min after the last change
+    const page = await feed(A);
+    const byPost = new Map<string, unknown[]>();
+    for (const i of page.items) byPost.set(i.postId, [...(byPost.get(i.postId) ?? []), i.payload]);
+    expect(byPost.get(r[0]!.id)).toEqual([{ from: 8, to: 9 }, { from: 7, to: 8 }]);
+    expect(byPost.get(r[2]!.id)).toEqual([{ from: 9, to: 10 }]);
+  });
+
+  it('a reaction on the first post stays on it when a later change joins the post', async () => {
+    const e = await mk(A, { title: 'X', rating: 7 });
+    const a = await idOf(A);
+    await env.DB.exec('DELETE FROM activity');
+    await rateAt(a, e.id, 8, at(0));
+    const [anchor] = await rows(e.id);
+    await env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?, ?, '🔥', ?)").bind(anchor!.id, a, at(1)).run();
+    await rateAt(a, e.id, 9, at(8));
+    const page = await feed(A);
+    expect(new Set(page.items.map((i) => i.postId))).toEqual(new Set([anchor!.id]));
+    expect(page.social[anchor!.id]).toEqual({ reactions: { '🔥': 1 }, mine: ['🔥'], comments: 0 });
+  });
+
+  it('a rating+status PATCH makes two rows in one post (the second statement sees the first as its anchor)', async () => {
+    const e = await mk(A, { title: 'X', status: 'Watching / In Progress' });
+    await env.DB.exec('DELETE FROM activity'); // so the PATCH's first row is the anchor
+    await patch(A, e.id, { rating: 7, status: 'Completed' });
+    const r = await rows(e.id);
+    expect(r).toHaveLength(2);
+    expect(r.filter((x) => x.post_id === null)).toHaveLength(1);
+    expect(new Set(r.map(postOf)).size).toBe(1);
+  });
+
+  it('a change right after create joins the added post', async () => {
+    const e = await mk(A, { title: 'X' });
+    await patch(A, e.id, { rating: 7 });
+    const r = await rows(e.id);
+    expect(r.map((x) => x.type)).toEqual(['added', 'rated']);
+    expect(postOf(r[1]!)).toBe(r[0]!.id);
+  });
+
+  it('a ratings save of 3 titles makes 3 posts', async () => {
+    const es = [await mk(A, { title: 'A', rating: 8.5 }), await mk(A, { title: 'B', rating: 8 }), await mk(A, { title: 'C', rating: 7.6 })];
+    await env.DB.exec('DELETE FROM activity');
+    const res = await as(A, '/api/ratings/anime/save', 'POST', { picks: [], moves: es.map((e) => ({ id: e.id, tier: 3 })), done: [] });
+    expect(res.status).toBe(200);
+    const all = (await env.DB.prepare('SELECT id, post_id FROM activity').all<{ id: string; post_id: string | null }>()).results;
+    expect(all).toHaveLength(3);
+    expect(all.every((x) => x.post_id === null)).toBe(true);
+  });
+});
+
+describe('GET /api/activity?show= (S6)', () => {
+  const titles = (p: ActivityPage) => [...new Set(p.items.map((i) => i.title))].sort();
+
+  it("friend B sees A's posts on everyone and friends, not on you; A's posts carry A's public user", async () => {
+    await befriend(A, B);
+    await mk(A, { title: 'Frieren', rating: 9 });
+    await mk(B, { title: 'Mine', rating: 5 });
+    expect(titles(await feed(B, '?show=everyone'))).toEqual(['Frieren', 'Mine']);
+    expect(titles(await feed(B, ''))).toEqual(['Frieren', 'Mine']); // default is everyone
+    expect(titles(await feed(B, '?show=friends'))).toEqual(['Frieren']);
+    expect(titles(await feed(B, '?show=you'))).toEqual(['Mine']);
+    const page = await feed(B, '?show=friends');
+    const a = await idOf(A);
+    expect(page.items[0]!.userId).toBe(a);
+    expect(page.users[a]).toEqual({ id: a, username: '', displayName: null, avatarAt: null });
+    expect(JSON.stringify(page)).not.toContain('a@example.com');
+  });
+
+  it("B never sees A's private-entry posts; turning an entry private hides its existing posts at once (review focus 1)", async () => {
+    await befriend(A, B);
+    await mk(A, { title: 'Secret', rating: 8, isPrivate: true });
+    const open = await mk(A, { title: 'Open', rating: 8 });
+    expect(titles(await feed(B, '?show=friends'))).toEqual(['Open']);
+    await patch(A, open.id, { isPrivate: true });
+    expect((await feed(B, '?show=friends')).items).toEqual([]);
+    expect((await feed(B, '?show=everyone')).items).toEqual([]);
+    expect(titles(await feed(A))).toEqual(['Open', 'Secret']); // the owner still sees both
+  });
+
+  it('pending C and stranger see none; unfriending cuts the feed at once', async () => {
+    await befriend(A, B);
+    await befriend(C, A, 'pending');
+    await mk(A, { title: 'Frieren', rating: 9 });
+    expect((await feed(C, '?show=everyone')).items).toEqual([]);
+    expect((await feed(C, '?show=friends')).items).toEqual([]);
+    await env.DB.exec('DELETE FROM friendships');
+    expect((await feed(B, '?show=everyone')).items).toEqual([]);
+  });
+
+  it('A\'s bare "added" post (no rating, no status) is hidden from B, shown to A on You', async () => {
+    await befriend(A, B);
+    await mk(A, { title: 'Bare' });
+    await mk(A, { title: 'Rated', rating: 7 });
+    await mk(A, { title: 'Marked', status: 'Completed' });
+    expect(titles(await feed(B, '?show=friends'))).toEqual(['Marked', 'Rated']);
+    expect(titles(await feed(B, '?show=everyone'))).toEqual(['Marked', 'Rated']);
+    expect(titles(await feed(A, '?show=you'))).toEqual(['Bare', 'Marked', 'Rated']);
+  });
+
+  it('a bare added post that later gets a rating in the same post shows to friends', async () => {
+    await befriend(A, B);
+    const e = await mk(A, { title: 'Later' });
+    expect((await feed(B, '?show=friends')).items).toEqual([]);
+    await patch(A, e.id, { rating: 8 });
+    const page = await feed(B, '?show=friends');
+    expect(page.items.map((i) => i.type).sort()).toEqual(['added', 'rated']);
+  });
+
+  it('an unknown show is a 400', async () => {
+    expect((await as(A, '/api/activity?show=all')).status).toBe(400);
+  });
+
+  it('social carries reaction counts, mine and comment counts (deleted comments left out)', async () => {
+    await befriend(A, B);
+    const e = await mk(A, { title: 'Frieren', rating: 9 });
+    const [anchor] = await rows(e.id);
+    const a = await idOf(A);
+    const b = await idOf(B);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?1, ?4, '❤️', ?3), ('r3', ?1, ?4, '🔥', ?3)")
+        .bind(anchor!.id, a, at(1), b),
+      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at, deleted_at) VALUES ('c1', ?1, ?2, 'nice', ?3, NULL), ('c2', ?1, ?2, 'gone', ?3, ?3)")
+        .bind(anchor!.id, b, at(2)),
+    ]);
+    const forB = await feed(B, '?show=friends');
+    expect(forB.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️', '🔥'], comments: 1 });
+    const forA = await feed(A);
+    expect(forA.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️'], comments: 1 });
+  });
+
+  it('a page with posts from 2 users, reactions and comments costs ≤ 10 queries', async () => {
+    await befriend(A, B);
+    for (let i = 0; i < 5; i++) await mk(A, { title: `A${i}`, rating: 7 });
+    for (let i = 0; i < 5; i++) await mk(B, { title: `B${i}`, rating: 7 });
+    const post = (await env.DB.prepare('SELECT id FROM activity LIMIT 1').first<{ id: string }>())!.id;
+    await env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c1', ?, ?, 'x', ?)").bind(post, await idOf(B), at(0)).run();
+    const spy = spyD1(env.DB);
+    const res = await app.fetch(new Request('https://app.test/api/activity?show=everyone'),
+      { ...env, DB: spy.db, ENVIRONMENT: 'dev', DEV_EMAIL: B } as Env);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as ActivityPage).items).toHaveLength(10);
+    expect(spy.queries).toBeLessThanOrEqual(10);
+    expect(spy.maxParams).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('unread (S8)', () => {
+  const unread = async (email: string, db?: D1Database) => {
+    const res = await app.fetch(new Request('https://app.test/api/activity/unread'),
+      { ...env, ...(db ? { DB: db } : {}), ENVIRONMENT: 'dev', DEV_EMAIL: email } as Env);
+    expect(res.status).toBe(200);
+    return (await res.json()) as { feed: number; requests: number };
+  };
+
+  it("counts B's new posts and others' comments and reactions for A, then 0 after seen; A's own don't count", async () => {
+    await befriend(A, B);
+    const mine = await mk(A, { title: 'Mine', rating: 6 });
+    expect((await as(A, '/api/activity/seen', 'POST')).status).toBe(204);
+    expect(await unread(A)).toEqual({ feed: 0, requests: 0 });
+
+    // Push the seen time back so the writes below are clearly newer.
+    await env.DB.prepare('UPDATE users SET feed_seen_at = ? WHERE email = ?').bind('2000-01-01T00:00:00.000Z', A).run();
+    await env.DB.exec('DELETE FROM activity');
+    await mk(B, { title: 'Theirs', rating: 9 });
+    await mk(B, { title: 'Bare' }); // bare added: not a post others see
+    await mk(B, { title: 'Hidden', rating: 9, isPrivate: true });
+    const a = await idOf(A);
+    const b = await idOf(B);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c1', ?1, ?2, 'mine', ?3), ('c2', ?1, ?4, 'theirs', ?3)")
+        .bind(mine.id, a, at(0), b),
+      env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '🔥', ?3), ('r2', ?1, ?4, '🔥', ?3)")
+        .bind(mine.id, a, at(0), b),
+    ]);
+    expect(await unread(A)).toEqual({ feed: 3, requests: 0 }); // Theirs + B's comment + B's reaction
+
+    expect((await as(A, '/api/activity/seen', 'POST')).status).toBe(204);
+    const seen = await env.DB.prepare('SELECT feed_seen_at FROM users WHERE email = ?').bind(A).first<{ feed_seen_at: string }>();
+    expect(seen!.feed_seen_at).toMatch(/^\d{4}-\d\d-\d\dT/);
+    // at(0) may lie after the real clock's "now": move those rows before the seen time.
+    await env.DB.exec('UPDATE comments SET created_at = \'2001-01-01T00:00:00.000Z\'; UPDATE reactions SET created_at = \'2001-01-01T00:00:00.000Z\';');
+    expect(await unread(A)).toEqual({ feed: 0, requests: 0 });
+  });
+
+  it('requests counts incoming pending only; feed caps at 99; 1 query plus sign-in', async () => {
+    await befriend(A, B);
+    await befriend(C, A, 'pending');
+    await idOf(A);
+    const b = await idOf(B);
+    const e = await mk(B, { title: 'X', rating: 5 });
+    await env.DB.exec('DELETE FROM activity');
+    const stmts: D1PreparedStatement[] = [];
+    for (let i = 0; i < 120; i++) {
+      stmts.push(env.DB.prepare(
+        `INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at) VALUES (?, ?, ?, 'rated', '{}', ?, ?)`,
+      ).bind(`u${i}`, b, e.id, at(i * 20), at(i * 20)));
+    }
+    for (let i = 0; i < stmts.length; i += 40) await env.DB.batch(stmts.slice(i, i + 40));
+    const spy = spyD1(env.DB);
+    expect(await unread(A, spy.db)).toEqual({ feed: 99, requests: 1 });
+    expect(spy.queries).toBeLessThanOrEqual(4);
+    expect(await unread(C)).toEqual({ feed: 0, requests: 0 }); // C's own request is outgoing
   });
 });

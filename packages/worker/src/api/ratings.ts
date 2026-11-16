@@ -22,6 +22,7 @@ import type { AppEnv } from '../auth/access';
 import {
   changedOf, isSeasonSet, loadSet, loadSets, planSave, refitTouched, runBatch, setWriteStatements, toSetItem,
 } from '../ratings/store';
+import { activityForRatingsSave, ratingsSaveActivityRows } from './activity';
 import { ENTRY_SELECT, rowToEntry, type EntryRow } from './entries';
 import { CATEGORIES, isTier } from './entryValidation';
 
@@ -80,8 +81,9 @@ ratings.get('/:set', async (c) => {
   return c.json({ items: loaded.items.map(toSetItem), comparisons: loaded.comparisons });
 });
 
-// 3-9 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 4: comparisons INSERT, set UPDATE,
-// queue DELETE, Entry re-select. Picks, rows and done ids each travel as one JSON parameter.
+// 3-10 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 5: comparisons INSERT, activity
+// INSERT, set UPDATE, queue DELETE, Entry re-select. Picks, rows and done ids each travel as one JSON
+// parameter, so no statement binds more than 4 parameters however large the save.
 ratings.post('/:set/save', async (c) => {
   const set = c.req.param('set');
   if (!isSet(set)) return c.json(invalid, 400);
@@ -109,6 +111,16 @@ ratings.post('/:set/save', async (c) => {
               json_extract(value, '$.t'), json_extract(value, '$.at'), json_extract(value, '$.u')
          FROM json_each(?1)`,
     ).bind(json, userId, set));
+  }
+  // Activity (spec §5.2 feed rule): titles this session named (a counted pick or a move) whose
+  // shown score moved by ≥ 0.5 or that changed tier; never rows changed only by the re-fit. Only
+  // list sets: activity rows name entries, so season picks log nothing. Before the set UPDATE,
+  // because each row reads the stored rating as its `from`.
+  if (!isSeasonSet(set)) {
+    const sessionIds = new Set<string>(payload.moves.map((m) => m.id));
+    for (const p of picks) if (!p.undone) sessionIds.add(p.winnerId).add(p.loserId);
+    const logged = ratingsSaveActivityRows(new Map(loaded.items.map((i) => [i.id, i])), changed, sessionIds);
+    if (logged.length > 0) stmts.push(activityForRatingsSave(db, userId, JSON.stringify(logged), new Date(base).toISOString()));
   }
   stmts.push(...setWriteStatements(db, userId, set, changed, loaded.stored));
   if (payload.done.length > 0) {

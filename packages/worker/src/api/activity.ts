@@ -64,6 +64,60 @@ export function activityForPatch(
   return out;
 }
 
+/** Shown-score change (spec §5.2 feed rule) at or above which a ratings save logs "re-rated". */
+export const RE_RATED_MIN_CHANGE = 0.5;
+
+type RatingState = { id: string; rating: number | null; tier: number | null };
+
+/**
+ * The titles a ratings save (POST /api/ratings/:set/save) logs, per the spec §5.2 feed rule: only
+ * titles the user's session named (a counted pick or a move), and of those only the ones whose
+ * shown score moved by at least 0.5, that changed tier, or that got their first rating. Titles that
+ * changed only because their tier re-fit never log. `before` is the set as loaded (tiers derived on
+ * the fly for rows not yet backfilled), `changed` the rows the save writes.
+ */
+export function ratingsSaveActivityRows(
+  before: Map<string, RatingState>,
+  changed: RatingState[],
+  sessionIds: Set<string>,
+): { id: string; rating: number }[] {
+  const out: { id: string; rating: number }[] = [];
+  for (const after of changed) {
+    if (!sessionIds.has(after.id) || after.rating === null) continue;
+    const old = before.get(after.id);
+    if (!old) continue;
+    const moved = old.rating === null
+      || old.tier !== after.tier
+      || Math.abs(after.rating - old.rating) >= RE_RATED_MIN_CHANGE - 1e-9;
+    if (moved) out.push({ id: after.id, rating: after.rating });
+  }
+  return out;
+}
+
+/**
+ * One statement for a whole ratings save (3 bound parameters however many titles; the rows travel
+ * as one JSON parameter). Each row compares against the STORED rating, so batch it BEFORE the set
+ * UPDATE. Rated / re-rated with `via: 'compare'`, the shape mergeActivity folds.
+ */
+export function activityForRatingsSave(
+  db: D1Database,
+  userId: string,
+  rowsJson: string,
+  now: string,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `${INSERT}
+       SELECT ${NEW_ID}, e.user_id, e.id, CASE WHEN e.rating IS NULL THEN 'rated' ELSE 're-rated' END,
+              json_object('from', e.rating, 'to', j.rating, 'via', 'compare'), ?3, ?3
+         FROM entries e
+         JOIN (SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rating') AS rating FROM json_each(?1)) j
+           ON j.id = e.id
+        WHERE e.user_id = ?2 AND (e.rating IS NULL OR e.rating <> j.rating)`,
+    )
+    .bind(rowsJson, userId, now);
+}
+
 interface Row {
   id: string; type: ActivityType; entry_id: string; payload_json: string; created_at: string;
   category: Category; title: string; cover_url: string;

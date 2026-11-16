@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import { validateEntryInput, validateSeasonInput } from '../src/api/entries';
 import type { Env } from '../src/env';
-import type { Entry, Season } from '@media-tracker/shared';
+import { priorFromScore, type Entry, type Season } from '@media-tracker/shared';
 
 const A = 'a@example.com';
 const B = 'b@example.com';
@@ -87,6 +87,14 @@ describe('validateEntryInput', () => {
     expect(ok({ title: 't', creator: 'a'.repeat(301) })).toBe(false);
   });
 
+  it('tier: an integer 0-3; scoreLocked: a boolean', () => {
+    for (const t of [0, 1, 2, 3]) expect(ok({ title: 't', tier: t })).toBe(true);
+    for (const t of [-1, 4, 1.5, '2', null, true]) expect(ok({ title: 't', tier: t })).toBe(false);
+    for (const l of [true, false]) expect(ok({ title: 't', scoreLocked: l })).toBe(true);
+    for (const l of [0, 1, 'true', null]) expect(ok({ title: 't', scoreLocked: l })).toBe(false);
+    expect(validateEntryInput({ tier: 2, scoreLocked: true }, 'patch', 'anime')).toEqual({ ok: true, value: { tier: 2, scoreLocked: true } });
+  });
+
   it('drops server-owned and unknown keys', () => {
     const r = validateEntryInput(
       { title: 't', id: 'x', userId: 'u', category: 'movies', importId: 'i', createdAt: 'c', junk: 1 },
@@ -104,6 +112,11 @@ describe('validateEntryInput', () => {
 });
 
 describe('validateSeasonInput', () => {
+  it('checks tier and scoreLocked', () => {
+    expect(validateSeasonInput({ tier: 3, scoreLocked: false })).toEqual({ ok: true, value: { tier: 3, scoreLocked: false } });
+    for (const bad of [{ tier: 4 }, { tier: '1' }, { tier: null }, { scoreLocked: 1 }]) expect(validateSeasonInput(bad).ok).toBe(false);
+  });
+
   it('checks label, rating and notes', () => {
     expect(validateSeasonInput({ label: 'S1', rating: 8.5, notes: 'n' }).ok).toBe(true);
     expect(validateSeasonInput({ label: 'a'.repeat(101) }).ok).toBe(false);
@@ -290,7 +303,8 @@ describe('seasons', () => {
 
     const pr = await as(A, `/api/seasons/${s.id}`, 'PATCH', { rating: 9, label: 'Season 1' });
     expect(pr.status).toBe(200);
-    expect(await pr.json()).toEqual({ ...s, rating: 9, label: 'Season 1' });
+    const p9 = priorFromScore(9, [9, 10]); // a typed number picks its tier and prior
+    expect(await pr.json()).toEqual({ ...s, rating: 9, label: 'Season 1', tier: 3, priorMean: p9, strength: p9 });
     expect((await as(A, `/api/seasons/${s.id}`, 'PATCH', { rating: null })).status).toBe(200);
 
     expect((await as(A, `/api/seasons/${s.id}`, 'DELETE')).status).toBe(204);

@@ -4,6 +4,7 @@ import { me } from './api/me';
 import { entries } from './api/entries';
 import { compare } from './api/compare';
 import { importApi } from './api/import';
+import { ratings } from './api/ratings';
 import { lookup } from './lookup/routes';
 
 export type { AppUser, AppEnv } from './auth/access';
@@ -50,6 +51,7 @@ api.route('/lookup', lookup);
 api.route('/', entries);
 api.route('/import', importApi);
 api.route('/compare', compare);
+api.route('/ratings', ratings);
 app.route('/api', api);
 
 app.notFound((c) => {

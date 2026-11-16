@@ -3,6 +3,7 @@ import { COMPARE_SAVE_MAX_CHANGES, type Category, type Entry } from '@media-trac
 import type { AppEnv } from '../auth/access';
 import { isValidRating } from './entryValidation';
 import { ENTRY_SELECT, rowToEntry } from './entries';
+import { activityForCompareSave } from './activity';
 
 export const compare = new Hono<AppEnv>();
 
@@ -78,7 +79,7 @@ function parseChanges(body: unknown): { changes: Change[]; doneEntryId: string |
   return { changes: out, doneEntryId: doneEntryId ?? null };
 }
 
-// One batch of 2-3 statements (+ up to 3 for sign-in = 6 queries, under the 50 limit),
+// One batch of 3-4 statements (+ up to 3 for sign-in = 7 queries, under the 50 limit),
 // each with a fixed number of bound parameters (the changes are one JSON parameter).
 compare.post('/save', async (c) => {
   let body: unknown;
@@ -93,7 +94,10 @@ compare.post('/save', async (c) => {
   const db = c.env.DB;
   const userId = c.var.user.id;
   const json = JSON.stringify(parsed.changes);
+  const now = new Date().toISOString();
   const stmts = [
+    // Before the UPDATE: it compares each new rating with the stored one.
+    activityForCompareSave(db, userId, json, now),
     db
       .prepare(
         `UPDATE entries SET
@@ -101,7 +105,7 @@ compare.post('/save', async (c) => {
            updated_at = ?3
          WHERE user_id = ?2 AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?1))`,
       )
-      .bind(json, userId, new Date().toISOString()),
+      .bind(json, userId, now),
   ];
   if (parsed.doneEntryId !== null) {
     stmts.push(
@@ -116,7 +120,7 @@ compare.post('/save', async (c) => {
       .bind(json, userId),
   );
   const res = await db.batch(stmts);
-  const updated = res[0]!.meta.changes;
+  const updated = res[1]!.meta.changes;
   const entries: Entry[] = (res[res.length - 1]!.results as Parameters<typeof rowToEntry>[0][]).map(rowToEntry);
   return c.json({ updated, entries });
 });

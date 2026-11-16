@@ -8,6 +8,7 @@ import {
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
 import { enqueueStatements } from './compare';
+import { activityForCreate, activityForPatch } from './activity';
 import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
 
 export { validateEntryInput, validateSeasonInput } from './entryValidation';
@@ -111,7 +112,7 @@ entries.get('/entries/:id', async (c) => {
   return entry ? c.json(entry) : c.json(notFound, 404);
 });
 
-// 3 queries (up to 5 with the compare queue): duplicate candidates, insert [+ enqueue, trim], re-select
+// 4 queries (up to 6 with the compare queue): duplicate candidates, insert + activity [+ enqueue, trim], re-select
 entries.post('/entries', async (c) => {
   const body = await readJson(c.req.raw);
   const category = (body as { category?: unknown } | null)?.category;
@@ -147,13 +148,13 @@ entries.post('/entries', async (c) => {
   const queued = typeof values.rating === 'number'
     ? enqueueStatements(c.env.DB, userId, id, c.var.user.settings.compareAsk)
     : [];
-  await c.env.DB.batch([insert, ...queued]);
+  await c.env.DB.batch([insert, activityForCreate(c.env.DB, userId, id, values, now), ...queued]);
 
   const entry = await loadEntry(c.env.DB, id, userId);
   return c.json({ entry, duplicateOf }, 201);
 });
 
-// 3 queries (up to 5 with the compare queue): category lookup, update [+ enqueue, trim], re-select
+// 3-5 queries (up to 7 with the compare queue): category lookup, [activity x0-2,] update [+ enqueue, trim], re-select
 entries.patch('/entries/:id', async (c) => {
   const id = c.req.param('id');
   const userId = c.var.user.id;
@@ -167,12 +168,15 @@ entries.patch('/entries/:id', async (c) => {
 
   const keys = Object.keys(v.value) as (keyof EntryFields)[];
   const sets = [...keys.map((k) => `${COLUMNS[k]} = ?`), 'updated_at = ?'];
+  const now = new Date().toISOString();
   const update = c.env.DB.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`)
-    .bind(...keys.map((k) => dbValue(v.value[k])), new Date().toISOString(), id, userId);
+    .bind(...keys.map((k) => dbValue(v.value[k])), now, id, userId);
+  // Activity rows compare against the stored row, so they go before the UPDATE in the same batch.
+  const logged = activityForPatch(c.env.DB, userId, id, v.value, now);
   const queued = typeof v.value.rating === 'number'
     ? enqueueStatements(c.env.DB, userId, id, c.var.user.settings.compareAsk)
     : [];
-  await c.env.DB.batch([update, ...queued]);
+  await c.env.DB.batch([...logged, update, ...queued]);
   return c.json(await loadEntry(c.env.DB, id, userId));
 });
 

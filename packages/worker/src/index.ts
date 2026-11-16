@@ -3,6 +3,7 @@ import { requireUser, type AppEnv } from './auth/access';
 import { me } from './api/me';
 import { entries } from './api/entries';
 import { compare } from './api/compare';
+import { activity } from './api/activity';
 import { importApi } from './api/import';
 import { lookup } from './lookup/routes';
 
@@ -50,6 +51,7 @@ api.route('/lookup', lookup);
 api.route('/', entries);
 api.route('/import', importApi);
 api.route('/compare', compare);
+api.route('/activity', activity);
 app.route('/api', api);
 
 app.notFound((c) => {

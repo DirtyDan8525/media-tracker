@@ -9,3 +9,4 @@ export { SourceFailure, answeredStatus, paced, resetPacing, setPacingClock, slee
 export { kitsuTitle } from './lookup/kitsu';
 export * as anilist from './lookup/anilist';
 export * from './compare';
+export * from './activity';

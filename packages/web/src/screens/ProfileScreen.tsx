@@ -20,6 +20,7 @@ import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CropSheet, PhotoPreviewSheet, type CropRect } from './profile/AvatarEditor';
 import { AvatarTooBigError, makeAvatar, readImage } from './profile/avatarImage';
+import { TierCounts } from './profile/TierCounts';
 import '../design/settings.css';
 import '../design/nav.css';
 
@@ -164,7 +165,7 @@ export function ProfileScreen() {
           )}
         </section>
 
-        {/* Task 11: the tier counts ("Loved 14 · Liked 22 · ...") go here, between My #1s and the rows. */}
+        <TierCounts />
 
         <div className="group__card">
           <Link to="/top5" className="group__row">

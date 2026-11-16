@@ -98,14 +98,6 @@ describe('Profile: info, tiles, strip, rows', () => {
     expect(await within(strip).findByText(/Rate something to see your #1/)).toBeInTheDocument();
   });
 
-  it('no tier counts are rendered (Task 11)', async () => {
-    fakeBackend({ me: ME(), entries: rows() });
-    renderApp('/profile');
-    await screen.findByText('@dan');
-    expect(screen.queryByText(/Loved|Liked|Didn't like/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: /Loved/ })).not.toBeInTheDocument();
-  });
-
   it('rows link to /top5, /stats, /settings', async () => {
     fakeBackend({ me: ME() });
     renderApp('/profile');

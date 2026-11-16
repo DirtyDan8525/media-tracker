@@ -128,15 +128,12 @@ describe('compare queue', () => {
   });
 });
 
-// The Sheet engine's save wrote `rating` alone, bypassing the tier model, so it is switched off
-// until Task 12 deletes it (Tasks 6–8 review, Important 2).
-describe('compare save (retired)', () => {
-  it('answers 410 gone for any body and writes nothing', async () => {
+// The Sheet engine's save is gone (Ruling Q1). Ratings are saved through POST /api/ratings/:set/save.
+describe('compare save (deleted)', () => {
+  it('POST /api/compare/save is 404 and writes nothing', async () => {
     const e = await mk(A, { rating: 4 });
-    for (const body of [{ changes: [{ id: e.id, rating: 9.25 }] }, { changes: [] }, {}, 'x']) {
-      const res = await as(A, '/api/compare/save', 'POST', body);
-      expect(res.status).toBe(410);
-      expect(await res.json()).toMatchObject({ error: 'gone' });
+    for (const body of [{ changes: [{ id: e.id, rating: 9.25 }] }, { changes: [] }, {}]) {
+      expect((await as(A, '/api/compare/save', 'POST', body)).status).toBe(404);
     }
     const row = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(e.id).first<{ rating: number }>();
     expect(row!.rating).toBe(4);

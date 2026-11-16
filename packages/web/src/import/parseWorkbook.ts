@@ -2,8 +2,6 @@ import readExcel from 'read-excel-file/universal';
 import {
   CATEGORY_CONFIG,
   COMPARE_ASK,
-  COMPARE_ROOM,
-  COMPARE_STYLE,
   STATUS_ALIASES,
   THEMES,
   normTitle,
@@ -265,7 +263,7 @@ function readSettings(
   const colors: Record<string, string> = {};
   const tabs: Record<string, boolean> = {};
   const oneOf = <T extends string>(
-    key: 'compareAsk' | 'compareStyle' | 'compareRoom',
+    key: 'compareAsk',
     label: string,
     allowed: readonly T[],
     v: string,
@@ -300,12 +298,7 @@ function readSettings(
       if (/^#[0-9a-f]{6}$/.test(hex)) colors[role] = hex;
       else warn(tab, rowNo, `${role} colour "${v}" is not a #rrggbb hex value; that colour was not imported.`);
     } else if (label === 'ask to compare') oneOf('compareAsk', rawLabel, COMPARE_ASK, v, rowNo);
-    else if (label === 're-rating style') oneOf('compareStyle', rawLabel, COMPARE_STYLE, v, rowNo);
-    else if (label === "when there's no room") oneOf('compareRoom', rawLabel, COMPARE_ROOM, v, rowNo);
-    else if (label === 'compare within') {
-      const n = Number(typeof value === 'string' ? value.replace(',', '.') : value);
-      out.compareWindow = Math.min(n > 0 ? n : 1, 10); // script: Number(x) > 0 ? Number(x) : 1
-    }
+    // The Sheet's Re-rating style, When there's no room and Compare within rows are not read (Ruling Q1).
   });
   if (Object.keys(tabs).length) out.tabs = tabs;
   if (Object.keys(colors).length) out.colors = colors;

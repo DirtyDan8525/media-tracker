@@ -4,7 +4,7 @@
 // runs together, loads their rating set and saves. Nothing is saved until Save.
 import {
   CATEGORY_CONFIG, createRatingSession, listOfSet, seasonSetOf, tierRange, tiersFor,
-  type Category, type Entry, type RatedItem, type RatingSession, type RatingSet,
+  type Category, type Entry, type RatedItem, type RatingChange, type RatingSession, type RatingSet,
   type SetItem, type Tier, type TierSet,
 } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,7 +19,6 @@ import { enabledLists, LIST_LABEL, seasonsEnabled } from '../../nav';
 import { useSessionMe } from '../../shell/SessionGate';
 import type { HomeList, ListCount, TierChips } from './CompareHome';
 import type { PairAnswer, PairItem } from './PairView';
-import type { RatingChange } from './ReviewView';
 
 export type FlowView =
   | { kind: 'loading' }

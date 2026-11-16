@@ -54,7 +54,7 @@ function settingsLine(s: Partial<UserSettings>): string {
   if (s.theme) parts.push(`${s.theme} theme`);
   if (s.colors && Object.keys(s.colors).length) parts.push('colors');
   if (s.tabs && Object.keys(s.tabs).length) parts.push('tabs');
-  if (['compareAsk', 'compareStyle', 'compareRoom', 'compareWindow'].some((k) => k in s)) parts.push('compare options');
+  if ('compareAsk' in s) parts.push('compare options');
   return parts.join(' · ');
 }
 

@@ -76,7 +76,7 @@ describe('PUT /api/me/settings', () => {
     const imported = {
       theme: 'Ocean', colors: { Background: '#0f1c2b' },
       tabs: { movies: true, tv: true, tvSeasons: true, animeSeasons: true, albums: true, songs: false, games: true, books: true },
-      compareAsk: 'Only when I start it', compareStyle: 'Swap the numbers', compareRoom: 'Give the same score', compareWindow: 1.5,
+      compareAsk: 'Only when I start it',
     };
     const res = await putSettings('a@example.com', imported);
     expect(res.status).toBe(200);
@@ -159,15 +159,13 @@ describe('sanitizeSettings', () => {
   const bad = (p: unknown) => expect(sanitizeSettings(p, cur)).toEqual({ ok: false });
 
   it('accepts each enum value and Custom theme', () => {
-    const r = sanitizeSettings(
-      { theme: 'Custom', compareAsk: 'Off', compareStyle: 'Swap the numbers', compareRoom: 'Push others down', compareWindow: 10 },
-      cur,
-    );
-    expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off', compareWindow: 10 } });
+    const r = sanitizeSettings({ theme: 'Custom', compareAsk: 'Off' }, cur);
+    expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off' } });
   });
 
-  it('accepts decimal and boundary compareWindow', () => {
-    for (const w of [0.5, 1.5, 10]) expect(sanitizeSettings({ compareWindow: w }, cur)).toMatchObject({ ok: true, settings: { compareWindow: w } });
+  it('drops the removed Sheet compare keys (an older client may still send them) instead of refusing the update', () => {
+    const r = sanitizeSettings({ theme: 'Ocean', compareStyle: 'Swap the numbers', compareRoom: 'x', compareWindow: 99 }, cur);
+    expect(r).toEqual({ ok: true, settings: { ...cur, theme: 'Ocean' } });
   });
 
   it('rejects bad values', () => {
@@ -178,15 +176,6 @@ describe('sanitizeSettings', () => {
     bad({ colors: [] });
     bad({ tabs: { anime: 'yes' } });
     bad({ tabs: null });
-    bad({ compareStyle: 'x' });
-    bad({ compareRoom: 'x' });
-    bad({ compareWindow: 0 });
-    bad({ compareWindow: -1 });
-    bad({ compareWindow: 10.5 });
-    bad({ compareWindow: 11 });
-    bad({ compareWindow: '2' });
-    bad({ compareWindow: NaN });
-    bad({ compareWindow: Infinity });
     bad(null);
     bad([]);
   });
@@ -214,6 +203,19 @@ describe('settings and rating tiers', () => {
     const me = (await (await as(A, '/api/me')).json()) as { settings: typeof DEFAULT_USER_SETTINGS };
     expect(me.settings.tiers).toEqual({ anime: custom });
     expect(sanitizeSettings({ tiers: { anime: custom } }, DEFAULT_USER_SETTINGS)).toEqual({ ok: true, settings: DEFAULT_USER_SETTINGS });
+  });
+
+  it('saved settings that still hold the dropped Sheet compare keys load without them, and a later write drops them from storage', async () => {
+    const A = 'a@example.com';
+    await as(A, '/api/me');
+    const stored = { ...DEFAULT_USER_SETTINGS, compareAsk: 'Off', compareStyle: 'Swap the numbers', compareRoom: 'Push others down', compareWindow: 2.5 };
+    await env.DB.prepare('UPDATE users SET settings_json = ? WHERE email = ?').bind(JSON.stringify(stored), A).run();
+    const me = (await (await as(A, '/api/me')).json()) as { settings: Record<string, unknown> };
+    expect(me.settings).toEqual({ ...DEFAULT_USER_SETTINGS, compareAsk: 'Off' });
+    expect((await putSettings(A, { theme: 'Ocean', compareWindow: 3 })).status).toBe(200);
+    const raw = await env.DB.prepare('SELECT settings_json FROM users WHERE email = ?').bind(A).first<{ settings_json: string }>();
+    const keys = Object.keys(JSON.parse(raw!.settings_json));
+    for (const k of ['compareStyle', 'compareRoom', 'compareWindow']) expect(keys).not.toContain(k);
   });
 
   it('the settings loader drops unknown stored keys', async () => {

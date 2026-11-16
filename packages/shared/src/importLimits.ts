@@ -41,12 +41,6 @@ export const IMPORT_CHUNK_SEASONS = SEASON_STATEMENTS * SEASONS_PER_STATEMENT;
 export const importStatementCount = (rows: number, seasons: number) =>
   IMPORT_UPSERT_STATEMENTS + Math.ceil(rows / ENTRIES_PER_STATEMENT) + Math.ceil(seasons / SEASONS_PER_STATEMENT);
 
-// ---- Compare save sizing ----------------------------------------------------
-// POST /api/compare/save writes every change in one UPDATE whose changes travel as a single
-// JSON parameter (json_each), so the statement always has 3 bound parameters. A request
-// carries at most this many changes; the web client splits beyond that.
-export const COMPARE_SAVE_MAX_CHANGES = 1000;
-
 // ---- Ratings save sizing ----------------------------------------------------
 // POST /api/ratings/:set/save sends its picks, moves and done ids as JSON parameters (json_each,
 // Ruling Q11). A request carries at most this many of each; the web client splits beyond that.

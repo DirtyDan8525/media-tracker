@@ -54,9 +54,3 @@ compare.delete('/queue/:entryId', async (c) => {
     .run();
   return c.body(null, 204);
 });
-
-// Retired: the Sheet engine's save wrote `rating` alone, bypassing the tier model (tier, prior and
-// strength went stale and nothing healed them). Ratings are saved through POST /api/ratings/:set/save.
-// Task 12 deletes this route with the rest of the Sheet engine. 0 queries beyond sign-in.
-compare.post('/save', (c) =>
-  c.json({ error: 'gone', message: 'This Compare save was replaced by tier ratings: update the app and save from Compare again.' }, 410));

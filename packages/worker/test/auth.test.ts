@@ -89,7 +89,7 @@ describe('dev bypass', () => {
     const res = await call('/api/me', { ENVIRONMENT: 'dev', DEV_EMAIL: 'old@example.com' });
     const { settings } = (await res.json()) as { settings: Record<string, unknown> };
     expect(settings.theme).toBe('Sunset');
-    expect(settings.compareWindow).toBe(1);
+    expect(settings.compareAsk).toBe('Both');
   });
 
   it('is ignored in prod', async () => {

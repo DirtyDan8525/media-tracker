@@ -1,15 +1,9 @@
-import { formatRating, type RatingSession } from '@media-tracker/shared';
+import { formatRating, type RatingChange } from '@media-tracker/shared';
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { Button } from '../../design/components/Button';
 import { CountUp } from '../../design/components/CountUp';
 import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
-
-/**
- * One changed title (old → new, with tiers). The ratings module's `RatingChange`; the top-level
- * name is still the Sheet engine's until Task 12 deletes it, so it is taken from the session.
- */
-export type RatingChange = ReturnType<RatingSession['changes']>[number];
 
 export interface ReviewViewProps {
   changes: RatingChange[];

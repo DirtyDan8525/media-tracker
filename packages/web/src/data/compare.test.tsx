@@ -1,12 +1,11 @@
 import type { Entry } from '@media-tracker/shared';
-import { COMPARE_SAVE_MAX_CHANGES } from '@media-tracker/shared';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
-import { COMPARE_QUEUE_KEY, dropFromQueue, saveCompareChanges, useCompareQueue } from './compare';
+import { COMPARE_QUEUE_KEY, dropFromQueue, useCompareQueue } from './compare';
 import { entriesKey } from './entryCache';
 import { saveEntryChange } from './entryMutations';
 import { setCompareEnabled } from '../test/flags';
@@ -21,57 +20,6 @@ function entry(id: string, over: Partial<Entry> = {}): Entry {
     createdAt: '', updatedAt: '', ...over,
   };
 }
-
-describe('saveCompareChanges', () => {
-  it('sends the changes and doneEntryId, then the cached list shows the new rating', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(entriesKey('anime'), [entry('e1'), entry('e2')]);
-    const calls = mockFetch({
-      'POST /api/compare/save': { body: { updated: 1, entries: [entry('e1', { rating: 8.8 })] } },
-      'GET /api/compare/queue': { body: { items: [] } },
-    });
-    expect(await saveCompareChanges(qc, [{ id: 'e1', rating: 8.8 }], 'e2')).toBe(true);
-    const post = calls.find((c) => c.method === 'POST')!;
-    expect(post.path).toBe('/api/compare/save');
-    expect(post.body).toEqual({ changes: [{ id: 'e1', rating: 8.8 }], doneEntryId: 'e2' });
-    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))!.find((e) => e.id === 'e1')!.rating).toBe(8.8);
-  });
-
-  it('omits doneEntryId when there is none', async () => {
-    const qc = makeQueryClient();
-    const calls = mockFetch({ 'POST /api/compare/save': { body: { updated: 0, entries: [] } } });
-    await saveCompareChanges(qc, [{ id: 'e1', rating: 5 }]);
-    expect(calls[0]!.body).toEqual({ changes: [{ id: 'e1', rating: 5 }] });
-    expect('doneEntryId' in (calls[0]!.body as object)).toBe(false);
-  });
-
-  it('splits 2,500 changes into 1000 + 1000 + 500, doneEntryId only on the last', async () => {
-    const qc = makeQueryClient();
-    const calls = mockFetch({ 'POST /api/compare/save': { body: { updated: 0, entries: [] } } });
-    const changes = Array.from({ length: 2500 }, (_, i) => ({ id: `id${i}`, rating: 5 }));
-    expect(COMPARE_SAVE_MAX_CHANGES).toBe(1000);
-    expect(await saveCompareChanges(qc, changes, 'done')).toBe(true);
-    const posts = calls.filter((c) => c.method === 'POST').map((c) => c.body as { changes: unknown[]; doneEntryId?: string });
-    expect(posts.map((p) => p.changes.length)).toEqual([1000, 1000, 500]);
-    expect(posts.map((p) => p.doneEntryId)).toEqual([undefined, undefined, 'done']);
-    expect(posts.slice(0, 2).every((p) => !('doneEntryId' in p))).toBe(true);
-  });
-
-  it('still sends doneEntryId when there are no changes', async () => {
-    const qc = makeQueryClient();
-    const calls = mockFetch({ 'POST /api/compare/save': { body: { updated: 0, entries: [] } } });
-    expect(await saveCompareChanges(qc, [], 'done')).toBe(true);
-    expect(calls[0]!.body).toEqual({ changes: [], doneEntryId: 'done' });
-  });
-
-  it('returns false on a 500 and leaves the cache unchanged', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(entriesKey('anime'), [entry('e1')]);
-    mockFetch({ 'POST /api/compare/save': { status: 500, body: { error: 'boom' } } });
-    expect(await saveCompareChanges(qc, [{ id: 'e1', rating: 1 }], 'e1')).toBe(false);
-    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(9);
-  });
-});
 
 const wrapperFor = (qc: ReturnType<typeof makeQueryClient>) => ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={qc}>{children}</QueryClientProvider>

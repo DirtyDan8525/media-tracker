@@ -137,9 +137,6 @@ export interface UserSettings {
   colors: Record<string, string>;
   tabs: Record<string, boolean>;
   compareAsk: string;
-  compareStyle: string;
-  compareRoom: string;
-  compareWindow: number;
   /** Rating tiers per list (missing = DEFAULT_TIERS). Written only by PUT /api/ratings/tiers/:list (Ruling Q3). */
   tiers: Partial<Record<Category, TierSet>>;
 }
@@ -152,16 +149,11 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
     animeSeasons: true, tvSeasons: true,
   },
   compareAsk: 'Both',
-  compareStyle: 'Meet in the middle',
-  compareRoom: 'Use in-between scores',
-  compareWindow: 1,
   tiers: {},
 };
 
-// Allowed values for the three compare options (the Sheet's Settings dropdowns).
+// Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).
 export const COMPARE_ASK = ['Both', 'Only when I start it', 'Only for new ratings', 'Off'] as const;
-export const COMPARE_STYLE = ['Meet in the middle', 'Swap the numbers'] as const;
-export const COMPARE_ROOM = ['Use in-between scores', 'Give the same score', 'Push others down'] as const;
 
 /** One list row parsed from a Sheet workbook, ready to send to POST /api/import. */
 export interface ImportRow {

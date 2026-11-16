@@ -42,3 +42,6 @@
 ## Phase 5 wireframes — approved 2026-11-16
 - Approved with no changes: `Home`, `AddPicker`, `Walkthrough`, `FeedV2`, `ProfilePC`, `EntryTiles` (`*.wf.dc.html`). Supersedes the 2026-11-15 bottom bar (Add tab → Home tab; Add is a floating bubble again) and S7's fixed reaction set (any single emoji via "+").
 - Plus: a "What's new / Coming soon" list in More (no wireframe; simple list rows).
+
+## Number-first rating wireframes — approved 2026-11-16
+- `RateClose`, `AddRate`, `Sharpen` (`*.wf.dc.html`) approved with no changes (item 14 of docs/plans/phase5-requests.md).

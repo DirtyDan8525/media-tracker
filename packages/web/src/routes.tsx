@@ -17,6 +17,7 @@ import { AppearanceScreen } from './screens/AppearanceScreen';
 import { TierEditor } from './screens/settings/TierEditor';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
+import { JoinScreen } from './screens/auth/JoinScreen';
 import { ResetScreen } from './screens/auth/ResetScreen';
 import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
@@ -96,6 +97,8 @@ function AdminRoute() {
 export const routes: RouteObject[] = [
   // The reset link works signed out, so it sits outside the gate.
   { path: 'reset/:token', element: <ResetScreen /> },
+  // So does a sign-up link from Dan.
+  { path: 'join/:token', element: <JoinScreen /> },
   {
     element: <SessionGate />,
     children: [

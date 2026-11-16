@@ -184,19 +184,45 @@ describe('app shell', () => {
       expect(profile.querySelector('img')).toHaveAttribute('src', `/api/me/avatar?v=${encodeURIComponent('2026-11-15T10:00:00Z')}`);
     });
 
-    it('the list header is a .page-header--bar containing the icon, the h1 and the profile button, and has no cover backdrop', async () => {
+    it('the list header is a .page-header--bar containing the logo, the h1 and the profile button, and has no cover backdrop', async () => {
       fakeBackend({ entries: [makeEntry({ title: 'Best', rating: 9.5, coverUrl: 'https://img.example/best.jpg' })] });
       renderApp('/list/anime');
       await screen.findByText('Best');
       const bar = document.querySelector<HTMLElement>('.page-header--bar')!;
       expect(bar).not.toBeNull();
       expect(within(bar).getByRole('heading', { level: 1, name: 'Anime' })).toBeInTheDocument();
-      expect(bar.querySelector('.page-header__icon svg')).not.toBeNull();
+      expect(within(bar).getByRole('link', { name: 'About Media Tracker' })).toBeInTheDocument();
       expect(within(bar).getByRole('link', { name: 'Profile' })).toBeInTheDocument();
       expect(document.querySelector('.page-header .backdrop')).toBeNull();
       // the sub-line and the chips sit below the band
       expect(bar).not.toContainElement(screen.getByText(/1 title/));
       expect(bar).not.toContainElement(screen.getByRole('combobox', { name: 'Status' }));
+    });
+
+    it('phone list header: logo button (About Media Tracker) top left, the list dropdown centred, profile button right', async () => {
+      mockApi(makeMe());
+      const { router } = renderApp('/list/anime');
+      await screen.findByRole('heading', { level: 1, name: 'Anime' });
+      const bar = document.querySelector<HTMLElement>('.page-header--bar')!;
+      const logo = await within(bar).findByRole('link', { name: 'About Media Tracker' });
+      expect(logo).toHaveAttribute('href', '/about');
+      expect(logo.querySelector('img')).toHaveAttribute('src', '/favicon.svg');
+      expect(logo).toHaveClass('page-header__logo');
+      const kids = Array.from(bar.children);
+      expect(kids[0]).toBe(logo);
+      expect(kids[1]).toContainElement(within(bar).getByRole('heading', { level: 1, name: 'Anime' }));
+      expect(kids[1]).toHaveClass('page-header__center');
+      expect(kids[2]).toContainElement(within(bar).getByRole('link', { name: 'Profile' }));
+      await userEvent.click(logo);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/about'));
+    });
+
+    it('PC: the list header has no logo button (the side nav has About)', async () => {
+      setViewportWidth(1280);
+      mockApi(makeMe());
+      renderApp('/list/anime');
+      await screen.findByRole('heading', { level: 1, name: 'Anime' });
+      expect(document.querySelector('.page-header__logo')).toBeNull();
     });
 
     it('PC: the list header is the themed bar too, with no profile button and the Add button', async () => {

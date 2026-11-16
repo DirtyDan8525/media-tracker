@@ -27,7 +27,7 @@ describe('/reset/:token', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/auth/reset')?.body).toEqual({ token: TOKEN, password: 'brand-new-pass' });
     expect(calls.find((c) => c.path === `/api/auth/reset/${TOKEN}`)).toBeDefined();
-    expect(screen.queryByRole('heading', { name: 'Set a new password' })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set a new password' })).not.toBeInTheDocument());
   });
 
   it('an expired or used link says so and offers sign in', async () => {

@@ -22,6 +22,7 @@ import { ListMenu } from '../shell/ListMenu';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CompareBanner } from './CompareBanner';
+import { InstallBanner } from './onboarding/InstallBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
 import { FilterChips, SearchBox } from './list/ListFilters';
@@ -199,7 +200,7 @@ function ListBody({ category }: { category: Category }) {
           />
         )}
       </PageHeader>
-      <div className="screen__body list"><CompareBanner />{body}</div>
+      <div className="screen__body list"><InstallBanner /><CompareBanner />{body}</div>
 
       {addOpen && (
         <Suspense fallback={<SheetFallback title="Add" onClose={() => setAddOpen(false)} />}>

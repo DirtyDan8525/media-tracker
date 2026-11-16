@@ -9,6 +9,7 @@ import { useIsWide } from '../hooks';
 import { waitingCount } from '../screens/CompareBanner';
 import { enabledLists } from '../nav';
 import { useCurrentList } from './currentList';
+import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
 import { AddBubble } from './AddBubble';
 import { useSessionMe } from './SessionGate';
@@ -23,6 +24,7 @@ export function AppFrame() {
     <BackfillProvider>
       <AddFriendProvider>
         <FrameLayout />
+        <OnboardingHost />
       </AddFriendProvider>
     </BackfillProvider>
   );

@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react';
+import { Link } from 'react-router';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { Icon, type IconName } from '../design/components/Icon';
 import { useIsWide } from '../hooks';
@@ -40,6 +41,26 @@ export function PageHeader({ title, sub, backTo, backUsesHistory, actions, child
   const end = (actions || showProfile) && (
     <div className="page-header__actions">{actions}{showProfile && <ProfileButton />}</div>
   );
+  if (icon && titleSlot && !wide) {
+    // Phone list bar: the app logo (About) at the left, the list dropdown in the middle, the profile button at the right.
+    return (
+      <>
+        <header className={['page-header', 'page-header--bar', 'page-header--centered', className].filter(Boolean).join(' ')}>
+          <Link to="/about" className="page-header__logo" aria-label="About Media Tracker">
+            <img src="/favicon.svg" alt="" width={32} height={32} />
+          </Link>
+          <div className="page-header__center">{titleSlot}</div>
+          {end}
+        </header>
+        {(sub || children) && (
+          <div className="page-header__below">
+            {sub && <span className="page-sub">{sub}</span>}
+            {children}
+          </div>
+        )}
+      </>
+    );
+  }
   if (icon) {
     // The band is the header itself; the sub-line and chips follow it on Background.
     return (

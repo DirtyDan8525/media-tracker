@@ -22,6 +22,12 @@ async function signInAndSetUsername(page: Page, username: string) {
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(field).toBeHidden();
   }
+  // Phase 5: the first-run walkthrough and install banner (seen/dismissed flags live in localStorage per browser).
+  const skip = page.getByRole('dialog', { name: 'Your lists' }).getByRole('button', { name: 'Skip' });
+  if (await skip.isVisible().catch(() => false)) await skip.click();
+  const notNow = page.getByRole('button', { name: 'Not now' });
+  if (await notNow.isVisible().catch(() => false)) await notNow.click();
+  await page.evaluate(() => { try { localStorage.setItem('mt-install-dismissed', '1'); } catch { /* ignore */ } });
 }
 
 test.describe.configure({ mode: 'serial' });

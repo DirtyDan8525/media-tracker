@@ -1,0 +1,36 @@
+/* Walkthrough, install steps and the install banner (Walkthrough.wf). */
+.walk { display: flex; flex-direction: column; align-items: center; gap: var(--space-8); text-align: center; }
+.walk__count { font-size: var(--fs-meta); }
+.walk__art {
+  width: 100%; height: 140px; border-radius: var(--radius-xl); background: var(--panel); color: var(--highlight);
+  display: flex; align-items: center; justify-content: center;
+}
+.walk__text { font-size: var(--fs-lg); line-height: 1.45; color: var(--text); }
+.walk__dots { display: flex; gap: var(--space-4); }
+.walk__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--grid-line); }
+.walk__dot.is-on { background: var(--highlight); }
+.walk__footer { display: flex; justify-content: space-between; gap: var(--space-6); }
+.walk__footer .btn--primary { min-width: 120px; }
+
+.install { display: flex; flex-direction: column; gap: var(--space-10); }
+.install__block { display: flex; flex-direction: column; gap: var(--space-4); }
+.install__heading { font-size: var(--fs-lg); font-weight: 700; color: var(--bright-text); }
+.install__steps { margin: 0; padding-left: var(--space-12); display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--fs-body); }
+.install__later { width: 100%; }
+
+.install-banner {
+  display: flex; align-items: center; gap: var(--space-4); margin: var(--space-4) var(--space-8) 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-8); border-radius: var(--radius-xl);
+  background: var(--card); font-size: var(--fs-sm);
+}
+.install-banner__text { flex: 1; min-width: 0; color: var(--bright-text); font-weight: 600; }
+.install-banner__how { min-height: var(--tap); padding: 0 var(--space-4); background: none; border: 0; cursor: pointer; color: var(--highlight); font-weight: 600; }
+
+/* More: the button row looks like the link rows. */
+button.group__row { width: 100%; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; }
+button.group__row:hover { background: var(--alt-row); }
+
+/* What's new */
+.whatsnew__release { padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-4); }
+.whatsnew__version { font-size: var(--fs-lg); font-weight: 700; color: var(--bright-text); }
+.whatsnew__list { margin: 0; padding-left: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--fs-body); }

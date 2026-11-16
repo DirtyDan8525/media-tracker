@@ -1,0 +1,62 @@
+/* ---------- List dropdown (list title, Add sheet's "Add to") and the Add bubble (Phase 5: Home, AddPicker boards) ---------- */
+.list-menu { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.list-menu__h1 { margin: 0; min-width: 0; max-width: 100%; }
+.list-menu__trigger {
+  display: inline-flex; align-items: center; gap: var(--space-4); max-width: 100%; box-sizing: border-box;
+  min-height: var(--tap); padding: 0 var(--space-3) 0 var(--space-2); margin: 0; border: 0; border-radius: var(--radius-md);
+  background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left;
+}
+.list-menu__trigger > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-menu__trigger:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+/* The Add sheet's field: a full-width bordered box like the other inputs. */
+.list-menu--field { align-self: stretch; width: 100%; }
+.list-menu--field .list-menu__trigger {
+  width: 100%; justify-content: space-between; min-height: 48px; padding: 0 var(--space-7);
+  border: 1px solid var(--grid-line); border-radius: var(--radius-md); background: var(--bg); color: var(--bright-text);
+  font-size: var(--fs-body); font-weight: 600;
+}
+.list-menu__chev { display: flex; flex: none; }
+.list-menu__trigger[aria-expanded="true"] .list-menu__chev { transform: rotate(180deg); }
+.list-menu__panel {
+  position: absolute; top: 100%; left: 0; z-index: 48; box-sizing: border-box; width: max-content; min-width: 220px; max-width: calc(100vw - 2 * var(--space-8));
+  max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; margin-top: var(--space-2); padding: var(--space-2);
+  border-radius: 12px; border: 1px solid var(--grid-line); background: var(--card); color: var(--text); box-shadow: var(--shadow-float);
+}
+.list-menu--field .list-menu__panel { position: static; width: 100%; max-width: none; margin-top: var(--space-3); box-shadow: none; }
+.list-menu__item {
+  display: flex; align-items: center; gap: var(--space-6); box-sizing: border-box; width: 100%; min-height: var(--tap);
+  padding: 0 var(--space-6); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text);
+  font: inherit; font-size: var(--fs-body); font-weight: 500; text-align: left; text-decoration: none; cursor: pointer;
+}
+.list-menu__item:hover { background: var(--panel); }
+.list-menu__item:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.list-menu__item[aria-current="true"], .list-menu__item[aria-checked="true"] { background: var(--panel); font-weight: 700; }
+.list-menu__label { flex: 1; min-width: 0; }
+.list-menu__count { color: var(--text); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.list-menu__check { display: flex; width: 18px; flex: none; color: var(--highlight); }
+
+/* The floating Add bubble: bottom right, above the bar. */
+.add-fab {
+  position: fixed; right: calc(var(--space-8) + env(safe-area-inset-right)); z-index: 46;
+  bottom: calc(var(--bottom-tabs-h) + var(--space-8) + env(safe-area-inset-bottom));
+  box-sizing: border-box; width: 56px; height: 56px; border-radius: var(--radius-fab);
+  display: flex; align-items: center; justify-content: center; text-decoration: none;
+  background: var(--highlight); color: var(--on-highlight); box-shadow: var(--shadow-float);
+}
+.add-fab:focus-visible { outline: 2px solid var(--bright-text); outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .add-fab { transition: transform .12s; }
+  .add-fab:active { transform: scale(.94); }
+  .list-menu__chev { transition: transform .15s; }
+}
+
+/* Phone list bar: logo (About) | list dropdown, centred | profile button */
+.page-header--centered { display: grid; grid-template-columns: var(--tap) minmax(0, 1fr) auto; column-gap: var(--space-6); }
+.page-header__logo {
+  box-sizing: border-box; width: var(--tap); height: var(--tap); display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); text-decoration: none;
+}
+.page-header__logo img { display: block; }
+.page-header__logo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.page-header__center { min-width: 0; display: flex; justify-content: center; }
+.page-header--centered .page-header__actions { justify-self: end; min-width: var(--tap); }

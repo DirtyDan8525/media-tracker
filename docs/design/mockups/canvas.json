@@ -497,6 +497,34 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Admin"
+    },
+    "SignIn.wf.dc.html": {
+      "x": 0,
+      "y": 16500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Sign in / Create account"
+    },
+    "Waiting.wf.dc.html": {
+      "x": 470,
+      "y": 16500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Waiting for approval"
+    },
+    "ResetPassword.wf.dc.html": {
+      "x": 940,
+      "y": 16500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Set a new password"
+    },
+    "AdminSignups.wf.dc.html": {
+      "x": 1410,
+      "y": 16500,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin sign-ups"
     }
   },
   "order": [
@@ -567,7 +595,11 @@
     "Feed.wf.dc.html",
     "CompareFriend.wf.dc.html",
     "EntryPrivacy.wf.dc.html",
-    "Admin.wf.dc.html"
+    "Admin.wf.dc.html",
+    "SignIn.wf.dc.html",
+    "Waiting.wf.dc.html",
+    "ResetPassword.wf.dc.html",
+    "AdminSignups.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -808,6 +840,13 @@
       "text": "Wireframes — Phase 4 social (for Dan's review)",
       "kind": "title1",
       "maxW": 3300
+    },
+    "wfp4b": {
+      "x": 0,
+      "y": 16300,
+      "text": "Wireframes — own sign-in (for Dan's review)",
+      "kind": "title1",
+      "maxW": 1800
     }
   },
   "designSystems": [],
@@ -849,6 +888,7 @@
     "m22",
     "wf1",
     "wf2",
-    "wfp4"
+    "wfp4",
+    "wfp4b"
   ]
 }

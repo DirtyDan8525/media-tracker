@@ -34,3 +34,7 @@
 - Approved with no changes: `FriendProfile`, `Friends`, `AddFriend`, `Feed`, `CompareFriend`, `EntryPrivacy`, `Admin` (`*.wf.dc.html`). Build to the calm v2 visual language with these layouts.
 - Copy drafted on the boards and approved: "Wants to be friends", "Add a friend to see what they rate.", privacy notes "Friends can't see it, its posts or its notes." / "Friends see the title, not your notes.", remove-access confirm "They won't be able to sign in. Their data stays."
 - Admin rows carry **Remove access** with a confirm (Dan's answer 1). Sub-screens use a back button instead of the profile button.
+
+## Own sign-in wireframes (Phase 4b) — approved 2026-11-16
+- Approved with no changes: `SignIn`, `Waiting`, `ResetPassword`, `AdminSignups` (`*.wf.dc.html`); `AdminSignups` replaces `Admin.wf` for the Admin screen.
+- Copy as drawn: "Dan approves new accounts — you'll get in as soon as he does.", errors "That username or password isn't right." / "Too many tries. Wait 15 minutes and try again." / "That username is taken.", waiting "Dan needs to approve your account. This page updates by itself.", removed "Your access was removed. Ask Dan if this is a mistake.", expired reset "This link has expired. Ask Dan for a new one."

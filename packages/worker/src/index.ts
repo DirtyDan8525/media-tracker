@@ -4,6 +4,7 @@ import { me } from './api/me';
 import { entries } from './api/entries';
 import { compare } from './api/compare';
 import { activity } from './api/activity';
+import { cover } from './api/cover';
 import { importApi } from './api/import';
 import { lookup } from './lookup/routes';
 
@@ -52,6 +53,7 @@ api.route('/', entries);
 api.route('/import', importApi);
 api.route('/compare', compare);
 api.route('/activity', activity);
+api.route('/cover', cover);
 app.route('/api', api);
 
 app.notFound((c) => {

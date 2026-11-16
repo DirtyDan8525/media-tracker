@@ -18,3 +18,10 @@
 
 ## Process
 - Dan wants low usage: cheap, simple mockups (wireframe level, calm style matching the approved v2 boards); no graphic-heavy work.
+
+## Amendments (Dan, after wireframe review, 2026-11-15 evening)
+- Bottom bar slot 4 is always **Compare** (the tier-rating Compare). Top 5 lives under Profile and More. Consequence: Phase 3b ships together with Phase 3c (Compare returns with the tier system); no interim Top 5 slot.
+- List heading style changes to **option 1: themed bar** (solid band in the theme's Header colour with list icon + title; profile button on it).
+- Top 5 share image styled like the approved Top5.v2 board: #1 large poster with blurred cover backdrop; ranks 1/2/3 gold, silver, bronze; 4–5 compact. "My #1s" image likewise with medal accents; small "Media Tracker · @username" footer.
+- Activity is designed for **friends' activity** (Everyone / Friends / You filter). Friends are built in Phase 4; until then it shows your own activity.
+- Profile is richer: cover-backdrop header band, big avatar, @username, member since, stat tiles incl. **Friends** count, **Add friend** button (shows "coming with friends" until Phase 4), My #1s strip, tier counts, rows My Top 5 / Stats / Settings, Log out.

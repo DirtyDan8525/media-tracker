@@ -25,7 +25,9 @@ export default defineConfig({
   reporter: [['list']],
   projects: SERVERS.map(({ project, port, device }) => ({
     name: project,
-    use: { ...device, channel: 'chrome', baseURL: `http://127.0.0.1:${port}`, serviceWorkers: 'block' },
+    use: { ...device, channel: 'chrome', baseURL: `http://127.0.0.1:${port}`, serviceWorkers: 'block',
+      // page.request calls send no Origin; the Worker refuses non-GET API calls without a same-origin one (A4).
+      extraHTTPHeaders: { Origin: `http://127.0.0.1:${port}` } },
   })),
   webServer: SERVERS.map(({ port }) => ({
     command: `node e2e/serve.mjs ${port}`,

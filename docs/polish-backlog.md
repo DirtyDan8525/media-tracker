@@ -35,3 +35,14 @@ Minor items that were noticed and deliberately not fixed (lean mode, 2026-11-16)
 ## Data layer and tests
 - `writeEntry` → `useAllEntries` cache update is not tested.
 - `packages/shared/tsconfig.json` has `types: ["node"]`, which also applies to `src` (meant for tests only).
+
+## Phase 4 / 4b (social, own sign-in)
+- No e2e test yet for the full social flow (sign up → approve → add friend → react/comment → Add to mine); unit/API tests cover each piece.
+- `GET /api/admin` has no spyD1 query-count assertion.
+- Raise PBKDF2 rounds (30,000 now, for the Workers Free CPU budget) if the plan becomes Paid; verification already accepts 10k–100k; consider rehash-on-login.
+- An ex-friend can't see or delete their own old comments on your posts (whole thread hidden).
+- Feed says "marked Elden Ring Playing" where the wireframe says "started"; no "last seen" divider; unread isn't refetched after a reaction; feed avatars use a small local component instead of `Avatar`.
+- Friend profile has no back button on PC; Compare lists have no paging; group Top 5 rows don't link (no ids); friend Stats tab omits histogram and tier lines; exact `@name` search isn't offered when it isn't a prefix match.
+- Add to mine (from Compare) stays on the list instead of opening the new entry (deliberate, for adding several).
+- Sign-in: default to the Sign in tab on devices that signed in before; rate-limit countdown; keep the username after a failed sign-in; in-app Change password; "Done" on the reset-link card.
+- No requests dot on the PC side-nav profile row.

@@ -205,6 +205,9 @@ test('Activity (You) shows "You added Frieren to Anime", reached from the Main n
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Activity' }).click();
   await expect(page).toHaveURL(/\/activity/);
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
+  // Everyone is the default since Phase 4 (S6); a bare "added" shows only under You.
+  await expect(page.getByRole('radio', { name: 'Everyone' })).toBeChecked();
+  await page.getByRole('radio', { name: 'You' }).click(); // controlled by the URL, so the state settles after the navigation
   await expect(page.getByRole('radio', { name: 'You' })).toBeChecked();
   await expect(page.getByText(/You\s+added\s+Frieren\s+to\s+Anime/).first()).toBeVisible();
 });

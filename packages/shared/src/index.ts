@@ -11,3 +11,4 @@ export * as anilist from './lookup/anilist';
 export * from './activity';
 export * from './avatar';
 export * from './ratings';
+export * from './social';

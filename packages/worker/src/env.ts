@@ -14,4 +14,8 @@ export interface Env {
   TMDB_KEY?: string;
   IGDB_ID?: string;
   IGDB_SECRET?: string;
+  /** Admin invites (S1): Cloudflare API token with Access: Apps and Policies Edit. Secret. */
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
+  ACCESS_POLICY_ID?: string;
 }

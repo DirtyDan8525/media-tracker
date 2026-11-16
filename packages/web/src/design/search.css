@@ -22,5 +22,8 @@
 .seg__opt--on { background: var(--panel); color: var(--text); font-weight: 700; box-shadow: inset 0 -3px 0 var(--highlight); }
 /* Highlight text on Panels fails 4.5:1 on light themes, so the choice is marked by weight and a Highlight underline. */
 .seg__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.seg__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.seg__opt:has(.seg__input:focus-visible) { outline: 2px solid var(--highlight); outline-offset: -2px; }
+@supports not selector(:has(*)) {
+  .seg__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: -2px; }
+}
 @media (min-width: 768px) { .search-screen__controls { max-width: 560px; } }

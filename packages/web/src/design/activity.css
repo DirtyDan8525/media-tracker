@@ -8,7 +8,11 @@
 }
 .activity-filter__opt--on { background: var(--panel); color: var(--text); font-weight: 700; border-color: var(--highlight); }
 .activity-filter__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.activity-filter__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
+/* The ring shows for keyboard focus only; without :has() it falls back to any focus. */
+.activity-filter__opt:has(.activity-filter__input:focus-visible) { outline: 2px solid var(--highlight); outline-offset: 2px; }
+@supports not selector(:has(*)) {
+  .activity-filter__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
+}
 
 .activity { display: flex; flex-direction: column; gap: var(--space-6); }
 .activity__day { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -19,7 +23,7 @@
 .activity__more { align-self: flex-start; }
 
 .activity-line {
-  display: flex; align-items: center; gap: var(--space-6); min-height: 64px; padding: var(--space-5) var(--space-6);
+  position: relative; display: flex; align-items: center; gap: var(--space-6); min-height: 64px; padding: var(--space-5) var(--space-6);
   border-radius: var(--radius-xl); background: var(--card); color: var(--text);
 }
 .activity-line__avatar {
@@ -31,6 +35,11 @@
 .activity-line__sentence strong { color: var(--bright-text); }
 .activity-line__title { color: var(--text); text-decoration: none; }
 .activity-line__title:hover { text-decoration: underline; }
+/* The title link is stretched over the whole row (a 64 px tap target, not a 20 px line of text);
+   its focus ring is drawn around the row. */
+a.activity-line__title::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+a.activity-line__title:focus-visible { outline: none; }
+a.activity-line__title:focus-visible::after { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: var(--radius-xl); }
 .activity-line__time { font-size: var(--fs-pill); color: var(--muted-text); }
 .activity-line__cover { flex: none; display: block; line-height: 0; }
 @media (min-width: 768px) { .activity-filter { max-width: 560px; } }

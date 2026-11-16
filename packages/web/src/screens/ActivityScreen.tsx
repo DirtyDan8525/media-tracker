@@ -5,9 +5,9 @@ import { useActivity } from '../data/useActivity';
 import { Button } from '../design/components/Button';
 import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
-import { Icon } from '../design/components/Icon';
 import { SegRadio } from '../design/components/SegRadio';
 import { SkeletonRow } from '../design/components/Skeleton';
+import { useNow } from '../hooks';
 import { LIST_LABEL } from '../nav';
 import { useCurrentList } from '../shell/currentList';
 import { useAddFriend } from '../shell/comingWithFriends';
@@ -48,7 +48,8 @@ export function ActivityScreen() {
   // boundary still fold into one line.
   const lines = useMemo(() => mergeActivity(data?.pages.flatMap((p) => p.items) ?? []), [data]);
   const initial = (me.username ?? me.email).charAt(0).toUpperCase();
-  const now = new Date();
+  // Ticks once a minute while the screen is visible, so "5 min ago" keeps up.
+  const now = useNow();
 
   let body: ReactNode;
   if (filter !== 'you') {
@@ -66,12 +67,9 @@ export function ActivityScreen() {
     body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>;
   } else if (lines.length === 0 && !hasNextPage) {
     body = (
-      <div className="empty-state">
-        <div className="empty-state__icon"><Icon name="activity" size={28} /></div>
-        <h2 className="empty-state__title">Nothing here yet</h2>
-        <p className="empty-state__body">Add or rate something and it shows up here.</p>
-        {current && <Link className="btn btn--primary" to={`/list/${current}`}>Open {LIST_LABEL[current]}</Link>}
-      </div>
+      <EmptyState icon="activity" title="Nothing here yet" body="Add or rate something and it shows up here."
+        actionLabel={current ? `Open ${LIST_LABEL[current]}` : undefined}
+        actionHref={current ? `/list/${current}` : undefined} />
     );
   } else {
     const days: { label: string; lines: ActivityLine[] }[] = [];
@@ -83,9 +81,10 @@ export function ActivityScreen() {
     }
     body = (
       <div className="activity">
-        {days.map((d) => (
-          <section key={d.label} aria-labelledby={`activity-${d.label}`} className="activity__day">
-            <h2 id={`activity-${d.label}`} className="activity__day-title">{d.label}</h2>
+        {days.map((d, i) => (
+          // The id is an index: a day label ("Sat, 13 Nov") has spaces, which an IDREF can't hold.
+          <section key={d.label} aria-labelledby={`activity-day-${i}`} className="activity__day">
+            <h2 id={`activity-day-${i}`} className="activity__day-title">{d.label}</h2>
             <ul className="stack-10 plain-list">
               {d.lines.map((line) => <ActivityRow key={line.key} line={line} initial={initial} now={now} />)}
             </ul>

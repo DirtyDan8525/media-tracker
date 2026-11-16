@@ -81,6 +81,21 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     }
   });
 
+  // A link stretched over its row: its ::after fills the nearest positioned ancestor (the row), so
+  // the hit area is the row's height, as long as the link itself is not positioned.
+  it.each([
+    ['a.activity-line__title', '.activity-line'],
+  ] as const)('%s is stretched over %s', (link, row) => {
+    const after = rules(`${link}::after`).join(';');
+    expect(after, `${link}::after`).toMatch(/content:\s*['"]{2}/);
+    expect(after).toMatch(/position:\s*absolute/);
+    expect(after).toMatch(/inset:\s*0(;|$|\s)/);
+    expect(rules(link).join(';'), `${link} must not be positioned`).not.toMatch(/position:\s*(relative|absolute)/);
+    expect(rules(row).join(';'), `${row} needs position: relative`).toMatch(/position:\s*relative/);
+    const size = declared(row, ['height', 'min-height']) ?? 0;
+    expect(size, `${row} is ${size}px`).toBeGreaterThanOrEqual(TAP);
+  });
+
   it('the cell button is also at least 44 px wide, and hit areas sit on positioned controls', () => {
     expect(declared('.cell-btn', ['min-width'])).toBe(TAP);
     // v2: chips and compact buttons are 44 px themselves; any control that still pads with ::after must be positioned

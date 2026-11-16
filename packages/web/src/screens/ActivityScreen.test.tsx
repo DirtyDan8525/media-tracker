@@ -1,5 +1,5 @@
 import type { ActivityItem, ActivityPage } from '@media-tracker/shared';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBackend } from '../test/fakeBackend';
@@ -159,6 +159,73 @@ describe('ActivityScreen', () => {
     expect(await screen.findByText('Nothing here yet')).toBeInTheDocument();
     expect(screen.getByText('Add or rate something and it shows up here.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Anime' })).toHaveAttribute('href', '/list/anime');
+  });
+
+  it('each day is a region named by its heading, through a valid id (older days have spaces and commas in their label)', async () => {
+    const older = new Date(2026, 10, 12, 9, 0).toISOString();
+    fakeBackend({ extra: { 'GET /api/activity': { body: page([
+      item({ type: 'added', title: 'Bleach', createdAt: ago(5) }),
+      item({ type: 'added', title: 'Naruto', createdAt: older }),
+    ]) } } });
+    const { container } = renderApp('/activity');
+    await screen.findByRole('link', { name: 'Naruto' });
+    const olderLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(older));
+    expect(screen.getByRole('region', { name: 'Today' })).toContainElement(screen.getByRole('link', { name: 'Bleach' }));
+    expect(screen.getByRole('region', { name: olderLabel })).toContainElement(screen.getByRole('link', { name: 'Naruto' }));
+    for (const s of container.querySelectorAll('section[aria-labelledby]')) {
+      const id = s.getAttribute('aria-labelledby')!;
+      expect(id, 'an IDREF has no whitespace or commas').toMatch(/^[A-Za-z][\w-]*$/);
+      expect(document.getElementById(id)?.tagName).toBe('H2');
+    }
+  });
+
+  it('the relative time ticks while the screen is open', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(NOW);
+    fakeBackend({ extra: { 'GET /api/activity': { body: page([item({ type: 'added', title: 'Bleach', createdAt: NOW.toISOString() })]) } } });
+    renderApp('/activity');
+    const row = (await screen.findByRole('link', { name: 'Bleach' })).closest('li')!;
+    expect(row.querySelector('time')).toHaveTextContent('just now');
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(row.querySelector('time')).toHaveTextContent('1 min ago');
+    act(() => { vi.advanceTimersByTime(4 * 60_000); });
+    expect(row.querySelector('time')).toHaveTextContent('5 min ago');
+  });
+
+  it('a failed Show more says "Couldn\'t load more." and keeps the loaded lines and the button', async () => {
+    fakeBackend({ extra: { 'GET /api/activity': (_b, url) => {
+      if (url.searchParams.get('before')) throw new TypeError('Failed to fetch');
+      return { body: page([item({ type: 'added', title: 'Newer', createdAt: ago(2) })], { before: ago(2), beforeId: 'a-last' }) };
+    } } });
+    renderApp('/activity');
+    await screen.findByRole('link', { name: 'Newer' });
+    expect(screen.queryByText("Couldn't load more.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await screen.findByText("Couldn't load more.")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load more.").closest('[role="status"]')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Newer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeEnabled();
+  });
+
+  it('Show more is disabled and busy while the next page loads', async () => {
+    let release: (() => void) | undefined;
+    fakeBackend({ extra: { 'GET /api/activity': (_b, url) => {
+      if (!url.searchParams.get('before')) {
+        return { body: page([item({ type: 'added', title: 'Newer', createdAt: ago(2) })], { before: ago(2), beforeId: 'a-last' }) };
+      }
+      return new Promise((resolve) => {
+        release = () => resolve({ body: page([item({ type: 'added', title: 'Older', createdAt: ago(300) })]) });
+      });
+    } } });
+    renderApp('/activity');
+    await screen.findByRole('link', { name: 'Newer' });
+    const more = screen.getByRole('button', { name: 'Show more' });
+    expect(more).not.toHaveAttribute('aria-busy', 'true');
+    await userEvent.click(more);
+    await waitFor(() => expect(more).toBeDisabled());
+    expect(more).toHaveAttribute('aria-busy', 'true');
+    release!();
+    expect(await screen.findByRole('link', { name: 'Older' })).toBeInTheDocument();
   });
 
   it('offline shows "Couldn\'t load your activity" with Retry', async () => {

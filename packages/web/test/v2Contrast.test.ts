@@ -53,6 +53,18 @@ describe('v2 contrast', () => {
       expect(contrast(t[role!]!, t.Panels!), `${name} ${role} on Panels`).toBeGreaterThanOrEqual(4.5);
     });
 
+  // The initial in an Activity line's avatar circle (Task 5 review).
+  it.each(NAMES)('%s: the Activity avatar initial is >= 4.5:1 on its circle', (name) => {
+    const d = decls('.activity-line__avatar');
+    const ROLE: Record<string, string> = { ...ROLE_OF_VAR, panel: 'Panels', card: 'Cards', bg: 'Background' };
+    const fg = ROLE[/var\(--([\w-]+)\)/.exec(d.color ?? '')?.[1] ?? ''];
+    const bg = ROLE[/var\(--([\w-]+)\)/.exec(d.background ?? '')?.[1] ?? ''];
+    expect(fg, `color is ${d.color}`).toBeTruthy();
+    expect(bg, `background is ${d.background}`).toBeTruthy();
+    const t = THEMES[name]!;
+    expect(contrast(t[fg!]!, t[bg!]!), `${name} ${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('the backdrop is hidden where color-mix() (its scrim) is unsupported', () => {
     expect(css).toMatch(/@supports not \(background: color-mix\(in srgb, red, blue\)\)\s*\{\s*\.backdrop\s*\{\s*display:\s*none;?\s*\}/);
   });

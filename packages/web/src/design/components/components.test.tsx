@@ -88,6 +88,14 @@ describe('design components: accessible names', () => {
     expect(onAction).toHaveBeenCalled();
   });
 
+  it('EmptyState can lead somewhere instead: a primary-styled link', () => {
+    render(<MemoryRouter><EmptyState icon="activity" title="Nothing here yet" actionLabel="Open Anime" actionHref="/list/anime" /></MemoryRouter>);
+    const link = screen.getByRole('link', { name: 'Open Anime' });
+    expect(link).toHaveAttribute('href', '/list/anime');
+    expect(link).toHaveClass('btn', 'btn--primary');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('Toast announces through a status region', async () => {
     function Harness() {
       const toast = useToast();

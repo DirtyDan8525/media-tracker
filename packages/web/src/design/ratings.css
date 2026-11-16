@@ -120,3 +120,6 @@
 .stats__list-dl dt { font-size: var(--fs-pill); color: var(--muted-text); }
 .stats__list-dl dd { margin: 0; font-size: var(--fs-body); color: var(--bright-text); font-variant-numeric: tabular-nums; }
 .stats__more { align-self: flex-start; }
+/* each list's tier counts ("Loved 14 · Liked 22 …"), under the list name on phone cards and in the PC table */
+.stats__tiers { display: block; margin: 0; font-size: var(--fs-pill); font-weight: 400; color: var(--muted-text); font-variant-numeric: tabular-nums; }
+.stats__table tbody th .stats__tiers { margin-top: var(--space-1); }

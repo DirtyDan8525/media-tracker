@@ -17,6 +17,43 @@ const rows = (): Entry[] => [
 afterEach(() => setViewportWidth(390));
 
 describe('Stats screen', () => {
+  const tiered = (): Entry[] => [
+    makeEntry({ category: 'anime', rating: 9.8, tier: 3 }), makeEntry({ category: 'anime', rating: 9.5, tier: 3 }),
+    makeEntry({ category: 'anime', rating: 8, tier: 2 }), makeEntry({ category: 'anime', rating: 2, tier: 0 }),
+    makeEntry({ category: 'anime', rating: null, tier: null }),
+    makeEntry({ category: 'movies', rating: 6.5, tier: 1 }),
+  ];
+
+  it('phone cards show each list\'s tier counts under that list\'s own names, top first', async () => {
+    const me = makeMe();
+    me.settings = { ...me.settings, tiers: { anime: { names: ['Skip', 'Okay', 'Great', 'Peak'], bounds: [5, 7, 9.5] } } };
+    fakeBackend({ entries: tiered(), me });
+    renderApp('/stats');
+    const cards = await screen.findByRole('list', { name: 'Stats by list' });
+    const anime = within(cards).getByRole('heading', { name: 'Anime' }).closest('li')!;
+    expect(within(anime).getByText('Peak 2 · Great 1 · Okay 0 · Skip 1')).toBeInTheDocument();
+    const movies = within(cards).getByRole('heading', { name: 'Movies' }).closest('li')!;
+    expect(within(movies).getByText("Loved 0 · Liked 0 · Fine 1 · Didn't like 0")).toBeInTheDocument();
+  });
+
+  it('the PC table puts the same line under the list name, and All media has none', async () => {
+    setViewportWidth(1200);
+    fakeBackend({ entries: tiered(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false }) });
+    renderApp('/stats');
+    const table = await screen.findByRole('table', { name: 'Stats by list' });
+    const anime = within(table).getByRole('row', { name: /^Anime/ });
+    expect(within(anime).getByText("Loved 2 · Liked 1 · Fine 0 · Didn't like 1")).toBeInTheDocument();
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(6);
+    expect(within(within(table).getByRole('row', { name: /^All media/ })).queryByText(/Loved/)).not.toBeInTheDocument();
+  });
+
+  it('a list with no tiered titles shows no tier line', async () => {
+    fakeBackend({ entries: [makeEntry({ category: 'anime', rating: null, tier: null })] });
+    renderApp('/stats');
+    const cards = await screen.findByRole('list', { name: 'Stats by list' });
+    expect(within(cards).queryByText(/Loved/)).not.toBeInTheDocument();
+  });
+
   it('labels the all-media numbers and charts have text equivalents', async () => {
     fakeBackend({ entries: rows() });
     renderApp('/stats');

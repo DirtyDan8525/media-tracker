@@ -1,5 +1,6 @@
 import { COMPARE_ASK } from '@media-tracker/shared';
 import { useId } from 'react';
+import { Link } from 'react-router';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
 import { Icon } from '../../design/components/Icon';
 import { useSessionMe } from '../../shell/SessionGate';
@@ -20,6 +21,12 @@ export function CompareOptions() {
           <Icon name="chevron" size={16} />
         </span>
       </div>
+      <Link to="/settings/tiers" className="group__row">
+        <span className="group__row-start"><span className="tile-icon"><Icon name="stats" size={18} /></span>Rating tiers</span>
+      </Link>
+      <Link to="/retier/anime" className="group__row">
+        <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Re-tier review</span>
+      </Link>
     </div>
   );
 }

@@ -197,3 +197,41 @@ describe('sanitizeSettings', () => {
     expect(JSON.stringify(cur)).toBe(before);
   });
 });
+
+describe('settings and rating tiers', () => {
+  const custom = { names: ['Meh', 'OK', 'Good', 'Great'], bounds: [5, 7, 8.5] };
+
+  it('PUT /api/me/settings ignores a tiers key', async () => {
+    const A = 'a@example.com';
+    expect((await as(A, '/api/ratings/tiers/anime', 'PUT', { tiers: custom })).status).toBe(200);
+    const res = await putSettings(A, { theme: 'Ocean', tiers: { anime: null, movies: custom } });
+    expect(res.status).toBe(200);
+    const { settings } = (await res.json()) as { settings: typeof DEFAULT_USER_SETTINGS };
+    expect(settings.theme).toBe('Ocean');
+    expect(settings.tiers).toEqual({ anime: custom });
+    // A tiers key alone, even a malformed one, is ignored rather than refused.
+    expect((await putSettings(A, { tiers: 'nope' })).status).toBe(200);
+    const me = (await (await as(A, '/api/me')).json()) as { settings: typeof DEFAULT_USER_SETTINGS };
+    expect(me.settings.tiers).toEqual({ anime: custom });
+    expect(sanitizeSettings({ tiers: { anime: custom } }, DEFAULT_USER_SETTINGS)).toEqual({ ok: true, settings: DEFAULT_USER_SETTINGS });
+  });
+
+  it('the settings loader drops unknown stored keys', async () => {
+    const A = 'a@example.com';
+    await as(A, '/api/me');
+    const stored = {
+      ...DEFAULT_USER_SETTINGS, compareAsk: 'Off', sheetOnly: 'stale', ratingStyle: 1,
+      tiers: { anime: custom, movies: { names: ['a', 'b', 'c', 'd'], bounds: [6, 6.1, 9] }, nope: custom },
+    };
+    await env.DB.prepare('UPDATE users SET settings_json = ? WHERE email = ?').bind(JSON.stringify(stored), A).run();
+    const me = (await (await as(A, '/api/me')).json()) as { settings: Record<string, unknown> };
+    expect(Object.keys(me.settings).sort()).toEqual(Object.keys(DEFAULT_USER_SETTINGS).sort());
+    expect(me.settings.compareAsk).toBe('Off');
+    // Tier sets that aren't valid (or aren't a list's) are dropped too, so they fall back to the defaults.
+    expect(me.settings.tiers).toEqual({ anime: custom });
+    // …and a later settings write doesn't carry the stale keys along.
+    await putSettings(A, { theme: 'Ocean' });
+    const raw = await env.DB.prepare('SELECT settings_json FROM users WHERE email = ?').bind(A).first<{ settings_json: string }>();
+    expect(Object.keys(JSON.parse(raw!.settings_json)).sort()).toEqual(Object.keys(DEFAULT_USER_SETTINGS).sort());
+  });
+});

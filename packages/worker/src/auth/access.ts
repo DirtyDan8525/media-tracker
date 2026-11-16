@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { MiddlewareHandler } from 'hono';
-import { DEFAULT_USER_SETTINGS, type UserSettings } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, validateTierSet, type Category, type UserSettings } from '@media-tracker/shared';
 import type { Env } from '../env';
 
 export interface AppUser {
@@ -55,20 +55,41 @@ interface UserRow {
   is_admin: number;
 }
 
-function toAppUser(row: UserRow): AppUser {
-  let stored: Partial<UserSettings> = {};
+const SETTINGS_KEYS = Object.keys(DEFAULT_USER_SETTINGS) as (keyof UserSettings)[];
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Stored settings merged over the defaults, keeping only the known UserSettings keys, so stale
+ * keys (old Sheet settings, removed options) stop riding along into responses and later writes.
+ * Tier sets are kept only for real lists and only when valid: they feed the ratings model.
+ */
+export function loadSettings(json: string): UserSettings {
+  let stored: unknown = {};
   try {
-    stored = JSON.parse(row.settings_json) as Partial<UserSettings>;
+    stored = JSON.parse(json);
   } catch {
     // corrupt settings fall back to defaults
   }
+  const known: Partial<Record<keyof UserSettings, unknown>> = {};
+  if (isPlainObject(stored)) for (const k of SETTINGS_KEYS) if (Object.hasOwn(stored, k)) known[k] = stored[k];
+  const tiers: UserSettings['tiers'] = {};
+  if (isPlainObject(known.tiers)) {
+    for (const [k, v] of Object.entries(known.tiers)) {
+      const t = Object.hasOwn(CATEGORY_CONFIG, k) ? validateTierSet(v) : null;
+      if (t !== null) tiers[k as Category] = t;
+    }
+  }
+  // merge over defaults so older rows missing a key still get one
+  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers };
+}
+
+function toAppUser(row: UserRow): AppUser {
   return {
     id: row.id,
     email: row.email,
     username: row.username,
     isAdmin: row.is_admin === 1,
-    // merge over defaults so older rows missing a key still get one
-    settings: { ...DEFAULT_USER_SETTINGS, ...stored },
+    settings: loadSettings(row.settings_json),
   };
 }
 

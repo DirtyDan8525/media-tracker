@@ -28,7 +28,8 @@ export type SanitizeResult = { ok: true; settings: UserSettings } | { ok: false 
 
 /**
  * Validates a partial settings update and merges it into `current`.
- * Unknown keys are dropped; a known key with a bad value fails the whole update.
+ * Unknown keys are dropped; a known key with a bad value fails the whole update. `tiers` is
+ * dropped too: only PUT /api/ratings/tiers/:list writes it, because a change re-fits scores (Q3).
  * `tabs` and `colors` merge per key; scalars replace. Does not mutate `current`.
  */
 export function sanitizeSettings(partial: unknown, current: UserSettings): SanitizeResult {

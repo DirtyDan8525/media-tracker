@@ -4,7 +4,7 @@ import { app } from '../src/index';
 import type { Env } from '../src/env';
 import {
   DEFAULT_TIERS, applyMove, fitTier, priorFromScore, refitSet, scoreOf, tierFor, tierRange,
-  type Comparison, type Entry, type RatedItem, type SavePayload, type Season, type SetItem, type Tier,
+  type Comparison, type Entry, type RatedItem, type SavePayload, type Season, type SetItem, type Tier, type TierSet,
 } from '@media-tracker/shared';
 import { loadSet, planSave } from '../src/ratings/store';
 import { spyD1 } from './d1spy';
@@ -557,5 +557,131 @@ describe('rating edits re-fit their set', () => {
     expect(body.comparisons.map((c) => [c.category, c.winnerId, c.loserId, c.isTie, c.undoneAt === null])).toEqual([
       ['anime', a, b, false, true], ['anime', b, a, false, false], ['anime_seasons', s2, s1, true, true],
     ]);
+  });
+});
+
+describe('PUT /api/ratings/tiers/:list', () => {
+  const NAMES = DEFAULT_TIERS.names;
+  const putTiers = (email: string, list: string, tiers: unknown, db?: D1Database) =>
+    as(email, `/api/ratings/tiers/${list}`, 'PUT', { tiers }, db);
+  type Settings = { tiers: Record<string, TierSet> };
+
+  /** A list with every kind of title: fitted, unfitted (incl. two decimals), locked, tier-only, legacy. */
+  async function library(uid: string) {
+    const loved = await seed(uid, 'anime', [9.97, 9.5, 9.4, 9.0, 9.3]);
+    const liked = await seed(uid, 'anime', [8.25, 7.5, 8.99]);
+    const low = await seed(uid, 'anime', [7.49, 6, 5.99, 0]);
+    const [legacy] = await seed(uid, 'anime', [9.2], { legacy: true });
+    await save(A, 'anime', { picks: [pick(loved[2]!, loved[1]!)] });
+    await patch(A, loved[4]!, { scoreLocked: true });
+    const tierOnly = ((await (await as(A, '/api/entries', 'POST', { category: 'anime', title: 'Mid', tier: 2 })).json()) as { entry: Entry }).entry.id;
+    const [s] = await seedSeasons(loved[0]!, [8.25]);
+    const movies = await seed(uid, 'movies', [9.5, 8.25]);
+    return { loved, liked, low, legacy: legacy!, tierOnly, season: s!, movies };
+  }
+
+  it('changing Loved to 8.5–10 moves no titles between tiers and spreads their scores', async () => {
+    const uid = await userId(A);
+    const lib = await library(uid);
+    const all = [...lib.loved, ...lib.liked, lib.legacy, lib.tierOnly];
+    const before = await rows('entries', all);
+    const next: TierSet = { names: NAMES, bounds: [6, 7.5, 8.5] };
+    const spy = spyD1(env.DB);
+    const res = await putTiers(A, 'anime', next, spy.db);
+    expect(res.status).toBe(200);
+    expect(spy.queries).toBeLessThanOrEqual(10);
+    expect(spy.maxParams).toBeLessThanOrEqual(100);
+    const body = (await res.json()) as { settings: Settings; entries: Entry[] };
+    expect(body.settings.tiers.anime).toEqual(next);
+
+    const after = await rows('entries', all);
+    // No title changes tier, and no prior changes: only the range under them.
+    expect(after.map((r) => r.tier)).toEqual([3, 3, 3, 3, 3, 2, 2, 2, 3, 2]);
+    expect(after.map((r) => r.prior_mean)).toEqual(before.map((r) => r.prior_mean ?? priorFromScore(r.rating!, tierRange(DEFAULT_TIERS, tierFor(r.rating!, DEFAULT_TIERS)))));
+    for (const r of after) {
+      if (r.score_locked === 1) continue;
+      const [lo, hi] = tierRange(next, r.tier!);
+      expect(r.rating!).toBeGreaterThanOrEqual(lo);
+      expect(r.rating!).toBeLessThan(hi === 10 ? 10.01 : hi);
+      expect(tierFor(r.rating!, next)).toBe(r.tier);
+    }
+    // Unfitted titles show their prior in the new range; Liked's middle (8.25) is now 8.0.
+    const byId = new Map(after.map((r) => [r.id, r]));
+    expect(byId.get(lib.liked[0]!)!.rating).toBe(8);
+    expect(byId.get(lib.tierOnly)!.rating).toBe(8);
+    expect(byId.get(lib.loved[0]!)!.rating).toBe(Math.round(scoreOf(byId.get(lib.loved[0]!)!.prior_mean!, [8.5, 10]) * 10) / 10);
+    // The locked title keeps its number exactly.
+    expect(byId.get(lib.loved[4]!)!.rating).toBe(9.3);
+    // The response carries the changed entries with the DB's values.
+    expect(body.entries.map((e) => e.id).sort()).toEqual(after.filter((r, k) => JSON.stringify(r) !== JSON.stringify(before[k])).map((r) => r.id).sort());
+    for (const e of body.entries) expect(fields(e)).toEqual(fields(asItem(byId.get(e.id)!)));
+    // The season tab follows its list's tiers: 8.25 in Liked is now 8.0.
+    const [season] = await rows('seasons', [lib.season]);
+    expect([season!.tier, season!.rating]).toEqual([2, 8]);
+    // And the Worker's own read agrees with a full refit of the new ranges (nothing left to do).
+    const items = (await env.DB.prepare("SELECT * FROM entries WHERE user_id = ? AND category = 'anime'").bind(uid).all<Row>()).results.map(asItem);
+    const comps = (await comparisonsOf(uid)).map((c) => ({ id: c.id, winnerId: c.winner_id, loserId: c.loser_id, isTie: c.is_tie === 1, createdAt: c.created_at, undoneAt: c.undone_at }));
+    expect(refitSet(items, comps, next)).toEqual([]);
+  });
+
+  it('other lists keep their tiers and scores (and so do the tiers whose range did not change)', async () => {
+    const uid = await userId(A);
+    const lib = await library(uid);
+    const untouched = [...lib.low, ...lib.movies];
+    const before = await rows('entries', untouched);
+    await putTiers(A, 'anime', { names: NAMES, bounds: [6, 7.5, 8.5] });
+    expect(await rows('entries', untouched)).toEqual(before);
+    const me = (await (await as(A, '/api/me')).json()) as { settings: Settings };
+    expect(Object.keys(me.settings.tiers)).toEqual(['anime']);
+    // A names-only change re-fits nothing.
+    const all = (await env.DB.prepare('SELECT * FROM entries ORDER BY rowid').all()).results;
+    const res = await putTiers(A, 'anime', { names: ['Nope', 'Fine', 'Liked', 'Loved'], bounds: [6, 7.5, 8.5] });
+    expect(((await res.json()) as { entries: Entry[] }).entries).toEqual([]);
+    expect((await env.DB.prepare('SELECT * FROM entries ORDER BY rowid').all()).results).toEqual(all);
+  });
+
+  it('null resets to defaults; an invalid TierSet is 400 and changes nothing', async () => {
+    const uid = await userId(A);
+    const lib = await library(uid);
+    const original = await rows('entries', lib.liked);
+    await putTiers(A, 'anime', { names: NAMES, bounds: [6, 7.5, 8.5] });
+    const snapshot = (await env.DB.prepare('SELECT * FROM entries ORDER BY rowid').all()).results;
+    const settingsBefore = (await env.DB.prepare('SELECT settings_json FROM users WHERE id = ?').bind(uid).first<{ settings_json: string }>())!.settings_json;
+    const bad: [string, unknown][] = [
+      ['anime', { names: NAMES, bounds: [6, 6.2, 9] }],
+      ['anime', { names: ['a', 'A', 'b', 'c'], bounds: [6, 7.5, 9] }],
+      ['anime', { names: NAMES, bounds: [6, 7.55, 9] }],
+      ['anime', { names: NAMES, bounds: [6, 7.5] }],
+      ['anime', { names: ['', 'b', 'c', 'd'], bounds: [6, 7.5, 9] }],
+      ['anime', 'defaults'],
+      ['anime_seasons', null],
+      ['nope', null],
+    ];
+    for (const [list, tiers] of bad) expect((await putTiers(A, list, tiers)).status, `${list} ${JSON.stringify(tiers)}`).toBe(400);
+    expect((await as(A, '/api/ratings/tiers/anime', 'PUT', {})).status).toBe(400);
+    expect((await as(A, '/api/ratings/tiers/anime', 'PUT', undefined, env.DB, '{x')).status).toBe(400);
+    expect((await env.DB.prepare('SELECT * FROM entries ORDER BY rowid').all()).results).toEqual(snapshot);
+    expect((await env.DB.prepare('SELECT settings_json FROM users WHERE id = ?').bind(uid).first<{ settings_json: string }>())!.settings_json).toBe(settingsBefore);
+
+    const res = await putTiers(A, 'anime', null);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { settings: Settings }).settings.tiers).toEqual({});
+    // Back on the defaults, the unfitted Liked titles show their priors again (8.25 → 8.3 is
+    // round1 of the prior's score, 7.5 → 7.5).
+    const back = await rows('entries', lib.liked);
+    expect(back.map((r) => r.tier)).toEqual(original.map((r) => r.tier));
+    expect(back.map((r) => r.prior_mean)).toEqual(original.map((r) => r.prior_mean));
+    for (const r of back) expect(r.rating).toBe(Math.min(8.9, Math.round(scoreOf(r.prior_mean!, [7.5, 9]) * 10) / 10));
+  });
+
+  it("only changes the signed-in user's rows", async () => {
+    const uidB = await userId(B);
+    const theirs = await seed(uidB, 'anime', [9.5, 8.25]);
+    const before = await rows('entries', theirs);
+    await userId(A);
+    expect((await putTiers(A, 'anime', { names: NAMES, bounds: [5, 7, 8] })).status).toBe(200);
+    expect(await rows('entries', theirs)).toEqual(before);
+    const me = (await (await as(B, '/api/me')).json()) as { settings: Settings };
+    expect(me.settings.tiers).toEqual({});
   });
 });

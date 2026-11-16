@@ -76,7 +76,7 @@ describe('PUT /api/me/settings', () => {
     const imported = {
       theme: 'Ocean', colors: { Background: '#0f1c2b' },
       tabs: { movies: true, tv: true, tvSeasons: true, animeSeasons: true, albums: true, songs: false, games: true, books: true },
-      compareAsk: 'Only when I start it', compareStyle: 'Swap the numbers', compareRoom: 'Give the same score', compareWindow: 1.5,
+      compareAsk: 'Only when I start it',
     };
     const res = await putSettings('a@example.com', imported);
     expect(res.status).toBe(200);
@@ -159,15 +159,13 @@ describe('sanitizeSettings', () => {
   const bad = (p: unknown) => expect(sanitizeSettings(p, cur)).toEqual({ ok: false });
 
   it('accepts each enum value and Custom theme', () => {
-    const r = sanitizeSettings(
-      { theme: 'Custom', compareAsk: 'Off', compareStyle: 'Swap the numbers', compareRoom: 'Push others down', compareWindow: 10 },
-      cur,
-    );
-    expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off', compareWindow: 10 } });
+    const r = sanitizeSettings({ theme: 'Custom', compareAsk: 'Off' }, cur);
+    expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off' } });
   });
 
-  it('accepts decimal and boundary compareWindow', () => {
-    for (const w of [0.5, 1.5, 10]) expect(sanitizeSettings({ compareWindow: w }, cur)).toMatchObject({ ok: true, settings: { compareWindow: w } });
+  it('drops the removed Sheet compare keys (an older client may still send them) instead of refusing the update', () => {
+    const r = sanitizeSettings({ theme: 'Ocean', compareStyle: 'Swap the numbers', compareRoom: 'x', compareWindow: 99 }, cur);
+    expect(r).toEqual({ ok: true, settings: { ...cur, theme: 'Ocean' } });
   });
 
   it("searchScope 'current' saves, 'everywhere' is rejected, and the default is 'all'", () => {
@@ -185,15 +183,6 @@ describe('sanitizeSettings', () => {
     bad({ colors: [] });
     bad({ tabs: { anime: 'yes' } });
     bad({ tabs: null });
-    bad({ compareStyle: 'x' });
-    bad({ compareRoom: 'x' });
-    bad({ compareWindow: 0 });
-    bad({ compareWindow: -1 });
-    bad({ compareWindow: 10.5 });
-    bad({ compareWindow: 11 });
-    bad({ compareWindow: '2' });
-    bad({ compareWindow: NaN });
-    bad({ compareWindow: Infinity });
     bad(null);
     bad([]);
   });
@@ -213,5 +202,56 @@ describe('PUT /api/me/settings searchScope', () => {
     expect((await putSettings('a@example.com', { searchScope: 'everywhere' })).status).toBe(400);
     const me = (await (await as('a@example.com', '/api/me')).json()) as { settings: { searchScope: string } };
     expect(me.settings.searchScope).toBe('current');
+  });
+});
+
+describe('settings and rating tiers', () => {
+  const custom = { names: ['Meh', 'OK', 'Good', 'Great'], bounds: [5, 7, 8.5] };
+
+  it('PUT /api/me/settings ignores a tiers key', async () => {
+    const A = 'a@example.com';
+    expect((await as(A, '/api/ratings/tiers/anime', 'PUT', { tiers: custom })).status).toBe(200);
+    const res = await putSettings(A, { theme: 'Ocean', tiers: { anime: null, movies: custom } });
+    expect(res.status).toBe(200);
+    const { settings } = (await res.json()) as { settings: typeof DEFAULT_USER_SETTINGS };
+    expect(settings.theme).toBe('Ocean');
+    expect(settings.tiers).toEqual({ anime: custom });
+    // A tiers key alone, even a malformed one, is ignored rather than refused.
+    expect((await putSettings(A, { tiers: 'nope' })).status).toBe(200);
+    const me = (await (await as(A, '/api/me')).json()) as { settings: typeof DEFAULT_USER_SETTINGS };
+    expect(me.settings.tiers).toEqual({ anime: custom });
+    expect(sanitizeSettings({ tiers: { anime: custom } }, DEFAULT_USER_SETTINGS)).toEqual({ ok: true, settings: DEFAULT_USER_SETTINGS });
+  });
+
+  it('saved settings that still hold the dropped Sheet compare keys load without them, and a later write drops them from storage', async () => {
+    const A = 'a@example.com';
+    await as(A, '/api/me');
+    const stored = { ...DEFAULT_USER_SETTINGS, compareAsk: 'Off', compareStyle: 'Swap the numbers', compareRoom: 'Push others down', compareWindow: 2.5 };
+    await env.DB.prepare('UPDATE users SET settings_json = ? WHERE email = ?').bind(JSON.stringify(stored), A).run();
+    const me = (await (await as(A, '/api/me')).json()) as { settings: Record<string, unknown> };
+    expect(me.settings).toEqual({ ...DEFAULT_USER_SETTINGS, compareAsk: 'Off' });
+    expect((await putSettings(A, { theme: 'Ocean', compareWindow: 3 })).status).toBe(200);
+    const raw = await env.DB.prepare('SELECT settings_json FROM users WHERE email = ?').bind(A).first<{ settings_json: string }>();
+    const keys = Object.keys(JSON.parse(raw!.settings_json));
+    for (const k of ['compareStyle', 'compareRoom', 'compareWindow']) expect(keys).not.toContain(k);
+  });
+
+  it('the settings loader drops unknown stored keys', async () => {
+    const A = 'a@example.com';
+    await as(A, '/api/me');
+    const stored = {
+      ...DEFAULT_USER_SETTINGS, compareAsk: 'Off', sheetOnly: 'stale', ratingStyle: 1,
+      tiers: { anime: custom, movies: { names: ['a', 'b', 'c', 'd'], bounds: [6, 6.1, 9] }, nope: custom },
+    };
+    await env.DB.prepare('UPDATE users SET settings_json = ? WHERE email = ?').bind(JSON.stringify(stored), A).run();
+    const me = (await (await as(A, '/api/me')).json()) as { settings: Record<string, unknown> };
+    expect(Object.keys(me.settings).sort()).toEqual(Object.keys(DEFAULT_USER_SETTINGS).sort());
+    expect(me.settings.compareAsk).toBe('Off');
+    // Tier sets that aren't valid (or aren't a list's) are dropped too, so they fall back to the defaults.
+    expect(me.settings.tiers).toEqual({ anime: custom });
+    // …and a later settings write doesn't carry the stale keys along.
+    await putSettings(A, { theme: 'Ocean' });
+    const raw = await env.DB.prepare('SELECT settings_json FROM users WHERE email = ?').bind(A).first<{ settings_json: string }>();
+    expect(Object.keys(JSON.parse(raw!.settings_json)).sort()).toEqual(Object.keys(DEFAULT_USER_SETTINGS).sort());
   });
 });

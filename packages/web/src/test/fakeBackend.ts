@@ -9,7 +9,7 @@ export function makeEntry(over: Partial<Entry> = {}): Entry {
     id: `e${n}`, userId: 'u1', category: 'anime', title: `Title ${n}`, typedTitle: '', status: null, rating: null, genres: '',
     creator: '', album: '', coverUrl: '', notes: '', releaseDate: '', synopsis: '', lengthLabel: '', origin: '',
     detailsState: 'none', isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null,
-    seasonAvg: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', ...over,
+    seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', ...over,
   };
 }
 
@@ -76,7 +76,7 @@ export function fakeBackend(opts: BackendOptions = {}) {
     },
     'GET /api/entries/:id/seasons': (_b, _u, p) => ({ body: seasons.filter((s) => s.entryId === p.id) }),
     'POST /api/entries/:id/seasons': (b, _u, p) => {
-      const s: Season = { id: `s${seasons.length + 1}-${Math.random().toString(36).slice(2, 6)}`, entryId: p.id!, label: '', rating: null, notes: '', ...(b as object) };
+      const s: Season = { id: `s${seasons.length + 1}-${Math.random().toString(36).slice(2, 6)}`, entryId: p.id!, label: '', rating: null, notes: '', tier: null, priorMean: null, strength: null, scoreLocked: false, ...(b as object) };
       seasons.push(s);
       return { status: 201, body: s };
     },

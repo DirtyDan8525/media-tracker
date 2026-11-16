@@ -64,26 +64,6 @@ export function activityForPatch(
   return out;
 }
 
-/** One statement for a whole Compare save (3 bound parameters however many titles). Batch BEFORE the UPDATE. */
-export function activityForCompareSave(
-  db: D1Database,
-  userId: string,
-  changesJson: string,
-  now: string,
-): D1PreparedStatement {
-  return db
-    .prepare(
-      `${INSERT}
-       SELECT ${NEW_ID}, e.user_id, e.id, CASE WHEN e.rating IS NULL THEN 'rated' ELSE 're-rated' END,
-              json_object('from', e.rating, 'to', j.rating, 'via', 'compare'), ?3, ?3
-         FROM entries e
-         JOIN (SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rating') AS rating FROM json_each(?1)) j
-           ON j.id = e.id
-        WHERE e.user_id = ?2 AND (e.rating IS NULL OR e.rating <> j.rating)`,
-    )
-    .bind(changesJson, userId, now);
-}
-
 interface Row {
   id: string; type: ActivityType; entry_id: string; payload_json: string; created_at: string;
   category: Category; title: string; cover_url: string;

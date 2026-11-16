@@ -1,7 +1,7 @@
-import { CATEGORY_CONFIG } from '@media-tracker/shared';
+import type { Category } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { useCallback, useRef, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
@@ -12,37 +12,35 @@ import { useIsWide } from '../hooks';
 import { enabledLists } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
-import { CompareHome } from './compare/CompareHome';
+import { CompareHome, HOME_TITLE } from './compare/CompareHome';
 import { PairView } from './compare/PairView';
 import { ReviewView, useFocusHeading } from './compare/ReviewView';
-import { useCompareFlow } from './compare/useCompareFlow';
+import { TierQuestion } from './compare/TierQuestion';
+import { useRatingFlow } from './compare/useRatingFlow';
 import '../design/compare.css';
 
-/** "Fix my ratings": the Sheet's Compare ratings dialog as a screen (route /compare). */
+/** "Fix my ratings" on the tier model (route /compare; `?place=<id>` places one title, then returns to its list). */
 export function CompareScreen() {
   const me = useSessionMe();
   const wide = useIsWide();
-  const flow = useCompareFlow();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const place = params.get('place') ?? undefined;
+  const onPlaced = useCallback((c: Category) => navigate(`/list/${c}`), [navigate]);
+  const flow = useRatingFlow(place ? { place, onPlaced } : {});
   const { view } = flow;
 
-  // Covers for the review rows (RatingChange carries none); the same queries the flow reads.
-  const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
-  const { data, isError } = useAllEntries(lists);
+  const { isError } = useAllEntries(enabledLists(me.settings));
   const qc = useQueryClient();
   // Once a run has been on screen, coming home moves focus to the home heading.
   const ranRun = useRef(false);
   if (view.kind !== 'loading' && view.kind !== 'off' && view.kind !== 'home') ranRun.current = true;
-  const byId = useMemo(() => new Map(Object.values(data).flat().map((e) => [e.id, e])), [data]);
-  const coverOf = useCallback((id: string) => {
-    const e = byId.get(id);
-    return e ? { src: e.coverUrl, square: CATEGORY_CONFIG[e.category].square } : undefined;
-  }, [byId]);
 
   switch (view.kind) {
     case 'loading':
       return (
         <div className="screen" aria-busy="true" aria-label="Loading">
-          <PageHeader title="Compare ratings" backTo="/more" />
+          <PageHeader title={HOME_TITLE} backTo="/more" />
           <div className="screen__body stack-10"><Skeleton height={64} /><Skeleton height={64} /></div>
         </div>
       );
@@ -57,7 +55,7 @@ export function CompareScreen() {
       if (isError) {
         return (
           <div className="screen">
-            <PageHeader title="Compare ratings" backTo="/more" />
+            <PageHeader title={HOME_TITLE} backTo="/more" />
             <div className="screen__body">
               <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
                 actionLabel="Retry" onAction={() => void qc.refetchQueries({ queryKey: ['entries'] })} />
@@ -67,21 +65,29 @@ export function CompareScreen() {
       }
       return (
         <CompareHome afterQueue={view.afterQueue} lists={view.lists} unrated={view.unrated} onlyNew={view.onlyNew}
-          window={me.settings.compareWindow} onList={flow.startList} onUnrated={flow.startUnrated}
-          focusHeading={ranRun.current} />
+          chosen={view.chosen} tiers={view.tiers} onList={flow.chooseList} onTier={flow.chooseTier} onRetryTiers={flow.retryTiers}
+          onUnrated={flow.startUnrated} focusHeading={ranRun.current} />
       );
     case 'ask':
       return (
         <RunFrame wide={wide} onHome={flow.toHome} covers={[view.left.cover, view.right.cover]}>
-          <PairView question={view.question} left={view.left} right={view.right} canBack={view.canBack}
-            onAnswer={flow.answer} onBack={flow.back} wide={wide} />
+          <PairView heading={view.heading} sub={view.sub} aId={view.aId} left={view.left} right={view.right}
+            progress={view.progress} canBack={view.canBack} settled={view.settled} tierNames={view.tierNames}
+            tierRanges={view.tierRanges} onAnswer={flow.answer} onBack={flow.back} onMove={flow.move} wide={wide} />
+        </RunFrame>
+      );
+    case 'tier':
+      return (
+        <RunFrame wide={wide} onHome={flow.toHome}>
+          <TierQuestion item={view.item} context={view.context} names={view.tierNames} ranges={view.ranges} canBack={view.canBack}
+            onPick={flow.pickTier} onBack={flow.back} onSkip={() => flow.answer('skip')} onStop={() => flow.answer('stop')} />
         </RunFrame>
       );
     case 'review':
       return (
         <RunFrame wide={wide} onHome={flow.toHome}>
-          <ReviewView changes={view.changes} asked={view.asked} canBack={view.canBack} hasNext={view.hasNext}
-            style={me.settings.compareStyle} coverOf={coverOf}
+          <ReviewView changes={view.changes} canBack={view.canBack} hasNext={view.hasNext} hasPicks={view.hasPicks}
+            tierNames={view.tierNames} coverOf={flow.coverOf} conflict={view.conflict} onReload={flow.reload}
             onBack={flow.back} onSave={() => void flow.save()} onDontSave={flow.dontSave} onNext={flow.next} />
         </RunFrame>
       );
@@ -97,17 +103,16 @@ export function CompareScreen() {
           <EndView title="Saved" sub="Top 5 and Stats update by themselves." action="Close" onAction={flow.next} />
         </RunFrame>
       );
-    case 'nothingToCompare':
+    case 'nothingLeft':
       return (
         <RunFrame wide={wide} onHome={flow.toHome}>
-          <EndView title={view.title} action="Next" onAction={flow.next}
-            sub={`Nothing on ${view.listName} is rated yet, so there's nothing to compare with. Give a couple of things a rating first.`} />
+          <EndView title="All settled" sub={view.line} action="Close" onAction={flow.next} />
         </RunFrame>
       );
   }
 }
 
-/** A run's screen: the way back to the Compare home (phone: arrow; PC: link-style), blurred covers behind on PC. */
+/** A run's screen: the way back to the home (phone: arrow; PC: link-style), blurred covers behind on PC. */
 /** Without `onHome` (while saving) the way home is shown but off, so a save can't land on a run that was left. */
 function RunFrame({ wide, onHome, covers, children }: { wide: boolean; onHome?: () => void; covers?: string[]; children: ReactNode }) {
   return (
@@ -119,8 +124,8 @@ function RunFrame({ wide, onHome, covers, children }: { wide: boolean; onHome?: 
       )}
       <div className="compare__top">
         {wide
-          ? <button type="button" className="compare__home-link" onClick={onHome} disabled={!onHome}>← Compare ratings</button>
-          : <IconButton label="Back to Compare ratings" icon="back" look="plain" onClick={onHome} disabled={!onHome} />}
+          ? <button type="button" className="compare__home-link" onClick={onHome} disabled={!onHome}>← {HOME_TITLE}</button>
+          : <IconButton label={`Back to ${HOME_TITLE}`} icon="back" look="plain" onClick={onHome} disabled={!onHome} />}
       </div>
       <div className="compare__body">{children}</div>
     </div>

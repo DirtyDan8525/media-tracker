@@ -1,6 +1,5 @@
 import type { Category } from '@media-tracker/shared';
 import { Link, NavLink, useLocation } from 'react-router';
-import { COMPARE_ENABLED } from '../../features';
 import { ADD_NOUN, addPath, SEARCH_PATH } from '../../nav';
 import { Icon } from './Icon';
 
@@ -8,8 +7,8 @@ import { Icon } from './Icon';
 const MORE_PATHS = ['/more', '/import', '/about', '/top5', '/stats'];
 
 /**
- * Phone bottom bar (B2, NavBar board): Add, Activity, Search (raised, centre), Compare (only while
- * Compare is enabled; otherwise an empty cell so Search stays centred), More. Five equal columns.
+ * Phone bottom bar (B2, NavBar board): Add, Activity, Search (raised, centre), Compare (slot 4 is
+ * always Compare, decisions 2026-11-15 Amendments), More. Five equal columns.
  * Add opens the current list's Add sheet (B3); with no list on there is no Add (an empty cell).
  */
 export function BottomTabs({ current, compareCount }: { current: Category | null; compareCount: number }) {
@@ -32,15 +31,13 @@ export function BottomTabs({ current, compareCount }: { current: Category | null
         <span className="bottom-tabs__search-circle"><Icon name="search" size={24} /></span>
         <span>Search</span>
       </NavLink>
-      {COMPARE_ENABLED ? (
-        <NavLink to="/compare" className="bottom-tabs__item" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
-          <span className="bottom-tabs__icon">
-            <Icon name="compare" size={22} />
-            {compareCount > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{compareCount}</span>}
-          </span>
-          <span>Compare</span>
-        </NavLink>
-      ) : <span className="bottom-tabs__empty" aria-hidden="true" />}
+      <NavLink to="/compare" className="bottom-tabs__item" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
+        <span className="bottom-tabs__icon">
+          <Icon name="compare" size={22} />
+          {compareCount > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{compareCount}</span>}
+        </span>
+        <span>Compare</span>
+      </NavLink>
       <Link to="/more" className={`bottom-tabs__item${moreCurrent ? ' active' : ''}`} aria-current={moreCurrent ? 'page' : undefined}>
         <Icon name="more" size={22} />
         <span>More</span>

@@ -1,10 +1,13 @@
-import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, sourceUrl, statusLabel, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
+import {
+  CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, sourceUrl, statusLabel, tierFor, tiersFor, type Entry, type LookupInfo, type Status, type Tier,
+} from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { removeEntryFromCache } from '../data/entryCache';
+import { refetchAfterDelete, retryOnConflict } from '../data/ratings';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntry } from '../data/useEntry';
 import { Button } from '../design/components/Button';
@@ -12,6 +15,7 @@ import { CountUp } from '../design/components/CountUp';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
 import { RatingBadge } from '../design/components/RatingBadge';
+import { TIERS_TOP_FIRST } from '../design/components/TierPicker';
 import { EmptyState } from '../design/components/EmptyState';
 import { Sheet } from '../design/components/Sheet';
 import { closestFirst } from '../hooks/useAddEntry';
@@ -64,6 +68,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   const me = useSessionMe();
   const cfg = CATEGORY_CONFIG[entry.category];
   const statusId = useId();
+  const lockHintId = useId();
   const [expanded, setExpanded] = useState(false);
   const [sheet, setSheet] = useState<'refetch' | 'delete' | null>(null);
 
@@ -73,6 +78,9 @@ function DetailBody({ entry }: { entry: Entry }) {
   const trimmed = entry.synopsis.endsWith('…');
   const moreUrl = sourceUrl(entry.source, entry.sourceId);
   const ratingCheck = (v: string) => { const p = parseRating(v); return p.ok ? null : p.error; };
+  // The tier is stored (a clamped 8.9 can sit in Loved); a row cached before 3c has none yet, so its number says.
+  const tiers = tiersFor(me.settings, entry.category);
+  const tierNow: Tier | null = entry.tier ?? (entry.rating !== null ? tierFor(entry.rating, tiers) : null);
 
   const genres = entry.genres.split(',').map((g) => g.trim()).filter(Boolean);
 
@@ -99,13 +107,31 @@ function DetailBody({ entry }: { entry: Entry }) {
 
         <div className="tiles">
           <div className="tile tile--rating">
-            <DetailField
-              className="tile__field" label="Rating" type="number" value={entry.rating === null ? '' : String(entry.rating)} placeholder="Unrated"
-              check={ratingCheck} onSave={(v) => { const p = parseRating(v); if (p.ok) save({ rating: p.value }); }}
-            />
-            <RatingBadge rating={entry.rating} size="lg">
-              {entry.rating !== null && <CountUp value={entry.rating} />}
-            </RatingBadge>
+            <div className="tile__rate-row">
+              <DetailField
+                className="tile__field" label="Rating" type="number" value={entry.rating === null ? '' : String(entry.rating)} placeholder="Unrated"
+                check={ratingCheck}
+                onSave={(v) => {
+                  // A typed number picks the tier (and unlocks); the same number again changes nothing, so a stored tier stays.
+                  const p = parseRating(v);
+                  if (p.ok && p.value !== entry.rating) save({ rating: p.value });
+                }}
+              />
+              <RatingBadge rating={entry.rating} size="lg">
+                {entry.rating !== null && <CountUp value={entry.rating} />}
+              </RatingBadge>
+            </div>
+            <div role="group" aria-label="Tier" className="tier-chips">
+              {TIERS_TOP_FIRST.map((t) => (
+                <Button key={t} variant="chip" active={tierNow === t} onClick={() => { if (tierNow !== t) save({ tier: t }); }}>{tiers.names[t]}</Button>
+              ))}
+            </div>
+            <label className="switch-row switch-row--detail">
+              <input type="checkbox" role="switch" checked={entry.scoreLocked} disabled={tierNow === null}
+                aria-describedby={lockHintId} onChange={(e) => save({ scoreLocked: e.target.checked })} />
+              Lock score
+            </label>
+            <p id={lockHintId} className="field-hint">Shows exactly this number; picks won't move it.</p>
           </div>
           {cfg.hasStatus && (
             <div className="tile">
@@ -192,6 +218,8 @@ function DetailBody({ entry }: { entry: Entry }) {
             removeEntryFromCache(qc, entry);
             // A deleted entry leaves the compare queue on the server; refresh the banner and nav counts now.
             void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
+            // The Worker re-fitted the titles left in its tier: their scores may have moved.
+            void refetchAfterDelete(qc, { kind: 'entry', category: entry.category });
             toast.show(`Deleted ${entry.title}`);
           }}
         />
@@ -297,7 +325,7 @@ function DeleteSheet({ entry, onClose, onDeleted }: { entry: Entry; onClose: () 
   async function remove() {
     setBusy(true);
     try {
-      await api.del(`/api/entries/${entry.id}`);
+      await retryOnConflict(() => api.del(`/api/entries/${entry.id}`));
       onDeleted();
     } catch (err) {
       setBusy(false);

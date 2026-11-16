@@ -56,6 +56,7 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     ['.link-btn', 'min-height'],
     ['.btn--compact', 'min-height'],
     ['.btn--chip', 'min-height'],
+    ['.tier-btn', 'min-height'],
     ['.select-chip', 'height'],
     ['.frame--wide .select-chip', 'height'],
     ['.cell-btn', 'min-height'],

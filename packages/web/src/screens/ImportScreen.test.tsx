@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseWorkbook } from '../import/parseWorkbook';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { renderApp } from '../test/renderApp';
+import { ratingSetKey } from '../data/ratings';
 import { toArrayBuffer } from '../../test/helpers/buildWorkbook';
 
 vi.mock('../import/parseWorkbook', async (importOriginal) => {
@@ -120,7 +121,7 @@ describe('ImportScreen', () => {
     expect(parseWorkbook).not.toHaveBeenCalled();
   });
 
-  it('sends 400 rows in chunks of at most 180 under one importId, then saves only the settings that were present', async () => {
+  it('sends 400 rows in chunks of at most 150 under one importId, then saves only the settings that were present', async () => {
     const { calls } = importBackend();
     renderApp('/import');
     await chooseMock(preview(Array.from({ length: 400 }, (_, i) => row(i)), { settings: { theme: 'Ocean', compareAsk: 'Off' } }));
@@ -128,7 +129,7 @@ describe('ImportScreen', () => {
     expect(await screen.findByText('Imported 400 titles')).toBeInTheDocument();
 
     const posts = importPosts(calls);
-    expect(posts.map((p) => p.rows.length)).toEqual([180, 180, 40]);
+    expect(posts.map((p) => p.rows.length)).toEqual([150, 150, 100]);
     expect(new Set(posts.map((p) => p.importId)).size).toBe(1);
     expect(posts[0]!.importId).toMatch(UUID);
     const puts = calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings');
@@ -154,7 +155,7 @@ describe('ImportScreen', () => {
     await screen.findByText('Imported 60 titles');
     const posts = importPosts(calls);
     expect(posts.length).toBeGreaterThan(2);
-    for (const p of posts) expect(p.rows.reduce((n, r) => n + (r.seasons?.length ?? 0), 0)).toBeLessThanOrEqual(240);
+    for (const p of posts) expect(p.rows.reduce((n, r) => n + (r.seasons?.length ?? 0), 0)).toBeLessThanOrEqual(165);
     expect(posts.flatMap((p) => p.rows)).toHaveLength(60);
   });
 
@@ -179,7 +180,7 @@ describe('ImportScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Import 400 titles' }));
 
     expect(await screen.findByText('Import stopped')).toBeInTheDocument();
-    expect(screen.getByText(/180 of 400/)).toBeInTheDocument();
+    expect(screen.getByText(/150 of 400/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try the rest again' })).toBeInTheDocument();
     expect(importPosts(calls)).toHaveLength(2); // stopped: no third chunk
     expect(calls.some((c) => c.method === 'PUT')).toBe(false); // settings only after the rows succeeded
@@ -198,7 +199,7 @@ describe('ImportScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Try the rest again' }));
     expect(await screen.findByText('Imported 400 titles')).toBeInTheDocument();
     const posts = importPosts(calls);
-    expect(posts.map((p) => p.rows.length)).toEqual([180, 180, 180, 40]);
+    expect(posts.map((p) => p.rows.length)).toEqual([150, 150, 150, 100]);
     expect(posts[2]!.rows[0]!.title).toBe(posts[1]!.rows[0]!.title);
     // every chunk carries its index, and the retry re-sends the failed chunk (1) with the same one
     expect(posts.map((p) => p.chunk)).toEqual([0, 1, 1, 2]);
@@ -221,7 +222,9 @@ describe('ImportScreen', () => {
 
   it('Undo on the done screen deletes the import and refreshes the lists', async () => {
     const { calls } = importBackend();
-    renderApp('/import');
+    const { queryClient } = renderApp('/import');
+    queryClient.setQueryData(ratingSetKey('anime'), { items: [], comparisons: [] });
+    queryClient.setQueryData(ratingSetKey('movies'), { items: [], comparisons: [] });
     await chooseMock(preview([row(1), row(2, { category: 'movies' })]));
     await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
     await screen.findByText('Imported 2 titles');
@@ -235,6 +238,9 @@ describe('ImportScreen', () => {
       expect(gets).toContain('/api/entries?category=anime');
       expect(gets).toContain('/api/entries?category=movies');
     });
+    // the Worker re-fitted what was left: the rating sets reload too
+    expect(queryClient.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(ratingSetKey('movies'))!.isInvalidated).toBe(true);
   });
 
   it('refreshes the lists of the imported categories after a successful import', async () => {
@@ -244,6 +250,33 @@ describe('ImportScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Import 1 title' }));
     await screen.findByText('Imported 1 title');
     await waitFor(() => expect(calls.map((c) => c.path)).toContain('/api/entries?category=games'));
+  });
+
+  it('Import done offers Check your tiers, linking to the first imported list', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies', rating: 8 }), row(2, { category: 'games', rating: 7 })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/movies');
+  });
+
+  it('Check your tiers points at the first list that has a rated row, and is absent when none was rated', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games', rating: 7 })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/games');
+  });
+
+  it('Import done has no Check your tiers when no imported row was rated', async () => {
+    importBackend();
+    renderApp('/import');
+    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games' })]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
+    await screen.findByText('Imported 2 titles');
+    expect(screen.queryByRole('link', { name: 'Check your tiers' })).not.toBeInTheDocument();
   });
 
   it('the done screen offers to fill in details; Start runs the backfill, Not now dismisses', async () => {

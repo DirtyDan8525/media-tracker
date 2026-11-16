@@ -2,7 +2,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBackend, makeEntry } from './test/fakeBackend';
-import { setCompareEnabled } from './test/flags';
 import { makeMe, mockApi } from './test/mockApi';
 import { renderApp } from './test/renderApp';
 import { setViewportWidth } from './test/viewport';
@@ -16,21 +15,7 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('with the flag off the Main nav\'s links read Add, Activity, Search, More, and slot 4 is an empty aria-hidden cell', async () => {
-      const calls = mockApi(makeMe());
-      renderApp('/list/anime');
-      const nav = await mainNav();
-      expect(linkNames(nav)).toEqual(['Add', 'Activity', 'Search', 'More']);
-      const cells = Array.from(nav.children);
-      expect(cells).toHaveLength(5);
-      expect(cells[3]).toHaveAttribute('aria-hidden', 'true');
-      expect(cells[3]).toBeEmptyDOMElement();
-      expect(cells[2]).toHaveTextContent('Search');
-      expect(calls.some((c) => c.path.includes('/api/compare/queue'))).toBe(false);
-    });
-
-    it('with the flag on they read Add, Activity, Search, Compare, More, Compare named "Compare, 2 waiting"', async () => {
-      setCompareEnabled(true);
+    it('the Main nav\'s links read Add, Activity, Search, Compare, More (slot 4 is always Compare), Compare named "Compare, 2 waiting"', async () => {
       mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
       renderApp('/list/anime');
       const nav = await mainNav();
@@ -38,6 +23,11 @@ describe('app shell', () => {
       expect(compare).toHaveAttribute('href', '/compare');
       expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Add', 'Activity', 'Search', 'Compare', 'More']);
       expect(compare.querySelector('.count-pill')).toHaveTextContent('2');
+      const cells = Array.from(nav.children);
+      expect(cells).toHaveLength(5);
+      expect(cells[2]).toHaveTextContent('Search');
+      expect(cells[3]).not.toHaveAttribute('aria-hidden');
+      expect(cells[3]).toHaveTextContent('Compare');
     });
 
     it('Activity has no count badge', async () => {
@@ -103,7 +93,7 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(within(nav).queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Activity', 'Search', 'More']);
+      expect(linkNames(nav)).toEqual(['Activity', 'Search', 'Compare', 'More']);
       expect(nav.children).toHaveLength(5);
       expect(screen.queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument();
     });
@@ -131,8 +121,7 @@ describe('app shell', () => {
       expect(within(nav).getAllByRole('link').filter((a) => a.hasAttribute('aria-current'))).toEqual([]);
     });
 
-    it('on /compare (enabled) the Compare tab is current', async () => {
-      setCompareEnabled(true);
+    it('on /compare the Compare tab is current', async () => {
       mockApi(makeMe());
       renderApp('/compare');
       const nav = await mainNav();
@@ -200,22 +189,20 @@ describe('app shell', () => {
   describe('PC side nav (Main, SideNavPC board)', () => {
     const sideNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('reads Profile, Add anime, Search, Activity, the enabled lists, then Import, Export my data, About (no Compare while hidden)', async () => {
+    it('reads Profile, Add anime, Search, Activity, Compare, the enabled lists, then Import, Export my data, About', async () => {
       setViewportWidth(1280);
-      const calls = mockApi(makeMe({}, { songs: false }), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }] } } });
+      mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
       const nav = await sideNav();
-      expect(within(nav).queryByRole('link', { name: 'Compare' })).not.toBeInTheDocument();
       // every row, in document order: links and the Export button
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile, @dan', 'Add anime', 'Search', 'Activity',
+        'Profile, @dan', 'Add anime', 'Search', 'Activity', 'Compare',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books',
         'Import', 'Export my data', 'About',
       ]);
       await screen.findByText('No anime yet');
       expect(nav.querySelector('.count-pill')).toBeNull();
-      expect(calls.some((c) => c.path.includes('/api/compare/queue'))).toBe(false);
     });
 
     it('no navigation is still called "Lists" on PC, and Top 5, Stats and Settings are not in the side nav', async () => {
@@ -306,8 +293,7 @@ describe('app shell', () => {
       await waitFor(() => expect(calls.some((c) => c.path === '/api/export')).toBe(true));
     });
 
-    it('with Compare enabled it comes right after Activity, with the waiting count', async () => {
-      setCompareEnabled(true);
+    it('Compare comes right after Activity, with the waiting count', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { songs: false }), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
       renderApp('/list/anime');
@@ -326,7 +312,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(4 + 7 + 2); // Profile, Add, Search, Activity + 7 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(5 + 7 + 2); // Profile, Add, Search, Activity, Compare + 7 lists + Import, About
     });
   });
 
@@ -344,42 +330,23 @@ describe('app shell', () => {
     expect(await screen.findByText('No games yet')).toBeInTheDocument();
   });
 
-  it('More has Ratings (Top 5, Stats), Your data (Import, Export) and App (About) only: no other lists, Settings or Appearance (no Compare while hidden)', async () => {
-    mockApi(makeMe({}, { books: false }));
-    renderApp('/more');
-    expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
-    const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(linkNames(main)).toEqual(['Top 5', 'Stats', 'Import from Google Sheets', 'About Media Tracker']);
-    expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
-  });
-
-  it('with Compare enabled, More lists Compare first under Ratings', async () => {
-    setCompareEnabled(true);
+  it('More has Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About) only: no other lists, Settings, Appearance or tier links', async () => {
     mockApi(makeMe({}, { books: false }));
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
     expect(linkNames(main)).toEqual(['Compare', 'Top 5', 'Stats', 'Import from Google Sheets', 'About Media Tracker']);
+    expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
     const tabs = screen.getByRole('navigation', { name: 'Main' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('More shows the waiting count on Compare', async () => {
-    setCompareEnabled(true);
     mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }] } } });
     renderApp('/more');
     await screen.findByRole('heading', { level: 1, name: 'More' });
     const body = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
     expect(await within(body).findByRole('link', { name: 'Compare, 1 waiting' })).toHaveAttribute('href', '/compare');
-  });
-
-  it('/compare redirects to the home list (replacing the entry) while Compare is hidden', async () => {
-    const calls = mockApi(makeMe());
-    const { router } = renderApp('/compare');
-    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
-    expect(router.state.historyAction).toBe('REPLACE');
-    expect(screen.queryByRole('heading', { name: 'Compare ratings' })).not.toBeInTheDocument();
-    expect(calls.some((c) => c.path.includes('/api/compare/'))).toBe(false);
   });
 
   it('an unknown list redirects home', async () => {

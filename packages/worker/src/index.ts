@@ -6,6 +6,8 @@ import { compare } from './api/compare';
 import { activity } from './api/activity';
 import { cover } from './api/cover';
 import { importApi } from './api/import';
+import { ratings } from './api/ratings';
+import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
 
 export type { AppUser, AppEnv } from './auth/access';
@@ -54,6 +56,7 @@ api.route('/import', importApi);
 api.route('/compare', compare);
 api.route('/activity', activity);
 api.route('/cover', cover);
+api.route('/ratings', ratings);
 app.route('/api', api);
 
 app.notFound((c) => {
@@ -62,6 +65,8 @@ app.notFound((c) => {
 });
 
 app.onError((err, c) => {
+  // A rating write raced another write to the same set; nothing was saved. The client reloads and retries.
+  if (err instanceof RatingConflict) return c.json({ error: 'conflict' }, 409);
   console.error(err);
   return c.json({ error: 'internal_error' }, 500);
 });

@@ -2,8 +2,6 @@ import { Hono } from 'hono';
 import {
   AVATAR_MAX_BYTES,
   COMPARE_ASK,
-  COMPARE_ROOM,
-  COMPARE_STYLE,
   DEFAULT_USER_SETTINGS,
   decodeAvatar,
   SEARCH_SCOPE,
@@ -11,14 +9,12 @@ import {
   type UserSettings,
 } from '@media-tracker/shared';
 import type { AppEnv, AppUser } from '../auth/access';
+import { ensureTiers } from '../ratings/store';
 
 export const me = new Hono<AppEnv>();
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-// A rating-difference window (script: `Number(x) > 0`, used as `y.rating - x.rating > window`), so decimals are fine.
-// Ratings span 1-10, so a window past 10 is meaningless.
-const COMPARE_WINDOW_MAX = 10;
 
 const ROLE_KEYS = Object.keys(THEMES.Midnight!);
 const TAB_KEYS = Object.keys(DEFAULT_USER_SETTINGS.tabs);
@@ -30,7 +26,9 @@ export type SanitizeResult = { ok: true; settings: UserSettings } | { ok: false 
 
 /**
  * Validates a partial settings update and merges it into `current`.
- * Unknown keys are dropped; a known key with a bad value fails the whole update.
+ * Unknown keys are dropped (that includes the removed compareStyle, compareRoom and
+ * compareWindow); a known key with a bad value fails the whole update. `tiers` is
+ * dropped too: only PUT /api/ratings/tiers/:list writes it, because a change re-fits scores (Q3).
  * `tabs` and `colors` merge per key; scalars replace. Does not mutate `current`.
  */
 export function sanitizeSettings(partial: unknown, current: UserSettings): SanitizeResult {
@@ -62,8 +60,6 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
   }
   const enums = [
     ['compareAsk', COMPARE_ASK],
-    ['compareStyle', COMPARE_STYLE],
-    ['compareRoom', COMPARE_ROOM],
     ['searchScope', SEARCH_SCOPE],
   ] as const;
   for (const [key, allowed] of enums) {
@@ -71,11 +67,6 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
     const v = partial[key];
     if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) return { ok: false };
     next[key] = v;
-  }
-  if ('compareWindow' in partial) {
-    const w = partial.compareWindow;
-    if (typeof w !== 'number' || !Number.isFinite(w) || w <= 0 || w > COMPARE_WINDOW_MAX) return { ok: false };
-    next.compareWindow = w;
   }
   return { ok: true, settings: next };
 }
@@ -97,7 +88,17 @@ export function meBody(user: AppUser) {
   return { id, email, username, isAdmin, settings, avatarAt, createdAt };
 }
 
-me.get('/', (c) => c.json(meBody(c.var.user)));
+// 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10). The backfill is
+// optional (every read and rating path derives missing tiers), so a failure is logged and /me,
+// which the app needs to boot, still answers.
+me.get('/', async (c) => {
+  try {
+    await ensureTiers(c.env.DB, c.var.user.id, c.var.user.settings);
+  } catch (err) {
+    console.error('ensureTiers failed', err);
+  }
+  return c.json(meBody(c.var.user));
+});
 
 me.put('/username', async (c) => {
   const body = await readJson(c.req.raw);

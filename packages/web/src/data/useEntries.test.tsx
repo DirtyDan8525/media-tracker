@@ -6,13 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { localDb } from '../db/local';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
-import { useAllEntries, useEntries } from './useEntries';
+import { refreshCategories, useAllEntries, useEntries } from './useEntries';
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {
     id, userId: 'u1', category: 'anime', title: id, typedTitle: id, status: null, rating: 9, genres: '', creator: '',
     album: '', coverUrl: '', notes: '', releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none',
-    isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null,
+    isPrivate: false, notesPrivate: false, source: null, sourceId: null, lookupState: 'ok', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false,
     createdAt: '', updatedAt: '', ...over,
   };
 }
@@ -58,5 +58,30 @@ describe('useEntries', () => {
       expect(result.current.data.movies?.map((e) => e.id)).toEqual(['m1']);
     });
     expect(result.current.isPending).toBe(false);
+  });
+
+  it('normalizes pre-3c rows (cached and fetched): missing tier/priorMean/strength become null, scoreLocked false', async () => {
+    const old = { ...entry('o1') } as Record<string, unknown>;
+    delete old.tier; delete old.priorMean; delete old.strength; delete old.scoreLocked;
+    await localDb.entries.bulkPut([old as unknown as Entry]);
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    const first = renderHook(() => useEntries('anime'), { wrapper });
+    await waitFor(() => expect(first.result.current.data?.[0]?.id).toBe('o1'));
+    expect(first.result.current.data![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+    mockFetch({ 'GET /api/entries': { body: [old] } });
+    const second = renderHook(() => useEntries('anime'), { wrapper });
+    await waitFor(() => expect(second.result.current.data && !second.result.current.isPlaceholderData).toBeTruthy());
+    expect(second.result.current.data![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+  });
+});
+
+describe('refreshCategories', () => {
+  it('normalizes the rows it stores (pre-3c rows read as unrated-tier)', async () => {
+    const { tier: _t, priorMean: _p, strength: _s, scoreLocked: _l, ...old } = entry('old', { rating: 8 });
+    mockFetch({ 'GET /api/entries': { body: [old] } });
+    const qc = makeQueryClient();
+    await refreshCategories(qc, ['anime']);
+    expect(qc.getQueryData<Entry[]>(['entries', 'anime'])![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
+    expect((await localDb.entries.get('old'))).toMatchObject({ tier: null, scoreLocked: false });
   });
 });

@@ -15,4 +15,4 @@ A private, installable web app that replaces Dan's Media Tracker Google Sheet.
 
 ## What it does
 
-Lists for anime, movies, TV, albums, songs, games and books with covers, details and ratings; import from the Sheet; **Compare** (fix my ratings), **Top 5** and **Stats**; search and Status/Genre filters on every list; 12 themes plus Custom colours (Settings → Appearance); **Export my data**. To update a deployed copy see "Updating to a new version" in `docs/SETUP.md`.
+Lists for anime, movies, TV, albums, songs, games and books with covers, details and ratings; import from the Sheet; **Compare** (tier ratings: place new ratings and fix old ones), **Top 5** and **Stats**; search and Status/Genre filters on every list; 12 themes plus Custom colours (Settings → Appearance); **Export my data**. To update a deployed copy see "Updating to a new version" in `docs/SETUP.md`.

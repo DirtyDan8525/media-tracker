@@ -1,3 +1,5 @@
+import type { Tier, TierSet } from './ratings/types';
+
 export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books';
 
 export type SourceId =
@@ -87,6 +89,14 @@ export interface Entry {
   lookupState: 'ok' | 'not_found' | 'pending';
   importId: string | null;
   seasonAvg: number | null;
+  /** Rating tier (null when unrated). Stored explicitly; never re-derived from an unchanged rating. */
+  tier: Tier | null;
+  /** Where the title starts inside its tier (a strength); null when unrated. */
+  priorMean: number | null;
+  /** The last fitted strength (= priorMean with no counted picks); null when unrated. */
+  strength: number | null;
+  /** A locked score shows exactly the typed number and still counts as an opponent. */
+  scoreLocked: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +107,10 @@ export interface Season {
   label: string;
   rating: number | null;
   notes: string;
+  tier: Tier | null;
+  priorMean: number | null;
+  strength: number | null;
+  scoreLocked: boolean;
 }
 
 export interface CategoryConfig {
@@ -123,11 +137,10 @@ export interface UserSettings {
   colors: Record<string, string>;
   tabs: Record<string, boolean>;
   compareAsk: string;
-  compareStyle: string;
-  compareRoom: string;
-  compareWindow: number;
   /** Where Search looks: every list that is turned on, or only the current list (SEARCH_SCOPE). */
   searchScope: string;
+  /** Rating tiers per list (missing = DEFAULT_TIERS). Written only by PUT /api/ratings/tiers/:list (Ruling Q3). */
+  tiers: Partial<Record<Category, TierSet>>;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -138,16 +151,12 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
     animeSeasons: true, tvSeasons: true,
   },
   compareAsk: 'Both',
-  compareStyle: 'Meet in the middle',
-  compareRoom: 'Use in-between scores',
-  compareWindow: 1,
   searchScope: 'all',
+  tiers: {},
 };
 
-// Allowed values for the three compare options (the Sheet's Settings dropdowns).
+// Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).
 export const COMPARE_ASK = ['Both', 'Only when I start it', 'Only for new ratings', 'Off'] as const;
-export const COMPARE_STYLE = ['Meet in the middle', 'Swap the numbers'] as const;
-export const COMPARE_ROOM = ['Use in-between scores', 'Give the same score', 'Push others down'] as const;
 
 export const SEARCH_SCOPE = ['all', 'current'] as const;
 

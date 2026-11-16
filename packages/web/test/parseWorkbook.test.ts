@@ -95,10 +95,9 @@ describe('sample workbook', () => {
       colors: { Background: '#0f1c2b' },
       tabs: { movies: true, tv: true, tvSeasons: true, animeSeasons: true, albums: true, songs: false, games: true, books: true },
       compareAsk: 'Only when I start it',
-      compareStyle: 'Swap the numbers',
-      compareRoom: 'Give the same score',
-      compareWindow: 1.5,
     });
+    // The Sheet's Re-rating style, When there's no room and Compare within are dropped (Ruling Q1).
+    for (const k of ['compareStyle', 'compareRoom', 'compareWindow']) expect(p.settings).not.toHaveProperty(k);
     expect(p.warnings.find((w) => w.tab === 'Settings')!).toMatchObject({ row: 15 });
     expect(p.warnings.find((w) => w.tab === 'Settings')!.message).toMatch(/Highlight/);
   });
@@ -205,7 +204,7 @@ describe('parseWorkbook edge cases', () => {
     expect(p.warnings).toEqual([]);
   });
 
-  it('settings: bad enum values and themes are dropped with a warning; compare window coerced', async () => {
+  it('settings: bad enum values and themes are dropped with a warning; the removed compare rows are ignored silently', async () => {
     const p = await parseRows([
       {
         name: 'Settings',
@@ -213,19 +212,15 @@ describe('parseWorkbook edge cases', () => {
           [null, 'Theme', 'Neon'],
           [null, 'Ask to compare', 'Sometimes'],
           [null, 'Re-rating style', 'Meet in the middle'],
+          [null, "When there's no room", 'Push others down'],
           [null, 'Compare within', 'abc'],
           [null, 'Movies', 'TRUE'],
           [null, 'Books', 'no'],
         ],
       },
     ]);
-    expect(p.settings).toEqual({ compareStyle: 'Meet in the middle', compareWindow: 1, tabs: { movies: true } });
-    expect(p.warnings.map((w) => w.row).sort()).toEqual([1, 2, 6]); // Books "no" is not TRUE/FALSE
-  });
-
-  it('settings: compare window is capped at 10', async () => {
-    const p = await parseRows([{ name: 'Settings', rows: [[null, 'Theme', 'Light'], [null, 'Compare within', 50]] }]);
-    expect(p.settings).toEqual({ theme: 'Light', compareWindow: 10 });
+    expect(p.settings).toEqual({ tabs: { movies: true } });
+    expect(p.warnings.map((w) => w.row).sort()).toEqual([1, 2, 7]); // Books "no" is not TRUE/FALSE
   });
 
   it('season rows with no show are skipped; season rating parsed like entries', async () => {

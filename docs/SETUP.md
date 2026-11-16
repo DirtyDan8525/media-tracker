@@ -128,7 +128,7 @@ Choose a username when the app asks.
 
 ## Updating to a new version
 
-Do this each time there is new code (for example, Phase 3: Compare, Top 5, Stats, themes, Export and search). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
+Do this each time there is new code (for example, Phase 3: Compare with rating tiers, Top 5, Stats, themes, Export and search). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
 
 1. Get the new code. Your copy may be on an older branch (for example `phase1-2`) and may never have heard of newer ones, so do these four commands in order:
    ```
@@ -149,17 +149,25 @@ Do this each time there is new code (for example, Phase 3: Compare, Top 5, Stats
      export CLOUDFLARE_API_TOKEN=PASTE_TOKEN_HERE
      ```
      (In PowerShell on your PC use `$env:CLOUDFLARE_API_TOKEN="PASTE_TOKEN_HERE"`.)
-4. Update the database tables. This is the same command as in section 6, "Create the tables":
+4. Check the database first (read-only; it changes nothing). The new rating code needs two things from the live database: `UPDATE … FROM`, and decimal numbers coming back exactly as stored (9.97 must stay 9.97). Run these two commands:
+   ```
+   npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --command "SELECT (SELECT value FROM json_each('[9.97,7.49,8.25]') WHERE key = 0) = 9.97 AS two_decimals_ok, (SELECT value FROM json_each('[-3.4760986898352724]')) = -3.4760986898352724 AS long_decimals_ok"
+   ```
+   ```
+   npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --command "EXPLAIN UPDATE entries SET rating = j.t FROM (SELECT 1 AS t, 'x' AS id) j WHERE entries.id = j.id"
+   ```
+   **Success:** the first prints `"two_decimals_ok": 1` and `"long_decimals_ok": 1`; the second prints a table of steps (a long list of `opcode` rows) and no error. `EXPLAIN` only describes what the command would do; it does not run it. If either command fails or shows a 0, stop and tell me before going on. It touches only columns that already exist, so it works before the update in step 5.
+5. Update the database tables. This is the same command as in section 6, "Create the tables":
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
-   Type `y` when asked. Phase 3 adds one table, `compare_queue` (the list of new ratings waiting to be double-checked). **Success:** it lists `0002_compare_queue.sql` with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 5, so the new app never runs against missing tables.
-5. Put the new app online:
+   Type `y` when asked. Phase 3 adds one table, `compare_queue` (the list of new ratings waiting to be double-checked), in `0002_compare_queue.sql`. Tier ratings add `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks. **Success:** it lists each new migration with a green check. If you are updating from an older version, the newest code includes three new migrations, `0003`, `0004` and `0005` (the navigation and profile work brings 0003 and 0004, tier ratings 0005); Wrangler applies them in that order, in one run, with the same command. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
+6. Put the new app online:
    ```
    npm run deploy
    ```
    **Success:** it ends with a `Deployed` message and your workers.dev address.
-6. Close the installed app completely and open it again (on Android, swipe it away from recent apps). The app updates itself in the background, so it can take one more close and reopen before the new screens appear.
+7. Close the installed app completely and open it again (on Android, swipe it away from recent apps). The app updates itself in the background, so it can take one more close and reopen before the new screens appear.
 
 Do not copy `DEV_EMAIL` or `LOOKUP_FAKE` into `wrangler.toml` for production. They exist only for local development and the end-to-end test, and the Worker ignores them unless `ENVIRONMENT` is `dev`.
 

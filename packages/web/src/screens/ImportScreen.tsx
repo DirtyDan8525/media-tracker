@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { useBackfill } from '../backfill/useBackfill';
 import { refreshCategories } from '../data/useEntries';
+import { refetchAfterDelete, retryOnConflict } from '../data/ratings';
 import { useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
@@ -46,6 +47,9 @@ async function readBuffer(file: File): Promise<ArrayBuffer> {
   });
 }
 
+/** The first imported list that has a rated row: where "Check your tiers" goes (null when nothing was rated). */
+const firstRatedCategory = (p: ImportPreview): Category | null =>
+  LIST_ORDER.find((c) => p.rows.some((r) => r.category === c && r.rating !== null)) ?? null;
 const categoriesOf = (p: ImportPreview): Category[] => LIST_ORDER.filter((c) => (p.counts[c] ?? 0) > 0);
 
 function settingsLine(s: Partial<UserSettings>): string {
@@ -53,7 +57,7 @@ function settingsLine(s: Partial<UserSettings>): string {
   if (s.theme) parts.push(`${s.theme} theme`);
   if (s.colors && Object.keys(s.colors).length) parts.push('colors');
   if (s.tabs && Object.keys(s.tabs).length) parts.push('tabs');
-  if (['compareAsk', 'compareStyle', 'compareRoom', 'compareWindow'].some((k) => k in s)) parts.push('compare options');
+  if ('compareAsk' in s) parts.push('compare options');
   return parts.join(' · ');
 }
 
@@ -142,12 +146,13 @@ export function ImportScreen() {
     try {
       let removed = 0;
       try {
-        removed = (await api.del<{ deleted: number }>(`/api/import/${r.importId}`))?.deleted ?? 0;
+        removed = (await retryOnConflict(() => api.del<{ deleted: number }>(`/api/import/${r.importId}`)))?.deleted ?? 0;
       } catch (err) {
         // 404: nothing of this import reached the server (the first chunk failed), so there is nothing to remove.
         if (!(err instanceof ApiError && err.status === 404)) throw err;
       }
-      await refreshCategories(qc, categoriesOf(r.preview));
+      // Lists and rating sets both reload: the Worker re-fitted what the import left behind.
+      await Promise.all(categoriesOf(r.preview).map((category) => refetchAfterDelete(qc, { kind: 'entry', category })));
       setStage({ k: 'undone', removed });
     } catch {
       setUndoError(true);
@@ -218,6 +223,9 @@ export function ImportScreen() {
               {undoError && <p role="alert" className="field-error">Couldn't undo. Try again.</p>}
               <div className="import__actions">
                 <Button onClick={() => void undo()} disabled={busy}>Undo import</Button>
+                {run.current && firstRatedCategory(run.current.preview) && (
+                  <Link to={`/retier/${firstRatedCategory(run.current.preview)}`} className="btn btn--primary">Check your tiers</Link>
+                )}
                 <Link to="/" className="btn btn--ghost">Go to my lists</Link>
               </div>
             </div>

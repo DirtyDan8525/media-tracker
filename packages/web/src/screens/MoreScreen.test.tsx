@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { setCompareEnabled } from '../test/flags';
 import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
@@ -14,35 +13,25 @@ describe('More (SettingsMore.v2)', () => {
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 
-  it('has the sections Ratings (Top 5, Stats), Your data and App (About), and nothing else', async () => {
-    const calls = mockApi(makeMe());
+  it('has the sections Ratings (Compare, Top 5, Stats), Your data and App (About), and nothing else', async () => {
+    mockApi(makeMe());
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
       .toEqual(['Ratings', 'Your data', 'App']);
-    expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Top 5', 'Stats']);
+    expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Compare', 'Top 5', 'Stats']);
     expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['About Media Tracker']);
-    expect(screen.queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
-    expect(calls.some((c) => c.path.includes('/api/compare/queue'))).toBe(false);
   });
 
-  it('has no Settings, Appearance or Other lists rows, even with lists beyond the fourth enabled', async () => {
+  it('has no Settings, Appearance, tier or Other lists rows (those live under Profile → Settings), even with lists beyond the fourth enabled', async () => {
     mockApi(makeMe());
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.queryByRole('region', { name: 'Settings' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Other lists' })).not.toBeInTheDocument();
-    for (const name of [/^Settings/, /^Appearance/, /^Comparing/, /^Books/, /^Songs/, /^Games/]) {
+    for (const name of [/^Settings/, /^Appearance/, /^Comparing/, /^Rating tiers/, /^Re-tier review/, /^Books/, /^Songs/, /^Games/]) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
-  });
-
-  it('with Compare enabled, Ratings starts with Compare', async () => {
-    setCompareEnabled(true);
-    mockApi(makeMe());
-    renderApp('/more');
-    const ratings = await screen.findByRole('region', { name: 'Ratings' });
-    expect(within(ratings).getAllByRole('link').map((a) => a.textContent)).toEqual(['Compare', 'Top 5', 'Stats']);
   });
 
   it('Back on Appearance returns to Settings when you came from Settings', async () => {

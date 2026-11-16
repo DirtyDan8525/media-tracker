@@ -92,24 +92,6 @@ describe('activity writes', () => {
     expect((await feed(A)).items).toEqual([]);
   });
 
-  it('compare save logs re-rated via compare only for titles whose rating changed', async () => {
-    const a = await mk(A, { title: 'Same', rating: 7 });
-    const b = await mk(A, { title: 'Changed', rating: 6 });
-    const c = await mk(A, { title: 'Fresh' });
-    const res = await as(A, '/api/compare/save', 'POST', {
-      changes: [{ id: a.id, rating: 7 }, { id: b.id, rating: 8 }, { id: c.id, rating: 5 }],
-    });
-    expect(res.status).toBe(200);
-    // `updated` is the entries UPDATE's change count (3 titles), not the activity insert's (2 rows).
-    expect(((await res.json()) as { updated: number }).updated).toBe(3);
-    const { items } = await feed(A);
-    const compared = items.filter((i) => i.payload.via === 'compare');
-    expect(compared).toHaveLength(2);
-    expect(compared.find((i) => i.entryId === b.id)).toMatchObject({ type: 're-rated', payload: { from: 6, to: 8, via: 'compare' } });
-    expect(compared.find((i) => i.entryId === c.id)).toMatchObject({ type: 'rated', payload: { from: null, to: 5, via: 'compare' } });
-    expect(items.some((i) => i.entryId === a.id && i.type !== 'added')).toBe(false);
-  });
-
   it('deleting the entry removes its rows', async () => {
     const e = await mk(A, { title: 'X', rating: 5 });
     expect((await as(A, `/api/entries/${e.id}`, 'DELETE')).status).toBe(204);

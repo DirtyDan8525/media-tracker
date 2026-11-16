@@ -1,392 +1,496 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Entry } from '@media-tracker/shared';
+import {
+  DEFAULT_TIERS, priorFromScore, tierFor, tierRange, type Entry, type SavePayload, type Season, type SetItem,
+} from '@media-tracker/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi, type Handler, type MockResponse } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
-import { setCompareEnabled } from '../test/flags';
 
-beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
+
+/** A rated entry as the Worker stores it after the backfill: tier from the number, prior = strength. */
+function rated(id: string, rating: number, over: Partial<Entry> = {}): Entry {
+  const tier = tierFor(rating, DEFAULT_TIERS);
+  const p = priorFromScore(rating, tierRange(DEFAULT_TIERS, tier));
+  return makeEntry({ id, title: id, rating, tier, priorMean: p, strength: p, ...over });
+}
+const unrated = (id: string, over: Partial<Entry> = {}) => makeEntry({ id, title: id, rating: null, ...over });
+
+const setItem = (e: Pick<Entry, 'id' | 'title' | 'rating' | 'tier' | 'priorMean' | 'strength' | 'scoreLocked' | 'coverUrl' | 'status'>): SetItem => ({
+  id: e.id, title: e.title, rating: e.rating, tier: e.tier, priorMean: e.priorMean, strength: e.strength,
+  scoreLocked: e.scoreLocked, cover: e.coverUrl, square: false, status: e.status,
+});
 
 interface Setup {
   entries: Entry[];
+  seasons?: Season[];
   queue?: string[];
   ask?: string;
   save?: Handler | MockResponse;
   tabs?: Record<string, boolean>;
-  /** Mutable: while true, GET /api/entries answers 500. */
-  fail?: { entries: boolean };
+  path?: string;
+  /** Answers GET /api/ratings/:set instead of the rows (the n-th call is `n`, from 1). */
+  ratingSet?: (set: string, n: number) => MockResponse;
 }
 
-function setup({ entries, queue = [], ask = 'Both', save, tabs = {}, fail }: Setup) {
+function setup({ entries, seasons = [], queue = [], ask = 'Both', save, tabs = {}, path = '/compare', ratingSet }: Setup) {
   const me = makeMe({}, tabs);
   me.settings = { ...me.settings, compareAsk: ask };
   const rows = entries.map((e) => ({ ...e }));
+  let setLoads = 0;
   const calls = mockApi(me, {
-    'GET /api/entries': (_b, url) => (fail?.entries
-      ? { status: 500, body: { error: 'boom' } }
-      : { body: rows.filter((e) => e.category === url.searchParams.get('category')) }),
+    'GET /api/entries': (_b, url) => ({ body: rows.filter((e) => e.category === url.searchParams.get('category')) }),
     'GET /api/compare/queue': () => ({
       body: { items: queue.map((id) => ({ entryId: id, category: rows.find((e) => e.id === id)?.category ?? 'anime' })) },
     }),
     'DELETE /api/compare/queue/:id': { status: 204 },
-    'POST /api/compare/save': save ?? ((b) => {
-      const { changes } = b as { changes: { id: string; rating: number }[] };
-      const updated = changes.map((c) => {
-        const row = rows.find((e) => e.id === c.id)!;
-        row.rating = c.rating;
-        return { ...row };
-      });
-      return { body: { updated: updated.length, entries: updated } };
-    }),
+    'GET /api/ratings/:set': (_b, _u, p) => {
+      if (ratingSet) return ratingSet(p.set!, ++setLoads);
+      if (p.set === 'anime_seasons') {
+        return { body: { items: seasons.map((s) => setItem({ ...s, title: `Show · ${s.label}`, coverUrl: '', status: null })), comparisons: [] } };
+      }
+      return { body: { items: rows.filter((e) => e.category === p.set).map(setItem), comparisons: [] } };
+    },
+    'POST /api/ratings/:set/save': save ?? { body: { items: [], entries: [] } },
   });
-  const app = renderApp('/compare');
+  const app = renderApp(path);
   return { calls, ...app };
 }
 
-const anime = () => [
-  makeEntry({ id: 'A', title: 'A', rating: 9 }),
-  makeEntry({ id: 'B', title: 'B', rating: 8.8 }),
-  makeEntry({ id: 'C', title: 'C', rating: 8.5 }),
+const lovedAnime = () => [
+  rated('Akira', 9.8), rated('Bebop', 9.5), rated('Clannad', 9.4),
+  rated('Dorohedoro', 8.0), rated('Erased', 7.9), rated('FLCL', 6.5),
 ];
 
 const pair = () => screen.getByRole('group', { name: 'Pick the better one' });
-const cardNames = () => within(pair()).getAllByRole('button').map((b) => b.getAttribute('aria-label'));
-const progress = (text: string) => screen.findByText(text);
+const cardNames = () => within(pair()).getAllByRole('button', { name: /, now / }).map((b) => b.getAttribute('aria-label'));
+const saves = (calls: { method: string; path: string; body: unknown }[], set = 'anime') =>
+  calls.filter((c) => c.method === 'POST' && c.path === `/api/ratings/${set}/save`).map((c) => c.body as SavePayload);
 
-/** A review row as read aloud: title, old rating, new rating badge, direction. */
+/** A review row as read aloud: title, tier change (if any), old rating, new rating badge, direction. */
 const readRow = (li: HTMLElement) => [
   li.querySelector('[data-role="title"]')!.textContent,
+  li.querySelector('[data-role="tiers"]')?.textContent ?? null,
   li.querySelector('[data-role="old"]')!.textContent,
   within(li.querySelector<HTMLElement>('[data-role="new"]')!).getByLabelText(/^Rating /).getAttribute('aria-label'),
   within(li).queryByText('up') ? 'up' : within(li).queryByText('down') ? 'down' : null,
 ];
 const reviewRows = () => within(screen.getByRole('list', { name: 'Rating changes' })).getAllByRole('listitem').map(readRow);
-const FULL_PASS_ROWS = [['B', '8.8', 'Rating 8.9', 'up'], ['C', '8.5', 'Rating 8.8', 'up'], ['A', '9.0', 'Rating 8.7', 'down']];
 
-async function fullPassToReview() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-  for (const name of ['B, now 8.8', 'C, now 8.5', 'B, now 8.8']) {
-    await userEvent.click(await within(pair()).findByRole('button', { name }));
-  }
-  await screen.findByRole('heading', { name: 'New ratings' });
+async function openTier(list: string, tier: string) {
+  await userEvent.click(await screen.findByRole('button', { name: list }));
+  await userEvent.click(await within(await screen.findByRole('group', { name: 'Tiers' })).findByRole('button', { name: tier }));
 }
 
+/** Fix my ratings on Anime · Loved: Bebop > Clannad, then Stop: the review. */
+async function fixToReview() {
+  await openTier('Anime (6)', 'Loved 3 titles');
+  await userEvent.click(await within(pair()).findByRole('button', { name: 'Bebop, now 9.5' }));
+  await screen.findByText('Pick 2');
+  await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+  await screen.findByRole('heading', { name: 'New ratings' });
+}
+const FIX_ROWS = [['Bebop', null, '9.5', 'Rating 9.6', 'up'], ['Clannad', null, '9.4', 'Rating 9.3', 'down']];
+const FIX_PAYLOAD: SavePayload = { picks: [{ winnerId: 'Bebop', loserId: 'Clannad', isTie: false, undone: false }], moves: [], done: [] };
+
 beforeEach(() => {
-  vi.spyOn(Math, 'random').mockReturnValue(0.99); // never flip: the question's first item is on the left
+  vi.spyOn(Math, 'random').mockReturnValue(0.99); // never flip: the question's first title is on the left
 });
 
-describe('Compare home', () => {
-  it('says comparing is off when Ask is Off', async () => {
-    setup({ entries: anime(), ask: 'Off' });
+describe('Fix my ratings: home', () => {
+  it('home: lists with ≥2 rated, season tabs when on, tier chips with counts; Off and Only-for-new texts', async () => {
+    setup({
+      entries: [
+        ...lovedAnime(),
+        rated('M1', 7, { category: 'movies' }),
+        unrated('M2', { category: 'movies' }),
+        unrated('M3', { category: 'movies' }),
+        unrated('W', { status: 'Watching / In Progress' }), // not finished: not offered
+      ],
+      seasons: [
+        { id: 's1', entryId: 'Akira', label: 'S1', rating: 9.2, notes: '', tier: 3, priorMean: 0, strength: 0, scoreLocked: false },
+        { id: 's2', entryId: 'Akira', label: 'S2', rating: 8, notes: '', tier: 2, priorMean: 0, strength: 0, scoreLocked: false },
+      ],
+      tabs: { tvSeasons: false },
+    });
+    expect(await screen.findByText('Pick a list. The app asks about the two closest titles in a tier; stop any time.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
+    const lists = screen.getByRole('group', { name: 'Lists' });
+    expect(within(lists).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Anime (6)', 'Anime Seasons']);
+
+    expect(screen.getByRole('heading', { name: 'Rate finished things with no score' })).toBeInTheDocument();
+    const unratedGroup = screen.getByRole('group', { name: 'Unrated lists' });
+    expect(within(unratedGroup).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Movies (2)']);
+
+    await userEvent.click(within(lists).getByRole('button', { name: 'Anime (6)' }));
+    const tiers = await screen.findByRole('group', { name: 'Tiers' });
+    expect(within(tiers).getAllByRole('button').map((b) => b.textContent)).toEqual(['All tiers', 'Loved 3', 'Liked 2', 'Fine 1', 'Didn\'t like 0']);
+    expect(within(tiers).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([null, 'Loved 3 titles', 'Liked 2 titles', 'Fine 1 title', 'Didn\'t like 0 titles']);
+    expect(within(lists).getByRole('button', { name: 'Anime (6)' })).toHaveAttribute('aria-pressed', 'true');
+
+    // a season tab has no count until opened; then its own tier counts
+    await userEvent.click(within(lists).getByRole('button', { name: 'Anime Seasons' }));
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Tiers' })).getAllByRole('button').map((b) => b.textContent))
+      .toEqual(['All tiers', 'Loved 1', 'Liked 1', 'Fine 0', 'Didn\'t like 0']));
+  });
+
+  it('home: Off says comparing is off', async () => {
+    setup({ entries: lovedAnime(), ask: 'Off' });
     expect(await screen.findByRole('heading', { name: 'Comparing is off' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings/appearance');
   });
 
-  it('offers lists with 2+ rated titles and the unrated finished titles by list', async () => {
-    setup({ entries: [
-      ...anime(),
-      makeEntry({ id: 'M1', category: 'movies', title: 'M1', rating: 7 }),
-      makeEntry({ id: 'M2', category: 'movies', title: 'M2', rating: null }),
-      makeEntry({ id: 'M3', category: 'movies', title: 'M3', rating: null }),
-    ] });
-    const lists = await screen.findByRole('group', { name: 'Lists' });
-    expect(screen.getByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
-    expect(within(lists).getByRole('button', { name: 'Anime (3)' })).toBeInTheDocument();
-    expect(within(lists).queryByRole('button', { name: /^Movies/ })).not.toBeInTheDocument();
-    const unrated = screen.getByRole('group', { name: 'Unrated lists' });
-    expect(within(unrated).getByRole('button', { name: 'Movies (2)' })).toBeInTheDocument();
-    expect(screen.getByText(/You only compare things rated within 1 of each other/)).toBeInTheDocument();
-  });
-
-  it('lists that fail to load: an error with Retry, not "nothing to compare"', async () => {
-    const fail = { entries: true };
-    setup({ entries: anime(), fail });
-    expect(await screen.findByRole('heading', { name: 'Couldn\'t load your lists' })).toBeInTheDocument();
-    expect(screen.queryByText(/Nothing to compare yet/)).not.toBeInTheDocument();
-    fail.entries = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('button', { name: 'Anime (3)' })).toBeInTheDocument();
-  });
-
-  it('Only for new ratings: no list buttons, the only-new text', async () => {
-    setup({ entries: anime(), ask: 'Only for new ratings' });
+  it('home: Only for new ratings offers no lists, with its own text', async () => {
+    setup({ entries: lovedAnime(), ask: 'Only for new ratings' });
     expect(await screen.findByText('Nothing is waiting. Settings → “Ask to compare” is set to only check new ratings.')).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Lists' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Anime (3)' })).not.toBeInTheDocument();
   });
 });
 
-describe('full pass', () => {
-  it('goes through Anime, reviews the script’s new ratings, saves them and the list shows them', async () => {
-    const { calls, router } = setup({ entries: anime() });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    expect(await screen.findByRole('heading', { name: 'Anime' })).toBeInTheDocument();
-    expect(screen.getByText('Which one do you think is better? Tap it.')).toBeInTheDocument();
-    expect(cardNames()).toEqual(['B, now 8.8', 'A, now 9.0']);
-    await userEvent.click(within(pair()).getByRole('button', { name: 'B, now 8.8' }));
-    expect(cardNames()).toEqual(['C, now 8.5', 'A, now 9.0']);
-    await userEvent.click(within(pair()).getByRole('button', { name: 'C, now 8.5' }));
-    expect(cardNames()).toEqual(['C, now 8.5', 'B, now 8.8']);
-    await userEvent.click(within(pair()).getByRole('button', { name: 'B, now 8.8' }));
+describe('Fix my ratings: a session', () => {
+  it('fix: asks the two closest titles in the chosen tier; About the same, Skip, Stop, Back; review shows old → new; Save posts the payload', async () => {
+    const { calls } = setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    expect(await screen.findByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
+    expect(screen.getByText('Anime · Loved')).toBeInTheDocument();
+    expect(screen.getByText('Which do you like more? Tap it.')).toBeInTheDocument();
+    expect(cardNames()).toEqual(['Bebop, now 9.5', 'Clannad, now 9.4']);
+    expect(screen.getByText('Pick 1')).toBeInTheDocument();
+
+    await userEvent.click(within(pair()).getByRole('button', { name: 'Bebop, now 9.5' }));
+    await screen.findByText('Pick 2');
+    expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.6']);
+    await userEvent.click(screen.getByRole('button', { name: 'About the same' }));
+    await screen.findByText('Pick 3');
+    await userEvent.click(screen.getByRole('button', { name: '← Back' }));
+    await screen.findByText('Pick 2');
+    expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.6']);
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    await waitFor(() => expect(cardNames()).toEqual(['Bebop, now 9.6', 'Clannad, now 9.3']));
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
 
     expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
-    expect(screen.getByText('Based on your picks (meet in the middle). Nothing is saved until you press Save.')).toBeInTheDocument();
-    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
+    expect(screen.getByText('Based on your picks. Nothing is saved until you press Save.')).toBeInTheDocument();
+    expect(reviewRows()).toEqual(FIX_ROWS);
+    expect(saves(calls)).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
     expect(await screen.findByRole('heading', { name: 'Saved' })).toBeInTheDocument();
-    expect(screen.getByText('Top 5 and Stats update by themselves.')).toBeInTheDocument();
-    const post = calls.find((c) => c.method === 'POST' && c.path === '/api/compare/save')!;
-    expect(post.body).toEqual({ changes: [{ id: 'B', rating: 8.9 }, { id: 'C', rating: 8.8 }, { id: 'A', rating: 8.7 }] });
-
-    await router.navigate('/list/anime');
-    await screen.findByText('B');
-    for (const r of ['8.9', '8.8', '8.7']) expect(screen.getAllByLabelText(`Rating ${r}`).length).toBeGreaterThan(0);
+    expect(saves(calls)).toEqual([{
+      picks: [
+        { winnerId: 'Bebop', loserId: 'Clannad', isTie: false, undone: false },
+        { winnerId: 'Akira', loserId: 'Bebop', isTie: true, undone: true },
+      ],
+      moves: [],
+      done: [],
+    }]);
   });
 
-  it('keys: ArrowLeft answers left, Backspace goes back, s skips; Backspace on the first question does nothing', async () => {
-    setup({ entries: anime() });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    await progress('Going through 1 of 2 · 0 picks so far');
+  it('Belongs in another tier moves the title, the next question changes, and the review shows the tier change', async () => {
+    const { calls } = setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    await screen.findByText('Pick 1');
+    const move = screen.getByRole('button', { name: 'Belongs in another tier: Clannad' });
+    expect(move).toHaveAttribute('aria-expanded', 'false');
+    expect(move.closest('button.pick')).toBeNull(); // a sibling of the card, never inside it
+    await userEvent.click(move);
+    const menu = screen.getByRole('menu', { name: 'Move Clannad to' });
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.getAttribute('aria-label'))).toEqual(['Liked · 7.5–8.9', 'Fine · 6–7.4', 'Didn\'t like · 0–5.9']);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Liked · 7.5–8.9' }));
+
+    await waitFor(() => expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.5']));
+    expect(screen.getByText('0 of 1 neighbours checked')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+    expect(reviewRows()).toEqual([['Clannad', 'Loved → Liked', '9.4', 'Rating 8.9', 'down']]);
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    await screen.findByRole('heading', { name: 'Saved' });
+    expect(saves(calls)).toEqual([{ picks: [], moves: [{ id: 'Clannad', tier: 2 }], done: [] }]);
+  });
+
+  it('the settledness bar shows checked of total and grows after a pick between neighbours', async () => {
+    setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    const bar = await screen.findByRole('progressbar', { name: 'Neighbours checked' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    expect(bar).toHaveAttribute('aria-valuemax', '2');
+    expect(screen.getByText('0 of 2 neighbours checked')).toBeInTheDocument();
+    await userEvent.click(within(pair()).getByRole('button', { name: 'Bebop, now 9.5' }));
+    expect(await screen.findByText('1 of 2 neighbours checked')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Neighbours checked' })).toHaveAttribute('aria-valuenow', '1');
+  });
+
+  it('nothing left to ask: a one-title tier ends at once with the friendly line', async () => {
+    const { calls } = setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Fine 1 title');
+    expect(await screen.findByText('Nothing left to ask in Anime · Fine. Your order is as settled as your picks make it.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(saves(calls)).toEqual([]);
+  });
+
+  it('a failed save keeps the review and shows the toast; Save again posts the same payload', async () => {
+    let fail = true;
+    const { calls } = setup({ entries: lovedAnime(), save: () => (fail ? { status: 500, body: { error: 'boom' } } : { body: { items: [], entries: [] } }) });
+    await fixToReview();
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    expect(await screen.findByText('Couldn\'t save your new ratings. Try again.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+    expect(reviewRows()).toEqual(FIX_ROWS);
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    expect(await screen.findByRole('heading', { name: 'Saved' })).toBeInTheDocument();
+    expect(saves(calls)).toEqual([FIX_PAYLOAD, FIX_PAYLOAD]);
+  });
+
+  it('a save that still conflicts after the retry says so, with Reload', async () => {
+    const { calls } = setup({ entries: lovedAnime(), save: { status: 409, body: { error: 'conflict' } } });
+    await fixToReview();
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Your ratings changed elsewhere. Reload and try again.');
+    expect(saves(calls)).toHaveLength(2); // the one automatic retry
+    expect(reviewRows()).toEqual(FIX_ROWS);
+    const before = calls.length;
+    await userEvent.click(within(alert).getByRole('button', { name: 'Reload' }));
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    await waitFor(() => expect(calls.slice(before).some((c) => c.method === 'GET' && c.path === '/api/entries?category=anime')).toBe(true));
+  });
+
+  it('keys and swipe still answer (←, →, ↓, S, Backspace; ±80 px)', async () => {
+    setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    await screen.findByText('Pick 1');
+    fireEvent.keyDown(document, { key: 'Backspace' }); // nothing to go back to
+    expect(screen.getByText('Pick 1')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'ArrowLeft' }); // Bebop
+    await screen.findByText('Pick 2');
+    expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.6']);
     fireEvent.keyDown(document, { key: 'Backspace' });
-    expect(screen.getByText('Going through 1 of 2 · 0 picks so far')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '← Back' })).toBeDisabled();
-
-    fireEvent.keyDown(document, { key: 'ArrowLeft' });
-    await progress('Going through 2 of 2 · 1 picks so far');
-    expect(cardNames()).toEqual(['C, now 8.5', 'A, now 9.0']); // B was picked over A
-
+    await screen.findByText('Pick 1');
+    expect(cardNames()).toEqual(['Bebop, now 9.5', 'Clannad, now 9.4']);
+    fireEvent.keyDown(document, { key: 'ArrowRight' }); // Clannad
+    await screen.findByText('Pick 2');
     fireEvent.keyDown(document, { key: 'Backspace' });
-    await progress('Going through 1 of 2 · 0 picks so far');
-    expect(cardNames()).toEqual(['B, now 8.8', 'A, now 9.0']);
+    await screen.findByText('Pick 1');
+    fireEvent.keyDown(document, { key: 'ArrowDown' }); // About the same
+    await screen.findByText('Pick 2');
+    fireEvent.keyDown(document, { key: 'Backspace' });
+    await screen.findByText('Pick 1');
+    fireEvent.keyDown(document, { key: 's' }); // skip: the other pair
+    await waitFor(() => expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.5']));
+    fireEvent.keyDown(document, { key: 'Backspace' }); // a skip alone can't be undone
+    expect(cardNames()).toEqual(['Akira, now 9.8', 'Bebop, now 9.5']);
 
-    fireEvent.keyDown(document, { key: 's' });
-    await progress('Going through 2 of 2 · 1 picks so far');
-    expect(cardNames()).toEqual(['C, now 8.5', 'B, now 8.8']); // skipped: B stays under A
-  });
-
-  it('moves focus to the new question’s heading after an answer', async () => {
-    setup({ entries: anime() });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    await userEvent.click(await within(pair()).findByRole('button', { name: 'B, now 8.8' }));
-    await progress('Going through 2 of 2 · 1 picks so far');
-    expect(screen.getByRole('heading', { name: 'Anime' })).toHaveFocus();
-  });
-
-  it('swipes: −80 px picks the left card, +80 px the right; 40 px or mostly vertical does nothing', async () => {
-    setup({ entries: anime() });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    await progress('Going through 1 of 2 · 0 picks so far');
     const swipe = (dx: number, dy: number) => {
       fireEvent.pointerDown(pair(), { clientX: 200, clientY: 300, pointerId: 1 });
       fireEvent.pointerUp(pair(), { clientX: 200 + dx, clientY: 300 + dy, pointerId: 1 });
     };
     swipe(40, 0);
     swipe(-80, 200);
-    expect(screen.getByText('Going through 1 of 2 · 0 picks so far')).toBeInTheDocument();
-
-    swipe(-80, 0);
-    await progress('Going through 2 of 2 · 1 picks so far');
-    expect(cardNames()).toEqual(['C, now 8.5', 'A, now 9.0']); // left = B
-
+    expect(screen.getByText('Pick 1')).toBeInTheDocument();
+    swipe(-80, 0); // left: Akira
+    await screen.findByText('Pick 2');
     fireEvent.keyDown(document, { key: 'Backspace' });
-    await progress('Going through 1 of 2 · 0 picks so far');
-    swipe(80, 0);
-    await progress('Going through 2 of 2 · 1 picks so far');
-    expect(cardNames()).toEqual(['C, now 8.5', 'B, now 8.8']); // right = A
+    await screen.findByText('Pick 1');
+    swipe(80, 0); // right: Bebop
+    await screen.findByText('Pick 2');
+    expect(screen.getByRole('heading', { name: 'Fix my ratings' })).toHaveFocus();
+  });
+});
+
+const LOAD_FAILED = "Couldn't load your ratings. Check your connection and try again.";
+const setReply = (rows: Entry[]): MockResponse => ({ body: { items: rows.map(setItem), comparisons: [] } });
+const setGets = (calls: { method: string; path: string }[]) => calls.filter((c) => c.method === 'GET' && c.path === '/api/ratings/anime').length;
+
+describe('Fix my ratings: more runs', () => {
+  it('a fix run loads the set fresh, not from the chip row\'s cached copy', async () => {
+    const rows = lovedAnime();
+    const changed = rows.map((e) => (e.id === 'Clannad' ? rated('Clannad', 9.45) : e)); // changed on another device
+    const { calls } = setup({ entries: rows, ratingSet: (_s, n) => setReply(n === 1 ? rows : changed) });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    await screen.findByText('Pick 1');
+    expect(cardNames()).toEqual(['Bebop, now 9.5', 'Clannad, now 9.45']);
+    expect(setGets(calls)).toBe(2);
   });
 
-  it('a failed save shows the toast, keeps the review intact, and Save again saves the same changes', async () => {
-    let failSave = true;
-    const { calls } = setup({ entries: anime(), save: (b) => {
-      if (failSave) return { status: 500, body: { error: 'boom' } };
-      const { changes } = b as { changes: { id: string; rating: number }[] };
-      return { body: { updated: changes.length, entries: changes.map((c) => ({ ...anime().find((e) => e.id === c.id)!, rating: c.rating })) } };
-    } });
-    await fullPassToReview();
-    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
-    expect(await screen.findByText('Couldn\'t save your new ratings. Try again.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
-    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
+  it('All tiers: runs over every tier with their neighbour pairs counted together', async () => {
+    setup({ entries: lovedAnime() });
+    await userEvent.click(await screen.findByRole('button', { name: 'Anime (6)' }));
+    await userEvent.click(await within(await screen.findByRole('group', { name: 'Tiers' })).findByRole('button', { name: 'All tiers' }));
+    expect(await screen.findByText('Anime · All tiers')).toBeInTheDocument();
+    expect(screen.getByText('0 of 3 neighbours checked')).toBeInTheDocument(); // Loved 2 + Liked 1 + Fine 0
+    const first = cardNames();
+    expect(first).toHaveLength(2);
+    await userEvent.click(within(pair()).getAllByRole('button', { name: /, now / })[0]!);
+    await screen.findByText('Pick 2');
+    expect(screen.getByText('1 of 3 neighbours checked')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+  });
 
-    failSave = false;
+  it('a set that fails to load: a toast, and the list and its tiers stay for another try', async () => {
+    const rows = lovedAnime();
+    setup({ entries: rows, ratingSet: (_s, n) => (n === 1 ? setReply(rows) : { status: 500, body: { error: 'boom' } }) });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Tiers' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Pick the better one' })).not.toBeInTheDocument();
+  });
+
+  it('flipped cards: the left card is the question\'s second title, and it answers "b"', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // below .5: flip
+    setup({ entries: lovedAnime() });
+    await openTier('Anime (6)', 'Loved 3 titles');
+    await screen.findByText('Pick 1');
+    expect(cardNames()).toEqual(['Clannad, now 9.4', 'Bebop, now 9.5']); // question order is Bebop, Clannad
+    fireEvent.keyDown(document, { key: 'ArrowLeft' }); // the left card: Clannad
+    await screen.findByText('Pick 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    await screen.findByRole('heading', { name: 'New ratings' });
+    expect(reviewRows()).toEqual([['Clannad', null, '9.4', 'Rating 9.5', 'up'], ['Bebop', null, '9.5', 'Rating 9.4', 'down']]);
+  });
+});
+
+describe('placing new ratings', () => {
+  const queued = () => [rated('Akira', 9.8), rated('Bebop', 9.5), rated('Clannad', 9.4), rated('Gintama', 9.2), rated('Haikyu', 9.1), rated('Dorohedoro', 8)];
+
+  it('queue: places each new rating with ~log2 picks; Save drops it from the queue; Don\'t save keeps it', async () => {
+    const { calls } = setup({ entries: queued(), queue: ['Bebop', 'Gintama'] });
+    expect(await screen.findByRole('heading', { name: 'Place it' })).toBeInTheDocument();
+    expect(screen.getByText('Placing Bebop · pick 1 of about 3')).toBeInTheDocument();
+    expect(cardNames()).toEqual(['Bebop, now 9.5', 'Gintama, now 9.2']);
+    await userEvent.click(within(pair()).getByRole('button', { name: 'Bebop, now 9.5' }));
+    expect(await screen.findByText('Placing Bebop · pick 2 of about 3')).toBeInTheDocument();
+    await userEvent.click(within(pair()).getByRole('button', { name: /^Clannad/ }));
+    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
+
+    // the next queued title
+    expect(await screen.findByText(/^Placing Gintama · pick 1 of about 3/)).toBeInTheDocument();
+    expect(saves(calls)).toEqual([{
+      picks: [
+        { winnerId: 'Bebop', loserId: 'Gintama', isTie: false, undone: false },
+        { winnerId: 'Clannad', loserId: 'Bebop', isTie: false, undone: false },
+      ],
+      moves: [],
+      done: ['Bebop'],
+    }]);
+    await userEvent.click(within(pair()).getAllByRole('button', { name: /, now / })[1]!);
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop and review' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Don\'t save' }));
+    expect(await screen.findByText(/^New ratings are placed\./)).toBeInTheDocument();
+    expect(saves(calls)).toHaveLength(1);
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('queue: a title with nothing to ask is All good; Close takes it off the queue', async () => {
+    const { calls } = setup({ entries: [rated('Akira', 9.8), rated('Dorohedoro', 8)], queue: ['Akira'] });
+    expect(await screen.findByRole('heading', { name: 'All good' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/compare/queue/Akira')).toBe(true));
+    expect(await screen.findByRole('heading', { name: 'Fix my ratings' })).toBeInTheDocument();
+  });
+
+  it('queue: waits when Ask is Only when I start it', async () => {
+    setup({ entries: queued(), queue: ['Bebop'], ask: 'Only when I start it' });
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Place it' })).not.toBeInTheDocument();
+  });
+
+  it('/compare?place=<id> places that title only, then returns to its list', async () => {
+    const { calls, router } = setup({ entries: queued(), queue: ['Gintama'], path: '/compare?place=Bebop' });
+    expect(await screen.findByText('Placing Bebop · pick 1 of about 3')).toBeInTheDocument();
+    await userEvent.click(within(pair()).getByRole('button', { name: 'Bebop, now 9.5' }));
+    await userEvent.click(await within(pair()).findByRole('button', { name: /^Clannad/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save new ratings' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(saves(calls)[0]!.done).toEqual(['Bebop']);
+  });
+
+  it('/compare?place=<id>: Don\'t save returns to its list too', async () => {
+    const { calls, router } = setup({ entries: queued(), path: '/compare?place=Bebop' });
+    await screen.findByText('Placing Bebop · pick 1 of about 3');
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(saves(calls)).toEqual([]);
+  });
+});
+
+describe('placing: gating, no tier and failures', () => {
+  const queued = () => [rated('Akira', 9.8), rated('Bebop', 9.5), rated('Clannad', 9.4), rated('Gintama', 9.2), rated('Haikyu', 9.1), rated('Dorohedoro', 8)];
+
+  it('?place= with no tier asks the tier first, then places it', async () => {
+    const { calls, router } = setup({ entries: [...queued(), unrated('Zed')], path: '/compare?place=Zed' });
+    expect(await screen.findByRole('heading', { name: 'Which tier is Zed in?' })).toBeInTheDocument();
+    expect(screen.getByText('Anime · 1 of 1 with no score')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('group', { name: 'Tier' })).getByRole('button', { name: 'Loved · 9–10' }));
+    expect(await screen.findByText(/^Placing Zed · pick 1 of about 3/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save new ratings' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+    expect(saves(calls)).toEqual([{ picks: [], moves: [{ id: 'Zed', tier: 3 }], done: ['Zed'] }]);
+  });
+
+  it('?place= works when Ask is Only for new ratings', async () => {
+    setup({ entries: queued(), ask: 'Only for new ratings', path: '/compare?place=Bebop' });
+    expect(await screen.findByText('Placing Bebop · pick 1 of about 3')).toBeInTheDocument();
+  });
+
+  it('?place= does nothing when Ask is Only when I start it (Q15): the home shows', async () => {
+    const { calls } = setup({ entries: queued(), ask: 'Only when I start it', path: '/compare?place=Bebop' });
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Place it' })).not.toBeInTheDocument();
+    expect(setGets(calls)).toBe(0);
+  });
+
+  it('?place= whose set fails to load: a toast and back to its list', async () => {
+    const { router } = setup({ entries: queued(), path: '/compare?place=Bebop', ratingSet: () => ({ status: 500, body: { error: 'boom' } }) });
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+  });
+
+  it('offline with a queue: one load attempt, one toast, then home (not one per title)', async () => {
+    const { calls } = setup({ entries: queued(), queue: ['Bebop', 'Gintama', 'Haikyu'], ratingSet: () => ({ status: 500, body: { error: 'boom' } }) });
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
+    expect(setGets(calls)).toBe(1);
+  });
+});
+
+describe('rating unrated titles', () => {
+  it('unrated: tier question, then placement, then review', async () => {
+    const { calls } = setup({ entries: [
+      rated('M1', 8, { category: 'movies' }), rated('M2', 7.8, { category: 'movies' }),
+      unrated('M3', { category: 'movies' }), unrated('M4', { category: 'movies' }),
+    ] });
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Unrated lists' })).getByRole('button', { name: 'Movies (2)' }));
+    expect(await screen.findByRole('heading', { name: 'Which tier is M3 in?' })).toBeInTheDocument();
+    expect(screen.getByText('Movies · 1 of 2 with no score')).toBeInTheDocument();
+    const picker = screen.getByRole('group', { name: 'Tier' });
+    expect(within(picker).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Loved · 9–10', 'Liked · 7.5–8.9', 'Fine · 6–7.4', 'Didn\'t like · 0–5.9']);
+    await userEvent.click(within(picker).getByRole('button', { name: 'Liked · 7.5–8.9' }));
+
+    expect(await screen.findByText('Placing M3 · pick 1 of about 2')).toBeInTheDocument();
+    expect(cardNames()[0]).toMatch(/^M3, now /);
+    await userEvent.click(within(pair()).getAllByRole('button', { name: /, now / })[0]!);
+    await screen.findByText('Placing M3 · pick 2 of about 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(await screen.findByRole('heading', { name: 'Which tier is M4 in?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
+
+    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
+    expect(reviewRows()).toEqual([['M3', 'Liked', '—', 'Rating 8.3', 'up']]);
     await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
     expect(await screen.findByRole('heading', { name: 'Saved' })).toBeInTheDocument();
-    const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/compare/save').map((c) => c.body);
-    expect(posts).toHaveLength(2);
-    expect(posts[1]).toEqual(posts[0]);
-    expect(posts[1]).toEqual({ changes: [{ id: 'B', rating: 8.9 }, { id: 'C', rating: 8.8 }, { id: 'A', rating: 8.7 }] });
-  });
-
-  it('the way home is off while saving; a failed save still lands on the intact review', async () => {
-    let answer: (r: { status: number; body: unknown }) => void = () => {};
-    setup({ entries: anime(), save: () => new Promise((r) => { answer = r; }) });
-    await fullPassToReview();
-    await userEvent.click(screen.getByRole('button', { name: 'Save new ratings' }));
-    expect(await screen.findByText('Saving…')).toBeInTheDocument();
-    const home = screen.getByRole('button', { name: 'Back to Compare ratings' });
-    expect(home).toBeDisabled();
-    await userEvent.click(home);
-    answer({ status: 500, body: { error: 'boom' } });
-    expect(await screen.findByText('Couldn\'t save your new ratings. Try again.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
-    expect(reviewRows()).toEqual(FULL_PASS_ROWS);
-  });
-
-  it('Don’t save after a full pass saves nothing and goes home, with focus on its heading', async () => {
-    const { calls } = setup({ entries: anime() });
-    await fullPassToReview();
-    await userEvent.click(screen.getByRole('button', { name: 'Don\'t save' }));
-    const heading = await screen.findByRole('heading', { name: 'Compare ratings' });
-    await waitFor(() => expect(heading).toHaveFocus());
-    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
-  });
-
-  it('Back to Compare ratings mid-run discards the run', async () => {
-    const { calls } = setup({ entries: anime() });
-    await userEvent.click(await screen.findByRole('button', { name: 'Anime (3)' }));
-    await userEvent.click(await within(pair()).findByRole('button', { name: 'B, now 8.8' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Compare ratings' }));
-    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
-    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
-    // starting again begins a fresh pass, not the old one
-    await userEvent.click(screen.getByRole('button', { name: 'Anime (3)' }));
-    expect(await screen.findByText('Going through 1 of 2 · 0 picks so far')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '← Back' })).toBeDisabled();
-  });
-});
-
-describe('the queue', () => {
-  const withE2 = () => [
-    makeEntry({ id: 'A', title: 'A', rating: 9 }),
-    makeEntry({ id: 'e2', title: 'E2', rating: 8.8 }),
-    makeEntry({ id: 'B', title: 'B', rating: 8.5 }),
-  ];
-
-  it('opens on the queued title; Don’t save leaves it queued', async () => {
-    const { calls } = setup({ entries: withE2(), queue: ['e2'] });
-    expect(await screen.findByRole('heading', { name: 'Placing E2 (Anime)' })).toBeInTheDocument();
-    expect(screen.getByText('New rating · 0 waiting')).toBeInTheDocument();
-    await userEvent.click(within(pair()).getByRole('button', { name: 'B, now 8.5' }));
-    expect(await screen.findByRole('heading', { name: 'New ratings' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Don\'t save' }));
-    expect(await screen.findByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
-    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/compare/save')).toBe(false);
-  });
-
-  it('saves a placed rating with doneEntryId', async () => {
-    const { calls } = setup({ entries: withE2(), queue: ['e2'] });
-    await screen.findByRole('heading', { name: 'Placing E2 (Anime)' });
-    await userEvent.click(within(pair()).getByRole('button', { name: 'B, now 8.5' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Save new ratings' }));
-    expect(await screen.findByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
-    expect(screen.getByText(/^New ratings are placed\. Pick a list/)).toBeInTheDocument();
-    const post = calls.find((c) => c.method === 'POST' && c.path === '/api/compare/save')!;
-    expect(post.body).toEqual({ changes: [{ id: 'e2', rating: 8.2 }], doneEntryId: 'e2' });
-  });
-
-  it('All good → Close takes the title off the queue', async () => {
-    const { calls } = setup({ entries: withE2(), queue: ['e2'] });
-    await screen.findByRole('heading', { name: 'Placing E2 (Anime)' });
-    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(await screen.findByRole('heading', { name: 'All good' })).toBeInTheDocument();
-    expect(screen.getByText('Your ratings already match your picks. Nothing changes.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/compare/queue/e2')).toBe(true));
-    expect(await screen.findByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
-  });
-
-  it('Stop on the first of 3 queued titles drops the rest for this visit', async () => {
-    setup({ entries: [
-      makeEntry({ id: 'A', title: 'A', rating: 9 }),
-      makeEntry({ id: 'q1', title: 'Q1', rating: 8.8 }),
-      makeEntry({ id: 'q2', title: 'Q2', rating: 8.6 }),
-      makeEntry({ id: 'q3', title: 'Q3', rating: 8.4 }),
-    ], queue: ['q1', 'q2', 'q3'] });
-    expect(await screen.findByRole('heading', { name: 'Placing Q1 (Anime)' })).toBeInTheDocument();
-    expect(screen.getByText('New rating · 2 waiting')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
-    expect(await screen.findByRole('heading', { name: 'All good' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findByText(/^New ratings are placed\./)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /^Placing Q[23]/ })).not.toBeInTheDocument();
-  });
-
-  it('Back after Stop shows 0 waiting', async () => {
-    setup({ entries: [
-      makeEntry({ id: 'A', title: 'A', rating: 9 }),
-      makeEntry({ id: 'q1', title: 'Q1', rating: 8.8 }),
-      makeEntry({ id: 'B', title: 'B', rating: 8.5 }),
-      makeEntry({ id: 'q2', title: 'Q2', rating: 8.6 }),
-    ], queue: ['q1', 'q2'] });
-    await screen.findByText('New rating · 1 waiting');
-    await userEvent.click(within(pair()).getAllByRole('button')[0]!); // Q1 better: one more question
-    await screen.findByText('New rating · 1 waiting');
-    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
-    await userEvent.click(await screen.findByRole('button', { name: '← Back to last pick' }));
-    expect(await screen.findByText('New rating · 0 waiting')).toBeInTheDocument();
-  });
-
-  it('leaves a queued title in a turned-off list queued and does not ask about it (Ruling P4)', async () => {
-    const { calls } = setup({ entries: [
-      ...anime(),
-      makeEntry({ id: 'm1', category: 'movies', title: 'M1', rating: 8 }),
-      makeEntry({ id: 'm2', category: 'movies', title: 'M2', rating: 7.5 }),
-    ], queue: ['m2'], tabs: { movies: false } });
-    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
-    expect(screen.getByText(/^Pick a list to go through\./)).toBeInTheDocument(); // not "New ratings are placed."
-    expect(screen.queryByRole('heading', { name: /^Placing/ })).not.toBeInTheDocument();
-    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
-  });
-
-  it('Back to Compare ratings while placing drops the rest of the queue for this visit', async () => {
-    const { calls } = setup({ entries: [
-      makeEntry({ id: 'A', title: 'A', rating: 9 }),
-      makeEntry({ id: 'q1', title: 'Q1', rating: 8.8 }),
-      makeEntry({ id: 'q2', title: 'Q2', rating: 8.6 }),
-    ], queue: ['q1', 'q2'] });
-    await screen.findByRole('heading', { name: 'Placing Q1 (Anime)' });
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Compare ratings' }));
-    expect(await screen.findByRole('group', { name: 'Lists' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /^Placing/ })).not.toBeInTheDocument();
-    expect(calls.some((c) => c.method === 'POST' || c.method === 'DELETE')).toBe(false);
-  });
-
-  it('skips a queued id missing from the loaded lists', async () => {
-    setup({ entries: withE2(), queue: ['gone', 'e2'] });
-    expect(await screen.findByRole('heading', { name: 'Placing E2 (Anime)' })).toBeInTheDocument();
-    expect(screen.getByText('New rating · 0 waiting')).toBeInTheDocument();
-  });
-});
-
-describe('unrated', () => {
-  it('rates each unrated title of a list, then they drop out of the home counts', async () => {
-    setup({ entries: [
-      makeEntry({ id: 'M1', category: 'movies', title: 'M1', rating: 7 }),
-      makeEntry({ id: 'M2', category: 'movies', title: 'M2', rating: null }),
-      makeEntry({ id: 'M3', category: 'movies', title: 'M3', rating: null }),
-    ] });
-    await userEvent.click(await screen.findByRole('button', { name: 'Movies (2)' }));
-    expect(await screen.findByRole('heading', { name: 'Rating M2 (Movies)' })).toBeInTheDocument();
-    expect(screen.getByText('Unrated 1 of 2')).toBeInTheDocument();
-    expect(cardNames()).toEqual(['M2, not rated yet', 'M1, now 7.0']);
-    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(await screen.findByRole('heading', { name: 'Rating M3 (Movies)' })).toBeInTheDocument();
-    expect(screen.getByText('Unrated 2 of 2')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Stop and review' }));
-    expect(await screen.findByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Unrated lists' })).not.toBeInTheDocument();
-  });
-
-  it('nothing rated on the list: says so, Next moves on', async () => {
-    setup({ entries: [makeEntry({ id: 'M2', category: 'movies', title: 'M2', rating: null })] });
-    await userEvent.click(await screen.findByRole('button', { name: 'Movies (1)' }));
-    expect(await screen.findByRole('heading', { name: 'M2' })).toBeInTheDocument();
-    expect(screen.getByText('Nothing on Movies is rated yet, so there\'s nothing to compare with. Give a couple of things a rating first.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(await screen.findByRole('heading', { name: 'Compare ratings' })).toBeInTheDocument();
+    expect(saves(calls, 'movies')).toEqual([{
+      picks: [{ winnerId: 'M3', loserId: 'M2', isTie: false, undone: false }],
+      moves: [{ id: 'M3', tier: 2 }],
+      done: ['M3', 'M4'],
+    }]);
   });
 });

@@ -35,6 +35,15 @@ describe('topFive', () => {
     topFive(rows);
     expect(rows.map((e) => e.title)).toEqual(['B', 'A']);
   });
+
+  it('equal shown score: higher tier, then stronger, decide the order', () => {
+    const rows = [
+      makeEntry({ id: 'a', title: 'A', rating: 9, tier: 2, strength: 4 }),
+      makeEntry({ id: 'b', title: 'B', rating: 9, tier: 3, strength: -0.2 }),
+      makeEntry({ id: 'c', title: 'C', rating: 9, tier: 3, strength: 0.3 }),
+    ];
+    expect(topFive(rows).map((e) => e.id)).toEqual(['c', 'b', 'a']);
+  });
 });
 
 describe('numberOnes', () => {

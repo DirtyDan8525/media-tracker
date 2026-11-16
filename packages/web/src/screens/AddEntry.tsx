@@ -1,33 +1,57 @@
-import { CATEGORY_CONFIG, STATUSES, formatRating, statusLabel, type Category, type Status } from '@media-tracker/shared';
+import {
+  CATEGORY_CONFIG, STATUSES, statusLabel, tierFor, tierRange, tiersFor, type Category, type Status, type Tier,
+} from '@media-tracker/shared';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
-import { RatingBadge } from '../design/components/RatingBadge';
 import { Sheet } from '../design/components/Sheet';
+import { TierPicker } from '../design/components/TierPicker';
+import { parseRating } from '../lists/validate';
 import { LIST_LABEL } from '../nav';
+import { useSessionMe } from '../shell/SessionGate';
 import type { AddInput } from '../hooks/useAddEntry';
 
 export interface AddEntryProps {
   category: Category;
-  onSubmit: (input: AddInput) => void;
+  /** `place`: "Add and place it", which opens Compare on the new entry once it is saved. */
+  onSubmit: (input: AddInput, opts?: { place?: boolean }) => void;
   onClose: () => void;
 }
 
 const lower = (s: string) => s.toLowerCase();
 
-/** The Add sheet: title, optional creator, a rating slider (can stay unrated) and status chips. */
+/**
+ * The Add sheet: title, optional creator, the list's four tier buttons with an "or type a number"
+ * box (either can stay empty: unrated), and status chips. A tapped tier posts `tier`; a typed
+ * number posts `rating` and the tier it falls in lights up. With Ask to compare on Both or Only for
+ * new ratings, a rated title can also be added and placed (Q15, Q16).
+ */
 export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
   const cfg = CATEGORY_CONFIG[category];
-  const ids = { title: useId(), creator: useId(), rating: useId() };
+  const me = useSessionMe();
+  const tiers = tiersFor(me.settings, category);
+  const ranges = ([0, 1, 2, 3] as Tier[]).map((t) => tierRange(tiers, t));
+  const ids = { title: useId(), creator: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
   const [title, setTitle] = useState('');
   const [creator, setCreator] = useState('');
-  const [rating, setRating] = useState<number | null>(null);
+  /** A tapped tier (posts `tier`); cleared by typing a number. */
+  const [tapped, setTapped] = useState<Tier | null>(null);
+  /** The number box's text; cleared by tapping a tier. */
+  const [typed, setTyped] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
-  const canAdd = title.trim() !== '';
+  const parsed = parseRating(typed);
+  const rating = parsed.ok ? parsed.value : null;
+  // Typing picks the tier its number falls in; tapping picks that tier.
+  const shownTier: Tier | null = rating !== null ? tierFor(rating, tiers) : tapped;
+  const canAdd = title.trim() !== '' && parsed.ok;
+  const canPlace = canAdd && shownTier !== null
+    && (me.settings.compareAsk === 'Both' || me.settings.compareAsk === 'Only for new ratings');
 
-  function submit(e?: FormEvent) {
-    e?.preventDefault();
+  function submit(place = false) {
     if (!canAdd) return;
-    onSubmit({ title: title.trim(), creator: creator.trim(), rating, status });
+    const input: AddInput = { title: title.trim(), creator: creator.trim(), status };
+    if (rating !== null) input.rating = rating;
+    else if (tapped !== null) input.tier = tapped;
+    onSubmit(input, place ? { place: true } : undefined);
     onClose();
   }
 
@@ -37,9 +61,14 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
       open
       title={`Add to ${LIST_LABEL[category]}`}
       onClose={onClose}
-      footer={<Button type="submit" form="add-entry-form" variant="primary" className="btn--block" disabled={!canAdd}>Add</Button>}
+      footer={(
+        <div className="add-footer">
+          <Button type="submit" form="add-entry-form" variant="primary" className="btn--block" disabled={!canAdd}>Add</Button>
+          {canPlace && <Button className="btn--block" onClick={() => submit(true)}>Add and place it</Button>}
+        </div>
+      )}
     >
-      <form id="add-entry-form" className="add-form" onSubmit={submit}>
+      <form id="add-entry-form" className="add-form" onSubmit={(e: FormEvent) => { e.preventDefault(); submit(); }}>
         <div className="field">
           <label className="field-label" htmlFor={ids.title}>{cfg.titleLabel}</label>
           <input
@@ -66,22 +95,18 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
         )}
 
         <div className="field">
-          <div className="field__row">
-            <label className="field-label" htmlFor={ids.rating}>Rating</label>
-            <output className="rating-readout" htmlFor={ids.rating}>
-              {rating === null ? 'Unrated' : <RatingBadge rating={rating} size="lg" className="settle" />}
-            </output>
-          </div>
+          <span className="field-label">How much did you like it?</span>
+          <TierPicker names={tiers.names} ranges={ranges} value={shownTier} label="Tier"
+            onPick={(t) => { setTyped(''); setTapped(t === tapped && rating === null ? null : t); }} />
+          <label className="field-label" htmlFor={ids.rating}>or type a number</label>
           <input
-            id={ids.rating} type="range" className="slider slider--rating" min={0} max={10} step={0.1} value={rating ?? 0}
-            aria-valuetext={rating === null ? 'Unrated' : formatRating(rating)}
-            onPointerDown={() => setRating((r) => r ?? 0)}
-            onChange={(e) => setRating(Math.round(Number(e.target.value) * 10) / 10)}
+            id={ids.rating} type="number" className="input" step="any" min={0} max={10} inputMode="decimal"
+            value={typed} aria-invalid={parsed.ok ? undefined : true} aria-describedby={parsed.ok ? ids.ratingHint : ids.ratingErr}
+            onChange={(e) => { setTyped(e.target.value); setTapped(null); }}
           />
-          <div className="field__row">
-            <span className="field-hint">Or leave it unrated for now.</span>
-            {rating !== null && <Button variant="ghost" compact onClick={() => setRating(null)}>Clear rating</Button>}
-          </div>
+          {parsed.ok
+            ? <span id={ids.ratingHint} className="field-hint">Typing a number picks the tier it falls in. Or leave it unrated for now.</span>
+            : <span id={ids.ratingErr} role="alert" className="field-error">{parsed.error}</span>}
         </div>
 
         {cfg.hasStatus && (

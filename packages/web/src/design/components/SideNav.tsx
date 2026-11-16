@@ -1,7 +1,6 @@
 import type { Category } from '@media-tracker/shared';
 import { Link, NavLink, useLocation } from 'react-router';
 import type { Me } from '../../api/types';
-import { COMPARE_ENABLED } from '../../features';
 import { ADD_NOUN, addPath, LIST_LABEL, SEARCH_PATH } from '../../nav';
 import { useExportData } from '../../screens/settings/ExportRow';
 import { Avatar } from './Avatar';
@@ -10,7 +9,7 @@ import { Icon } from './Icon';
 /**
  * PC side nav (B20/B21, SideNavPC board), `nav "Main"`: the profile row (32 px avatar + @username),
  * Add (a primary button-styled link to the current list's Add sheet; none while every list is off),
- * Search, Activity, Compare (with its waiting count; only while Compare is enabled), a divider, every
+ * Search, Activity, Compare (with its waiting count), a divider, every
  * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats
  * and Settings are reached through Profile.
  */
@@ -42,12 +41,10 @@ export function SideNav({ lists, counts, compareCount = 0, current, me }: {
       <NavLink to="/activity" className="side-nav__link">
         <span className="side-nav__link-start"><Icon name="activity" size={18} />Activity</span>
       </NavLink>
-      {COMPARE_ENABLED && (
-        <NavLink to="/compare" className="side-nav__link side-nav__link--split" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
-          <span className="side-nav__link-start"><Icon name="compare" size={18} />Compare</span>
-          {compareCount > 0 && <span className="count-pill">{compareCount}</span>}
-        </NavLink>
-      )}
+      <NavLink to="/compare" className="side-nav__link side-nav__link--split" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
+        <span className="side-nav__link-start"><Icon name="compare" size={18} />Compare</span>
+        {compareCount > 0 && <span className="count-pill">{compareCount}</span>}
+      </NavLink>
       <div className="side-nav__divider" role="presentation" />
       {lists.map((c) => (
         <NavLink key={c} to={`/list/${c}`} className="side-nav__list">

@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, type Category, type Entry } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
 
 const SOURCES = ['anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb'];
 const LOOKUP_STATES = ['ok', 'not_found', 'pending'];
@@ -12,12 +12,12 @@ export type EntryFields = Partial<
     Entry,
     | 'title' | 'typedTitle' | 'status' | 'rating' | 'genres' | 'creator' | 'album' | 'coverUrl' | 'notes'
     | 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'detailsState' | 'isPrivate' | 'notesPrivate'
-    | 'source' | 'sourceId' | 'lookupState'
+    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked'
   >
->;
+> & { tier?: Tier };
 
 export type EntryValidation = { ok: true; value: EntryFields } | { ok: false };
-export type SeasonFields = { label?: string; rating?: number | null; notes?: string };
+export type SeasonFields = { label?: string; rating?: number | null; notes?: string; tier?: Tier; scoreLocked?: boolean };
 export type SeasonValidation = { ok: true; value: SeasonFields } | { ok: false };
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -31,6 +31,9 @@ export function isValidRating(r: unknown): r is number | null {
 }
 
 const isStr = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
+
+/** A rating tier: 0 (bottom) … 3 (top). Clearing a rating is `rating: null`, never `tier: null`. */
+export const isTier = (v: unknown): v is Tier => v === 0 || v === 1 || v === 2 || v === 3;
 
 function isCoverUrl(v: unknown): boolean {
   if (!isStr(v, 2000)) return false;
@@ -62,6 +65,8 @@ const FIELD_CHECKS: Record<string, (v: unknown) => boolean> = {
   source: (v) => v === null || (typeof v === 'string' && SOURCES.includes(v)),
   sourceId: (v) => v === null || isStr(v, 300),
   rating: isValidRating,
+  tier: isTier,
+  scoreLocked: (v) => typeof v === 'boolean',
 };
 
 /**
@@ -106,6 +111,14 @@ export function validateSeasonInput(input: unknown): SeasonValidation {
   if ('notes' in input) {
     if (!isStr(input.notes, 5000)) return { ok: false };
     out.notes = input.notes;
+  }
+  if ('tier' in input) {
+    if (!isTier(input.tier)) return { ok: false };
+    out.tier = input.tier;
+  }
+  if ('scoreLocked' in input) {
+    if (typeof input.scoreLocked !== 'boolean') return { ok: false };
+    out.scoreLocked = input.scoreLocked;
   }
   return { ok: true, value: out };
 }

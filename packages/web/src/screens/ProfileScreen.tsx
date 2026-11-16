@@ -164,7 +164,7 @@ export function ProfileScreen() {
           )}
         </section>
 
-        {/* Task 11: the tier counts ("Loved 14 · Liked 22 · ...", behind COMPARE_ENABLED) go here, between My #1s and the rows. */}
+        {/* Task 11: the tier counts ("Loved 14 · Liked 22 · ...") go here, between My #1s and the rows. */}
 
         <div className="group__card">
           <Link to="/top5" className="group__row">

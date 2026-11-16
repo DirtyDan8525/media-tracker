@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { Category } from '@media-tracker/shared';
 
 export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share';
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -31,6 +31,7 @@ const PATHS: Record<IconName, ReactElement> = {
   palette: <><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-1.5-1-2.5S14 15 15 15h2a4 4 0 0 0 4-4c0-4.4-4-8-9-8z" /><circle cx="7.5" cy="11" r="1.2" /><circle cx="10" cy="7" r="1.2" /><circle cx="15" cy="7.5" r="1.2" /></>,
   check: <path d="M5 12l5 5 9-10" />,
   warning: <><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18v.5" /></>,
+  tiers: <><path d="M12 3l9 4.5-9 4.5-9-4.5z" /><path d="M3 12l9 4.5 9-4.5" /><path d="M3 16.5l9 4.5 9-4.5" /></>,
   download: <path d="M12 4v12M7 11l5 5 5-5M4 20h16" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   logout: <path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9" />,

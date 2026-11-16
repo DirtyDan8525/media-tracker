@@ -8,13 +8,13 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AppearanceScreen } from './screens/AppearanceScreen';
+import { TierEditor } from './screens/settings/TierEditor';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
 import { UsernameSetup } from './screens/UsernameSetup';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
 import { HomeRedirect } from './shell/HomeRedirect';
-import { COMPARE_ENABLED } from './features';
 import { SessionGate, SETUP_PATH } from './shell/SessionGate';
 
 // Entry details load on demand: the list screen is what most visits need.
@@ -26,8 +26,22 @@ const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ 
 // Compare (and the shared engine it runs) only loads when opened.
 const CompareScreen = lazy(() => import('./screens/CompareScreen').then((m) => ({ default: m.CompareScreen })));
 
+// Re-tier review loads on demand too.
+const RetierScreen = lazy(() => import('./screens/RetierScreen').then((m) => ({ default: m.RetierScreen })));
+
+function RetierRoute() {
+  return (
+    <Suspense fallback={
+      <div className="screen" aria-busy="true" aria-label="Loading">
+        <div className="screen__body"><Skeleton height={80} /></div>
+      </div>
+    }>
+      <RetierScreen />
+    </Suspense>
+  );
+}
+
 function CompareRoute() {
-  if (!COMPARE_ENABLED) return <Navigate to="/" replace />;
   return (
     <Suspense fallback={
       <div className="screen" aria-busy="true" aria-label="Loading">
@@ -83,10 +97,12 @@ export const routes: RouteObject[] = [
           { path: 'search', element: <SearchScreen /> },
           { path: 'profile', element: <ProfileScreen /> },
           { path: 'compare', element: <CompareRoute /> },
+          { path: 'retier/:set', element: <RetierRoute /> },
           { path: 'top5', element: <Top5Screen /> },
           { path: 'stats', element: <StatsScreen /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'settings/appearance', element: <AppearanceScreen /> },
+          { path: 'settings/tiers', element: <TierEditor /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'more', element: <MoreScreen /> },
           { path: '*', element: <Navigate to="/" replace /> },

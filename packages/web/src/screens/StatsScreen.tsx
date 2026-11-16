@@ -1,4 +1,4 @@
-import { formatRating, ratingColor, type Category } from '@media-tracker/shared';
+import { formatRating, ratingColor, tiersFor, type Category } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useAllEntries } from '../data/useEntries';
@@ -11,12 +11,18 @@ import { useCfSet } from '../design/ThemeContext';
 import { useIsWide } from '../hooks';
 import { enabledLists, LIST_LABEL } from '../nav';
 import { computeStats, ratingDistribution, type ListStats } from '../ratings/stats';
+import { TIERS_TOP_FIRST } from '../design/components/TierPicker';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import '../design/ratings.css';
 
 const DASH = '—';
 const MAX_GENRES = 10;
+/** "Loved 14 · Liked 22 · Fine 6 · Didn't like 2" in the list's own tier names; null when nothing is in a tier. */
+function tierLine(s: ListStats, names: readonly string[]): string | null {
+  if (s.tiers.every((n) => n === 0)) return null;
+  return TIERS_TOP_FIRST.map((t) => `${names[t]} ${s.tiers[t]}`).join(' · ');
+}
 const pct = (n: number, of: number): number => (of > 0 ? Math.round((n / of) * 100) : 0);
 
 /** Counts and averages over the lists that are turned on (route /stats). Charts are drawn in theme colours; every one has a table beside it for screen readers. */
@@ -131,14 +137,14 @@ export function StatsScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} />)}
+                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
                   <StatsRow name="All media" s={all} index={stats.lists.length} total />
                 </tbody>
               </table>
             </div>
           ) : (
             <ul className="stats__cards" aria-label="Stats by list">
-              {stats.lists.map((l, i) => <ListCard key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} />)}
+              {stats.lists.map((l, i) => <ListCard key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
             </ul>
           )}
         </section>
@@ -175,7 +181,7 @@ export function StatsScreen() {
   );
 }
 
-function ListCard({ name, s, index }: { name: string; s: ListStats; index: number }) {
+function ListCard({ name, s, index, tiers }: { name: string; s: ListStats; index: number; tiers: string | null }) {
   return (
     <li className="stats__list-card">
       <div className="stats__list-head">
@@ -185,6 +191,7 @@ function ListCard({ name, s, index }: { name: string; s: ListStats; index: numbe
       <div className="stats__list-rated" aria-hidden="true">
         <Bar value={s.entries ? s.rated / s.entries : 0} index={index} />{s.rated}/{s.entries}
       </div>
+      {tiers && <p className="stats__tiers">{tiers}</p>}
       <dl className="stats__list-dl">
         <div><dt>Entries</dt><dd>{s.entries}</dd></div>
         <div><dt>Rated</dt><dd>{s.rated}</dd></div>
@@ -196,10 +203,10 @@ function ListCard({ name, s, index }: { name: string; s: ListStats; index: numbe
   );
 }
 
-function StatsRow({ name, s, index, total }: { name: string; s: ListStats; index: number; total?: boolean }) {
+function StatsRow({ name, s, index, total, tiers }: { name: string; s: Omit<ListStats, 'tiers'>; index: number; total?: boolean; tiers?: string | null }) {
   return (
     <tr className={total ? 'stats__total' : undefined}>
-      <th scope="row">{name}</th>
+      <th scope="row">{name}{tiers && <span className="stats__tiers">{tiers}</span>}</th>
       <td className="num">{s.entries}</td>
       <td className="num"><Bar value={s.entries ? s.rated / s.entries : 0} index={index} />{s.rated}</td>
       <td className="num">{s.average === null ? DASH : <RatingBadge rating={s.average} size="xs" />}</td>

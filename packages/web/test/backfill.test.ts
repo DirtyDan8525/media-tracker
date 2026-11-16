@@ -8,7 +8,7 @@ function entry(over: Partial<Entry> = {}): Entry {
     status: 'completed' as Entry['status'], rating: 9, genres: '', creator: 'Sunrise', album: '',
     coverUrl: 'c.jpg', notes: 'my notes', releaseDate: '', synopsis: '', lengthLabel: '', origin: '',
     detailsState: 'none', isPrivate: false, notesPrivate: false, source: null, sourceId: null,
-    lookupState: 'ok', importId: null, seasonAvg: null, createdAt: 'x', updatedAt: 'x', ...over,
+    lookupState: 'ok', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: 'x', updatedAt: 'x', ...over,
   };
 }
 function info(over: Partial<LookupInfo> = {}): LookupInfo {

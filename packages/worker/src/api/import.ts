@@ -8,10 +8,14 @@ import {
   IMPORT_SEASON_PARAMS,
   SEASONS_PER_STATEMENT,
   importStatementCount,
+  seasonSetOf,
+  tiersFor,
   type Category,
+  type RatingSet,
   type ImportRow,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/access';
+import { loadSets, planRemove, runBatch, setWriteStatements, tierFieldsFor } from '../ratings/store';
 import { CATEGORIES, validateEntryInput, validateSeasonInput } from './entryValidation';
 
 export const importApi = new Hono<AppEnv>();
@@ -74,7 +78,14 @@ const placeholders = (params: number, rows: number, literalTail = '') =>
   Array.from({ length: rows }, () => `(${Array(params).fill('?').join(', ')}${literalTail})`).join(', ');
 
 const ENTRY_COLS =
-  'id, user_id, category, title, typed_title, status, rating, genres, creator, album, cover_url, notes, lookup_state, import_id, created_at, updated_at';
+  'id, user_id, category, title, typed_title, status, rating, genres, creator, album, cover_url, notes, lookup_state, import_id, created_at, updated_at, tier, prior_mean, strength';
+
+/** tier, prior_mean, strength for an imported rating (spec §5.5): its list's tier, shown score unchanged. */
+const tierCols = (rating: number | null, settings: AppEnv['Variables']['user']['settings'], category: Category) => {
+  if (rating === null) return [null, null, null];
+  const f = tierFieldsFor(rating, tiersFor(settings, category));
+  return [f.tier, f.priorMean, f.strength];
+};
 
 // 1 lookup + 1 batch (<= 46 statements). All-or-nothing.
 importApi.post('/', async (c) => {
@@ -140,16 +151,18 @@ importApi.post('/', async (c) => {
   const now = new Date(baseMs).toISOString();
   const entryVals: unknown[][] = [];
   const seasonVals: unknown[][] = [];
+  const settings = c.var.user.settings;
   clean.forEach((r) => {
     const id = crypto.randomUUID();
     entryVals.push([
       id, userId, r.category, r.title, r.title, r.status, r.rating, r.genres, r.creator, r.album,
-      r.coverUrl, r.notes, r.coverUrl ? 'ok' : 'not_found', importId, now, now,
+      r.coverUrl, r.notes, r.coverUrl ? 'ok' : 'not_found', importId, now, now, ...tierCols(r.rating, settings, r.category),
     ]);
     for (const s of r.seasons) {
       // Distinct created_at keeps the sheet's season order (seasons list by created_at).
       const at = new Date(baseMs + seasonVals.length).toISOString();
-      seasonVals.push([crypto.randomUUID(), id, s.label, s.rating, s.notes, at]);
+      // Seasons use their parent list's tiers (Ruling Q4).
+      seasonVals.push([crypto.randomUUID(), id, s.label, s.rating, s.notes, at, ...tierCols(s.rating, settings, r.category)]);
     }
   });
 
@@ -174,7 +187,7 @@ importApi.post('/', async (c) => {
     const part = seasonVals.slice(i, i + SEASONS_PER_STATEMENT);
     stmts.push(
       db
-        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
+        .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at, tier, prior_mean, strength) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
         .bind(...(part.flat() as never[])),
     );
   }
@@ -182,24 +195,49 @@ importApi.post('/', async (c) => {
   return c.json({ inserted: clean.length });
 });
 
-// 1 lookup (with count) + 1 batch of 2 (seasons go via ON DELETE CASCADE).
+// 1 batch of 2 (owner with count, the import's entry ids and lists); loadSets of the lists it
+// touched and their season tabs (≤ 10, one batch); then 1 batch: its comparisons, its entries
+// (seasons go via ON DELETE CASCADE), the imports row, and the re-fit of every tier its rated
+// titles leave (≤ 9 set UPDATEs). ≤ 27 queries with sign-in.
 importApi.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const userId = c.var.user.id;
   if (!UUID_RE.test(id)) return c.json(notFound, 404);
   const db = c.env.DB;
-  const owned = await db
-    .prepare(
+  const [own, mine] = await db.batch([
+    db.prepare(
       `SELECT (SELECT COUNT(*) FROM entries e WHERE e.import_id = i.id AND e.user_id = i.user_id) AS n
        FROM imports i WHERE i.id = ? AND i.user_id = ?`,
-    )
-    .bind(id, userId)
-    .first<{ n: number }>();
+    ).bind(id, userId),
+    db.prepare('SELECT id, category FROM entries WHERE import_id = ? AND user_id = ?').bind(id, userId),
+  ]);
+  const owned = (own!.results as { n: number }[])[0];
   if (!owned) return c.json(notFound, 404);
-  // (D1's meta.changes would include cascaded season rows, so count entries up front.)
-  await db.batch([
+  const imported = mine!.results as { id: string; category: Category }[];
+  const gone = new Set(imported.map((r) => r.id));
+
+  // The import's titles leave their tiers: re-fit those tiers without them.
+  const sets: RatingSet[] = [];
+  for (const cat of new Set(imported.map((r) => r.category))) {
+    sets.push(cat);
+    const s = seasonSetOf(cat);
+    if (s !== null) sets.push(s);
+  }
+  const settings = c.var.user.settings;
+  const refits = sets.length === 0 ? [] : (await loadSets(db, userId, sets, (s) => tiersFor(settings, s))).flatMap((l) =>
+    setWriteStatements(db, userId, l.set,
+      planRemove(l, (i) => gone.has(i.kind === 'entry' ? i.id : i.entryId!), tiersFor(settings, l.set)), l.stored));
+
+  // Undo removes everything the import brought, including the picks that name its titles or
+  // their seasons. They go first, while the seasons still exist to be named.
+  const named = `SELECT id FROM entries WHERE import_id = ?2 AND user_id = ?1
+                 UNION ALL SELECT s.id FROM seasons s JOIN entries e ON e.id = s.entry_id WHERE e.import_id = ?2 AND e.user_id = ?1`;
+  // (D1's meta.changes would include cascaded season rows, so entries were counted up front.)
+  await runBatch(db, [
+    db.prepare(`DELETE FROM comparisons WHERE user_id = ?1 AND (winner_id IN (${named}) OR loser_id IN (${named}))`).bind(userId, id),
     db.prepare('DELETE FROM entries WHERE import_id = ? AND user_id = ?').bind(id, userId),
     db.prepare('DELETE FROM imports WHERE id = ? AND user_id = ?').bind(id, userId),
+    ...refits,
   ]);
   return c.json({ deleted: owned.n });
 });

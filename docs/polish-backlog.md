@@ -48,5 +48,5 @@ Minor items that were noticed and deliberately not fixed (lean mode, 2026-11-16)
 - No requests dot on the PC side-nav profile row.
 
 ## Reported by Dan (2026-11-16)
-- Entry detail on phone: the Rating and Status tiles sit side by side and are squished; stack them or give them room.
-- **Bug to check:** re-rating Invincible several times before settling on 9.6 made 5–6 Activity posts. Edits to one title within 10 minutes should fold into one post (S5). Check which version was deployed and which path wrote the rows (detail PATCH, slider, or a Compare save).
+- ~~Entry detail on phone: Rating and Status tiles squished~~ — fixed: stacked below 640px.
+- **Checked:** the Phase 4 server folds 6 re-rates into one post (test `rerate.test.ts`); likely seen on the older version. Recheck after deploying Phase 4. Original report: re-rating Invincible several times before settling on 9.6 made 5–6 Activity posts. Edits to one title within 10 minutes should fold into one post (S5). Check which version was deployed and which path wrote the rows (detail PATCH, slider, or a Compare save).

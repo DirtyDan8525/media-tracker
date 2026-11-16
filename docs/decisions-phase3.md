@@ -57,3 +57,16 @@ Full wording and reasoning are in `docs/plans/2026-11-13-phase3-ratings.md`. Whe
 - **Anime lookups run on the device, with Kitsu as the server backup.** AniList blocks Cloudflare's IPs, so the browser calls AniList (using the shared adapter) and the Worker's chain falls back to Kitsu when the device finds nothing. Cost if wrong: anime lookups lose AniList when the device is offline.
 - End-to-end tests (Task 12): the compare test reads the starting count from `/api/compare/queue` and expects that count plus 3 after adding three rated anime, so it does not depend on what earlier tests left waiting. The tests still run in order (serial mode). "Stop and review" followed by "Don't save" is tested by calling the lower-rated of the pair better, so the review has a change to discard. The dev shortcuts `DEV_EMAIL` and `LOOKUP_FAKE` are passed on the command line (`--var`) by `e2e/serve.mjs` for the e2e run, and for local development they live in the gitignored `packages/worker/.dev.vars` (copied from `.dev.vars.example`), never in `wrangler.toml`. The Worker honours them only when `ENVIRONMENT` is `dev`.
 - Parked, not built: a warning for a Custom label colour that is hard to read on Highlight; the Retry button briefly showing the full skeleton; no flush of the search debounce on unmount.
+
+## Phase 3b rulings from the build ledger (navigation and profile)
+
+The plan's own rulings (B1 to B24) are in `docs/plans/2026-11-15-phase3b-nav-profile.md`. These were made while building, and the merge with the tier ratings is in `docs/decisions-phase3c.md`.
+
+- Lists-menu counts use Text colour: Muted text can't reach 4.5:1 on the see-through menu in the light themes.
+- The bottom bar's Add reads "Add movie" on the Movies list and so on, per B3 (its name is "Add <noun>" of the current list).
+- More stays lit on `/top5` and `/stats`, because Top 5 is reachable from More as well as from Profile.
+- The side-nav profile link's accessible name is "Profile, @username", so it contains the visible text (WCAG 2.5.3).
+- Two Add controls on PC (the side nav's and the list's own) are acceptable.
+- Share cards: the #1 poster's height fits the card (434 px). Save image downloads the file; Share goes through `shareOrSave`. Sheet titles follow the boards. Add keeps every URL parameter except `add`.
+- Compare is a bottom-bar tab, so its home screen (and its loading, off and error states) has no Back button. A run keeps its in-flow controls ("Back to Fix my ratings", the pair's "← Back").
+- Profile tier counts (B23): rated titles only, counted by each title's stored tier, or by its own list's tiers when the row has none yet; names are the shared names when every enabled list uses the same ones, otherwise the default names. Shown as the small tier bar with one muted line, and nothing until a title is rated.

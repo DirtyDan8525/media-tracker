@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists `0001_init.sql` with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0005_tier_ratings.sql`) with a green check.
 
 ## 7. Deploy the app
 
@@ -128,7 +128,7 @@ Choose a username when the app asks.
 
 ## Updating to a new version
 
-Do this each time there is new code (for example, Phase 3: Compare with rating tiers, Top 5, Stats, themes, Export and search). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
+Do this each time there is new code (for example, Phase 3: rating tiers and Compare, Top 5, Stats, themes, Export; and Phase 3b: the new bottom bar, Search, Activity and your Profile). Run the commands one at a time from the `media-tracker` folder, in the Codespace terminal (or PowerShell on your PC).
 
 1. Get the new code. Your copy may be on an older branch (for example `phase1-2`) and may never have heard of newer ones, so do these four commands in order:
    ```
@@ -161,7 +161,12 @@ Do this each time there is new code (for example, Phase 3: Compare with rating t
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
-   Type `y` when asked. Phase 3 adds one table, `compare_queue` (the list of new ratings waiting to be double-checked), in `0002_compare_queue.sql`. Tier ratings add `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks. **Success:** it lists each new migration with a green check. If you are updating from an older version, the newest code includes three new migrations, `0003`, `0004` and `0005` (the navigation and profile work brings 0003 and 0004, tier ratings 0005); Wrangler applies them in that order, in one run, with the same command. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
+   Type `y` when asked. This one command applies every migration your database is missing, in order. Coming from the Phase 3 version it applies three:
+   - `0003_activity.sql`: the `activity` table (the Activity screen), with one "added" line for each title you already have.
+   - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
+   - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
+
+   (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:
    ```
    npm run deploy

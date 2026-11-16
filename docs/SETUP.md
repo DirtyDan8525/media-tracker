@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0005_tier_ratings.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0006_social.sql`) with a green check.
 
 ## 7. Deploy the app
 
@@ -124,6 +124,34 @@ Choose a username when the app asks.
 
 **Success:** "Imported N titles" appears and your lists fill up. Undo is available right after if something looks wrong.
 
+## 12. Let friends in (admin invites)
+
+This lets you approve a friend's email from the app (More > **Admin**) instead of editing the Access policy by hand. The app edits the policy for you, using a token that can do only that. Skip this section if you would rather add emails in the dashboard yourself.
+
+1. In the Cloudflare dashboard click your profile icon > **My Profile** > **API Tokens** > **Create Token** > **Create Custom Token**. Name it `media-tracker access`. Under Permissions choose **Account** · **Access: Apps and Policies** · **Edit**. Under Account Resources choose **Include** · your account. Add no other permissions. Create the token and copy it (it is shown only once).
+   **Success:** you see the token on screen and a "Create another token" or "View all tokens" button.
+2. Store it as a secret (paste the token when asked):
+   ```
+   npm exec -w packages/worker -- wrangler secret put CF_API_TOKEN --env production
+   ```
+   **Success:** `Success! Uploaded secret CF_API_TOKEN`.
+3. Find your Account ID: in the dashboard open **Workers & Pages**; **Account ID** is on the right side. In `packages/worker/wrangler.toml`, under `[env.production.vars]`, set `CF_ACCOUNT_ID` to it (keep the quotes).
+   **Success:** the line reads `CF_ACCOUNT_ID = "<32 letters and numbers>"`.
+4. Find the policy ID: **Zero Trust** > **Access** > **Policies**, then open "Dan only" (rename it "Friends" if you like). The policy ID is in the address bar after `/policies/`. Put it in `[env.production.vars]` as `ACCESS_POLICY_ID`. If the policy is not listed there, create one on that page (action **Allow**, **Include** > **Emails** = your email), attach it to the Media Tracker application, and remove the old one from the application.
+   **Success:** `ACCESS_POLICY_ID = "<the id>"` is saved, and the policy is attached to the application.
+5. Check it before you deploy (PowerShell; put your token, account ID and policy ID in place of the `<...>` parts):
+   ```
+   curl.exe -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/accounts/<account id>/access/policies/<policy id>
+   ```
+   **Success:** the reply contains `"success":true` and your email address. If it says `Authentication error`, the token or its permission is wrong (go back to step 1).
+6. Deploy:
+   ```
+   npm run deploy
+   ```
+   **Success:** More > **Admin** > approve a test email shows an invite link. Send that link to your friend: they sign in with the email you approved, pick a username, and are offered "Add @you".
+
+To take someone's access away, press **Remove** next to their email in Admin. The app drops their email from the policy (it refuses to remove your own email or the last email on the policy). Their lists and ratings stay in the database; they just cannot sign in any more.
+
 ---
 
 ## Updating to a new version
@@ -161,10 +189,11 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
-   Type `y` when asked. This one command applies every migration your database is missing, in order. Coming from the Phase 3 version it applies three:
+   Type `y` when asked. This one command applies every migration your database is missing, in order. Coming from the Phase 3 version it applies these:
    - `0003_activity.sql`: the `activity` table (the Activity screen), with one "added" line for each title you already have.
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
+   - `0006_social.sql`: friends, invite links, reactions, comments and the list of approved emails (Phase 4). Apply it **before** deploying: the new app reads these tables.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:

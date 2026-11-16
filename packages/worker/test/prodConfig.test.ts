@@ -47,4 +47,12 @@ describe('wrangler.toml production vars', () => {
   it('keeps DEV_EMAIL and LOOKUP_FAKE out of the top-level vars too', () => {
     expect(section('vars')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
   });
+
+  it('never holds the Cloudflare API token, and declares the two ids', () => {
+    expect(toml).not.toMatch(/CF_API_TOKEN/);
+    expect(section('vars')).toMatch(/CF_ACCOUNT_ID/);
+    expect(section('vars')).toMatch(/ACCESS_POLICY_ID/);
+    expect(prod).toMatch(/CF_ACCOUNT_ID/);
+    expect(prod).toMatch(/ACCESS_POLICY_ID/);
+  });
 });

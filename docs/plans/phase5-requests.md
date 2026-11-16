@@ -46,3 +46,6 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
     - The planned view has **its own order**: drag to rearrange (with a handle; keyboard and "Move up/down" alternatives for accessibility), so the top is what's next. Saved per list on the server; new planned titles go to the bottom.
     - A friend's recommendation can be saved straight into Plan to watch.
 16. **Filters take too much room on phones:** shrink the filter area (e.g. one compact row: search + "Filters" button opening a sheet, with active filters as small chips).
+
+## Profile bio (Dan, 2026-11-16)
+17. A short **bio** on profiles (like Instagram): plain text, up to 150 characters, line breaks and emoji allowed, no links. Edit it from your Profile; friends see it under your name on your profile.

@@ -10,20 +10,33 @@ const MAX_REDIRECTS = 3;
 const invalid = { error: 'invalid' } as const;
 const upstream = { error: 'upstream' } as const;
 
-/** Hosts that are never a public cover server: loopback names, internal suffixes, IP literals in private ranges. */
+/**
+ * Hosts that are never a public cover server: loopback names, internal suffixes, IPv6 literals and
+ * IPv4 literals in private, loopback, link-local, CGNAT, benchmarking (198.18/15), IETF protocol
+ * (192.0.0/24), documentation (TEST-NET-1/2/3) and multicast/reserved ranges.
+ *
+ * This is a name/literal check only. It does NOT defend against DNS rebinding or a public name that
+ * resolves to a private address: a Worker cannot see the resolved IP. That is acceptable on Workers,
+ * whose outbound fetch cannot reach private (RFC 1918), loopback or link-local addresses, so there is
+ * no internal network to reach. Do not reuse this proxy on a runtime that sits inside a private network.
+ */
 function isBlockedHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, '');
   if (h === '' || h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return true;
   if (h.startsWith('[') || h.includes(':')) return true; // IPv6 literals
   const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h); // the URL parser has already normalised other IPv4 spellings
   if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
+    const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
     return (
       a === 0 || a === 10 || a === 127 || a >= 224 ||
       (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113)
     );
   }
   return false;
@@ -65,9 +78,12 @@ async function readCapped(res: Response, max: number): Promise<Uint8Array | null
   return out;
 }
 
-// 1 query (+ sign-in) and one outbound fetch. Only a URL that is the cover_url of one of the
-// caller's own entries is fetched, so this is not an open proxy. The URL is compared as the exact
-// stored string (not a normalised form), so what was checked is what is fetched.
+// 1 query (+ sign-in) and up to 4 outbound fetches (one request and at most 3 redirect hops).
+// Sign-in is required and the url must equal the cover_url of one of the caller's own entries, so
+// it is not an anonymous proxy. But cover_url is user-set (any http(s) URL), so in effect a signed-in
+// user can have the Worker fetch any public http(s) image of up to COVER_MAX_BYTES (B18); the size,
+// time, type and host limits above and below are what bound that. The ownership check compares the
+// raw string; the host check and the fetch then both use the parsed (normalised) URL.
 cover.get('/', async (c) => {
   const raw = c.req.query('url');
   if (!raw || raw.length > 2000) return c.json(invalid, 400);

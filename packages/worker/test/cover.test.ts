@@ -89,6 +89,42 @@ describe('GET /api/cover', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('more than 3 redirects is 502', async () => {
+    await mk(A, COVER);
+    upstream((url) => new Response(null, { status: 302, headers: { location: `${url}x` } }));
+    expect((await proxy(A, COVER)).status).toBe(502);
+    expect(fetchSpy).toHaveBeenCalledTimes(4); // the first request plus 3 hops, then it gives up
+  });
+
+  it('a 3xx without Location is 502', async () => {
+    await mk(A, COVER);
+    upstream(() => new Response(null, { status: 302 }));
+    expect((await proxy(A, COVER)).status).toBe(502);
+  });
+
+  it('decimal, hex, IPv4-mapped and reserved-range IP literals are not fetched', async () => {
+    upstream(() => new Response(IMG, { headers: { 'content-type': 'image/jpeg' } }));
+    const urls = [
+      'http://2130706433/a.jpg', 'http://0x7f.1/a.jpg', 'http://017700000001/a.jpg', 'http://127.1/a.jpg',
+      'http://[::ffff:127.0.0.1]/a.jpg', 'http://[::ffff:7f00:1]/a.jpg', 'http://localhost./a.jpg',
+      'http://198.18.0.1/a.jpg', 'http://198.19.255.1/a.jpg', 'http://192.0.0.8/a.jpg',
+      'http://192.0.2.1/a.jpg', 'http://198.51.100.7/a.jpg', 'http://203.0.113.9/a.jpg',
+    ];
+    for (const url of urls) {
+      await mk(A, url);
+      expect((await proxy(A, url)).status, url).toBe(502);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('a content-type with parameters is served as the bare type', async () => {
+    await mk(A, COVER);
+    upstream(() => new Response(IMG, { headers: { 'content-type': 'IMAGE/JPEG; charset=binary' } }));
+    const res = await proxy(A, COVER);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+  });
+
   it('a redirect to a private host is refused', async () => {
     await mk(A, COVER);
     upstream(() => new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest' } }));

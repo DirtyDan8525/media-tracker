@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
 import { AVATAR_MAX_BYTES, decodeAvatar } from '@media-tracker/shared';
@@ -117,6 +117,35 @@ describe('PUT /api/me/avatar', () => {
       { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env,
     );
     expect(form.status).toBe(415);
+  });
+});
+
+describe('PUT /api/me/avatar body size', () => {
+  const send = (headers: Record<string, string>, body: string) =>
+    app.fetch(
+      new Request('https://app.test/api/me/avatar', { method: 'PUT', headers: { 'content-type': 'application/json', ...headers }, body }),
+      { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env,
+    );
+
+  it('refuses a declared content-length over the cap before reading the body', async () => {
+    const res = await send({ 'content-length': '5000000' }, '{}');
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses an oversized body that sends no or a false content-length', async () => {
+    const big = JSON.stringify({ type: 'image/webp', data: 'A'.repeat(300_000) });
+    expect((await send({}, big)).status).toBe(400);
+  });
+
+  it('does not parse an oversized body (not even to find it invalid JSON)', async () => {
+    const spy = vi.spyOn(Request.prototype, 'json');
+    await send({}, 'x'.repeat(300_000));
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('still accepts a maximum-size photo', async () => {
+    expect((await put(A, 'image/webp', webp(AVATAR_MAX_BYTES - 12))).status).toBe(200);
   });
 });
 

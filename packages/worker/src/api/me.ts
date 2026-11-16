@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
 import {
+  AVATAR_MAX_BYTES,
   COMPARE_ASK,
   COMPARE_ROOM,
   COMPARE_STYLE,
   DEFAULT_USER_SETTINGS,
+  decodeAvatar,
   SEARCH_SCOPE,
   THEMES,
   type UserSettings,
 } from '@media-tracker/shared';
-import { decodeAvatar } from '@media-tracker/shared';
 import type { AppEnv, AppUser } from '../auth/access';
 
 export const me = new Hono<AppEnv>();
@@ -131,9 +132,43 @@ me.put('/settings', async (c) => {
   return c.json({ settings: result.settings });
 });
 
+// Base64 of a maximum-size photo is about 87.4 KB; allow a little for the JSON around it.
+const AVATAR_BODY_MAX = Math.ceil(AVATAR_MAX_BYTES / 3) * 4 + 1024;
+
+/** Reads the request body as JSON, refusing (null) anything over `max` bytes before parsing it. */
+async function readJsonCapped(req: Request, max: number): Promise<unknown> {
+  const declared = req.headers.get('content-length');
+  if (declared !== null && !(Number(declared) <= max)) return null;
+  if (!req.body) return null;
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const ch of chunks) {
+    all.set(ch, at);
+    at += ch.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(all));
+  } catch {
+    return null;
+  }
+}
+
 // 2 queries (+ sign-in). The photo is the caller's own: the row key is the signed-in user id.
 me.put('/avatar', async (c) => {
-  const decoded = decodeAvatar(await readJson(c.req.raw));
+  const decoded = decodeAvatar(await readJsonCapped(c.req.raw, AVATAR_BODY_MAX));
   if (!decoded) return c.json(invalid, 400);
 
   const user = c.var.user;

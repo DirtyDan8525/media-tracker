@@ -100,6 +100,8 @@ describe('activity writes', () => {
       changes: [{ id: a.id, rating: 7 }, { id: b.id, rating: 8 }, { id: c.id, rating: 5 }],
     });
     expect(res.status).toBe(200);
+    // `updated` is the entries UPDATE's change count (3 titles), not the activity insert's (2 rows).
+    expect(((await res.json()) as { updated: number }).updated).toBe(3);
     const { items } = await feed(A);
     const compared = items.filter((i) => i.payload.via === 'compare');
     expect(compared).toHaveLength(2);
@@ -155,6 +157,37 @@ describe('GET /api/activity', () => {
     expect(seen).toEqual([...seen].sort().reverse());
   });
 
+  it('pages rows with mixed created_at values across page boundaries without gaps or duplicates', async () => {
+    const e = await mk(A, { title: 'X' });
+    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(A).first<{ id: string }>();
+    await env.DB.exec('DELETE FROM activity');
+    const stmts: D1PreparedStatement[] = [];
+    const expected: { id: string; at: string }[] = [];
+    for (let i = 0; i < 130; i++) {
+      // groups of 7 share a timestamp, so page edges (50, 100) fall mid-group; ids run against time order
+      const at = new Date(Date.UTC(2026, 10, 15, 10, 0, 0) + Math.floor(i / 7) * 1000).toISOString();
+      const id = `m${String(999 - i).padStart(4, '0')}`;
+      expected.push({ id, at });
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at) VALUES (?, ?, ?, 'rated', '{}', ?, ?)`,
+        ).bind(id, user!.id, e.id, at, at),
+      );
+    }
+    for (let i = 0; i < stmts.length; i += 40) await env.DB.batch(stmts.slice(i, i + 40));
+    expected.sort((x, y) => (x.at === y.at ? (x.id < y.id ? 1 : -1) : x.at < y.at ? 1 : -1));
+
+    const seen: string[] = [];
+    let qs = '';
+    for (let guard = 0; guard < 6; guard++) {
+      const page = await feed(A, qs);
+      seen.push(...page.items.map((i) => i.id));
+      if (!page.next) break;
+      qs = `?before=${encodeURIComponent(page.next.before)}&beforeId=${encodeURIComponent(page.next.beforeId)}`;
+    }
+    expect(seen).toEqual(expected.map((x) => x.id));
+  });
+
   it('before without beforeId is a 400, and so is beforeId without before', async () => {
     expect((await as(A, '/api/activity?before=2026-11-15T10:00:00.000Z')).status).toBe(400);
     expect((await as(A, '/api/activity?beforeId=x')).status).toBe(400);
@@ -166,10 +199,33 @@ describe('GET /api/activity', () => {
   });
 });
 
-describe('migration seed', () => {
-  it('seeds nothing here (tables empty at migration time) and ids are 32 hex chars', async () => {
-    await mk(A, { title: 'X' });
-    const r = await env.DB.prepare('SELECT id FROM activity').first<{ id: string }>();
-    expect(r!.id).toMatch(/^[0-9a-f]{32}$/);
+describe('migration seed (0003)', () => {
+  it('adds one added row per existing non-imported entry at its created_at, and none for imports', async () => {
+    const migration = env.TEST_MIGRATIONS.find((m) => m.name.startsWith('0003'));
+    const seed = migration?.queries.filter((q) => /INSERT INTO activity/i.test(q));
+    expect(seed).toHaveLength(1);
+
+    await mk(A, { title: 'Pre-existing' }); // creates the user
+    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(A).first<{ id: string }>();
+    await env.DB.exec('DELETE FROM activity'); // as if these entries predate the activity table
+    const ins = (id: string, importId: string | null, at: string) =>
+      env.DB.prepare(
+        `INSERT INTO entries (id, user_id, category, title, import_id, created_at, updated_at) VALUES (?, ?, 'anime', ?, ?, ?, ?)`,
+      ).bind(id, user!.id, id, importId, at, at);
+    await env.DB.batch([
+      ins('hand-made', null, '2026-01-02T03:04:05.000Z'),
+      ins('imported', 'imp-1', '2026-01-03T00:00:00.000Z'),
+    ]);
+
+    await env.DB.prepare(seed![0]!).run();
+    const rows = (await env.DB.prepare('SELECT * FROM activity ORDER BY created_at').all<Record<string, string>>()).results;
+    const byEntry = Object.fromEntries(rows.map((r) => [r.entry_id, r]));
+    expect(Object.keys(byEntry).sort()).toHaveLength(2); // Pre-existing (uuid) + hand-made; never 'imported'
+    expect(byEntry.imported).toBeUndefined();
+    expect(byEntry['hand-made']).toMatchObject({
+      user_id: user!.id, type: 'added', payload_json: '{}',
+      created_at: '2026-01-02T03:04:05.000Z', updated_at: '2026-01-02T03:04:05.000Z',
+    });
+    expect(byEntry['hand-made']!.id).toMatch(/^[0-9a-f]{32}$/);
   });
 });

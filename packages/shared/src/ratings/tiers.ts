@@ -22,7 +22,10 @@ export function seasonSetOf(c: Category): RatingSet | null {
   return null;
 }
 
-/** The tier a score falls in. Boundary values belong to the higher tier (Ruling Q2). */
+/**
+ * The tier a score falls in. Boundary values belong to the higher tier (Ruling Q2). Use it only
+ * for a newly typed number: a stored title's tier is its `tier` field (see the module note).
+ */
 export function tierFor(score: number, t: TierSet): Tier {
   const [b1, b2, b3] = t.bounds;
   if (score >= b3) return 3;

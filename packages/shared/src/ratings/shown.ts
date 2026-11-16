@@ -9,6 +9,22 @@ type RefitOpts = { rangeChanged?: boolean; priorSd?: number };
 const SAME_STRENGTH = 1e-9;
 
 /**
+ * The number a score shows as, with one or two decimals. Below the top tier it is capped just under
+ * the tier's upper bound (8.9, or 8.99 with two decimals, for the default Liked), so a shown score
+ * never reads as the next tier's lower bound. The top tier may show its upper bound (10.0).
+ *
+ * Note: switching a title between one and two decimals can lower its shown number by up to 0.04
+ * (9.04 → 9.0, or 9.05 shown as 9.1 then 9.04) even when its strength rose. Accepted: the
+ * guarantees of spec §5.2 are about strengths and scores, which are monotonic; only the rounding
+ * of the display can step back.
+ */
+export function shownValue(score: number, range: [number, number], twoDecimals: boolean): number {
+  const v = twoDecimals ? round2(score) : round1(score);
+  if (range[1] >= 10) return v;
+  return Math.min(v, twoDecimals ? round2(range[1] - 0.01) : round1(range[1] - 0.1));
+}
+
+/**
  * Re-fits one tier and works out its shown scores (Rulings Q6, Q7). `items` are the rated titles
  * of the tier, `range` its score range. Returns only the items whose `rating` or `strength`
  * changed, with the new values, in input order.
@@ -18,6 +34,7 @@ const SAME_STRENGTH = 1e-9;
  *   a neighbour in strength order shows the same one-decimal text and the two strengths differ.
  * - An unfitted title keeps its stored rating, unless the range changed, it has no rating (tier
  *   only), or it was fitted before (strength ≠ prior): then it shows round1(scoreOf(prior)).
+ * Every value it writes goes through `shownValue`, so it stays below the next tier's lower bound.
  */
 export function refitTier(items: RatedItem[], comparisons: Comparison[], range: [number, number], opts?: RefitOpts): RatedItem[] {
   const strengths = fitTier(items, comparisons, { priorSd: opts?.priorSd });
@@ -30,7 +47,9 @@ export function refitTier(items: RatedItem[], comparisons: Comparison[], range: 
   const order = [...items].sort((a, b) => str(b) - str(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   // The one-decimal text each title would show. A locked title shows its typed number.
   const oneText = (i: RatedItem): number =>
-    fitted.has(i.id) && !i.scoreLocked ? round1(scoreOf(str(i), range)) : round1(i.rating ?? round1(scoreOf(prior(i), range)));
+    fitted.has(i.id) && !i.scoreLocked
+      ? shownValue(scoreOf(str(i), range), range, false)
+      : round1(i.rating ?? shownValue(scoreOf(prior(i), range), range, false));
 
   const next = new Map<string, number | null>();
   order.forEach((i, k) => {
@@ -41,11 +60,11 @@ export function refitTier(items: RatedItem[], comparisons: Comparison[], range: 
       const collides = [order[k - 1], order[k + 1]].some(
         (o) => o !== undefined && oneText(o) === mine && Math.abs(str(o) - str(i)) > SAME_STRENGTH,
       );
-      next.set(i.id, collides ? round2(score) : round1(score));
+      next.set(i.id, shownValue(score, range, collides));
       return;
     }
     const reset = opts?.rangeChanged || i.rating === null || i.strength !== i.priorMean;
-    next.set(i.id, reset ? round1(scoreOf(prior(i), range)) : i.rating);
+    next.set(i.id, reset ? shownValue(scoreOf(prior(i), range), range, false) : i.rating);
   });
 
   const out: RatedItem[] = [];
@@ -71,13 +90,15 @@ export function refitSet(items: RatedItem[], comparisons: Comparison[], tiers: T
 
 /**
  * A typed rating. A number sets the tier it falls in, the prior from the number, strength = prior
- * and rating = the number; the lock is `lock`, or unchanged when omitted. Null clears the rating.
+ * and rating = the number. The lock is `lock` when given; otherwise a number that changes the tier
+ * unlocks the title (Ruling Q8) and one in the same tier keeps the lock. Null clears the rating.
  */
 export function applyTyped(item: RatedItem, rating: number | null, tiers: TierSet, lock?: boolean): RatedItem {
   if (rating === null) return { ...item, rating: null, tier: null, priorMean: null, strength: null, scoreLocked: false };
   const tier = tierFor(rating, tiers);
   const priorMean = priorFromScore(rating, tierRange(tiers, tier));
-  return { ...item, rating, tier, priorMean, strength: priorMean, scoreLocked: lock ?? item.scoreLocked };
+  const scoreLocked = lock ?? (item.tier !== null && tier !== item.tier ? false : item.scoreLocked);
+  return { ...item, rating, tier, priorMean, strength: priorMean, scoreLocked };
 }
 
 /**
@@ -88,7 +109,7 @@ export function applyTyped(item: RatedItem, rating: number | null, tiers: TierSe
 export function applyMove(item: RatedItem, tier: Tier, tiers: TierSet): RatedItem {
   const range = tierRange(tiers, tier);
   const priorMean = item.rating === null ? 0 : priorFromScore(item.rating, range);
-  return { ...item, tier, priorMean, strength: priorMean, rating: round1(scoreOf(priorMean, range)), scoreLocked: false };
+  return { ...item, tier, priorMean, strength: priorMean, rating: shownValue(scoreOf(priorMean, range), range, false), scoreLocked: false };
 }
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base' });

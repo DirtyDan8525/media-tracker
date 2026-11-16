@@ -1,5 +1,6 @@
 import { nextPair, pairKey, placementAnswer, placementNext, settledness, startPlacement, type Placement } from './questions';
-import { applyMove, compareRated, refitSet } from './shown';
+import { applyMove, compareRated, refitSet, refitTier } from './shown';
+import { tierRange } from './tiers';
 import type { Comparison, PickInput, RatedItem, RatingChange, SavePayload, Tier, TierSet } from './types';
 
 export type SessionMode = { kind: 'fix'; tier: Tier | null } | { kind: 'place'; ids: string[] } | { kind: 'unrated'; ids: string[] };
@@ -32,10 +33,14 @@ interface PickRecord { winnerId: string; loserId: string; isTie: boolean; undone
 
 /** Everything that Back restores. Immutable: each action makes a new one. */
 interface State {
-  /** Base items with this session's moves and tier choices applied (what the fit starts from). */
+  /**
+   * Base items with this session's moves and tier choices applied (what the fit starts from). A
+   * moved title is always `applyMove(base, finalTier)`, and one back in its base tier is the base
+   * item itself, exactly as the Worker applies `payload().moves` to its stored rows.
+   */
   moved: Map<string, RatedItem>;
-  /** Ids in the order they were first moved (or given a tier) by an action still in the log. */
-  movedIds: string[];
+  /** Final tier of each title whose tier differs from the base, in the order first moved. */
+  finalTiers: Map<string, Tier>;
   picks: PickRecord[];
   /** After the fit: what the session shows now. */
   items: Map<string, RatedItem>;
@@ -75,9 +80,26 @@ export function createRatingSession(
     ...picks.map((p) => ({ id: `session-${p.seq}`, winnerId: p.winnerId, loserId: p.loserId, isTie: p.isTie, createdAt: '', undoneAt: null })),
   ];
 
-  const fit = (moved: Map<string, RatedItem>, picks: PickRecord[]): Map<string, RatedItem> => {
+  /** The full fit, at the start. */
+  const fitAll = (moved: Map<string, RatedItem>, picks: PickRecord[]): Map<string, RatedItem> => {
     const items = new Map(moved);
     for (const c of refitSet([...moved.values()], comparisonsOf(picks), tiers, opts)) items.set(c.id, c);
+    return items;
+  };
+
+  /**
+   * Re-fits only the tiers an action touched. Tiers are fitted independently (a tier's result
+   * depends only on its own titles and the picks between them), so this equals a full re-fit.
+   */
+  const refit = (prev: Map<string, RatedItem>, moved: Map<string, RatedItem>, picks: PickRecord[], touched: (Tier | null)[]) => {
+    const items = new Map(prev);
+    const comps = comparisonsOf(picks);
+    for (const t of new Set(touched)) {
+      if (t === null) continue;
+      const inTier = [...moved.values()].filter((i) => i.tier === t);
+      for (const i of inTier) items.set(i.id, i);
+      for (const c of refitTier(inTier, comps, tierRange(tiers, t), opts)) items.set(c.id, c);
+    }
     return items;
   };
 
@@ -103,7 +125,7 @@ export function createRatingSession(
 
   let state: State = (() => {
     const moved = new Map(baseById);
-    return advance({ moved, movedIds: [], picks: [], items: fit(moved, []), skipped: new Set(), stopped: false, cursor: 0, placement: null, reached: [] });
+    return advance({ moved, finalTiers: new Map(), picks: [], items: fitAll(moved, []), skipped: new Set(), stopped: false, cursor: 0, placement: null, reached: [] });
   })();
 
   const scope = (s: State): RatedItem[] =>
@@ -133,14 +155,21 @@ export function createRatingSession(
     question = questionOf(state);
   };
 
-  /** Applies a move or tier choice: the title keeps its rough place (Q23), then everything is re-fitted. */
-  const moveState = (id: string, t: Tier): State => {
+  /**
+   * Applies a move or tier choice, or returns null when the title is already in that tier (a
+   * no-op). The moved title is built from the base (Q23 keeps its rough place from its stored
+   * score); one moved back to its base tier is restored untouched and leaves the payload.
+   */
+  const moveState = (id: string, t: Tier): State | null => {
     const cur = state.items.get(id)!;
+    if (cur.tier === t) return null;
+    const base = baseById.get(id)!;
     const moved = new Map(state.moved);
-    moved.set(id, applyMove(cur, t, tiers));
-    const movedIds = state.movedIds.includes(id) ? state.movedIds : [...state.movedIds, id];
+    const finalTiers = new Map(state.finalTiers);
+    if (base.tier === t) { moved.set(id, base); finalTiers.delete(id); }
+    else { moved.set(id, applyMove(base, t, tiers)); finalTiers.set(id, t); }
     // A move invalidates the frozen tier order, so the current placement restarts.
-    return advance({ ...state, moved, movedIds, items: fit(moved, state.picks), placement: null });
+    return advance({ ...state, moved, finalTiers, items: refit(state.items, moved, state.picks, [cur.tier, t]), placement: null });
   };
 
   const session: RatingSession = {
@@ -172,20 +201,23 @@ export function createRatingSession(
       const rec: PickRecord = { winnerId: w, loserId: l, isTie: a === 'same', undone: false, seq: allPicks.length };
       allPicks.push(rec);
       const picks = [...state.picks, rec];
-      const next: State = { ...state, picks, items: fit(state.moved, picks) };
+      const touched = [state.moved.get(w)!.tier, state.moved.get(l)!.tier];
+      const next: State = { ...state, picks, items: refit(state.items, state.moved, picks, touched) };
       if (mode.kind !== 'fix') next.placement = placementAnswer(state.placement!, a);
       commit('pick', advance(next));
     },
 
     chooseTier(t) {
       if (question?.kind !== 'tier') return;
-      commit('tier', moveState(question.item.id, t));
+      const next = moveState(question.item.id, t);
+      if (next !== null) commit('tier', next);
     },
 
     move(id, t) {
       const cur = state.items.get(id);
       if (cur === undefined || state.stopped) return;
-      commit('move', moveState(id, t));
+      const next = moveState(id, t);
+      if (next !== null) commit('move', next);
     },
 
     back() {
@@ -215,7 +247,7 @@ export function createRatingSession(
 
     payload() {
       const picks: PickInput[] = allPicks.map((p) => ({ winnerId: p.winnerId, loserId: p.loserId, isTie: p.isTie, undone: p.undone }));
-      const moves = state.movedIds.map((id) => ({ id, tier: state.moved.get(id)!.tier! }));
+      const moves = [...state.finalTiers].map(([id, tier]) => ({ id, tier }));
       return { picks, moves, done: [...state.reached] };
     },
   };

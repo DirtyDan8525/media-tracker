@@ -11,10 +11,13 @@ const logit = (p: number) => Math.log(p / (1 - p));
 const item = (id: string, priorMean: number | null, scoreLocked = false): Item => ({ id, priorMean, scoreLocked });
 const win = (w: string, l: string, isTie = false, undoneAt: string | null = null): Cmp => ({ winnerId: w, loserId: l, isTie, undoneAt });
 
-/** n ∈ [2, 40] titles with random priors, ⌊R·3n⌋ earlier picks (15% ties), and one new pick a beats b. */
-function randomCase(R: () => number): { items: Item[]; earlier: Cmp[]; next: Cmp } {
+/**
+ * n ∈ [2, 40] titles with random priors, ⌊R·3n⌋ earlier picks (15% ties), and one new pick a beats b.
+ * With `locked`, 10% of titles are locked; with `tieNext`, the new pick is a tie 15% of the time.
+ */
+function randomCase(R: () => number, o: { locked?: boolean; tieNext?: boolean } = {}): { items: Item[]; earlier: Cmp[]; next: Cmp } {
   const n = 2 + Math.floor(R() * 39);
-  const items = Array.from({ length: n }, (_, i) => item(`i${i}`, logit(0.03 + 0.94 * R())));
+  const items = Array.from({ length: n }, (_, i) => item(`i${i}`, logit(0.03 + 0.94 * R()), o.locked === true && R() < 0.1));
   const two = (): [string, string] => {
     const a = Math.floor(R() * n);
     let b = Math.floor(R() * (n - 1));
@@ -23,7 +26,7 @@ function randomCase(R: () => number): { items: Item[]; earlier: Cmp[]; next: Cmp
   };
   const earlier = Array.from({ length: Math.floor(R() * 3 * n) }, () => { const [a, b] = two(); return win(a, b, R() < 0.15); });
   const [a, b] = two();
-  return { items, earlier, next: win(a, b) };
+  return { items, earlier, next: win(a, b, o.tieNext === true && R() < 0.15) };
 }
 
 function shuffle<T>(xs: T[], R: () => number): T[] {
@@ -112,6 +115,38 @@ describe('fitTier', () => {
     expect(violations).toBe(0);
   });
 
+  test('a pick never lowers the winner or raises the loser, with locked titles and earlier tie picks (2,000 random cases)', () => {
+    const R = rng(43);
+    let violations = 0, lockedCases = 0;
+    for (let c = 0; c < 2000; c++) {
+      const { items, earlier, next } = randomCase(R, { locked: true });
+      if (items.some((i) => i.scoreLocked)) lockedCases++;
+      const before = fitTier(items, earlier), after = fitTier(items, [...earlier, next]);
+      if (after.get(next.winnerId)! < before.get(next.winnerId)! - 1e-12) violations++;
+      if (after.get(next.loserId)! > before.get(next.loserId)! + 1e-12) violations++;
+      for (const i of items) if (i.scoreLocked && after.get(i.id) !== i.priorMean) violations++;
+    }
+    expect(lockedCases).toBeGreaterThan(1000);
+    expect(violations).toBe(0);
+  });
+
+  // Measured 2026-11-15 (2,000 cases each, print with PRINT_DRIFT=1):
+  //   plain, seed 42: mean change of the tier average +4.3e-5, up in 50.95% of cases;
+  //   locked titles and tie picks, seed 44: mean change −2.7e-6, up in 49.0% of cases.
+  test('no drift with locked titles and tie picks: mean change < 0.001, rises in 45–55% of cases', () => {
+    const R = rng(44);
+    const changes: number[] = [];
+    for (let c = 0; c < 2000; c++) {
+      const { items, earlier, next } = randomCase(R, { locked: true, tieNext: true });
+      const avg = (s: Map<string, number>) => mean(items.map((i) => sc(s.get(i.id)!)));
+      changes.push(avg(fitTier(items, [...earlier, next])) - avg(fitTier(items, earlier)));
+    }
+    const up = changes.filter((d) => d > 0).length / changes.length;
+    if (process.env.PRINT_DRIFT) console.log('drift locked+ties', mean(changes), up);
+    expect(Math.abs(mean(changes))).toBeLessThan(0.001);
+    expect(up).toBeGreaterThanOrEqual(0.45); expect(up).toBeLessThanOrEqual(0.55);
+  });
+
   test('no drift: over 2,000 random cases the mean change of the tier average is < 0.001 and it rises in 45–55% of cases', () => {
     const R = rng(42);
     const changes: number[] = [];
@@ -121,21 +156,42 @@ describe('fitTier', () => {
       changes.push(avg(fitTier(items, [...earlier, next])) - avg(fitTier(items, earlier)));
     }
     const up = changes.filter((d) => d > 0).length / changes.length;
+    if (process.env.PRINT_DRIFT) console.log('drift plain', mean(changes), up);
     expect(Math.abs(mean(changes))).toBeLessThan(0.001);
     expect(up).toBeGreaterThanOrEqual(0.45); expect(up).toBeLessThanOrEqual(0.55);
   });
 
-  test('a 120-title tier with 480 picks fits in under 50 ms', () => {
+  test('groups not linked by picks are fitted separately, with the same result as alone', () => {
+    const R = rng(11);
+    const group = (p: string, n: number) => Array.from({ length: n }, (_, i) => item(`${p}${i}`, logit(0.03 + 0.94 * R())));
+    const A = group('a', 12), B = group('b', 9), C = [item('c0', 0.4)];
+    const picks = (g: Item[], m: number) => Array.from({ length: m }, () => {
+      const x = Math.floor(R() * g.length); let y = Math.floor(R() * (g.length - 1)); if (y >= x) y++;
+      return win(g[x].id, g[y].id, R() < 0.15);
+    });
+    const pa = picks(A, 30), pb = picks(B, 20);
+    const all = fitTier([...A, ...B, ...C], [...pa, ...pb]);
+    const alone = new Map([...fitTier(A, pa), ...fitTier(B, pb)]);
+    for (const i of [...A, ...B]) expect(Object.is(all.get(i.id), alone.get(i.id))).toBe(true);
+    expect(all.get('c0')).toBe(0.4);
+  });
+
+  // Complexity guard (Review Focus 5), sized past a big real tier: one connected 150-title tier with
+  // 600 picks. Median of 5 runs after warm-up, so one slow run on a busy machine doesn't fail it.
+  test('a 150-title tier with 600 picks fits in under 8 ms', () => {
     const R = rng(9);
-    const items = Array.from({ length: 120 }, (_, i) => item(`t${String(i).padStart(3, '0')}`, logit(0.03 + 0.94 * R())));
-    const picks = Array.from({ length: 480 }, () => {
-      const a = Math.floor(R() * 120); let b = Math.floor(R() * 119); if (b >= a) b++;
+    const items = Array.from({ length: 150 }, (_, i) => item(`t${String(i).padStart(3, '0')}`, logit(0.03 + 0.94 * R())));
+    const picks = Array.from({ length: 600 }, () => {
+      const a = Math.floor(R() * 150); let b = Math.floor(R() * 149); if (b >= a) b++;
       return win(items[a].id, items[b].id, R() < 0.15);
     });
-    fitTier(items, picks); // warm up the JIT
-    const t0 = performance.now();
-    const s = fitTier(items, picks);
-    expect(performance.now() - t0).toBeLessThan(50);
-    expect(s.size).toBe(120);
+    for (let k = 0; k < 3; k++) fitTier(items, picks); // warm up the JIT
+    const times: number[] = [];
+    let s = new Map<string, number>();
+    for (let k = 0; k < 5; k++) { const t0 = performance.now(); s = fitTier(items, picks); times.push(performance.now() - t0); }
+    times.sort((a, b) => a - b);
+    if (process.env.PRINT_FIT) console.log('fit 150/600 ms', times);
+    expect(times[2]).toBeLessThan(8);
+    expect(s.size).toBe(150);
   });
 });

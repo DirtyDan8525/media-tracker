@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
-  DEFAULT_TIERS, applyTyped, createRatingSession, round1, tierRange,
-  type Comparison, type RatedItem, type RatingSession, type Tier,
+  DEFAULT_TIERS, applyMove, applyTyped, compareRated, createRatingSession, refitSet, round1, round2, tierRange,
+  type Comparison, type RatedItem, type RatingChange, type RatingSession, type SavePayload, type SessionMode, type Tier,
 } from '../src/ratings';
 import { DAN_TOP14 } from './fixtures/danTop14';
+import { rng } from './helpers/prng';
 
 const blank = (id: string): RatedItem => ({ id, title: id, rating: null, tier: null, priorMean: null, strength: null, scoreLocked: false });
 const typed = (id: string, r: number, lock = false) => applyTyped(blank(id), r, DEFAULT_TIERS, lock);
@@ -185,5 +186,101 @@ describe('changes', () => {
       { id: 'Fullmetal Alchemist: Brotherhood', title: 'Fullmetal Alchemist: Brotherhood', old: 10, rating: 9.98, oldTier: 3, tier: 3 },
       { id: 'Cyberpunk: Edgerunners', title: 'Cyberpunk: Edgerunners', old: 10, rating: 9.96, oldTier: 3, tier: 3 },
     ]);
+  });
+});
+
+describe('moves match the Worker', () => {
+  test('a move into the current tier does nothing', () => {
+    const s = session([...top14(), ...liked(3)], { kind: 'fix', tier: null });
+    s.move('Attack on Titan', 2);
+    expect(s.canBack).toBe(false);
+    expect(s.payload().moves).toEqual([]);
+    expect(s.changes()).toEqual([]);
+  });
+
+  test('a title moved away and back is restored unchanged and leaves the payload', () => {
+    const s = session([typed('x', 8.25), typed('y', 8.0), typed('z', 9.5)], { kind: 'fix', tier: null });
+    s.move('x', 3);
+    expect(s.payload().moves).toEqual([{ id: 'x', tier: 3 }]);
+    s.move('x', 2);
+    expect(s.payload().moves).toEqual([]);
+    expect(s.changes()).toEqual([]); // still 8.25, not 8.3
+    expect(s.canBack).toBe(true);
+    s.back();
+    expect(s.payload().moves).toEqual([{ id: 'x', tier: 3 }]);
+  });
+
+  test('repeated moves are built from the stored item with the final tier', () => {
+    const base = typed('x', 2.28);
+    const s = session([base, typed('y', 8.0), typed('w', 7.0)], { kind: 'fix', tier: null });
+    s.move('x', 2); s.move('x', 1);
+    expect(s.payload().moves).toEqual([{ id: 'x', tier: 1 }]);
+    expect(s.changes()).toEqual([{ id: 'x', title: 'x', old: 2.28, rating: applyMove(base, 1, DEFAULT_TIERS).rating, oldTier: 0, tier: 1 }]);
+  });
+
+  // What the Worker does on Save: apply the payload's moves to its stored rows, then fit with the
+  // stored comparisons plus the picks not undone.
+  function workerChanges(base: { items: RatedItem[]; comparisons: Comparison[] }, payload: SavePayload): RatingChange[] {
+    const stored = new Map(base.items.map((i) => [i.id, i]));
+    const moved = new Map(stored);
+    for (const m of payload.moves) {
+      const b = stored.get(m.id);
+      if (b !== undefined && b.tier !== m.tier) moved.set(m.id, applyMove(b, m.tier, DEFAULT_TIERS));
+    }
+    const comps: Comparison[] = [
+      ...base.comparisons,
+      ...payload.picks.filter((p) => !p.undone).map((p, k) => ({ id: `w${k}`, winnerId: p.winnerId, loserId: p.loserId, isTie: p.isTie, createdAt: '', undoneAt: null })),
+    ];
+    const items = new Map(moved);
+    for (const c of refitSet([...moved.values()], comps, DEFAULT_TIERS)) items.set(c.id, c);
+    const out: (RatingChange & { strength: number | null })[] = [];
+    for (const [id, now] of items) {
+      const was = stored.get(id)!;
+      if (now.rating === null || now.tier === null || (now.rating === was.rating && now.tier === was.tier)) continue;
+      out.push({ id, title: now.title, old: was.rating, rating: now.rating, oldTier: was.tier, tier: now.tier, strength: now.strength });
+    }
+    return out.sort(compareRated).map(({ strength: _, ...c }) => c);
+  }
+
+  test('random sessions with moves, Back and Skip preview exactly what the Worker saves (400 sessions)', () => {
+    const R = rng(77);
+    let moves = 0, backs = 0;
+    for (let c = 0; c < 400; c++) {
+      const n = 6 + Math.floor(R() * 25);
+      const raw = Array.from({ length: n }, (_, i) => {
+        const id = `t${String(i).padStart(2, '0')}`;
+        return R() < 0.1 ? blank(id) : typed(id, round2(R() * 10), R() < 0.1);
+      });
+      const randomPick = (k: number): Comparison => {
+        const a = Math.floor(R() * n); let b = Math.floor(R() * (n - 1)); if (b >= a) b++;
+        return { id: `b${k}`, winnerId: raw[a].id, loserId: raw[b].id, isTie: R() < 0.15, createdAt: '', undoneAt: R() < 0.1 ? 'x' : null };
+      };
+      const comparisons = Array.from({ length: Math.floor(R() * 2 * n) }, (_, k) => randomPick(k));
+      // Stored rows are the Worker's last fit of them.
+      const fitted = new Map(raw.map((i) => [i.id, i]));
+      for (const ch of refitSet(raw, comparisons, DEFAULT_TIERS)) fitted.set(ch.id, ch);
+      const base = { items: [...fitted.values()], comparisons };
+      const unrated = base.items.filter((i) => i.tier === null).map((i) => i.id);
+      const someIds = base.items.filter(() => R() < 0.3).map((i) => i.id);
+      const modes: SessionMode[] = [
+        { kind: 'fix', tier: null }, { kind: 'fix', tier: Math.floor(R() * 4) as Tier },
+        { kind: 'place', ids: someIds }, { kind: 'unrated', ids: unrated },
+      ];
+      const s = createRatingSession({ ...base, tiers: DEFAULT_TIERS }, modes[c % 4]);
+      for (let k = 0; k < 40; k++) {
+        const r = R();
+        const q = s.question;
+        if (q?.kind === 'tier' && r < 0.6) s.chooseTier(Math.floor(R() * 4) as Tier);
+        else if (r < 0.3) s.answer('a');
+        else if (r < 0.42) s.answer('b');
+        else if (r < 0.5) s.answer('same');
+        else if (r < 0.6) s.answer('skip');
+        else if (r < 0.8) { s.move(base.items[Math.floor(R() * n)].id, Math.floor(R() * 4) as Tier); moves++; }
+        else if (r < 0.97) { s.back(); backs++; }
+        else s.answer('stop');
+      }
+      expect(s.changes()).toEqual(workerChanges(base, s.payload()));
+    }
+    expect(moves).toBeGreaterThan(1000); expect(backs).toBeGreaterThan(1000);
   });
 });

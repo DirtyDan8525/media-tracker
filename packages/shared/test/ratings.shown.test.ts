@@ -19,9 +19,17 @@ describe('applyTyped', () => {
     const x = typed('x', 8.25);
     expect(x).toMatchObject({ rating: 8.25, tier: 2, scoreLocked: false });
     expect(x.priorMean).toBe(priorFromScore(8.25, [7.5, 9])); expect(x.strength).toBe(x.priorMean);
-    expect(applyTyped({ ...x, scoreLocked: true }, 9.5, DEFAULT_TIERS).scoreLocked).toBe(true);
-    expect(applyTyped({ ...x, scoreLocked: true }, 9.5, DEFAULT_TIERS, false).scoreLocked).toBe(false);
+    expect(applyTyped({ ...x, scoreLocked: true }, 8.7, DEFAULT_TIERS).scoreLocked).toBe(true);
+    expect(applyTyped({ ...x, scoreLocked: true }, 8.7, DEFAULT_TIERS, false).scoreLocked).toBe(false);
     expect(applyTyped({ ...x, scoreLocked: true }, null, DEFAULT_TIERS)).toEqual({ ...blank('x'), scoreLocked: false });
+  });
+
+  test('a typed number in another tier unlocks (Q8) unless lock is passed', () => {
+    const locked = typed('x', 8.5, true);
+    expect(applyTyped(locked, 9.5, DEFAULT_TIERS)).toMatchObject({ tier: 3, scoreLocked: false });
+    expect(applyTyped(locked, 9.5, DEFAULT_TIERS, true)).toMatchObject({ tier: 3, scoreLocked: true });
+    expect(applyTyped(locked, 8.7, DEFAULT_TIERS)).toMatchObject({ tier: 2, scoreLocked: true }); // same tier: kept
+    expect(applyTyped(blank('n'), 8.7, DEFAULT_TIERS)).toMatchObject({ tier: 2, scoreLocked: false });
   });
 });
 
@@ -60,6 +68,41 @@ describe('refitSet / refitTier', () => {
     const y = out.get('y')!.rating!;
     expect(round1(y)).toBe(9.1); expect(decimals(y)).toBe(2); expect(y).toBeGreaterThan(9.1); expect(y).toBeLessThan(9.15);
     expect(out.has('x')).toBe(false);
+  });
+
+  test('a locked neighbour counts by its typed number in the two-decimal rule', () => {
+    // F typed 9.5 loses to G and drops to about 9.47; L is locked at 9.5 right below it: F shows two decimals.
+    const items = [typed('L', 9.5, true), typed('F', 9.5), typed('G', 9.9)];
+    const out = byId(refitSet(items, [pick('G', 'F')], DEFAULT_TIERS));
+    const f = out.get('F')!.rating!;
+    expect(round1(f)).toBe(9.5); expect(decimals(f)).toBe(2);
+    expect(out.has('L')).toBe(false);
+    // Unlocked and unfitted, L would show 9.5 too: same result. Locked at 9.1 instead: no collision, one decimal.
+    const apart = byId(refitSet([typed('L', 9.1, true), typed('F', 9.5), typed('G', 9.9)], [pick('G', 'F')], DEFAULT_TIERS));
+    expect(apart.get('F')!.rating).toBe(9.5);
+  });
+
+  test('a fitted title at the top of a tier never shows the next tier\'s lower bound', () => {
+    // w wins five times at the top of Liked: its score rounds to 9.0, which would read as Loved.
+    const items = [typed('w', 8.95), typed('a', 8.9), typed('b', 8.5), typed('c', 8.0)];
+    const out = byId(refitSet(items, [pick('w', 'a'), pick('w', 'a'), pick('w', 'b'), pick('w', 'b'), pick('w', 'c')], DEFAULT_TIERS));
+    const w = out.get('w')!;
+    expect(scoreOf(w.strength!, [7.5, 9])).toBeGreaterThan(8.95);
+    expect(w.rating!).toBeLessThanOrEqual(8.99);
+    expect(tierFor(w.rating!, DEFAULT_TIERS)).toBe(2);
+    for (const i of out.values()) expect(tierFor(i.rating!, DEFAULT_TIERS)).toBe(i.tier);
+    // One decimal: 8.9 at most.
+    const solo = refitSet([typed('w', 8.95), typed('c', 8.0)], [pick('w', 'c'), pick('w', 'c')], DEFAULT_TIERS);
+    expect(solo.find((i) => i.id === 'w')!.rating).toBe(8.9);
+    // The top tier may show its upper bound.
+    const top = refitSet([typed('t', 9.97), typed('u', 9.5)], [pick('t', 'u'), pick('t', 'u')], DEFAULT_TIERS);
+    expect(top.find((i) => i.id === 't')!.rating).toBe(10);
+  });
+
+  test('tier-only and reset titles near the top edge stay in their tier', () => {
+    // A tier-only Didn't like title whose prior sits near the top of 0–6 would round to 6.0 (Fine).
+    const t = { ...blank('t'), tier: 0 as Tier, priorMean: 5, strength: 5 };
+    expect(refitTier([t], [], tierRange(DEFAULT_TIERS, 0))[0].rating).toBe(5.9);
   });
 
   test('picks in one tier never change another tier', () => {
@@ -126,7 +169,8 @@ describe('applyMove', () => {
     expect(up).toMatchObject({ tier: 3, rating: 9, scoreLocked: false });
     expect(up.priorMean).toBe(priorFromScore(9.03, [9, 10])); expect(up.strength).toBe(up.priorMean);
     const down = applyMove(applyTyped(blank('y'), 9.0, DEFAULT_TIERS), 2, DEFAULT_TIERS);
-    expect(down).toMatchObject({ tier: 2, rating: round1(scoreOf(down.priorMean!, [7.5, 9])) });
+    // 8.955 would round to 9.0, which reads as Loved: a Liked title shows 8.9 at most.
+    expect(down).toMatchObject({ tier: 2, rating: 8.9 });
     expect(scoreOf(down.priorMean!, [7.5, 9])).toBeCloseTo(8.955, 12);
     expect(applyMove(applyTyped(blank('z'), 5, DEFAULT_TIERS), 1, DEFAULT_TIERS).priorMean).toBe(priorFromScore(6, [6, 7.5])); // clamps to 3%
     expect(applyMove({ ...blank('u'), rating: null }, 2, DEFAULT_TIERS)).toMatchObject({ priorMean: 0, rating: 8.3 }); // unrated → middle
@@ -146,7 +190,7 @@ describe('compareRated', () => {
 });
 
 describe('guarantees', () => {
-  test('shown scores stay within the tier range (2,000 random cases)', () => {
+  test('shown scores stay within the tier range and read as their own tier (2,000 random cases)', () => {
     const R = rng(3);
     for (let c = 0; c < 2000; c++) {
       const tier = Math.floor(R() * 4) as Tier;
@@ -161,6 +205,7 @@ describe('guarantees', () => {
       for (const i of refitTier(items, comps, [low, high], { priorSd: 0.5 + R() * 2 })) {
         expect(i.scoreLocked).toBe(false);
         expect(i.rating!).toBeGreaterThanOrEqual(low); expect(i.rating!).toBeLessThanOrEqual(high);
+        expect(tierFor(i.rating!, DEFAULT_TIERS)).toBe(tier); // never the next tier's lower bound
       }
     }
   });

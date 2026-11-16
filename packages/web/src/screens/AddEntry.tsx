@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, formatRating, type Category, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, formatRating, statusLabel, type Category, type Status } from '@media-tracker/shared';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
 import { RatingBadge } from '../design/components/RatingBadge';
@@ -89,7 +89,7 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
             <legend className="field-label">Status</legend>
             <div className="chips__row">
               {STATUSES.map((s) => (
-                <Button key={s} variant="chip" active={status === s} onClick={() => setStatus(status === s ? null : s)}>{s}</Button>
+                <Button key={s} variant="chip" active={status === s} onClick={() => setStatus(status === s ? null : s)}>{statusLabel(s, category)}</Button>
               ))}
             </div>
           </fieldset>

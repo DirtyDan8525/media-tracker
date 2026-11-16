@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, sourceUrl, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, ORIGIN_LABEL, STATUSES, sourceUrl, statusLabel, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -115,7 +115,7 @@ function DetailBody({ entry }: { entry: Entry }) {
                 onChange={(e) => save({ status: (e.target.value || null) as Status | null })}
               >
                 <option value="">No status</option>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s, entry.category)}</option>)}
               </select>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, type Category, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, statusLabel, type Category, type Status } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../../design/components/Icon';
 import { IconButton } from '../../design/components/IconButton';
@@ -82,7 +82,7 @@ export function FilterChips({ category, filter, onChange, genres, sort }: Omit<L
         <select aria-label="Status" className={`select-chip${filter.status ? ' is-on' : ''}`} value={filter.status}
           onChange={(e) => onChange({ status: e.target.value as Status | '' })}>
           <option value="">Status: All</option>
-          {STATUSES.map((s) => <option key={s} value={s}>Status: {s}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s}>Status: {statusLabel(s, category)}</option>)}
         </select>
       )}
       {showGenre && (

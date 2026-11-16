@@ -70,7 +70,7 @@ describe('design components: accessible names', () => {
   });
 
   it('StatusPill shows the status', () => {
-    render(<StatusPill status="On Hold" cf={CF_SETS.Midnight} />);
+    render(<StatusPill status="On Hold" category="anime" cf={CF_SETS.Midnight} />);
     const pill = screen.getByText('On Hold');
     expect(pill.style.background).toBe('rgb(74, 63, 28)'); // #4a3f1c
   });

@@ -60,7 +60,7 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
         <div className="entry-card__text">
           <span className="entry-card__title" data-role="title">{e.title}</span>
           {meta && <span className="entry-card__meta">{meta}</span>}
-          {e.status && <StatusPill status={e.status} />}
+          {e.status && <StatusPill status={e.status} category={e.category} />}
         </div>
         <RatingBadge rating={e.rating} className="settle" />
       </Link>

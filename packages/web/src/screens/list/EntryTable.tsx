@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, formatRating, type Entry, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, STATUSES, formatRating, statusLabel, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
@@ -94,14 +94,14 @@ function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry
           {editable ? (
             <EditableCell
               col="status" kind="select" label={`Status for ${e.title}`}
-              viewLabel={`Status for ${e.title}: ${e.status ?? 'not set'}`}
-              view={e.status ? <StatusPill status={e.status} /> : <span className="muted">Set status</span>}
+              viewLabel={`Status for ${e.title}: ${e.status ? statusLabel(e.status, e.category) : 'not set'}`}
+              view={e.status ? <StatusPill status={e.status} category={e.category} /> : <span className="muted">Set status</span>}
               initial={e.status ?? ''}
-              options={[{ value: '', label: 'No status' }, ...STATUSES.map((s) => ({ value: s, label: s }))]}
+              options={[{ value: '', label: 'No status' }, ...STATUSES.map((s) => ({ value: s, label: statusLabel(s, e.category) }))]}
               validate={(raw) => ({ ok: true, value: (raw || null) as Status | null })}
               onSave={(status) => save({ status })}
             />
-          ) : (e.status && <StatusPill status={e.status} />)}
+          ) : (e.status && <StatusPill status={e.status} category={e.category} />)}
         </td>
       )}
       <td className="muted">{e.genres}</td>

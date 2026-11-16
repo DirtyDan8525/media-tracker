@@ -45,3 +45,6 @@
 
 ## Number-first rating wireframes — approved 2026-11-16
 - `RateClose`, `AddRate`, `Sharpen` (`*.wf.dc.html`) approved with no changes (item 14 of docs/plans/phase5-requests.md).
+
+## Header, Plan to watch, bio wireframes — approved 2026-11-16
+- `ListHeader`, `PlanToWatch`, `ProfileBio` (`*.wf.dc.html`) approved with no changes (items 15–18 of docs/plans/phase5-requests.md).

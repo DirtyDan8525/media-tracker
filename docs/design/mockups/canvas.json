@@ -588,6 +588,27 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Sharpen my ratings"
+    },
+    "ListHeader.wf.dc.html": {
+      "x": 0,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · List header + filters sheet"
+    },
+    "PlanToWatch.wf.dc.html": {
+      "x": 470,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Plan to watch"
+    },
+    "ProfileBio.wf.dc.html": {
+      "x": 940,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Profile bio"
     }
   },
   "order": [
@@ -671,7 +692,10 @@
     "EntryTiles.wf.dc.html",
     "RateClose.wf.dc.html",
     "AddRate.wf.dc.html",
-    "Sharpen.wf.dc.html"
+    "Sharpen.wf.dc.html",
+    "ListHeader.wf.dc.html",
+    "PlanToWatch.wf.dc.html",
+    "ProfileBio.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -933,6 +957,13 @@
       "text": "Wireframes — number-first rating (for Dan's review)",
       "kind": "title1",
       "maxW": 1400
+    },
+    "wfp5b": {
+      "x": 0,
+      "y": 20100,
+      "text": "Wireframes — Plan to watch, filters, bio (for Dan's review)",
+      "kind": "title1",
+      "maxW": 1400
     }
   },
   "designSystems": [],
@@ -977,6 +1008,7 @@
     "wfp4",
     "wfp4b",
     "wfp5",
-    "wfp5r"
+    "wfp5r",
+    "wfp5b"
   ]
 }

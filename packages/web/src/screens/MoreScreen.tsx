@@ -1,39 +1,21 @@
 import { Link } from 'react-router';
 import { useCompareQueue } from '../data/compare';
-import { useListCounts } from '../data/useEntries';
 import { Icon } from '../design/components/Icon';
 import { COMPARE_ENABLED } from '../features';
-import { enabledLists, LIST_LABEL, splitForPhone } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { waitingCount } from './CompareBanner';
 import { ExportRow } from './settings/ExportRow';
-import { SettingsLinks } from './settings/SettingsLinks';
 import '../design/settings.css';
 
-/** Phone "More" (SettingsMore.v2): the enabled lists that don't fit the bottom bar, Ratings (Compare while enabled, Top 5, Stats), Your data (Import, Export), Settings (Appearance, Comparing), then Settings and About. */
+/** Phone "More" (B20): Ratings (Compare while enabled, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings is under Profile. */
 export function MoreScreen() {
   const me = useSessionMe();
-  const counts = useListCounts().data ?? {};
   const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);
-  const { more } = splitForPhone(enabledLists(me.settings));
   return (
     <div className="screen">
       <PageHeader title="More" profile />
       <div className="screen__body stack-18">
-        {more.length > 0 && (
-          <section aria-labelledby="more-lists" className="group">
-            <h2 id="more-lists" className="group__title">Other lists</h2>
-            <div className="group__card">
-              {more.map((c) => (
-                <Link key={c} to={`/list/${c}`} className="group__row">
-                  <span className="group__row-start"><span className="tile-icon"><Icon name={c} size={18} /></span>{LIST_LABEL[c]}</span>
-                  {counts[c] !== undefined && <span className="group__value">{counts[c]}</span>}
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
         <section aria-labelledby="more-ratings" className="group">
           <h2 id="more-ratings" className="group__title">Ratings</h2>
           <div className="group__card">
@@ -62,16 +44,9 @@ export function MoreScreen() {
             <ExportRow />
           </div>
         </section>
-        <section aria-labelledby="more-settings" className="group">
-          <h2 id="more-settings" className="group__title">Settings</h2>
-          <div className="group__card">
-            <SettingsLinks />
-          </div>
-        </section>
         <section aria-labelledby="more-app" className="group">
           <h2 id="more-app" className="group__title">App</h2>
           <div className="group__card">
-            <Link to="/settings" className="group__row">Settings</Link>
             <Link to="/about" className="group__row">About Media Tracker</Link>
           </div>
         </section>

@@ -21,10 +21,9 @@ function download(text: string, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Settings → Your data → "Export my data" (SettingsMore.v2): GET /api/export saved as a dated .json file. */
-export function ExportRow() {
+/** GET /api/export saved as a dated .json file, with the busy flag and the failure toast; shared by every Export button. */
+export function useExportData() {
   const toast = useToast();
-  const hintId = useId();
   const [busy, setBusy] = useState(false);
 
   async function run() {
@@ -39,8 +38,16 @@ export function ExportRow() {
     }
   }
 
+  return { busy, run: () => void run() };
+}
+
+/** More → Your data → "Export my data" (SettingsMore.v2) and Settings: a row with the file type as its hint. */
+export function ExportRow() {
+  const hintId = useId();
+  const { busy, run } = useExportData();
+
   return (
-    <button type="button" className="group__row export-row" disabled={busy} aria-describedby={hintId} onClick={() => void run()}>
+    <button type="button" className="group__row export-row" disabled={busy} aria-describedby={hintId} onClick={run}>
       <span className="group__row-start">
         <span className="tile-icon"><Icon name="download" size={18} /></span>
         {busy ? 'Exporting…' : 'Export my data'}

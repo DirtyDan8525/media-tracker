@@ -2,11 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { COMPARE_ENABLED } from '../src/features';
 
-/** Opens the Add sheet for anime: the bottom bar's Add on the phone, the list header's button on PC. */
+/** Opens the Add sheet for anime: the Add link in the Main nav (the phone's bottom bar, the PC's side nav). */
 async function openAddAnime(page: Page) {
-  const add = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Add anime' })
-    .or(page.getByRole('button', { name: 'Add anime' }));
-  await add.click();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Add anime' }).click();
   await expect(page.getByRole('dialog', { name: 'Add to Anime' })).toBeVisible();
 }
 
@@ -17,8 +15,8 @@ const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', imp
 async function signInAndSetUsername(page: Page, username: string) {
   await page.goto('/');
   const field = page.getByLabel('Username');
-  // Phone: the bottom bar (navigation "Main"). PC: its side nav, whose first list link is Anime.
-  const nav = page.getByRole('navigation', { name: 'Main' }).or(page.getByRole('link', { name: 'Anime' }).first());
+  // Phone: the bottom bar. PC: the side nav. Both are navigation "Main".
+  const nav = page.getByRole('navigation', { name: 'Main' });
   await expect(field.or(nav).first()).toBeVisible();
   if (await field.isVisible()) {
     await field.fill(username);
@@ -102,6 +100,8 @@ test('Compare is hidden: no banner, nav link or Comparing section; /compare goes
   await page.goto('/more');
   await expect(page.getByRole('heading', { level: 1, name: 'More' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Compare/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /^Settings|^Appearance/ })).toHaveCount(0); // under Profile now
+  await page.goto('/settings');
   await page.getByRole('link', { name: /^Appearance/ }).click();
   await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Comparing' })).toHaveCount(0);
@@ -227,7 +227,7 @@ test('phone shell: Lists button picks a list, Add from Activity opens that list\
 
   // The profile button on the themed bar opens Profile.
   await page.locator('.page-header--bar').getByRole('link', { name: 'Profile' }).click();
-  await expect(page.getByText('@e2e_user')).toBeVisible();
+  await expect(page.getByRole('main').getByText('@e2e_user')).toBeVisible();
 });
 
 test('Settings → Appearance → Sakura sets the page background', async ({ page }) => {
@@ -240,7 +240,7 @@ test('Settings → Appearance → Sakura sets the page background', async ({ pag
 test('Profile: pick a photo, crop it with the keyboard, save, and it survives a reload', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/profile');
-  await expect(page.getByText('@e2e_user')).toBeVisible();
+  await expect(page.getByRole('main').getByText('@e2e_user')).toBeVisible();
 
   // A real 600 x 400 PNG made in the browser (the crop, resize and WebP/JPEG encode all run for real).
   const b64 = await page.evaluate<string>(`(async () => {

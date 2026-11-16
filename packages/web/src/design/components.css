@@ -157,7 +157,16 @@
   padding: var(--space-12) var(--space-7);
   background: var(--header-row); border-right: 1px solid var(--grid-line);
 }
-.side-nav__brand { font-size: var(--fs-brand); font-weight: 800; color: var(--highlight); padding: 0 var(--space-5) var(--space-9); }
+/* Profile row (32 px avatar + @username), then the primary Add link (SideNavPC board). */
+.side-nav__profile {
+  display: flex; align-items: center; gap: var(--space-5); min-height: 56px; padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md); color: var(--bright-text); text-decoration: none;
+}
+.side-nav__profile:hover { background: var(--alt-row); }
+.side-nav__profile.active { background: var(--panel); }
+.side-nav__username { font-size: var(--fs-body); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-nav__add { width: 100%; margin: var(--space-3) 0 var(--space-4); gap: var(--space-4); text-decoration: none; }
+.side-nav__divider { height: 1px; margin: var(--space-4) var(--space-3); background: var(--grid-line); }
 .side-nav__list {
   display: flex; justify-content: space-between; align-items: center;
   min-height: var(--tap); padding: 0 var(--space-6); border-radius: var(--radius-md);
@@ -178,6 +187,8 @@
 .side-nav__link-start { display: flex; align-items: center; gap: var(--space-5); }
 .side-nav__link:not(.active) .side-nav__link-start svg { color: var(--muted-text); }
 .side-nav__link--split { justify-content: space-between; }
+.side-nav__button { width: 100%; border: 0; background: none; font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.side-nav__button:disabled { opacity: 0.6; cursor: default; }
 .side-nav__link:hover { background: var(--card); }
 .side-nav__link.active { color: var(--highlight); font-weight: 600; }
 

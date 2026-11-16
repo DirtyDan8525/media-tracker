@@ -34,7 +34,7 @@ function FrameLayout() {
   if (wide) {
     return (
       <div className="frame frame--wide">
-        <SideNav lists={lists} counts={counts} compareCount={compareCount} />
+        <SideNav lists={lists} counts={counts} compareCount={compareCount} current={current} me={me} />
         <main className="frame__main">
           <Outlet />
         </main>

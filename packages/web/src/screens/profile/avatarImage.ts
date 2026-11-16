@@ -125,8 +125,12 @@ export async function makeAvatar(
   canvas.height = AVATAR_SIZE;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new AvatarReadError();
-  ctx.fillStyle = '#ffffff'; // JPEG has no alpha: a transparent PNG would turn black
+  // The photo is flattened onto white on purpose, whatever the encoder: WebP and PNG could keep alpha, but
+  // JPEG (the Safari fallback) cannot, and one image must look the same in every browser (not Highlight
+  // showing through on Chrome and white on Safari).
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+  ctx.imageSmoothingQuality = 'high'; // a 3000 px photo down to 256 px aliases with the default setting
   ctx.drawImage(img, rect.sx, rect.sy, rect.side, rect.side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
 
   let type: AvatarType = 'image/webp';

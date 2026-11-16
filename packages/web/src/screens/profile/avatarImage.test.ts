@@ -96,6 +96,13 @@ describe('makeAvatar', () => {
     expect(encode.mock.calls.map((c) => c[1])).toEqual(['image/webp', 'image/jpeg']);
   });
 
+  it('downsamples with high-quality smoothing', async () => {
+    const ctx = { fillRect: vi.fn(), drawImage: vi.fn(), fillStyle: '' } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+    await makeAvatar(img, rect, async (_c, type) => blobOf(10, type));
+    expect(ctx.imageSmoothingQuality).toBe('high');
+  });
+
   it('a canvas that cannot draw is a read error, not a hang', async () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     await expect(makeAvatar(img, rect, vi.fn())).rejects.toBeInstanceOf(AvatarReadError);

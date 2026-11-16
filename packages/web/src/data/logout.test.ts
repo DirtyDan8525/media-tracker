@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { REAUTH_FLAG } from '../api/auth';
 import { localDb } from '../db/local';
 import { CURRENT_LIST_KEY } from '../shell/currentList';
-import { LOGOUT_PATH, logOut } from './logout';
+import { LOGOUT_PATH, logOut, STEP_TIMEOUT_MS } from './logout';
 
 function stubLocation() {
   const assign = vi.fn();
@@ -56,5 +56,22 @@ describe('logOut', () => {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('denied'); });
     await logOut(new QueryClient());
     expect(assign).toHaveBeenCalledWith('/cdn-cgi/access/logout');
+  });
+
+  it('a Dexie clear() that never settles does not stall the logout: each step has a timeout', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const assign = stubLocation();
+      vi.spyOn(localDb.entries, 'clear').mockReturnValue(new Promise(() => {}) as never);
+      vi.spyOn(localDb.me, 'clear').mockResolvedValue(undefined as never);
+      localStorage.setItem(CURRENT_LIST_KEY, 'movies');
+      const done = logOut(new QueryClient());
+      await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS + 10);
+      await done;
+      expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
+      expect(assign).toHaveBeenCalledExactlyOnceWith('/cdn-cgi/access/logout');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

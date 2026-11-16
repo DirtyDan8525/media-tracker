@@ -193,6 +193,20 @@ describe('Profile: photo', () => {
     expect(screen.getByRole('dialog', { name: 'Your new photo' })).toBeInTheDocument();
   });
 
+  it('shows "Reading photo…" while a large photo decodes, then opens the crop sheet', async () => {
+    fakeBackend({ me: ME() });
+    let done!: (b: ImageBitmap) => void;
+    vi.mocked(readImage).mockReturnValue(new Promise<ImageBitmap>((r) => { done = r; }));
+    renderApp('/profile');
+    await choose();
+    const busy = await screen.findByRole('button', { name: 'Reading photo…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    done(bitmap());
+    await screen.findByRole('dialog', { name: 'Crop photo' });
+    expect(screen.queryByRole('button', { name: 'Reading photo…' })).not.toBeInTheDocument();
+  });
+
   it('a read error toasts "Couldn\'t read that image. Try a JPEG or PNG." and opens no sheet', async () => {
     fakeBackend({ me: ME() });
     vi.mocked(readImage).mockRejectedValue(new AvatarReadError());
@@ -260,6 +274,40 @@ describe('CropSheet', () => {
     return { onUse, view, use: () => fireEvent.click(screen.getByRole('button', { name: 'Use photo' })) };
   };
   const usedRect = (onUse: ReturnType<typeof vi.fn>) => onUse.mock.calls.at(-1)![0] as { sx: number; sy: number; side: number };
+
+  it('the live preview is drawn from the downscaled photo canvas, never the full-size bitmap', () => {
+    const draw = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      { drawImage: draw, clearRect: vi.fn(), fillRect: vi.fn() } as unknown as CanvasRenderingContext2D,
+    );
+    const { view } = setup();
+    fireEvent.keyDown(view, { key: 'ArrowLeft' });
+    const nineArg = draw.mock.calls.filter((c) => c.length === 9);
+    expect(nineArg.length).toBeGreaterThan(1); // drawn again after the pan
+    for (const c of nineArg) expect(c[0]).toBeInstanceOf(HTMLCanvasElement);
+    // the full bitmap is only used for the one-off paint of the photo canvas
+    expect(draw.mock.calls.filter((c) => c[0] === IMG)).toHaveLength(1);
+    // source rect is in canvas pixels: the photo canvas is 4000 * (1120 / 3000) wide, so the side at 1x is 3000 * that
+    const [, , , sw] = nineArg[0]!;
+    expect(sw).toBeCloseTo(3000 * (1120 / 3000), 0);
+  });
+
+  it('stays square when the sheet is narrower than 280 px (320 px phones)', () => {
+    const spy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(240);
+    try {
+      const { onUse, view } = setup();
+      expect(view).toHaveStyle({ width: '240px', height: '240px' });
+      fireEvent.change(screen.getByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Use photo' }));
+      const before = usedRect(onUse);
+      fireEvent.keyDown(view, { key: 'ArrowLeft' });
+      fireEvent.click(screen.getByRole('button', { name: 'Use photo' }));
+      // 10 viewport px at a 240 px viewport (not 280)
+      expect(usedRect(onUse).sx - before.sx).toBeCloseTo(10 / ((240 / 3000) * 2), 3);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 
   it('starts centred at 1x', () => {
     const { onUse, use } = setup();

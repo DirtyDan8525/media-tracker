@@ -1,11 +1,11 @@
 import type { AvatarType } from '@media-tracker/shared';
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
 import { clampCrop, cropRect, initialCrop, MAX_SCALE, MIN_SCALE, zoomAt, type CropState } from './avatarImage';
 import '../../design/nav.css';
 
-/** The square viewport, in CSS px (B11). */
+/** The square viewport, in CSS px (B11); on a narrower sheet (a 320 px phone) it shrinks to fit and stays square. */
 export const CROP_VIEW = 280;
 const KEY_STEP = 10;
 const WHEEL_BASE = 1.1;
@@ -27,34 +27,64 @@ const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: 
 export function CropSheet({ image, onUse, onCancel }: { image: ImageBitmap; onUse: (rect: CropRect) => void; onCancel: () => void }) {
   const { width: w, height: h } = image;
   const zoomId = useId();
+  const [view, setView] = useState(CROP_VIEW);
   const [crop, setCrop] = useState<CropState>(() => initialCrop(w, h, CROP_VIEW));
   const viewRef = useRef<HTMLDivElement>(null);
   const photoRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
 
-  const fit = CROP_VIEW / Math.min(w, h); // viewport px per photo px at zoom 1
+  // Fit the viewport to the room the sheet gives it (the .crop box less its padding), so it stays square.
+  const viewNow = useRef(CROP_VIEW);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const box = viewRef.current?.parentElement;
+      if (!box) return;
+      const cs = getComputedStyle(box);
+      const room = box.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+      if (!(room > 0)) return; // not laid out (or jsdom): keep the size we have
+      const next = Math.min(CROP_VIEW, Math.floor(room));
+      const prev = viewNow.current;
+      if (next === prev) return;
+      viewNow.current = next;
+      setCrop((c) => ({ ...c, x: (c.x * next) / prev, y: (c.y * next) / prev })); // same part of the photo stays in view
+      setView(next);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  const fit = view / Math.min(w, h); // viewport px per photo px at zoom 1
   const paint = Math.min(1, PAINT_SHORT_SIDE / Math.min(w, h));
 
   useEffect(() => {
     const canvas = photoRef.current;
     const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    if (canvas && ctx) {
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
   }, [image]);
 
-  const rect = cropRect(crop, w, h, CROP_VIEW);
+  const rect = cropRect(crop, w, h, view);
+  // The live preview reads the already-downscaled photo canvas (at most 1120 px on its short side), not the
+  // full-size bitmap (12 MP from a phone camera), so every pan and zoom step stays cheap.
   useEffect(() => {
     const canvas = previewRef.current;
+    const photo = photoRef.current;
     const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) {
+    if (canvas && photo && ctx) {
+      const k = photo.width / w; // canvas px per source px
+      ctx.imageSmoothingQuality = 'high';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, rect.sx, rect.sy, rect.side, rect.side, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(photo, rect.sx * k, rect.sy * k, rect.side * k, rect.side * k, 0, 0, canvas.width, canvas.height);
     }
-  }, [image, rect.sx, rect.sy, rect.side]);
+  }, [image, w, rect.sx, rect.sy, rect.side]);
 
-  const pan = useCallback((dx: number, dy: number) => setCrop((c) => clampCrop({ ...c, x: c.x + dx, y: c.y + dy }, w, h, CROP_VIEW)), [w, h]);
-  const zoomTo = useCallback((next: (c: CropState) => number, fx = CROP_VIEW / 2, fy = CROP_VIEW / 2) =>
-    setCrop((c) => zoomAt(c, next(c), fx, fy, w, h, CROP_VIEW)), [w, h]);
+  const pan = useCallback((dx: number, dy: number) => setCrop((c) => clampCrop({ ...c, x: c.x + dx, y: c.y + dy }, w, h, view)), [w, h, view]);
+  const zoomTo = useCallback((next: (c: CropState) => number, fx = view / 2, fy = view / 2) =>
+    setCrop((c) => zoomAt(c, next(c), fx, fy, w, h, view)), [w, h, view]);
 
   // The wheel listener is native and not passive: React's onWheel can't stop the page from scrolling.
   useEffect(() => {
@@ -94,7 +124,7 @@ export function CropSheet({ image, onUse, onCancel }: { image: ImageBitmap; onUs
     const [m0, m1] = [mid(prev, other), mid(cur, other)];
     const d0 = dist(prev, other);
     const ratio = d0 > 0 ? dist(cur, other) / d0 : 1;
-    setCrop((c) => zoomAt({ ...c, x: c.x + m1.x - m0.x, y: c.y + m1.y - m0.y }, c.scale * ratio, m1.x, m1.y, w, h, CROP_VIEW));
+    setCrop((c) => zoomAt({ ...c, x: c.x + m1.x - m0.x, y: c.y + m1.y - m0.y }, c.scale * ratio, m1.x, m1.y, w, h, view));
   }
 
   const onPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
@@ -123,7 +153,7 @@ export function CropSheet({ image, onUse, onCancel }: { image: ImageBitmap; onUs
         </div>
       }>
       <div className="crop">
-        <div ref={viewRef} className="crop__viewport" role="group" tabIndex={0}
+        <div ref={viewRef} className="crop__viewport" role="group" tabIndex={0} style={{ width: view, height: view }}
           aria-label="Photo crop area. Arrow keys move the photo, plus and minus zoom"
           onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
           onKeyDown={onKeyDown}>

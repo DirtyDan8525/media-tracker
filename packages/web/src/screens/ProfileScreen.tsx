@@ -127,7 +127,9 @@ export function ProfileScreen() {
         <div className="profile__id">
           <div className="profile__photo"><Avatar me={me} size={96} /></div>
           <div className="profile__photo-actions">
-            <Button variant="ghost" compact disabled={reading} onClick={() => fileInput.current?.click()}>Change photo</Button>
+            <Button variant="ghost" compact disabled={reading} aria-busy={reading} onClick={() => fileInput.current?.click()}>
+              {reading ? 'Reading photo…' : 'Change photo'}
+            </Button>
             {me.avatarAt && <Button variant="ghost" compact disabled={remove.isPending} onClick={() => void removePhoto()}>Remove photo</Button>}
           </div>
           <input ref={fileInput} type="file" accept="image/*" hidden aria-label="Choose a photo" onChange={(e) => void onFile(e)} />

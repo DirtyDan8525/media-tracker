@@ -1,6 +1,5 @@
 import { Link } from 'react-router';
 import { Icon } from '../../design/components/Icon';
-import { COMPARE_ENABLED } from '../../features';
 import { enabledLists } from '../../nav';
 import { useSessionMe } from '../../shell/SessionGate';
 
@@ -8,7 +7,7 @@ export const APPEARANCE_PATH = '/settings/appearance';
 
 /**
  * The rows that open the Appearance page (SettingsMore.v2's "Settings" section): Appearance with
- * the current theme's Background, Cards and Highlight and its name; Comparing with "Ask: …" (only while Compare is enabled).
+ * the current theme's Background, Cards and Highlight and its name; Comparing with "Ask: …".
  */
 export function SettingsLinks() {
   const { settings } = useSessionMe();
@@ -27,12 +26,10 @@ export function SettingsLinks() {
           <span className="group__row-start"><span className="tile-icon"><Icon name="tiers" size={18} /></span>Re-tier review</span>
         </Link>
       )}
-      {COMPARE_ENABLED && (
-        <Link to={APPEARANCE_PATH} className="group__row">
-          <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Comparing</span>{' '}
-          <span className="group__value">Ask: {settings.compareAsk}</span>
-        </Link>
-      )}
+      <Link to={APPEARANCE_PATH} className="group__row">
+        <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Comparing</span>{' '}
+        <span className="group__value">Ask: {settings.compareAsk}</span>
+      </Link>
     </>
   );
 }

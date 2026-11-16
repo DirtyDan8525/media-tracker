@@ -7,9 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
 import { makeMe, mockApi, type Handler, type MockResponse } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
-import { setCompareEnabled } from '../test/flags';
 
-beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 /** A rated entry as the Worker stores it after the backfill: tier from the number, prior = strength. */
 function rated(id: string, rating: number, over: Partial<Entry> = {}): Entry {

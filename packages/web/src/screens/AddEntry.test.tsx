@@ -3,11 +3,9 @@ import userEvent from '@testing-library/user-event';
 import type { Category, TierSet } from '@media-tracker/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
-import { setCompareEnabled } from '../test/flags';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
-beforeEach(() => setCompareEnabled(true)); // "Add and place it" opens Compare, which is hidden in the real build
 
 function meWith(ask = 'Both', tiers?: Partial<Record<Category, TierSet>>) {
   const me = makeMe();
@@ -189,16 +187,6 @@ describe('the Add sheet: Add and place it', () => {
     expect(placeButton(d)).not.toBeInTheDocument();
     await userEvent.click(within(d).getByRole('button', { name: 'Fine · 6–7.4' }));
     expect(placeButton(d)).toBeInTheDocument();
-  });
-
-  it('is off while Compare is hidden in the build', async () => {
-    setCompareEnabled(false);
-    fakeBackend({ me: meWith() });
-    renderApp('/list/anime');
-    const d = await openAdd();
-    await typeTitle(d);
-    await userEvent.click(within(d).getByRole('button', { name: 'Liked · 7.5–8.9' }));
-    expect(placeButton(d)).not.toBeInTheDocument();
   });
 
   it('creates the entry, then opens /compare?place=<id>', async () => {

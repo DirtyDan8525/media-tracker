@@ -2,7 +2,6 @@ import {
   CATEGORY_CONFIG, STATUSES, statusLabel, tierFor, tierRange, tiersFor, type Category, type Status, type Tier,
 } from '@media-tracker/shared';
 import { useId, useState, type FormEvent } from 'react';
-import { COMPARE_ENABLED } from '../features';
 import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
 import { TierPicker } from '../design/components/TierPicker';
@@ -44,7 +43,7 @@ export function AddEntry({ category, onSubmit, onClose }: AddEntryProps) {
   // Typing picks the tier its number falls in; tapping picks that tier.
   const shownTier: Tier | null = rating !== null ? tierFor(rating, tiers) : tapped;
   const canAdd = title.trim() !== '' && parsed.ok;
-  const canPlace = canAdd && COMPARE_ENABLED && shownTier !== null
+  const canPlace = canAdd && shownTier !== null
     && (me.settings.compareAsk === 'Both' || me.settings.compareAsk === 'Only for new ratings');
 
   function submit(place = false) {

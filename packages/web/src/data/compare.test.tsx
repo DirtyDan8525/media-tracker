@@ -8,9 +8,7 @@ import { makeQueryClient } from '../test/queryClient';
 import { COMPARE_QUEUE_KEY, dropFromQueue, useCompareQueue } from './compare';
 import { entriesKey } from './entryCache';
 import { saveEntryChange } from './entryMutations';
-import { setCompareEnabled } from '../test/flags';
 
-beforeEach(() => setCompareEnabled(true)); // these exercise Compare, which is hidden in the real build
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
   return {

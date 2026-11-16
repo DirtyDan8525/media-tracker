@@ -2,7 +2,6 @@ import { Link } from 'react-router';
 import { useCompareQueue } from '../data/compare';
 import { useListCounts } from '../data/useEntries';
 import { Icon } from '../design/components/Icon';
-import { COMPARE_ENABLED } from '../features';
 import { enabledLists, LIST_LABEL, splitForPhone } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
@@ -37,12 +36,10 @@ export function MoreScreen() {
         <section aria-labelledby="more-ratings" className="group">
           <h2 id="more-ratings" className="group__title">Ratings</h2>
           <div className="group__card">
-            {COMPARE_ENABLED && (
-              <Link to="/compare" className="group__row" aria-label={waiting > 0 ? `Compare, ${waiting} waiting` : undefined}>
-                <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Compare</span>
-                {waiting > 0 && <span className="count-pill">{waiting}</span>}
-              </Link>
-            )}
+            <Link to="/compare" className="group__row" aria-label={waiting > 0 ? `Compare, ${waiting} waiting` : undefined}>
+              <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Compare</span>
+              {waiting > 0 && <span className="count-pill">{waiting}</span>}
+            </Link>
             <Link to="/top5" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>Top 5</span>
               <span className="group__chev"><Icon name="chevron" size={18} /></span>

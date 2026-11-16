@@ -145,8 +145,6 @@ describe('Settings: Rating tiers', () => {
 
 describe('Settings: Comparing links', () => {
   it('Rating tiers and Re-tier review sit under Ask to compare', async () => {
-    const { setCompareEnabled } = await import('../../test/flags');
-    setCompareEnabled(true);
     mockApi(makeMe());
     renderApp('/settings/appearance');
     const section = await screen.findByRole('region', { name: 'Comparing' });

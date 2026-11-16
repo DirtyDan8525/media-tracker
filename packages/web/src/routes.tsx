@@ -3,6 +3,7 @@ import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import { SearchScreen } from './screens/SearchScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AppearanceScreen } from './screens/AppearanceScreen';
 import { StatsScreen } from './screens/StatsScreen';
@@ -76,6 +77,7 @@ export const routes: RouteObject[] = [
           { path: 'list/:category', element: <ListScreen /> },
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
+          { path: 'search', element: <SearchScreen /> },
           { path: 'compare', element: <CompareRoute /> },
           { path: 'top5', element: <Top5Screen /> },
           { path: 'stats', element: <StatsScreen /> },

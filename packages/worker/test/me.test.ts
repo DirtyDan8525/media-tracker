@@ -170,6 +170,13 @@ describe('sanitizeSettings', () => {
     for (const w of [0.5, 1.5, 10]) expect(sanitizeSettings({ compareWindow: w }, cur)).toMatchObject({ ok: true, settings: { compareWindow: w } });
   });
 
+  it("searchScope 'current' saves, 'everywhere' is rejected, and the default is 'all'", () => {
+    expect(cur.searchScope).toBe('all');
+    expect(sanitizeSettings({ searchScope: 'current' }, cur)).toMatchObject({ ok: true, settings: { searchScope: 'current' } });
+    bad({ searchScope: 'everywhere' });
+    bad({ searchScope: 1 });
+  });
+
   it('rejects bad values', () => {
     bad({ theme: 'Nope' });
     bad({ theme: 5 });
@@ -195,5 +202,16 @@ describe('sanitizeSettings', () => {
     const before = JSON.stringify(cur);
     sanitizeSettings({ tabs: { anime: false }, colors: { Text: '#123456' } }, cur);
     expect(JSON.stringify(cur)).toBe(before);
+  });
+});
+
+describe('PUT /api/me/settings searchScope', () => {
+  it("saves 'current' and answers 400 for 'everywhere'", async () => {
+    const ok = await putSettings('a@example.com', { searchScope: 'current' });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { settings: { searchScope: string } }).settings.searchScope).toBe('current');
+    expect((await putSettings('a@example.com', { searchScope: 'everywhere' })).status).toBe(400);
+    const me = (await (await as('a@example.com', '/api/me')).json()) as { settings: { searchScope: string } };
+    expect(me.settings.searchScope).toBe('current');
   });
 });

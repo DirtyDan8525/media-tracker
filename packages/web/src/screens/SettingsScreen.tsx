@@ -1,3 +1,4 @@
+import { SEARCH_SCOPE } from '@media-tracker/shared';
 import { useState } from 'react';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
@@ -9,6 +10,7 @@ import { FillDetailsRow } from './settings/FillDetailsRow';
 import { SettingsLinks } from './settings/SettingsLinks';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
+import '../design/search.css';
 import '../design/settings.css';
 
 /**
@@ -39,6 +41,21 @@ export function SettingsScreen() {
                 <span>{label}</span>
               </label>
             ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="set-search" className="group">
+          <h2 id="set-search" className="group__title">Search</h2>
+          <div className="group__card group__pad">
+            <div role="radiogroup" aria-label="Where Search looks" className="seg">
+              {SEARCH_SCOPE.map((v) => (
+                <button key={v} type="button" role="radio" aria-checked={me.settings.searchScope === v}
+                  className={me.settings.searchScope === v ? 'seg__opt seg__opt--on' : 'seg__opt'}
+                  onClick={() => { if (me.settings.searchScope !== v) save.mutate({ searchScope: v }); }}>
+                  {v === 'all' ? 'All lists' : 'Only the current list'}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 

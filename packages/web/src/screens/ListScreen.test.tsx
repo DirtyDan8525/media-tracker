@@ -507,6 +507,16 @@ describe('v2 look', () => {
   });
 });
 
+describe('current list', () => {
+  it('visiting /list/books remembers books as the current list', async () => {
+    localStorage.clear();
+    fakeBackend({ entries: [] });
+    renderApp('/list/books');
+    await screen.findByRole('heading', { name: 'Books' });
+    expect(localStorage.getItem('mt-current-list')).toBe('books');
+  });
+});
+
 describe('search and filters', () => {
   const three = () => fakeBackend({ entries: [
     makeEntry({ title: 'Frieren', rating: 9, status: 'Completed', genres: 'Fantasy, Adventure', creator: 'Madhouse' }),

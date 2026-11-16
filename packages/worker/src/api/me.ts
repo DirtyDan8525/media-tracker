@@ -4,6 +4,7 @@ import {
   COMPARE_ROOM,
   COMPARE_STYLE,
   DEFAULT_USER_SETTINGS,
+  SEARCH_SCOPE,
   THEMES,
   type UserSettings,
 } from '@media-tracker/shared';
@@ -62,6 +63,7 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
     ['compareAsk', COMPARE_ASK],
     ['compareStyle', COMPARE_STYLE],
     ['compareRoom', COMPARE_ROOM],
+    ['searchScope', SEARCH_SCOPE],
   ] as const;
   for (const [key, allowed] of enums) {
     if (!(key in partial)) continue;

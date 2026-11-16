@@ -52,3 +52,6 @@ export function seasonsEnabled(settings: Pick<UserSettings, 'tabs'>, category: C
 export const ADD_NOUN: Record<Category, string> = {
   anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book',
 };
+
+/** Global search (`/search?q=`). */
+export const SEARCH_PATH = '/search';

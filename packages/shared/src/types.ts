@@ -126,6 +126,8 @@ export interface UserSettings {
   compareStyle: string;
   compareRoom: string;
   compareWindow: number;
+  /** Where Search looks: every list that is turned on, or only the current list (SEARCH_SCOPE). */
+  searchScope: string;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -139,12 +141,15 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   compareStyle: 'Meet in the middle',
   compareRoom: 'Use in-between scores',
   compareWindow: 1,
+  searchScope: 'all',
 };
 
 // Allowed values for the three compare options (the Sheet's Settings dropdowns).
 export const COMPARE_ASK = ['Both', 'Only when I start it', 'Only for new ratings', 'Off'] as const;
 export const COMPARE_STYLE = ['Meet in the middle', 'Swap the numbers'] as const;
 export const COMPARE_ROOM = ['Use in-between scores', 'Give the same score', 'Push others down'] as const;
+
+export const SEARCH_SCOPE = ['all', 'current'] as const;
 
 /** One list row parsed from a Sheet workbook, ready to send to POST /api/import. */
 export interface ImportRow {

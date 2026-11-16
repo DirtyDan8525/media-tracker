@@ -14,8 +14,10 @@ import { useToast } from '../design/components/Toast';
 import { useAddEntry } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
 import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
+import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
 import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
+import { rememberList } from '../shell/currentList';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CompareBanner } from './CompareBanner';
@@ -55,6 +57,7 @@ function ListBody({ category }: { category: Category }) {
   const wide = useIsWide();
   const { data, isPending, isError } = useEntries(category);
   const add = useAddEntry(category);
+  useEffect(() => rememberList(category), [category]);
   const [sort, setSort] = useState<SortKey>('rating');
   const [addOpen, setAddOpen] = useState(false);
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
@@ -67,14 +70,8 @@ function ListBody({ category }: { category: Category }) {
     () => (data ? normalizeFilter(urlFilter, CATEGORY_CONFIG[category].hasStatus, genres) : urlFilter),
     [data, urlFilter, category, genres],
   );
-  // The box keeps its own text (no dropped characters or caret jumps); the URL follows ~150 ms later, by `replace`.
-  const [qText, setQText] = useState(urlFilter.q);
-  const lastWritten = useRef(urlFilter.q);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
-    if (urlFilter.q !== lastWritten.current) { lastWritten.current = urlFilter.q; setQText(urlFilter.q); } // Back / reload
-  }, [urlFilter.q]);
+  // The box keeps its own text; the URL follows ~150 ms later, by `replace` (useUrlText).
+  const { text: qText, setText: setQ, clear: clearQ } = useUrlText('q');
   useEffect(() => {
     if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre)) return;
     setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre }, prev), { replace: true });
@@ -82,24 +79,13 @@ function ListBody({ category }: { category: Category }) {
   const filter: ListFilter = { ...clean, q: qText };
   const [searchOpen, setSearchOpen] = useSearchOpen(qText);
   const toggleWrap = useRef<HTMLSpanElement>(null);
-  const writeQ = (q: string) => {
-    lastWritten.current = q;
-    setParams((prev) => writeFilter({ ...readFilter(prev), q }, prev), { replace: true });
-  };
   const changeFilter = (next: Partial<ListFilter>) => {
     const { q, ...rest } = next;
-    if (q !== undefined) {
-      setQText(q);
-      clearTimeout(timer.current);
-      if (q === '') writeQ('');
-      else timer.current = setTimeout(() => writeQ(q), 150);
-    }
+    if (q !== undefined) setQ(q);
     if (Object.keys(rest).length) setParams((prev) => writeFilter({ ...readFilter(prev), ...rest }, prev), { replace: true });
   };
   const clearAll = () => {
-    clearTimeout(timer.current);
-    lastWritten.current = '';
-    setQText('');
+    clearQ();
     setParams((prev) => writeFilter({ q: '', status: '', genre: '' }, prev), { replace: true });
   };
   const filtering = isFiltering(filter);

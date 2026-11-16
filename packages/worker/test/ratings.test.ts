@@ -402,6 +402,42 @@ describe('concurrent writes', () => {
     expect(rx!.strength).not.toBe(rx!.prior_mean); // the save's fit stands
   });
 
+  it('a fresh write succeeds, bumps the rev and leaves no guard state behind', async () => {
+    const uid = await userId(A);
+    const [x, y] = await seed(uid, 'anime', [9.5, 9.2]);
+    expect((await save(A, 'anime', { picks: [pick(y!, x!)] })).status).toBe(200);
+    expect((await patch(A, x!, { rating: 9.6 })).status).toBe(200);
+    const revs = (await env.DB.prepare('SELECT id, rating_rev FROM entries WHERE user_id = ?').bind(uid).all<{ id: string; rating_rev: number }>()).results;
+    expect(new Map(revs.map((r) => [r.id, r.rating_rev])).get(x!)).toBe(2);
+    const bad = await env.DB.prepare('SELECT (SELECT COUNT(*) FROM entries WHERE rating_rev < 0) + (SELECT COUNT(*) FROM seasons WHERE rating_rev < 0) AS n').first<{ n: number }>();
+    expect(bad!.n).toBe(0);
+  });
+
+  it('the guard is the named constraint: a stale rev is refused by rating_rev_mismatch', async () => {
+    const uid = await userId(A);
+    const [x] = await seed(uid, 'anime', [9.5]);
+    await expect(env.DB.prepare('UPDATE entries SET rating_rev = -1 WHERE id = ?').bind(x).run()).rejects.toThrow(/rating_rev_mismatch/);
+    expect(uid).toBeTruthy();
+  });
+
+  it('any other DB error in a rating write stays a 500 (even a JSON one)', async () => {
+    const uid = await userId(A);
+    const [x, y] = await seed(uid, 'anime', [9.5, 9.2]);
+    for (const msg of ['D1_ERROR: database is locked: SQLITE_BUSY', 'D1_ERROR: malformed JSON: SQLITE_ERROR']) {
+      let n = 0;
+      const failing = new Proxy(env.DB, {
+        get(t, p) {
+          if (p === 'batch') return async (st: D1PreparedStatement[]) => { if (++n === 2) throw new Error(msg); return t.batch(st); };
+          const v = Reflect.get(t, p, t);
+          return typeof v === 'function' ? v.bind(t) : v;
+        },
+      });
+      const res = await save(A, 'anime', { picks: [pick(y!, x!)] }, failing);
+      expect(res.status, msg).toBe(500);
+    }
+    expect(await comparisonsOf(uid)).toEqual([]);
+  });
+
   it('rows whose rating did not change are written without a rating', async () => {
     const uid = await userId(A);
     const legacy = await seed(uid, 'anime', [9.97, 8.25], { legacy: true });

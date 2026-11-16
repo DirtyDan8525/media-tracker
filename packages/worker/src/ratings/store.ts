@@ -290,16 +290,20 @@ export class RatingConflict extends Error {
   constructor() { super('rating_conflict'); }
 }
 
+/** The named CHECK on `rating_rev` (migration 0005) that a stale set write violates. */
+export const RATING_GUARD = 'rating_rev_mismatch';
+
 /**
- * Runs a batch that contains set writes. A stale row makes its UPDATE fail (see
- * `setWriteStatements`), which rolls the whole batch back; that failure becomes RatingConflict,
- * which the app answers with 409.
+ * Runs a batch that contains set writes. A stale row makes its UPDATE violate the named
+ * constraint `rating_rev_mismatch` (see `setWriteStatements`), which rolls the whole batch back;
+ * only that constraint becomes RatingConflict (409). Every other error stays an error (500).
  */
 export async function runBatch(db: D1Database, stmts: D1PreparedStatement[]): Promise<D1Result[]> {
   try {
     return await db.batch(stmts);
   } catch (e) {
-    if (/malformed JSON/i.test(String(e instanceof Error ? e.message : e))) throw new RatingConflict();
+    const msg = String(e instanceof Error ? `${e.message} ${String((e as { cause?: unknown }).cause ?? '')}` : e);
+    if (msg.includes(RATING_GUARD)) throw new RatingConflict();
     throw e;
   }
 }
@@ -317,10 +321,11 @@ const J = `SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rev'
  * never round-trips through JSON. Entries are guarded by user and list; seasons by their entry's
  * user and list.
  *
- * Optimistic guard: each row carries the `rating_rev` it was loaded with. If the stored rev
- * differs (another write landed in between), evaluating its rating raises an SQL error that
- * aborts the batch (`runBatch` → 409). The expression depends on the row, so SQLite can't hoist
- * it. Rows deleted in between simply match nothing. No statement when nothing changed.
+ * Optimistic guard: each row carries the `rating_rev` it was loaded with. A fresh row gets
+ * rev + 1; a row whose stored rev differs (another write landed in between) gets -1, which the
+ * named CHECK `rating_rev_mismatch` refuses, aborting the batch (`runBatch` → 409). No extra
+ * statement and no guard rows: nothing is left behind on success or failure. Rows deleted in
+ * between simply match nothing. No statement when nothing changed.
  */
 export function setWriteStatements(
   db: D1Database, userId: string, set: RatingSet, changed: RatedItem[], stored: Map<string, StoredFields>,
@@ -335,10 +340,9 @@ export function setWriteStatements(
     return row;
   }));
   const t = isSeasonSet(set) ? 'seasons' : 'entries';
-  const sets = `rating = CASE WHEN ${t}.rating_rev IS NOT j.rev THEN json('rating_conflict ' || ${t}.id)
-                              WHEN j.rc THEN j.rating ELSE ${t}.rating END,
+  const sets = `rating = CASE WHEN j.rc THEN j.rating ELSE ${t}.rating END,
                 tier = j.tier, prior_mean = j.prior, strength = j.strength, score_locked = j.locked,
-                rating_rev = ${t}.rating_rev + 1`;
+                rating_rev = CASE WHEN ${t}.rating_rev IS j.rev THEN ${t}.rating_rev + 1 ELSE -1 END`;
   if (t === 'seasons') {
     return [db.prepare(
       `UPDATE seasons SET ${sets} FROM (${J}) AS j

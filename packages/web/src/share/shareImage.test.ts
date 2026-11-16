@@ -67,8 +67,56 @@ describe('loadCover', () => {
       init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')));
     })));
     const pending = loadCover('https://img.example/slow.jpg');
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(25_000); // 10 s for the proxy attempt, 10 s for the direct one
     expect(await pending).toBeNull();
+  });
+});
+
+describe('loadCover device fallback', () => {
+  const url = 'https://s4.anilist.co/file/cover.jpg';
+
+  it('uses the direct CORS fetch when the proxy returns 502', async () => {
+    const bitmap = { width: 10, height: 15, close: vi.fn() };
+    const fetchSpy = vi.fn(async (u: string) =>
+      u.startsWith('/api/cover') ? new Response('{"error":"bad_gateway"}', { status: 502 }) : new Response(pngBytes(), { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+    expect(await loadCover(url)).toBe(bitmap);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const [direct, init] = fetchSpy.mock.calls[1] as unknown as [string, RequestInit];
+    expect(direct).toBe(url);
+    expect(init.mode).toBe('cors');
+    expect(init.credentials).toBe('omit');
+  });
+
+  it('returns null (placeholder) when the proxy and the direct fetch both fail', async () => {
+    const decode = vi.fn();
+    vi.stubGlobal('createImageBitmap', decode);
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      if (u.startsWith('/api/cover')) return new Response('x', { status: 502 });
+      throw new TypeError('Failed to fetch');
+    }));
+    expect(await loadCover(url)).toBeNull();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('x', { status: 502 })));
+    expect(await loadCover(url)).toBeNull();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch directly when the proxy succeeds', async () => {
+    const bitmap = { width: 1, height: 1, close: vi.fn() };
+    const fetchSpy = vi.fn(async () => new Response(pngBytes(), { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+    expect(await loadCover(url)).toBe(bitmap);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('never falls back for non-http(s) URLs', async () => {
+    const fetchSpy = vi.fn(async () => new Response('x', { status: 502 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubGlobal('createImageBitmap', vi.fn());
+    expect(await loadCover('data:image/png;base64,AAAA')).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -173,7 +221,8 @@ describe('renderCardPng', () => {
     expect(load.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual(expect.arrayContaining([
       expect.stringMatching(/^400 .*Inter/), expect.stringMatching(/^700 .*Inter/), expect.stringMatching(/^800 .*Inter/),
     ]));
-    expect(seen.sort()).toEqual([coverProxyUrl('https://img.example/f.jpg'), coverProxyUrl('https://img.example/gone.jpg')].sort());
+    // The failed cover is retried straight from the device after the proxy 404s.
+    expect(seen.sort()).toEqual([coverProxyUrl('https://img.example/f.jpg'), coverProxyUrl('https://img.example/gone.jpg'), 'https://img.example/gone.jpg'].sort());
     expect(drawn).toContain(bitmap);
     expect(bitmap.close).toHaveBeenCalled();
     delete (document as { fonts?: unknown }).fonts;

@@ -8,13 +8,12 @@ export function coverProxyUrl(url: string): string {
   return `/api/cover?url=${encodeURIComponent(url)}`;
 }
 
-/** A decoded cover through the proxy, or null for no URL, any error, a hang or an image that won't decode. */
-export async function loadCover(url: string): Promise<ImageBitmap | null> {
-  if (!url) return null;
+/** One timed attempt: fetch, require OK, decode. Null on any error, non-OK status, hang or undecodable image. */
+async function attempt(input: string, init: RequestInit): Promise<ImageBitmap | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), COVER_LOAD_MS);
   try {
-    const res = await fetch(coverProxyUrl(url), { credentials: 'same-origin', signal: ctl.signal });
+    const res = await fetch(input, { ...init, signal: ctl.signal });
     if (!res.ok) return null;
     return await createImageBitmap(await res.blob());
   } catch {
@@ -22,6 +21,27 @@ export async function loadCover(url: string): Promise<ImageBitmap | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function isHttpUrl(url: string): boolean {
+  try {
+    const p = new URL(url).protocol;
+    return p === 'http:' || p === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A decoded cover: through the same-origin proxy first; if that fails (e.g. AniList's CDN blocks Cloudflare
+ * Workers), straight from the device with CORS (never no-cors: an opaque response taints the canvas). Null
+ * for no URL or when both fail.
+ */
+export async function loadCover(url: string): Promise<ImageBitmap | null> {
+  if (!url) return null;
+  const viaProxy = await attempt(coverProxyUrl(url), { credentials: 'same-origin' });
+  if (viaProxy || !isHttpUrl(url)) return viaProxy;
+  return attempt(url, { mode: 'cors', credentials: 'omit' });
 }
 
 export type CardSpec = Omit<CardInput, 'rows'> & { rows: (Omit<CardRow, 'cover'> & { coverUrl: string })[] };

@@ -1,17 +1,9 @@
-import { DEFAULT_USER_SETTINGS, tierFor, tiersFor, type Category, type Entry, type TierSet } from '@media-tracker/shared';
+import type { Entry } from '@media-tracker/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { COMPARE_QUEUE_KEY } from './compare';
 import { patchLocal, restoreLocal, writeEntry } from './entryCache';
-import { ratingSetKey } from './ratings';
-import { ME_KEY } from './useMe';
-import type { Me } from '../api/types';
+import { CLOSE_COUNTS_KEY, ratingSetKey } from './ratings';
 import { refreshCategories } from './useEntries';
-
-/** The list's tiers from the cached profile (the defaults before it has loaded). */
-export function cachedTiers(qc: QueryClient, category: Category): TierSet {
-  return tiersFor(qc.getQueryData<Me>(ME_KEY)?.settings ?? DEFAULT_USER_SETTINGS, category);
-}
 
 export const SAVE_FAILED = "Couldn't save that change";
 
@@ -25,22 +17,16 @@ export async function saveEntryChange(
   patch: Partial<Entry>,
   onFail?: (err: unknown) => void,
 ): Promise<Entry | null> {
-  const prev = patchLocal(qc, entry, patch);
-  // What the Worker will work out, shown now (the server's row replaces it). It is not part of the request:
-  // a typed number is sent alone so the Worker picks the tier, and a tier chip sends no lock.
-  if (prev && !('scoreLocked' in patch)) {
-    const tier = typeof patch.rating === 'number' ? tierFor(patch.rating, cachedTiers(qc, entry.category)) : patch.tier;
-    if (tier !== undefined && tier !== prev.tier) patchLocal(qc, entry, { tier, scoreLocked: false });
-  }
+  // A typed number is the truth (Ruling N1): it shows at once as both the typed and the shown number.
+  const prev = patchLocal(qc, entry, 'rating' in patch ? { ...patch, typed: patch.rating } : patch);
   try {
     const saved = await api.patch<Entry>(`/api/entries/${entry.id}`, patch);
     writeEntry(qc, saved);
-    // A new rating can put the entry on the Compare queue.
-    if ('rating' in patch) void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
-    // A rating, tier or lock edit re-fits the entry's tiers on the Worker, which returns only this
-    // row: reload the list (its neighbours' scores) and the rating set.
-    if ('rating' in patch || 'tier' in patch || 'scoreLocked' in patch) {
+    // A retype re-fits the entry's list on the Worker, which returns only this row: reload the list
+    // (a close neighbour's nudge may change), the rating set and the close-call counts.
+    if ('rating' in patch) {
       void qc.invalidateQueries({ queryKey: ratingSetKey(entry.category) });
+      void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
       void refreshCategories(qc, [entry.category]);
     }
     return saved;

@@ -1,8 +1,9 @@
 import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Navigate, useParams, useSearchParams } from 'react-router';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
+import { useSavePlanOrder } from '../data/planOrder';
 import { useEntries, useListCounts } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 import { CountUp } from '../design/components/CountUp';
@@ -14,6 +15,7 @@ import { useToast } from '../design/components/Toast';
 import { useAddEntry, type AddInput } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
 import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
+import { planRows, readPlanView, writePlanView } from '../lists/plan';
 import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
 import { ADD_NOUN, enabledLists, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
@@ -21,11 +23,12 @@ import { rememberList } from '../shell/currentList';
 import { ListMenu } from '../shell/ListMenu';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
-import { CompareBanner } from './CompareBanner';
+import { useCloseCall } from './sharpen/CloseCallSheet';
 import { InstallBanner } from './onboarding/InstallBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
-import { FilterChips, SearchBox } from './list/ListFilters';
+import { PlanList } from './list/PlanList';
+import { ActiveChips, activeFilters, FilterBar, FilterChips, FilterSheet, PlanSwitch, planLabel, SearchBox } from './list/ListFilters';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));
@@ -52,7 +55,6 @@ export function ListScreen() {
 }
 
 function ListBody({ category }: { category: Category }) {
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const me = useSessionMe();
@@ -63,16 +65,25 @@ function ListBody({ category }: { category: Category }) {
   useEffect(() => rememberList(category), [category]);
   const [sort, setSort] = useState<SortKey>('rating');
   const [addOpen, setAddOpen] = useState(false);
-  // "Add and place it": once the entry is saved and its lookup (and picker) is done, open Compare on it.
-  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Plan to watch (item 15): only lists with a Status column can have planned titles. Remembered per list on this device.
+  const hasStatus = CATEGORY_CONFIG[category].hasStatus;
+  const [plannedOn, setPlannedOn] = useState(() => hasStatus && readPlanView(category));
+  const planned = hasStatus && plannedOn;
+  const setPlanned = (on: boolean) => { setPlannedOn(on); writePlanView(category, on); };
+  const savePlan = useSavePlanOrder(category, () => toast.show("Couldn't save the new order"));
+  // A rated add: once the entry is saved and its lookup (and picker) is done, ask about close ratings (N6).
+  const { ask: askClose, element: closeCallSheet } = useCloseCall();
+  const [askFor, setAskFor] = useState<Entry | null>(null);
   useEffect(() => {
-    if (placeId === null || (add.state !== 'idle' && add.state !== 'saved')) return;
-    navigate(`/compare?place=${encodeURIComponent(placeId)}`);
-  }, [placeId, add.state, navigate]);
-  const submitAdd = async (input: AddInput, opts?: { place?: boolean }) => {
+    if (askFor === null || (add.state !== 'idle' && add.state !== 'saved')) return;
+    void askClose(askFor.category, askFor.id);
+    setAskFor(null);
+  }, [askFor, add.state, askClose]);
+  const submitAdd = async (input: AddInput) => {
     const entry = await add.add(input);
     if (entry && input.category && input.category !== category) toast.show(`Added to ${LIST_LABEL[input.category]}`);
-    if (entry && opts?.place) setPlaceId(entry.id);
+    if (entry && entry.rating !== null) setAskFor(entry);
   };
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
 
@@ -101,8 +112,8 @@ function ListBody({ category }: { category: Category }) {
     if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre)) return;
     setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre }, prev), { replace: true });
   }, [data, clean, urlFilter.status, urlFilter.genre, setParams]);
-  // B6: only the PC list filters by text (its "/" box); a `q` in a phone list URL is ignored.
-  const filter: ListFilter = { ...clean, q: wide ? qText : '' };
+  // The Plan to watch view is all one status, so a Status filter does not apply there (it comes back when the switch is off).
+  const filter: ListFilter = { ...clean, status: planned ? '' : clean.status, q: qText };
   const changeFilter = (next: Partial<ListFilter>) => {
     const { q, ...rest } = next;
     if (q !== undefined) setQ(q);
@@ -114,22 +125,30 @@ function ListBody({ category }: { category: Category }) {
   };
   const filtering = isFiltering(filter);
   const total = data?.length ?? 0;
+  const plannedAll = useMemo(() => planRows(data ?? []), [data]);
+  const planOrder = useMemo(() => plannedAll.map((e) => e.id), [plannedAll]);
   const rows = useMemo(
-    () => sortEntries((data ?? []).filter((e) => matchesFilter(e, filter)), sort),
-    [data, filter, sort],
+    () => (planned
+      ? plannedAll.filter((e) => matchesFilter(e, filter))
+      : sortEntries((data ?? []).filter((e) => matchesFilter(e, filter)), sort)),
+    [data, plannedAll, planned, filter, sort],
   );
   const rated = rows.filter((e) => e.rating !== null);
   const average = rated.length ? rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length : null;
-  const sub = data
-    ? (
-      <>
-        {filtering
-          ? `${rows.length} of ${total} ${total === 1 ? 'title' : 'titles'}`
-          : `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated`}
-        {wide && !filtering && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
-      </>
-    )
-    : undefined;
+  const chips = activeFilters(category, filter, planned);
+  const removeChip = (key: 'status' | 'genre') => changeFilter(key === 'status' ? { status: '' } : { genre: '' });
+  const sub = !data
+    ? undefined
+    : planned
+      ? (filtering ? `${rows.length} of ${plannedAll.length} planned` : `${rows.length} planned · your ${planLabel(category).split(' ').pop()} order`)
+      : (
+        <>
+          {filtering
+            ? `${rows.length} of ${total} ${total === 1 ? 'title' : 'titles'}`
+            : `${rows.length} ${rows.length === 1 ? 'title' : 'titles'} · ${rated.length} rated`}
+          {wide && !filtering && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
+        </>
+      );
   const label = `${LIST_LABEL[category]} list`;
   const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;
   const addLabel = `Add ${ADD_NOUN[category]}`;
@@ -144,6 +163,8 @@ function ListBody({ category }: { category: Category }) {
     if (pasteFor) void saveEntryChange(qc, pasteFor, { coverUrl: url, lookupState: 'ok' }, () => toast.show(SAVE_FAILED));
   }
 
+  // The switch is on every list with a Status column; PC has it in the header's actions, the phone in its filter row.
+  const planSwitch = hasStatus ? <PlanSwitch category={category} on={planned} onChange={setPlanned} /> : null;
   const actions = { onRetry: (e: Entry) => void add.retry(e), onPaste: setPasteFor };
   let body: ReactNode;
   if (isPending && !data) {
@@ -154,6 +175,13 @@ function ListBody({ category }: { category: Category }) {
     );
   } else if (isError && !data) {
     body = <EmptyState icon="info" title="Couldn't load this list" body="Check your connection and try again." />;
+  } else if (planned && plannedAll.length === 0) {
+    body = (
+      <EmptyState
+        icon={category} title="Nothing planned yet"
+        body={`Set a title's status to ${planLabel(category)} and it shows up here, in the order you choose.`}
+      />
+    );
   } else if (total > 0 && rows.length === 0) {
     body = (
       <EmptyState
@@ -168,6 +196,13 @@ function ListBody({ category }: { category: Category }) {
         title={`No ${NOUN[category]} yet`}
         body={`Tap Add to put your first ${ADD_NOUN[category]} here. You can also import your Google Sheet.`}
       />
+    );
+  } else if (planned) {
+    body = (
+      <>
+        {filtering && <p className="plan-hint">Clear the search and filters to change the order.</p>}
+        <PlanList rows={rows} order={planOrder} label={label} reorderable={!filtering} onReorder={savePlan} {...actions} />
+      </>
     );
   } else {
     body = wide
@@ -184,12 +219,21 @@ function ListBody({ category }: { category: Category }) {
             {LIST_LABEL[category]}
           </ListMenu>
         )}
-        actions={wide ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} />}{addButton}</> : undefined}
+        actions={wide ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} />}{planSwitch}{addButton}</> : undefined}
       >
-        {total > 0 && (
+        {total > 0 && !wide && (
+          <>
+            <FilterBar
+              category={category} filter={filter} onChange={changeFilter} count={chips.length}
+              onOpenFilters={() => setFiltersOpen(true)} planSwitch={planSwitch}
+            />
+            <ActiveChips chips={chips} onRemove={removeChip} />
+          </>
+        )}
+        {total > 0 && wide && (
           <FilterChips
-            category={category} filter={filter} onChange={changeFilter} genres={genres}
-            sort={total > 1 ? (
+            category={category} filter={filter} onChange={changeFilter} genres={genres} planned={planned}
+            sort={total > 1 && !planned ? (
               <div className="sort">
                 <label className="sort__label" htmlFor="list-sort">Sort</label>
                 <select id="list-sort" className="select-chip" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -200,11 +244,18 @@ function ListBody({ category }: { category: Category }) {
           />
         )}
       </PageHeader>
-      <div className="screen__body list"><InstallBanner /><CompareBanner />{body}</div>
+      <div className="screen__body list"><InstallBanner />{body}</div>
 
+      {filtersOpen && (
+        <FilterSheet
+          category={category} filter={filter} onChange={changeFilter} genres={genres} sort={sort} onSort={setSort}
+          planned={planned} shown={rows.length} onClose={() => setFiltersOpen(false)}
+          onClear={() => { clearAll(); setSort('rating'); }}
+        />
+      )}
       {addOpen && (
         <Suspense fallback={<SheetFallback title="Add" onClose={() => setAddOpen(false)} />}>
-          <AddEntry category={category} onSubmit={(input, opts) => void submitAdd(input, opts)} onClose={() => setAddOpen(false)} />
+          <AddEntry category={category} onSubmit={(input) => void submitAdd(input)} onClose={() => setAddOpen(false)} />
         </Suspense>
       )}
       {add.state === 'choose' && add.pickTarget && (
@@ -215,6 +266,7 @@ function ListBody({ category }: { category: Category }) {
           />
         </Suspense>
       )}
+      {closeCallSheet}
       {pasteFor && (
         <Suspense fallback={<SheetFallback title="Paste image link" onClose={() => setPasteFor(null)} />}>
           <PasteImageSheet title={pasteFor.title} onSave={savePaste} onClose={() => setPasteFor(null)} />

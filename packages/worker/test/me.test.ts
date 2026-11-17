@@ -210,7 +210,10 @@ describe('settings and rating tiers', () => {
 
   it('PUT /api/me/settings ignores a tiers key', async () => {
     const A = 'a@example.com';
-    expect((await as(A, '/api/ratings/tiers/anime', 'PUT', { tiers: custom })).status).toBe(200);
+    await as(A, '/api/me');
+    // Tier sets are no longer written by the app (N9); one stored earlier is kept as it is.
+    await env.DB.prepare("UPDATE users SET settings_json = json_set(settings_json, '$.tiers', json(?)) WHERE email = ?")
+      .bind(JSON.stringify({ anime: custom }), A).run();
     const res = await putSettings(A, { theme: 'Ocean', tiers: { anime: null, movies: custom } });
     expect(res.status).toBe(200);
     const { settings } = (await res.json()) as { settings: typeof DEFAULT_USER_SETTINGS };

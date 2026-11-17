@@ -20,7 +20,7 @@ export const inviteLink = (code: string): string => `${location.origin}/add/${co
 
 export type Friend = PublicUser & { since: string };
 export interface FriendsData { friends: Friend[]; incoming: PublicUser[]; outgoing: PublicUser[] }
-export interface ProfileData { user: PublicUser; memberSince: string | null; relation: Relation }
+export interface ProfileData { user: PublicUser; memberSince: string | null; bio?: string | null; relation: Relation }
 export interface FriendEntryData { entry: FriendEntry; seasons: { id: string; label: string; rating: number | null; notes: string | null }[] }
 export interface FriendsEntries { userId: string; entries: FriendEntry[] }
 export interface AdminData {

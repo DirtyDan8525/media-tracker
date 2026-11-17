@@ -2,7 +2,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Entry, Season } from '@media-tracker/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { COMPARE_QUEUE_KEY } from '../data/compare';
 import { ratingSetKey } from '../data/ratings';
 import { DETAILS, fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
@@ -257,16 +256,6 @@ describe('Back and delete', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
   });
 
-  it('deleting an entry refreshes the compare queue', async () => {
-    fakeBackend({ entries: [frieren()] });
-    const { queryClient } = renderApp('/entry/f1');
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-    const d = await screen.findByRole('dialog', { name: 'Delete this entry?' });
-    await userEvent.click(within(d).getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: COMPARE_QUEUE_KEY }));
-  });
-
   it('deleting an entry reloads its rating sets (the Worker re-fits its neighbours)', async () => {
     fakeBackend({ entries: [frieren()] });
     const { queryClient } = renderApp('/entry/f1');
@@ -426,116 +415,72 @@ describe('entry details: Pick the right match', () => {
   });
 });
 
-describe('entry details: tier and lock', () => {
-  const tiered = (over: Partial<Entry> = {}) => frieren({ rating: 9.5, tier: 3, priorMean: 2, strength: 2, ...over });
-  const chips = () => within(screen.getByRole('group', { name: 'Tier' })).getAllByRole('button');
+describe('entry details: number-first rating tile (Rulings N1, N6, N8)', () => {
+  const nudged = (over: Partial<Entry> = {}) => frieren({ rating: 9.62, typed: 9.6, tier: 3, priorMean: 9.6, strength: 9.62, ...over });
+  const closeRoutes = {
+    'GET /api/ratings/anime/close/:id': (_b: unknown, _u: URL, p: Record<string, string>) => ({ body: {
+      item: { id: p.id, title: 'Frieren', rating: 9.2, typed: 9.2, tier: 3, priorMean: 9.2, strength: 9.2, scoreLocked: false, cover: '', square: false, status: 'Completed' },
+      others: [{ id: 'arc', title: 'Arcane', rating: 9.2, typed: 9.2, tier: 3, priorMean: 9.2, strength: 9.2, scoreLocked: false, cover: '', square: false, status: 'Completed' }],
+    } }),
+  };
 
-  it('shows the list\'s four tier names top first, with the entry\'s tier pressed', async () => {
-    fakeBackend({ entries: [tiered()] });
+  it('has no tier chips and no Lock switch', async () => {
+    fakeBackend({ entries: [nudged()] });
     renderApp('/entry/f1');
     await screen.findByRole('spinbutton', { name: 'Rating' });
-    expect(chips().map((b) => b.textContent)).toEqual(['Loved', 'Liked', 'Fine', "Didn't like"]);
-    expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false', 'false']);
+    expect(screen.queryByRole('group', { name: 'Tier' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Lock score' })).not.toBeInTheDocument();
   });
 
-  it('uses the list\'s own tier names (custom Anime tiers)', async () => {
+  it('the field holds the typed number; the badge and a hint show the nudged one', async () => {
+    fakeBackend({ entries: [nudged()] });
+    renderApp('/entry/f1');
+    expect(await screen.findByRole('spinbutton', { name: 'Rating' })).toHaveValue(9.6);
+    expect(screen.getByText('You typed 9.6; a close call nudged it to 9.62.')).toBeInTheDocument();
+  });
+
+  it('retyping the typed number posts nothing; a different number PATCHes { rating } only', async () => {
+    const { calls } = fakeBackend({ entries: [nudged()] });
+    renderApp('/entry/f1');
+    const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
+    await userEvent.clear(rating);
+    await userEvent.type(rating, '9.60');
+    await userEvent.tab();
+    await userEvent.clear(rating);
+    await userEvent.type(rating, '9');
+    await userEvent.tab();
+    await waitFor(() => expect(patches(calls)).toEqual([{ rating: 9 }]));
+  });
+
+  it('a saved rating with a close title opens the close-call sheet over the entry', async () => {
+    const { calls } = fakeBackend({ entries: [frieren({ rating: 8, typed: 8 })], extra: closeRoutes });
+    renderApp('/entry/f1');
+    const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
+    await userEvent.clear(rating);
+    await userEvent.type(rating, '9.2');
+    await userEvent.tab();
+    const sheet = await screen.findByRole('dialog', { name: 'Close call' });
+    expect(within(sheet).getByRole('button', { name: 'Arcane, 9.2' })).toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/api/ratings/anime/close/f1')).toBe(true);
+  });
+
+  it('with "Ask me to compare close ratings" off, nothing is asked', async () => {
     const me = makeMe();
-    me.settings = { ...me.settings, tiers: { anime: { names: ['Skip', 'Okay', 'Great', 'Peak'], bounds: [5, 7, 9.5] } } };
-    fakeBackend({ me, entries: [tiered({ rating: 8, tier: 2 })] });
-    renderApp('/entry/f1');
-    await screen.findByRole('spinbutton', { name: 'Rating' });
-    expect(chips().map((b) => b.textContent)).toEqual(['Peak', 'Great', 'Okay', 'Skip']);
-    expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false', 'false']);
-  });
-
-  it('a tier chip PATCHes { tier } and nothing else', async () => {
-    const { calls } = fakeBackend({ entries: [tiered()] });
-    renderApp('/entry/f1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Liked' }));
-    await waitFor(() => expect(patches(calls)).toEqual([{ tier: 2 }]));
-  });
-
-  it('the pressed tier is not a new choice: pressing it posts nothing', async () => {
-    const { calls } = fakeBackend({ entries: [tiered()] });
-    renderApp('/entry/f1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Loved' }));
-    expect(patches(calls)).toEqual([]);
-  });
-
-  it('an entry cached before 3c (rating, no tier) shows the tier its number falls in', async () => {
-    fakeBackend({ entries: [frieren({ rating: 8, tier: null })] });
-    renderApp('/entry/f1');
-    await screen.findByRole('spinbutton', { name: 'Rating' });
-    expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false', 'false']);
-  });
-
-  it('the Lock score switch PATCHes { scoreLocked: true }, then { scoreLocked: false }, with its hint', async () => {
-    const { calls } = fakeBackend({ entries: [tiered()] });
-    renderApp('/entry/f1');
-    const lock = await screen.findByRole('switch', { name: 'Lock score' });
-    expect(lock).not.toBeChecked();
-    expect(screen.getByText("Shows exactly this number; picks won't move it.")).toBeInTheDocument();
-    expect(lock).toHaveAccessibleDescription("Shows exactly this number; picks won't move it.");
-    await userEvent.click(lock);
-    await waitFor(() => expect(patches(calls)).toEqual([{ scoreLocked: true }]));
-    await waitFor(() => expect(screen.getByRole('switch', { name: 'Lock score' })).toBeChecked());
-    await userEvent.click(screen.getByRole('switch', { name: 'Lock score' }));
-    await waitFor(() => expect(patches(calls)).toEqual([{ scoreLocked: true }, { scoreLocked: false }]));
-  });
-
-  it('a locked entry shows the switch on', async () => {
-    fakeBackend({ entries: [tiered({ scoreLocked: true })] });
-    renderApp('/entry/f1');
-    expect(await screen.findByRole('switch', { name: 'Lock score' })).toBeChecked();
-  });
-
-  it('an unrated entry has the chips but no lock to set', async () => {
-    fakeBackend({ entries: [frieren({ rating: null, tier: null })] });
-    renderApp('/entry/f1');
-    await screen.findByRole('spinbutton', { name: 'Rating' });
-    expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', 'false']);
-    expect(screen.getByRole('switch', { name: 'Lock score' })).toBeDisabled();
-  });
-
-  it('typing a different number PATCHes { rating } only: the Worker picks the tier from it', async () => {
-    const { calls } = fakeBackend({ entries: [tiered({ rating: 8.9, tier: 3 })] }); // 8.9 sits in Loved (clamped), tier is stored
+    me.settings = { ...me.settings, compareAsk: 'Off' };
+    const { calls } = fakeBackend({ me, entries: [frieren({ rating: 8, typed: 8 })], extra: closeRoutes });
     renderApp('/entry/f1');
     const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
     await userEvent.clear(rating);
-    await userEvent.type(rating, '8');
+    await userEvent.type(rating, '9.2');
     await userEvent.tab();
-    await waitFor(() => expect(patches(calls)).toEqual([{ rating: 8 }]));
+    await waitFor(() => expect(patches(calls)).toEqual([{ rating: 9.2 }]));
+    expect(calls.some((c) => c.path.includes('/close/'))).toBe(false);
   });
 
-  it('an unchanged number never re-derives the tier: retyping 8.9 as 8.90 posts nothing', async () => {
-    const { calls } = fakeBackend({ entries: [tiered({ rating: 8.9, tier: 3 })] });
+  it('a Plan to watch title has no rating field (N8)', async () => {
+    fakeBackend({ entries: [frieren({ status: 'Plan to watch', rating: null })] });
     renderApp('/entry/f1');
-    const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
-    await userEvent.clear(rating);
-    await userEvent.type(rating, '8.90');
-    await userEvent.tab();
-    // A later, real change is the barrier: handlers run in order, so if the unchanged number had posted, it would be first.
-    await userEvent.clear(rating);
-    await userEvent.type(rating, '7');
-    await userEvent.tab();
-    await waitFor(() => expect(patches(calls)).toEqual([{ rating: 7 }]));
-  });
-
-  it('typing a number moves the tier chip at once, before the server answers', async () => {
-    fakeBackend({ entries: [tiered({ rating: 9.5, tier: 3 })], extra: { 'PATCH /api/entries/:id': () => new Promise(() => {}) } });
-    renderApp('/entry/f1');
-    const rating = await screen.findByRole('spinbutton', { name: 'Rating' });
-    await userEvent.clear(rating);
-    await userEvent.type(rating, '8');
-    await userEvent.tab();
-    await waitFor(() => expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false', 'false']));
-  });
-
-  it('a tier chip unlocks the score at once, before the server answers', async () => {
-    fakeBackend({ entries: [tiered({ rating: 9.5, tier: 3, scoreLocked: true })], extra: { 'PATCH /api/entries/:id': () => new Promise(() => {}) } });
-    renderApp('/entry/f1');
-    expect(await screen.findByRole('switch', { name: 'Lock score' })).toBeChecked();
-    await userEvent.click(chips()[1]!); // top first: Loved, Liked, Fine, Didn't like
-    await waitFor(() => expect(screen.getByRole('switch', { name: 'Lock score' })).not.toBeChecked());
+    await screen.findByRole('combobox', { name: 'Status' });
+    expect(screen.queryByRole('spinbutton', { name: 'Rating' })).not.toBeInTheDocument();
   });
 });

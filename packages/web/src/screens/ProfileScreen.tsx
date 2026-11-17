@@ -21,10 +21,12 @@ import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { CropSheet, PhotoPreviewSheet, type CropRect } from './profile/AvatarEditor';
 import { AvatarTooBigError, makeAvatar, readImage } from './profile/avatarImage';
+import { EditProfileSheet } from './profile/EditProfileSheet';
 import { TierCounts } from './profile/TierCounts';
 import '../design/settings.css';
 import '../design/nav.css';
 import '../design/wide.css';
+import '../design/plan.css';
 
 const READ_ERROR = "Couldn't read that image. Try a JPEG or PNG.";
 const SAVE_ERROR = "Couldn't save your photo. Try again.";
@@ -66,6 +68,7 @@ export function ProfileScreen() {
   const num = (n: number | string) => (waiting ? DASH : n);
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
   const [reading, setReading] = useState(false);
   const [image, setImage] = useState<ImageBitmap | null>(null);
   const [draft, setDraft] = useState<{ type: 'image/webp' | 'image/jpeg'; data: string } | null>(null);
@@ -138,7 +141,10 @@ export function ProfileScreen() {
             {me.avatarAt && <Button variant="ghost" compact disabled={remove.isPending} onClick={() => void removePhoto()}>Remove photo</Button>}
           </div>
           <input ref={fileInput} type="file" accept="image/*" hidden aria-label="Choose a photo" onChange={(e) => void onFile(e)} />
+          {me.displayName && <h2 className="profile__display">{me.displayName}</h2>}
           <p className="profile__name">@{me.username}</p>
+          {me.bio && <p className="profile__bio">{me.bio}</p>}
+          <Button variant="ghost" compact className="profile__edit" onClick={() => setEditing(true)}>Edit profile</Button>
           {since && <p className="profile__since">Member since {since}</p>}
         </div>
 
@@ -200,6 +206,7 @@ export function ProfileScreen() {
         </div>
       </div>
 
+      {editing && <EditProfileSheet me={me} onClose={() => setEditing(false)} />}
       {image && <CropSheet image={image} onUse={(r) => void usePhoto(r)} onCancel={closeImage} />}
       {draft && <PhotoPreviewSheet photo={draft} saving={save.isPending} onSave={() => void savePhoto()} onCancel={() => setDraft(null)} />}
     </div>

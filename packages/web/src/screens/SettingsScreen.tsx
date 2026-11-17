@@ -8,6 +8,7 @@ import { TAB_SWITCHES } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
+import { CompareOptions } from './settings/CompareOptions';
 import { SettingsLinks } from './settings/SettingsLinks';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
@@ -17,8 +18,8 @@ import '../design/settings.css';
 import '../design/wide.css';
 
 /**
- * Settings: tab switches, "Fill in details", "Export my data", username, and links to the Appearance page
- * (theme, Custom colours, compare options), which More links to as well (SettingsMore.v2).
+ * Settings: tab switches, search, "Fill in details", "Export my data", username, Ratings ("Ask me to
+ * compare close ratings" and Sharpen my ratings, Ruling N9) and the Appearance page (theme, Custom colours).
  */
 export function SettingsScreen() {
   const me = useSessionMe();
@@ -90,8 +91,13 @@ export function SettingsScreen() {
           </div>
         </section>
 
+        <section aria-labelledby="set-ratings" className="group">
+          <h2 id="set-ratings" className="group__title">Ratings</h2>
+          <CompareOptions />
+        </section>
+
         <section aria-labelledby="set-look" className="group">
-          <h2 id="set-look" className="group__title">Appearance and comparing</h2>
+          <h2 id="set-look" className="group__title">Appearance</h2>
           <div className="group__card">
             <SettingsLinks />
           </div>

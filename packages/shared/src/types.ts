@@ -97,6 +97,10 @@ export interface Entry {
   strength: number | null;
   /** A locked score shows exactly the typed number and still counts as an opponent. */
   scoreLocked: boolean;
+  /** The number typed or imported: the truth; `rating` is what it shows after close-call nudges (Ruling N1). Absent on rows cached before Phase 5. */
+  typed?: number | null;
+  /** Position in the list's Plan to watch order (1 = up next); null when not planned or not yet placed (absent on rows cached before Phase 5). */
+  planOrder?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,6 +115,8 @@ export interface Season {
   priorMean: number | null;
   strength: number | null;
   scoreLocked: boolean;
+  /** The typed number (Ruling N1); absent on rows cached before Phase 5. */
+  typed?: number | null;
 }
 
 export interface CategoryConfig {
@@ -182,3 +188,8 @@ export interface ImportPreview {
   warnings: { tab: string; row: number; message: string }[];
   settings: Partial<UserSettings> | null;
 }
+
+/** The stored status that Plan to watch means on every list (the list's own wording: statusLabel). */
+export const PLAN_STATUS: Status = 'Plan to watch';
+/** Most titles one plan-order save may carry. */
+export const PLAN_ORDER_MAX = 500;

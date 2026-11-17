@@ -109,11 +109,11 @@ describe('design components: accessible names', () => {
   it('BottomTabs: the Main nav, its links named; Home is first and links to /', () => {
     render(
       <MemoryRouter initialEntries={['/activity']}>
-        <BottomTabs compareCount={0} />
+        <BottomTabs />
       </MemoryRouter>,
     );
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'Compare', 'More']);
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'More']);
     expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
     expect(within(nav).getByRole('link', { name: 'Activity' })).toHaveAttribute('aria-current', 'page');
   });

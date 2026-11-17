@@ -25,6 +25,7 @@ import { CompareWithFriend } from './CompareWithFriend';
 import { CategoryChips, PersonAvatar, Tabs, who, type TabDef } from './parts';
 import '../../design/ratings.css';
 import '../../design/social.css';
+import '../../design/plan.css';
 
 const TABS: TabDef<'lists' | 'top5' | 'stats' | 'compare'>[] = [
   { id: 'lists', label: 'Lists' }, { id: 'top5', label: 'Top 5' }, { id: 'stats', label: 'Stats' }, { id: 'compare', label: 'Compare' },
@@ -72,7 +73,7 @@ export function FriendProfile() {
   }
   const { user, relation } = profile.data;
   return relation === 'friend' || relation === 'self'
-    ? <FriendView user={user} />
+    ? <FriendView user={user} bio={profile.data.bio ?? null} />
     : <StrangerView user={user} relation={relation} />;
 }
 
@@ -118,7 +119,7 @@ function StrangerView({ user, relation }: { user: PublicUser; relation: 'none' |
   );
 }
 
-function FriendView({ user }: { user: PublicUser }) {
+function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
   const [params, setParams] = useSearchParams();
   const entries = useFriendEntries(user.username);
   const friends = useFriends();
@@ -151,6 +152,7 @@ function FriendView({ user }: { user: PublicUser }) {
           <PersonAvatar user={user} size={80} />
           <h1>{who(user)}</h1>
           {user.displayName && <span className="friend-id__user">@{user.username}</span>}
+          {bio && <p className="friend-id__bio">{bio}</p>}
         </div>
         <dl className="friend-tiles">
           {tiles.map(([label, value]) => (

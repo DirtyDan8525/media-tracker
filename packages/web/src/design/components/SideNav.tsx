@@ -10,14 +10,13 @@ import { Icon } from './Icon';
 /**
  * PC side nav (B20/B21, SideNavPC board), `nav "Main"`: the profile row (32 px avatar + @username),
  * Add (a primary button-styled link to the current list's Add sheet; none while every list is off),
- * Home (the last list shown), Search, Activity, Compare (with its waiting count), a divider, every
- * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats
- * and Settings are reached through Profile.
+ * Home (the last list shown), Search, Activity, a divider, every
+ * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats,
+ * Sharpen my ratings and Settings are reached through Profile and More (Compare left with tiers, N9).
  */
-export function SideNav({ lists, counts, compareCount = 0, activityCount = 0, current, me }: {
+export function SideNav({ lists, counts, activityCount = 0, current, me }: {
   lists: Category[];
   counts: Partial<Record<Category, number>>;
-  compareCount?: number;
   activityCount?: number;
   current: Category | null;
   me: Pick<Me, 'username' | 'email' | 'avatarAt'> & Partial<Pick<Me, 'isAdmin'>>;
@@ -46,10 +45,6 @@ export function SideNav({ lists, counts, compareCount = 0, activityCount = 0, cu
       <NavLink to="/activity" className="side-nav__link side-nav__link--split" aria-label={activityCount > 0 ? `Activity, ${countText(activityCount)} new` : undefined}>
         <span className="side-nav__link-start"><Icon name="activity" size={18} />Activity</span>
         {activityCount > 0 && <span className="count-pill">{countText(activityCount)}</span>}
-      </NavLink>
-      <NavLink to="/compare" className="side-nav__link side-nav__link--split" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
-        <span className="side-nav__link-start"><Icon name="compare" size={18} />Compare</span>
-        {compareCount > 0 && <span className="count-pill">{compareCount}</span>}
       </NavLink>
       <div className="side-nav__divider" role="presentation" />
       {lists.map((c) => (

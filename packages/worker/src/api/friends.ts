@@ -33,9 +33,9 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 const userByUsername = (db: D1Database, username: string) =>
   db
-    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at FROM users WHERE username = ? AND status = 'active'`)
+    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at, bio FROM users WHERE username = ? AND status = 'active'`)
     .bind(username.toLowerCase())
-    .first<PublicUserRow & { created_at: string | null }>();
+    .first<PublicUserRow & { created_at: string | null; bio: string | null }>();
 
 // Pending -> accepted when the other side already asked; a fresh pending row otherwise. Never downgrades.
 const REQUEST_SQL = `INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES (?1, ?2, 'pending', ?3, ?4)
@@ -185,7 +185,9 @@ users.get('/:username', async (c) => {
   const u = await userByUsername(c.env.DB, c.req.param('username'));
   if (!u) return c.json(notFound, 404);
   const relation: Relation = await relationOf(c.env.DB, c.var.user.id, u.id);
-  return c.json({ user: publicUser(u), memberSince: u.created_at ?? null, relation });
+  // The bio is for friends (and yourself): a stranger sees the header only.
+  const bio = relation === 'self' || relation === 'friend' ? u.bio ?? null : null;
+  return c.json({ user: publicUser(u), memberSince: u.created_at ?? null, bio, relation });
 });
 
 type Resolved = { user: PublicUserRow; rel: Relation };

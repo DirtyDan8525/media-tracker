@@ -1,22 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useCompareQueue } from '../data/compare';
 import { useUnread } from '../data/feed';
 import { Icon } from '../design/components/Icon';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
-import { waitingCount } from './CompareBanner';
 import { Walkthrough } from './onboarding/Walkthrough';
 import { ExportRow } from './settings/ExportRow';
 import '../design/settings.css';
 import '../design/wide.css';
 
-/** Phone "More" (B20): Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings (with the rating tier links) is under Profile. */
+/** Phone "More" (B20): Ratings (Sharpen my ratings, Top 5, Stats), Your data (Import, Export) and App (About). Lists are in the Lists menu, Settings is under Profile. */
 export function MoreScreen() {
   const me = useSessionMe();
   // The same count as the Profile dot; for the admin it includes people waiting for approval.
   const requests = useUnread().data?.requests ?? 0;
-  const waiting = waitingCount(useCompareQueue().data ?? [], me.settings);
   const [tour, setTour] = useState(false);
   return (
     <div className="screen">
@@ -25,9 +22,9 @@ export function MoreScreen() {
         <section aria-labelledby="more-ratings" className="group">
           <h2 id="more-ratings" className="group__title">Ratings</h2>
           <div className="group__card">
-            <Link to="/compare" className="group__row" aria-label={waiting > 0 ? `Compare, ${waiting} waiting` : undefined}>
-              <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Compare</span>
-              {waiting > 0 && <span className="count-pill">{waiting}</span>}
+            <Link to="/sharpen" className="group__row">
+              <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Sharpen my ratings</span>
+              <span className="group__chev"><Icon name="chevron" size={18} /></span>
             </Link>
             <Link to="/top5" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>Top 5</span>

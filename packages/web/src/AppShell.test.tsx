@@ -15,19 +15,15 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('the Main nav\'s links read Home, Activity, Search, Compare, More (slot 4 is always Compare), Compare named "Compare, 2 waiting"', async () => {
-      mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
+    it('the Main nav\'s links read Home, Activity, Search, More: Compare left with tiers (N9)', async () => {
+      mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await mainNav();
-      const compare = await within(nav).findByRole('link', { name: 'Compare, 2 waiting' });
-      expect(compare).toHaveAttribute('href', '/compare');
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Compare', 'More']);
-      expect(compare.querySelector('.count-pill')).toHaveTextContent('2');
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'More']);
+      expect(within(nav).queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
       const cells = Array.from(nav.children);
-      expect(cells).toHaveLength(5);
+      expect(cells).toHaveLength(4);
       expect(cells[2]).toHaveTextContent('Search');
-      expect(cells[3]).not.toHaveAttribute('aria-hidden');
-      expect(cells[3]).toHaveTextContent('Compare');
     });
 
     it('Activity has no count badge when nothing is unread', async () => {
@@ -116,8 +112,8 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Compare', 'More']);
-      expect(nav.children).toHaveLength(5);
+      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'More']);
+      expect(nav.children).toHaveLength(4);
     });
 
     it.each([
@@ -128,6 +124,7 @@ describe('app shell', () => {
       ['/about', 'More'],
       ['/top5', 'More'],
       ['/stats', 'More'],
+      ['/sharpen', 'More'],
     ])('on %s the current tab is %s', async (path, tab) => {
       mockApi(makeMe(), { 'GET /api/activity': { body: { items: [], next: null } } });
       renderApp(path);
@@ -143,27 +140,15 @@ describe('app shell', () => {
       expect(within(nav).getAllByRole('link').filter((a) => a.hasAttribute('aria-current')).map((a) => a.textContent)).toEqual(['Home']);
     });
 
-    it('on /compare the Compare tab is current', async () => {
-      mockApi(makeMe());
-      renderApp('/compare');
-      const nav = await mainNav();
-      expect(within(nav).getByRole('link', { name: /^Compare/ })).toHaveAttribute('aria-current', 'page');
+    it.each(['/compare', '/retier/anime'])('%s (an old link) lands on Sharpen my ratings', async (path) => {
+      mockApi(makeMe(), { 'GET /api/ratings/close-counts': { body: { counts: {} } } });
+      const { router } = renderApp(path);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/sharpen'));
     });
 
     it.each(['/list/anime', '/search', '/activity', '/more', '/top5'])('the profile button is on %s', async (path) => {
       mockApi(makeMe(), { 'GET /api/activity': { body: { items: [], next: null } } });
       renderApp(path);
-      const profile = await screen.findByRole('link', { name: 'Profile' });
-      expect(profile).toHaveAttribute('href', '/profile');
-      expect(profile).toHaveClass('profile-btn');
-      expect(profile.closest('header')).not.toBeNull();
-    });
-
-    it.each(['/compare', '/retier/anime'])('B9: the profile button is in the header on %s (phone)', async (path) => {
-      mockApi(makeMe(), { 'GET /api/ratings/anime': { body: { items: [], comparisons: [] } } });
-      renderApp(path);
-      await screen.findByRole('heading', { level: 1, name: path === '/compare' ? 'Fix my ratings' : 'Re-tier' });
-      await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull()); // the loaded screen, not its skeleton
       const profile = await screen.findByRole('link', { name: 'Profile' });
       expect(profile).toHaveAttribute('href', '/profile');
       expect(profile).toHaveClass('profile-btn');
@@ -196,7 +181,7 @@ describe('app shell', () => {
       expect(document.querySelector('.page-header .backdrop')).toBeNull();
       // the sub-line and the chips sit below the band
       expect(bar).not.toContainElement(screen.getByText(/1 title/));
-      expect(bar).not.toContainElement(screen.getByRole('combobox', { name: 'Status' }));
+      expect(bar).not.toContainElement(screen.getByRole('button', { name: 'Filters' }));
     });
 
     it('phone list header: logo button (About Media Tracker) top left, the list dropdown centred, profile button right', async () => {
@@ -253,7 +238,7 @@ describe('app shell', () => {
       expect(row.querySelector('.count-pill')).toHaveTextContent('3');
     });
 
-    it('reads Profile, Add anime, Search, Activity, Compare, the enabled lists, then Import, Export my data, About', async () => {
+    it('reads Profile, Add anime, Search, Activity, the enabled lists, then Import, Export my data, About (no Compare, N9)', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
@@ -261,7 +246,7 @@ describe('app shell', () => {
       // every row, in document order: links and the Export button
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity', 'Compare',
+        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books',
         'Import', 'Export my data', 'About',
       ]);
@@ -357,16 +342,12 @@ describe('app shell', () => {
       await waitFor(() => expect(calls.some((c) => c.path === '/api/export')).toBe(true));
     });
 
-    it('Compare comes right after Activity, with the waiting count', async () => {
+    it('has no Compare row (Sharpen my ratings is in More and Settings)', async () => {
       setViewportWidth(1280);
-      mockApi(makeMe({}, { songs: false }), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }, { entryId: 'b', category: 'tv' }] } } });
+      mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
       const nav = await sideNav();
-      const link = await within(nav).findByRole('link', { name: 'Compare, 2 waiting' });
-      expect(link).toHaveAttribute('href', '/compare');
-      expect(link.querySelector('.count-pill')).toHaveTextContent('2');
-      expect(link.querySelector('svg')).not.toBeNull();
-      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Compare', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'About']);
+      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'About']);
       expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
     });
 
@@ -376,7 +357,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(6 + 7 + 2); // Profile, Add, Home, Search, Activity, Compare + 7 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(5 + 7 + 2); // Profile, Add, Home, Search, Activity + 7 lists + Import, About
     });
   });
 
@@ -394,23 +375,23 @@ describe('app shell', () => {
     expect(await screen.findByText('No games yet')).toBeInTheDocument();
   });
 
-  it('More has Ratings (Compare, Top 5, Stats), Your data (Import, Export) and App (About) only: no other lists, Settings, Appearance or tier links', async () => {
+  it('More has Ratings (Sharpen my ratings, Top 5, Stats), Your data (Import, Export) and App (About) only: no other lists, Settings, Appearance or tier links', async () => {
     mockApi(makeMe({}, { books: false }));
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(linkNames(main)).toEqual(['Compare', 'Top 5', 'Stats', 'Import from Google Sheets', "What's new", 'Coming soon', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats', 'Import from Google Sheets', "What's new", 'Coming soon', 'About Media Tracker']);
     expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
     const tabs = screen.getByRole('navigation', { name: 'Main' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('More shows the waiting count on Compare', async () => {
-    mockApi(makeMe(), { 'GET /api/compare/queue': { body: { items: [{ entryId: 'a', category: 'anime' }] } } });
+  it('More links to Sharpen my ratings', async () => {
+    mockApi(makeMe());
     renderApp('/more');
     await screen.findByRole('heading', { level: 1, name: 'More' });
     const body = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(await within(body).findByRole('link', { name: 'Compare, 1 waiting' })).toHaveAttribute('href', '/compare');
+    expect(within(body).getByRole('link', { name: 'Sharpen my ratings' })).toHaveAttribute('href', '/sharpen');
   });
 
   it('an unknown list redirects home', async () => {

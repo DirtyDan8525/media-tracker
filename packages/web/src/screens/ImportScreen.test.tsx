@@ -252,28 +252,10 @@ describe('ImportScreen', () => {
     await waitFor(() => expect(calls.map((c) => c.path)).toContain('/api/entries?category=games'));
   });
 
-  it('Import done offers Check your tiers, linking to the first imported list', async () => {
+  it('Import done no longer offers Check your tiers (tiers left the UI, N9)', async () => {
     importBackend();
     renderApp('/import');
     await chooseMock(preview([row(1, { category: 'movies', rating: 8 }), row(2, { category: 'games', rating: 7 })]));
-    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
-    await screen.findByText('Imported 2 titles');
-    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/movies');
-  });
-
-  it('Check your tiers points at the first list that has a rated row, and is absent when none was rated', async () => {
-    importBackend();
-    renderApp('/import');
-    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games', rating: 7 })]));
-    await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
-    await screen.findByText('Imported 2 titles');
-    expect(screen.getByRole('link', { name: 'Check your tiers' })).toHaveAttribute('href', '/retier/games');
-  });
-
-  it('Import done has no Check your tiers when no imported row was rated', async () => {
-    importBackend();
-    renderApp('/import');
-    await chooseMock(preview([row(1, { category: 'movies' }), row(2, { category: 'games' })]));
     await userEvent.click(await screen.findByRole('button', { name: 'Import 2 titles' }));
     await screen.findByText('Imported 2 titles');
     expect(screen.queryByRole('link', { name: 'Check your tiers' })).not.toBeInTheDocument();

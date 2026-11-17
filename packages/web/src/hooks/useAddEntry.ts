@@ -1,9 +1,8 @@
-import { CATEGORY_CONFIG, normTitle, round1, scoreOf, tierRange, similarity, type Category, type Entry, type LookupInfo, type Status, type Tier } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, PLAN_STATUS, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { api } from '../api/client';
-import { COMPARE_QUEUE_KEY } from '../data/compare';
-import { cachedTiers } from '../data/entryMutations';
+import { CLOSE_COUNTS_KEY } from '../data/ratings';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
 import { LIST_LABEL } from '../nav';
@@ -14,10 +13,8 @@ import { runLookup } from '../lookup/run';
 export interface AddInput {
   title: string;
   creator?: string;
-  /** A typed number: the Worker picks the tier it falls in. */
+  /** A typed number: the truth (Ruling N1). Never sent for a Plan to watch title (N8). */
   rating?: number | null;
-  /** A tapped tier, with no number (the title starts in the middle of it). */
-  tier?: Tier;
   status?: Status | null;
   /** The list to add to (the Add sheet's "Add to"); default: the list the hook was made for. */
   category?: Category;
@@ -105,21 +102,17 @@ export function useAddEntry(defaultCategory: Category) {
     const creator = cfg.creatorLabel ? (input.creator ?? '').trim() : '';
     const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: 'pending' };
     if (creator) body.creator = creator;
-    if (input.rating !== undefined && input.rating !== null) body.rating = input.rating;
-    else if (input.tier !== undefined) body.tier = input.tier;
     if (cfg.hasStatus && input.status) body.status = input.status;
+    if (input.rating !== undefined && input.rating !== null && body.status !== PLAN_STATUS) body.rating = input.rating;
 
     // The row appears before anything comes back.
     const now = new Date().toISOString();
-    // A tapped tier starts in the middle of its range, as the Worker will place it.
-    const tierOnly = body.rating === undefined && input.tier !== undefined;
-    const tempRating = tierOnly ? round1(scoreOf(0, tierRange(cachedTiers(qc, category), input.tier!))) : null;
     const tempId = `tmp-${++tempCounter}`;
     const temp: Entry = {
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
-      rating: (body.rating as number | undefined) ?? tempRating, genres: '', creator, album: '', coverUrl: '', notes: '',
+      rating: (body.rating as number | undefined) ?? null, typed: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
-      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: input.tier ?? null, priorMean: tierOnly ? 0 : null, strength: tierOnly ? 0 : null, scoreLocked: false, createdAt: now, updatedAt: now,
+      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
     };
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });
@@ -132,7 +125,7 @@ export function useAddEntry(defaultCategory: Category) {
       lookupRunning.add(entry.id);
       lookupRunning.delete(tempId);
       writeEntry(qc, entry, { replaceId: tempId });
-      if (entry.rating !== null) void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
+      if (entry.rating !== null) void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
       if (res.duplicateOf) toast.show(`Already on your ${LIST_LABEL[category]} list`);
     } catch {
       lookupRunning.delete(tempId);

@@ -1,4 +1,4 @@
-import { DEFAULT_TIERS, type Entry, type SavePayload, type TierSet } from '@media-tracker/shared';
+import { type Entry, type SavePayload } from '@media-tracker/shared';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -13,11 +13,11 @@ import { localDb } from '../db/local';
 import { makeEntry } from '../test/fakeBackend';
 import { makeMe, mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
-import { COMPARE_QUEUE_KEY } from './compare';
 import { entriesKey, entryKey } from './entryCache';
-import { ratingSetKey, refetchAfterDelete, retryOnConflict, saveRatings, saveRatingsResult, saveTiers, useRatingSet } from './ratings';
+import {
+  CLOSE_COUNTS_KEY, askCloseCalls, ratingSetKey, refetchAfterDelete, retryOnConflict, saveClosePick, saveRatings, saveRatingsResult, useRatingSet,
+} from './ratings';
 import { ApiError } from '../api/client';
-import { ME_KEY } from './useMe';
 
 const payload: SavePayload = { picks: [{ winnerId: 'a', loserId: 'b', isTie: false, undone: false }], moves: [], done: ['a'] };
 const setBody = { items: [], comparisons: [] };
@@ -39,22 +39,22 @@ describe('useRatingSet', () => {
 });
 
 describe('saveRatings', () => {
-  it('writes returned entries and invalidates the set, queue and seasons', async () => {
+  it('writes returned entries and invalidates the set, the close-call counts and seasons', async () => {
     const qc = makeQueryClient();
     qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'a', category: 'anime', rating: 9 })]);
     qc.setQueryData(ratingSetKey('anime'), setBody);
-    qc.setQueryData(COMPARE_QUEUE_KEY, []);
+    qc.setQueryData(CLOSE_COUNTS_KEY, {});
     qc.setQueryData(['seasons', 'x'], []);
     const calls = mockFetch({
       'POST /api/ratings/anime/save': { body: { items: [], entries: [makeEntry({ id: 'a', category: 'anime', rating: 9.2, tier: 3 })] } },
       'GET /api/ratings/anime': { body: setBody },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatings(qc, 'anime', payload)).toBe(true);
     expect(calls.find((c) => c.method === 'POST')!.body).toEqual(payload);
     expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(9.2);
     expect(qc.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true);
-    expect(qc.getQueryState(COMPARE_QUEUE_KEY)!.isInvalidated).toBe(true);
+    expect(qc.getQueryState(CLOSE_COUNTS_KEY)!.isInvalidated).toBe(true);
     // a list set does not touch seasons
     expect(qc.getQueryState(['seasons', 'x'])!.isInvalidated).toBe(false);
   });
@@ -67,7 +67,7 @@ describe('saveRatings', () => {
     const calls = mockFetch({
       'POST /api/ratings/anime_seasons/save': { body: { items: [], entries: [] } },
       'GET /api/entries': { body: [makeEntry({ id: 'p', category: 'anime', seasonAvg: 8.1 })] },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatings(qc, 'anime_seasons', payload)).toBe(true);
     expect(qc.getQueryState(['seasons', 'p'])!.isInvalidated).toBe(true);
@@ -81,7 +81,7 @@ describe('saveRatings', () => {
     const calls = mockFetch({
       'POST /api/ratings/anime/save': () => (++posts === 1 ? { status: 409, body: { error: 'conflict' } } : { body: { items: [], entries: [] } }),
       'GET /api/ratings/anime': { body: setBody },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatings(qc, 'anime', payload)).toBe(true);
     const order = calls.filter((c) => c.path.startsWith('/api/ratings/')).map((c) => `${c.method} ${c.path}`);
@@ -109,35 +109,30 @@ describe('saveRatings', () => {
   });
 });
 
-describe('saveTiers', () => {
-  const mine: TierSet = { names: ['a', 'b', 'c', 'd'], bounds: [5, 7, 8.5] };
-  it('writes returned entries and settings, and invalidates the list and season sets', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(ME_KEY, makeMe());
-    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'a', category: 'anime', rating: 9 })]);
-    qc.setQueryData(ratingSetKey('anime'), setBody);
-    qc.setQueryData(ratingSetKey('anime_seasons'), setBody);
-    const me = makeMe();
-    const calls = mockFetch({
-      'PUT /api/ratings/tiers/anime': { body: { settings: { ...me.settings, tiers: { anime: mine } }, entries: [makeEntry({ id: 'a', category: 'anime', rating: 8.7 })] } },
-      'GET /api/ratings/anime': { body: setBody },
-      'GET /api/ratings/anime_seasons': { body: setBody },
-    });
-    expect(await saveTiers(qc, 'anime', mine)).toBe(true);
-    expect(calls[0]!.body).toEqual({ tiers: mine });
-    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.7);
-    expect(qc.getQueryData<ReturnType<typeof makeMe>>(ME_KEY)!.settings.tiers).toEqual({ anime: mine });
-    expect(qc.getQueryState(ratingSetKey('anime'))!.isInvalidated).toBe(true);
-    expect(qc.getQueryState(ratingSetKey('anime_seasons'))!.isInvalidated).toBe(true);
-    expect((await localDb.me.get('me'))?.value.settings.tiers).toEqual({ anime: mine });
+describe('close calls', () => {
+  it('askCloseCalls: on for Both and Only for new ratings (N9)', () => {
+    expect(['Both', 'Only for new ratings', 'Only when I start it', 'Off'].map((compareAsk) => askCloseCalls({ compareAsk }))).toEqual([true, true, false, false]);
   });
 
-  it('null resets to the defaults; failure returns false', async () => {
+  it('saveClosePick posts one pick, writes the returned entries and returns the changed titles', async () => {
     const qc = makeQueryClient();
-    const calls = mockFetch({ 'PUT /api/ratings/tiers/movies': { status: 400, body: { error: 'invalid' } } });
-    expect(await saveTiers(qc, 'movies', null)).toBe(false);
-    expect(calls[0]!.body).toEqual({ tiers: null });
-    expect(DEFAULT_TIERS.bounds).toEqual([6, 7.5, 9]);
+    qc.setQueryData(entriesKey('tv'), [makeEntry({ id: 'inv', category: 'tv', rating: 9.6, typed: 9.6 })]);
+    qc.setQueryData(CLOSE_COUNTS_KEY, {});
+    const item = { id: 'inv', title: 'Invincible', rating: 9.62 };
+    const calls = mockFetch({
+      'POST /api/ratings/tv/save': { body: { items: [item], entries: [makeEntry({ id: 'inv', category: 'tv', rating: 9.62, typed: 9.6 })] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
+    });
+    expect(await saveClosePick(qc, 'tv', { winnerId: 'inv', loserId: 'arc', isTie: false })).toEqual([item]);
+    expect(calls[0]!.body).toEqual({ picks: [{ winnerId: 'inv', loserId: 'arc', isTie: false, undone: false }], moves: [], done: [] });
+    expect(qc.getQueryData<Entry[]>(entriesKey('tv'))![0]!.rating).toBe(9.62);
+    expect(qc.getQueryState(CLOSE_COUNTS_KEY)!.isInvalidated).toBe(true);
+  });
+
+  it('saveClosePick returns null on failure', async () => {
+    const qc = makeQueryClient();
+    mockFetch({ 'POST /api/ratings/tv/save': { status: 500, body: { error: 'boom' } } });
+    expect(await saveClosePick(qc, 'tv', { winnerId: 'a', loserId: 'b', isTie: true })).toBeNull();
   });
 });
 
@@ -186,7 +181,7 @@ describe('saveRatingsResult', () => {
     expect(await saveRatingsResult(qc, 'anime', payload)).toBe('conflict');
     mockFetch({ 'POST /api/ratings/anime/save': { status: 500, body: { error: 'x' } } });
     expect(await saveRatingsResult(qc, 'anime', payload)).toBe('failed');
-    mockFetch({ 'POST /api/ratings/anime/save': { body: { items: [], entries: [] } }, 'GET /api/compare/queue': { body: { items: [] } } });
+    mockFetch({ 'POST /api/ratings/anime/save': { body: { items: [], entries: [] } }, 'GET /api/ratings/close-counts': { body: { counts: {} } } });
     expect(await saveRatingsResult(qc, 'anime', payload)).toBe('ok');
   });
 });
@@ -203,32 +198,6 @@ describe('retryOnConflict', () => {
 });
 
 describe('Task 10 review fixes', () => {
-  it('saveTiers on a list with seasons also reloads the seasons and the parent list (season averages)', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(ME_KEY, makeMe());
-    qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'p', category: 'anime', seasonAvg: 9 })]);
-    qc.setQueryData(['seasons', 'p'], []);
-    const me = makeMe();
-    const calls = mockFetch({
-      'PUT /api/ratings/tiers/anime': { body: { settings: me.settings, entries: [] } },
-      'GET /api/entries': { body: [makeEntry({ id: 'p', category: 'anime', seasonAvg: 8.6 })] },
-    });
-    expect(await saveTiers(qc, 'anime', null)).toBe(true);
-    expect(qc.getQueryState(['seasons', 'p'])!.isInvalidated).toBe(true);
-    expect(calls.some((c) => c.path === '/api/entries?category=anime')).toBe(true);
-    expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.seasonAvg).toBe(8.6);
-  });
-
-  it('saveTiers on a list without seasons leaves seasons alone', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(ME_KEY, makeMe());
-    qc.setQueryData(['seasons', 'x'], []);
-    const calls = mockFetch({ 'PUT /api/ratings/tiers/movies': { body: { settings: makeMe().settings, entries: [] } } });
-    expect(await saveTiers(qc, 'movies', null)).toBe(true);
-    expect(qc.getQueryState(['seasons', 'x'])!.isInvalidated).toBe(false);
-    expect(calls.some((c) => c.path.startsWith('/api/entries'))).toBe(false);
-  });
-
   it('a 409 refreshes the list too, so rows changed on another device are not stale', async () => {
     const qc = makeQueryClient();
     qc.setQueryData(entriesKey('anime'), [makeEntry({ id: 'other', category: 'anime', rating: 8 })]);
@@ -237,7 +206,7 @@ describe('Task 10 review fixes', () => {
       'POST /api/ratings/anime/save': () => (++posts === 1 ? { status: 409, body: { error: 'conflict' } } : { body: { items: [], entries: [] } }),
       'GET /api/ratings/anime': { body: setBody },
       'GET /api/entries': { body: [makeEntry({ id: 'other', category: 'anime', rating: 8.4 })] },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatings(qc, 'anime', payload)).toBe(true);
     await waitFor(() => expect(qc.getQueryData<Entry[]>(entriesKey('anime'))![0]!.rating).toBe(8.4));
@@ -261,7 +230,7 @@ describe('Task 10 review fixes', () => {
         await new Promise((r) => setTimeout(r, 40));
         return { body: [makeEntry({ id: 'other', category: 'anime', rating })] };
       },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatings(qc, 'anime', payload)).toBe(true);
     await new Promise((r) => setTimeout(r, 100));
@@ -297,7 +266,7 @@ describe('Task 10 review fixes', () => {
     vi.mocked(entryCache.writeEntry).mockImplementationOnce(() => { throw new Error('cache'); });
     mockFetch({
       'POST /api/ratings/anime/save': { body: { items: [], entries: [makeEntry({ id: 'a', category: 'anime', rating: 9.2 })] } },
-      'GET /api/compare/queue': { body: { items: [] } },
+      'GET /api/ratings/close-counts': { body: { counts: {} } },
     });
     expect(await saveRatingsResult(qc, 'anime', payload)).toBe('ok');
   });

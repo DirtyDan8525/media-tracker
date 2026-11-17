@@ -4,12 +4,13 @@ import {
   COMPARE_ASK,
   DEFAULT_USER_SETTINGS,
   decodeAvatar,
+  validateBio,
   SEARCH_SCOPE,
   THEMES,
   type UserSettings,
 } from '@media-tracker/shared';
 import { USERNAME_RE, type AppEnv, type AppUser } from '../auth/user';
-import { ensureTiers } from '../ratings/store';
+import { ensureTyped } from '../ratings/store';
 import { ensureInviteCode, newInviteCode } from '../social/inviteCode';
 
 export const me = new Hono<AppEnv>();
@@ -92,18 +93,18 @@ export function cleanDisplayName(raw: unknown): string | null | undefined {
 
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, status } = user;
-  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, status };
+  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, bio, status } = user;
+  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, bio, status };
 }
 
-// 2 queries (4 when the lazy tier backfill finds rows to assign; Ruling Q10). The backfill is
-// optional (every read and rating path derives missing tiers), so a failure is logged and /me,
-// which the app needs to boot, still answers.
+// 2 queries (≤ 21 when the lazy typed-number backfill finds sets to re-fit; Ruling N2). The
+// backfill is optional (every read and rating path derives a missing typed number), so a failure
+// is logged and /me, which the app needs to boot, still answers.
 me.get('/', async (c) => {
   try {
-    await ensureTiers(c.env.DB, c.var.user.id, c.var.user.settings);
+    await ensureTyped(c.env.DB, c.var.user.id, c.var.user.settings);
   } catch (err) {
-    console.error('ensureTiers failed', err);
+    console.error('ensureTyped failed', err);
   }
   return c.json(meBody(c.var.user));
 });
@@ -128,6 +129,16 @@ me.put('/username', async (c) => {
     throw err;
   }
   return c.json(meBody({ ...user, username }));
+});
+
+// 1 query (+ sign-in). Item 17: trimmed, line breaks kept, <= 150 characters, <= 4 lines, no links ('no_links'); empty clears it.
+me.put('/bio', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body) return c.json(invalid, 400);
+  const v = validateBio(body.bio);
+  if (!v.ok) return c.json({ error: v.error }, 400);
+  await c.env.DB.prepare('UPDATE users SET bio = ? WHERE id = ?').bind(v.bio, c.var.user.id).run();
+  return c.json(meBody({ ...c.var.user, bio: v.bio }));
 });
 
 me.put('/settings', async (c) => {

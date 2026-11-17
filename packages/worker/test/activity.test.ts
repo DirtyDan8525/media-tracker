@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
-import type { ActivityPage, Entry, SavePayload, Tier } from '@media-tracker/shared';
+import type { ActivityPage, Entry, SavePayload } from '@media-tracker/shared';
 import { activityForPatch, ratingsSaveActivityRows } from '../src/api/activity';
 import { pair } from '../src/social/visibility';
 import { spyD1 } from './d1spy';
@@ -217,41 +217,32 @@ describe('migration seed (0003)', () => {
   });
 });
 
-describe('activity on POST/PATCH /entries with tier ratings', () => {
-  it('a tier-only create logs added with the middle score it gets', async () => {
+describe('activity on POST/PATCH /entries, number-first', () => {
+  it('a tier key alone is ignored (N10): the create is unrated and a tier PATCH logs nothing', async () => {
     const e = await mk(A, { title: 'Tiered', tier: 2 });
-    expect(e.rating).not.toBeNull();
+    expect(e.rating).toBeNull();
+    await patch(A, e.id, { tier: 3 });
     const { items } = await feed(A);
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ type: 'added', entryId: e.id, payload: { rating: e.rating } });
+    expect(items[0]).toMatchObject({ type: 'added', entryId: e.id, payload: {} });
   });
 
-  it('a tier-chip move (no rating key) logs re-rated with the final stored rating', async () => {
-    const e = await mk(A, { title: 'Mover', rating: 8 });
-    await patch(A, e.id, { tier: 3 });
-    const stored = await env.DB.prepare('SELECT rating, tier FROM entries WHERE id = ?').bind(e.id).first<{ rating: number; tier: number }>();
-    expect(stored!.tier).toBe(3);
-    const { items } = await feed(A);
-    expect(items.map((i) => i.type)).toEqual(['re-rated', 'added']);
-    expect(items[0]!.payload).toEqual({ from: 8, to: stored!.rating });
-  });
-
-  it('a lock-only edit logs nothing; neighbours re-written by the edit log nothing', async () => {
+  it('a lock-only edit logs nothing; neighbours re-written by a retype log nothing', async () => {
     const a = await mk(A, { title: 'A', rating: 9.5 });
     const b = await mk(A, { title: 'B', rating: 9.4 });
-    // Picks make a and b fitted, so an edit to one re-fits the other.
+    // A pick makes a and b nudged, so a retype of one re-fits the other.
     const res = await as(A, '/api/ratings/anime/save', 'POST', { picks: [{ winnerId: b.id, loserId: a.id, isTie: false, undone: false }], moves: [], done: [] });
     expect(res.status).toBe(200);
     await env.DB.exec('DELETE FROM activity');
     const before = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(a.id).first<{ rating: number }>();
     await patch(A, b.id, { scoreLocked: true });
     expect((await feed(A)).items).toEqual([]);
-    await patch(A, b.id, { rating: 9.1, scoreLocked: true });
+    await patch(A, b.id, { rating: 9.3 });
     const after = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(a.id).first<{ rating: number }>();
     expect(after!.rating).not.toBe(before!.rating); // a was re-fitted …
     const { items } = await feed(A);
     expect(items.map((i) => i.entryId)).toEqual([b.id]); // … but only the edited title logs
-    expect(items[0]).toMatchObject({ type: 're-rated', payload: { to: 9.1 } });
+    expect(items[0]).toMatchObject({ type: 're-rated' });
   });
 });
 
@@ -265,88 +256,29 @@ describe('activity on POST /api/ratings/:set/save', () => {
       { ...env, ...(db ? { DB: db } : {}), ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env,
     );
   const pick = (winnerId: string, loserId: string, undone = false) => ({ winnerId, loserId, isTie: false, undone });
-  const ratingOf = async (id: string) =>
-    (await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(id).first<{ rating: number | null }>())!.rating;
   const logged = async () => (await feed(A)).items.filter((i) => i.type !== 'added');
 
-  it('a move to another tier logs re-rated via compare from the stored to the final rating', async () => {
-    const e = await mk(A, { title: 'Moved', rating: 8.5 });
-    const res = await save({ moves: [{ id: e.id, tier: 3 }] });
-    expect(res.status).toBe(200);
-    const items = await logged();
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ type: 're-rated', entryId: e.id, payload: { from: 8.5, to: await ratingOf(e.id), via: 'compare' } });
-  });
-
-  it('a pick that moves a shown score by less than 0.5 logs nothing; titles changed only by the re-fit never log', async () => {
-    const a = await mk(A, { title: 'A', rating: 9.5 });
-    const b = await mk(A, { title: 'B', rating: 9.4 });
-    const c = await mk(A, { title: 'C', rating: 9.3 });
-    // c and a get a pick between them; later sessions name only a and b, so c changes by re-fit alone.
-    expect((await save({ picks: [pick(c.id, a.id)] })).status).toBe(200);
-    const cBefore = await ratingOf(c.id);
-    const aBefore = await ratingOf(a.id);
-    expect((await save({ picks: [pick(b.id, a.id), pick(b.id, a.id)] })).status).toBe(200);
-    expect(await ratingOf(c.id)).not.toBe(cBefore); // c moved, through a
-    const items = await logged();
-    expect(items.some((i) => i.entryId === c.id)).toBe(false);
-    // Whatever a and b did, each logged row is one whose score moved by ≥ 0.5 (none here: Loved is 9–10).
-    expect(Math.abs((await ratingOf(a.id))! - aBefore!)).toBeLessThan(0.5);
-    expect(items).toEqual([]);
-  });
-
-  it('an undone pick and a move to the stored tier log nothing', async () => {
-    const a = await mk(A, { title: 'A', rating: 9.5 });
-    const b = await mk(A, { title: 'B', rating: 7 });
-    expect((await save({ picks: [pick(b.id, a.id, true)], moves: [{ id: a.id, tier: 3 }] })).status).toBe(200);
+  it('a close-call pick logs nothing (a nudge is at most 0.2)', async () => {
+    const a = await mk(A, { title: 'A', rating: 9.6 });
+    const b = await mk(A, { title: 'B', rating: 9.6 });
+    expect((await save({ picks: [pick(b.id, a.id)] })).status).toBe(200);
     expect(await logged()).toEqual([]);
   });
 
-  it('season sets log nothing (activity rows name entries)', async () => {
-    const e = await mk(A, { title: 'Show', rating: 8 });
-    const s = await as(A, `/api/entries/${e.id}/seasons`, 'POST', { label: 'S1', rating: 8 });
-    expect(s.status).toBe(201);
-    const season = (await s.json()) as { id: string };
-    expect(season.id).toBeTruthy();
-    const res = await app.fetch(
-      new Request('https://app.test/api/ratings/anime_seasons/save', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ picks: [], moves: [{ id: season.id, tier: 0 }], done: [] }),
-      }),
-      { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env,
-    );
-    expect(res.status).toBe(200);
-    expect(await logged()).toEqual([]);
-  });
-
-  it('a stale save (409) logs nothing: the activity insert rolls back with the batch', async () => {
-    const e = await mk(A, { title: 'Moved', rating: 8.5 });
-    const spy = spyD1(env.DB);
-    spy.beforeBatch = async () => {
-      await env.DB.prepare('UPDATE entries SET rating_rev = rating_rev + 1 WHERE id = ?').bind(e.id).run();
-    };
-    const res = await save({ moves: [{ id: e.id, tier: 3 }] }, spy.db);
-    expect(res.status).toBe(409);
-    expect(await logged()).toEqual([]);
-  });
-
-  it('a 1000-pick, 1000-move save that logs every title stays within D1 limits (≤ 100 params, ≤ 10 queries)', async () => {
+  it('a 1000-pick save stays within D1 limits (≤ 100 params, ≤ 10 queries)', async () => {
     const user = await (async () => { await feed(A); return (await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(A).first<{ id: string }>())!.id; })();
     const ids = Array.from({ length: 1000 }, () => crypto.randomUUID());
     const stmts = ids.map((id, i) => env.DB.prepare(
-      `INSERT INTO entries (id, user_id, category, title, rating, created_at, updated_at) VALUES (?, ?, 'anime', ?, ?, ?, ?)`,
-    ).bind(id, user, `T${i}`, 6.2 + (i % 8) / 10, new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(), '2026-01-01T00:00:00.000Z'));
+      `INSERT INTO entries (id, user_id, category, title, rating, typed, created_at, updated_at) VALUES (?, ?, 'anime', ?, ?, ?, ?, ?)`,
+    ).bind(id, user, `T${i}`, 6.2 + (i % 8) / 10, 6.2 + (i % 8) / 10, new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(), '2026-01-01T00:00:00.000Z'));
     for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
-    // Every title moves from Fine to Loved: each one logs.
-    const moves = ids.map((id) => ({ id, tier: 3 as Tier }));
-    const picks = Array.from({ length: 1000 }, (_, i) => pick(ids[i]!, ids[(i * 7 + 3) % 1000]!));
+    const picks = Array.from({ length: 1000 }, (_, i) => pick(ids[i]!, ids[(i * 8 + 8) % 1000]!));
     const spy = spyD1(env.DB);
-    const res = await save({ picks, moves }, spy.db);
+    const res = await save({ picks }, spy.db);
     expect(res.status).toBe(200);
     expect(spy.queries).toBeLessThanOrEqual(10);
     expect(spy.maxParams).toBeLessThanOrEqual(100);
-    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM activity WHERE type = 're-rated'").first<{ n: number }>();
-    expect(n!.n).toBe(1000);
+    expect(await logged()).toEqual([]);
   });
 });
 
@@ -448,16 +380,6 @@ describe('posts (S5): post_id written at insert time', () => {
     const r = await rows(e.id);
     expect(r.map((x) => x.type)).toEqual(['added', 'rated']);
     expect(postOf(r[1]!)).toBe(r[0]!.id);
-  });
-
-  it('a ratings save of 3 titles makes 3 posts', async () => {
-    const es = [await mk(A, { title: 'A', rating: 8.5 }), await mk(A, { title: 'B', rating: 8 }), await mk(A, { title: 'C', rating: 7.6 })];
-    await env.DB.exec('DELETE FROM activity');
-    const res = await as(A, '/api/ratings/anime/save', 'POST', { picks: [], moves: es.map((e) => ({ id: e.id, tier: 3 })), done: [] });
-    expect(res.status).toBe(200);
-    const all = (await env.DB.prepare('SELECT id, post_id FROM activity').all<{ id: string; post_id: string | null }>()).results;
-    expect(all).toHaveLength(3);
-    expect(all.every((x) => x.post_id === null)).toBe(true);
   });
 });
 

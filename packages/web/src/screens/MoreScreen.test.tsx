@@ -13,13 +13,13 @@ describe('More (SettingsMore.v2)', () => {
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 
-  it('has the sections Ratings (Compare, Top 5, Stats), Your data and App (What is new, Coming soon, About), and nothing else', async () => {
+  it('has the sections Ratings (Sharpen my ratings, Top 5, Stats), Your data and App (What is new, Coming soon, About), and nothing else', async () => {
     mockApi(makeMe({ isAdmin: false }));
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
       .toEqual(['Ratings', 'Your data', 'App']);
-    expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Compare', 'Top 5', 'Stats']);
+    expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats']);
     expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(["What's new", 'Coming soon', 'About Media Tracker']);
   });
 

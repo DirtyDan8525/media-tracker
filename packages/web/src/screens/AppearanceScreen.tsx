@@ -1,11 +1,10 @@
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
-import { CompareOptions } from './settings/CompareOptions';
 import { CustomColors } from './settings/CustomColors';
 import { ThemePicker } from './settings/ThemePicker';
 import '../design/settings.css';
 
-/** Settings → Appearance and Comparing (SettingsAppearance.v2 / SettingsCustom.v2), reached from More and Settings;
+/** Settings → Appearance (SettingsAppearance.v2 / SettingsCustom.v2), reached from Settings;
  * Back returns to whichever you came from (More when opened directly). */
 export function AppearanceScreen() {
   const me = useSessionMe();
@@ -25,10 +24,6 @@ export function AppearanceScreen() {
           </section>
         )}
 
-        <section aria-labelledby="set-compare" className="group">
-          <h2 id="set-compare" className="group__title">Comparing</h2>
-          <CompareOptions />
-        </section>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { formatRating, type Season } from '@media-tracker/shared';
+import { formatRating, seasonSetOf, type Season } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { entriesKey, entryKey } from '../../data/entryCache';
@@ -9,6 +9,7 @@ import { IconButton } from '../../design/components/IconButton';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
 import { parseRating } from '../../lists/validate';
+import { useCloseCall } from '../sharpen/CloseCallSheet';
 import { DetailField } from './DetailField';
 import type { Entry } from '@media-tracker/shared';
 
@@ -25,6 +26,7 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
   const qc = useQueryClient();
   const toast = useToast();
   const key = seasonsKey(entry.id);
+  const { ask: askClose, element: closeCallSheet } = useCloseCall();
   const { data, isPending, isError } = useQuery({ queryKey: key, queryFn: () => api.get<Season[]>(`/api/entries/${entry.id}/seasons`) });
   const seasons = data ?? [];
 
@@ -45,12 +47,18 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
 
   async function patch(s: Season, body: Partial<Pick<Season, 'label' | 'rating' | 'notes'>>) {
     const before = qc.getQueryData<Season[]>(key) ?? [];
-    set(before.map((x) => (x.id === s.id ? { ...x, ...body } : x)));
+    // A typed number is the truth (N1): it shows at once as both the typed and the shown number.
+    set(before.map((x) => (x.id === s.id ? { ...x, ...body, ...('rating' in body ? { typed: body.rating } : {}) } : x)));
+    let saved: Season;
     try {
-      await retryOnConflict(() => api.patch<Season>(`/api/seasons/${s.id}`, body));
+      saved = await retryOnConflict(() => api.patch<Season>(`/api/seasons/${s.id}`, body));
     } catch { set(before); fail(); return; }
     // A rating write re-fits the season set on the Worker: the other seasons' scores may move too.
-    if ('rating' in body) void refetchAfterSeasonWrite(qc, entry.category, entry.id);
+    if ('rating' in body) {
+      void refetchAfterSeasonWrite(qc, entry.category, entry.id);
+      const seasonSet = seasonSetOf(entry.category);
+      if (seasonSet !== null && saved.rating !== null) void askClose(seasonSet, saved.id);
+    }
   }
   async function remove(s: Season) {
     const before = qc.getQueryData<Season[]>(key) ?? [];
@@ -76,13 +84,17 @@ export function SeasonsEditor({ entry }: { entry: Pick<Entry, 'id' | 'category'>
         <div key={s.id} className="season-row rise-in" style={{ '--i': Math.min(i, 10) } as CSSProperties}>
           <DetailField hideLabel label={`Season ${i + 1} name`} value={s.label} maxLength={100} className="season-row__f"
             check={(v) => (v.trim() === '' ? 'Give the season a name.' : null)} onSave={(label) => void patch(s, { label })} />
-          <DetailField hideLabel label={`Season ${i + 1} rating`} type="number" value={s.rating === null ? '' : String(s.rating)}
+          <DetailField hideLabel label={`Season ${i + 1} rating`} type="number" value={typedOf(s) === null ? '' : String(typedOf(s))}
             placeholder="–" check={(v) => { const p = parseRating(v); return p.ok ? null : p.error; }}
-            onSave={(v) => { const p = parseRating(v); if (p.ok) void patch(s, { rating: p.value }); }} />
+            onSave={(v) => { const p = parseRating(v); if (p.ok && p.value !== typedOf(s)) void patch(s, { rating: p.value }); }} />
           <DetailField hideLabel label={`Season ${i + 1} notes`} value={s.notes} maxLength={5000} placeholder="Notes" onSave={(notes) => void patch(s, { notes })} />
           <IconButton label={`Remove season ${i + 1}`} icon="close" look="plain" onClick={() => void remove(s)} />
         </div>
       ))}
+      {closeCallSheet}
     </section>
   );
 }
+
+/** The number to edit: the typed one (a close call may have nudged the shown `rating`). */
+const typedOf = (s: Season): number | null => s.typed ?? s.rating;

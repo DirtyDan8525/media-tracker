@@ -176,3 +176,15 @@
 .retier__footer { position: sticky; bottom: 0; padding: var(--space-5) var(--space-8) var(--space-8); background: var(--bg); }
 .retier__save { width: 100%; min-height: 56px; }
 @media (prefers-reduced-motion: no-preference) { .retier__sec { transition: border-color .15s, outline-color .15s; } }
+
+/* Number-first close calls (RateClose / Sharpen boards). */
+.close-call { display: flex; flex-direction: column; gap: var(--space-6); }
+.close-call__bar { display: flex; align-items: center; justify-content: space-between; min-height: var(--tap); }
+.close-call__count { font-size: var(--fs-meta); color: var(--muted-text); }
+.close-pair { display: flex; flex-direction: column; gap: var(--space-6); }
+.close-pair__q { margin: 0; font-size: var(--fs-lg); font-weight: 600; color: var(--bright-text); }
+.close-done { display: flex; flex-direction: column; gap: var(--space-4); }
+.close-done__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.close-done__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--tap); color: var(--text); }
+.close-done__num { font-variant-numeric: tabular-nums; color: var(--bright-text); }
+.sharpen { max-width: 680px; }

@@ -234,7 +234,7 @@ describe('DELETE /api/import/:id', () => {
 describe('import and rating tiers', () => {
   const DAN = [10, 9.97, 9.9, 9, 8.99, 8.25, 7.5, 7.49, 6, 5.99, 0.5, 0];
 
-  it('import writes tier, prior and strength; rating unchanged', async () => {
+  it('import keeps every rating exactly; the next sign-in fills typed once (N2), then costs 3 queries', async () => {
     const id = crypto.randomUUID();
     const rows = [
       ...DAN.map((rating, i) => row(i, { category: 'anime', title: `A${i}`, rating })),
@@ -242,26 +242,24 @@ describe('import and rating tiers', () => {
         seasons: [{ label: 'S1', rating: 8.25, notes: '' }, { label: 'S2', rating: 9.97, notes: '' }, { label: 'S3', rating: null, notes: '' }] }),
     ];
     expect((await post(A, id, rows)).status).toBe(200);
+    // Read paths show typed before the backfill.
+    const before = (await (await as(A, '/api/entries?category=anime')).json()) as Entry[];
+    expect(before.filter((e) => e.title !== 'Unrated').map((e) => e.typed)).toEqual(DAN);
+    await as(A, '/api/me');
     const spy = spyD1(env.DB);
-    // Nothing for the backfill to do: import already set the tiers (sign-in + 2 SELECTs).
     await as(A, '/api/me', 'GET', undefined, spy.db);
-    expect(spy.queries).toBe(3);
+    expect(spy.queries).toBe(3); // sign-in + the backfill's 2 SELECTs: nothing left
 
     const list = (await (await as(A, '/api/entries?category=anime')).json()) as Entry[];
     const rated = list.filter((e) => e.title !== 'Unrated');
     expect(rated.map((e) => e.rating)).toEqual(DAN);
+    expect(rated.map((e) => e.typed)).toEqual(DAN);
     expect(rated.map((e) => e.tier)).toEqual([3, 3, 3, 3, 2, 2, 2, 1, 1, 0, 0, 0]);
-    for (const e of rated) {
-      expect(e.priorMean).toBe(priorFromScore(e.rating!, tierRange(DEFAULT_TIERS, e.tier!)));
-      expect(e.strength).toBe(e.priorMean);
-      expect(e.scoreLocked).toBe(false);
-    }
+    for (const e of rated) expect(e).toMatchObject({ priorMean: e.rating, strength: e.rating, scoreLocked: false });
     const u = list.find((e) => e.title === 'Unrated')!;
-    expect(u).toMatchObject({ rating: null, tier: null, priorMean: null, strength: null, scoreLocked: false });
+    expect(u).toMatchObject({ rating: null, typed: null, tier: null, priorMean: null, strength: null, scoreLocked: false });
     const seasons = (await (await as(A, `/api/entries/${u.id}/seasons`)).json()) as Season[];
-    expect(seasons.map((s) => [s.rating, s.tier, s.scoreLocked])).toEqual([[8.25, 2, false], [9.97, 3, false], [null, null, false]]);
-    expect(seasons[0]!.priorMean).toBe(priorFromScore(8.25, [7.5, 9]));
-    expect(seasons[0]!.strength).toBe(seasons[0]!.priorMean);
+    expect(seasons.map((s) => [s.rating, s.typed, s.tier])).toEqual([[8.25, 8.25, 2], [9.97, 9.97, 3], [null, null, null]]);
   });
 
   it("uses the importing user's own tiers for the list (and its seasons)", async () => {

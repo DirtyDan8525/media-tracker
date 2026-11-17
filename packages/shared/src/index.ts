@@ -13,3 +13,4 @@ export * from './avatar';
 export * from './ratings';
 export * from './social';
 export * from './compareFriends';
+export * from './bio';

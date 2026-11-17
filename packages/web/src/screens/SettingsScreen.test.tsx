@@ -37,32 +37,26 @@ describe('SettingsScreen', () => {
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings");
   });
 
-  it('shows the username, and links to Appearance (the theme) and Comparing', async () => {
+  it('shows the username and links to Appearance (the theme)', async () => {
     mockApi(makeMe());
     const { router } = renderApp('/settings');
     expect(await screen.findByText('@dan')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup', { name: 'Theme' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Appearance Midnight' })).toHaveAttribute('href', '/settings/appearance');
-    expect(screen.getByRole('link', { name: 'Comparing Ask: Both' })).toHaveAttribute('href', '/settings/appearance');
     await userEvent.click(screen.getByRole('link', { name: 'Appearance Midnight' }));
     expect(router.state.location.pathname).toBe('/settings/appearance');
     expect(await screen.findByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Comparing' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Comparing' })).not.toBeInTheDocument();
   });
 
-  it('has the rating tier links (Rating tiers, Re-tier review) beside Comparing, reached from Profile', async () => {
+  it('Ratings has one switch and Sharpen my ratings; no tier links (N9), reached from Profile', async () => {
     mockApi(makeMe({}, { anime: false }));
     const { router } = renderApp('/profile');
     await userEvent.click(await screen.findByRole('link', { name: 'Settings' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
-    const section = await screen.findByRole('region', { name: 'Appearance and comparing' });
-    expect(within(section).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Appearance Midnight', 'Rating tiers', 'Re-tier review', 'Comparing Ask: Both',
-    ]);
-    expect(within(section).getByRole('link', { name: 'Rating tiers' })).toHaveAttribute('href', '/settings/tiers');
-    // Re-tier review opens the first enabled list.
-    expect(within(section).getByRole('link', { name: 'Re-tier review' })).toHaveAttribute('href', '/retier/movies');
+    const section = await screen.findByRole('region', { name: 'Ratings' });
+    expect(within(section).getByRole('switch', { name: 'Ask me to compare close ratings' })).toBeChecked();
+    expect(within(section).getAllByRole('link').map((a) => a.textContent)).toEqual(['Sharpen my ratings']);
+    expect(screen.queryByRole('link', { name: /Rating tiers|Re-tier review/ })).not.toBeInTheDocument();
   });
 
   it('changes the username, showing a taken error inline', async () => {

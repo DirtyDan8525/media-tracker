@@ -12,6 +12,8 @@ export interface AppUser {
   avatarAt: string | null;
   createdAt: string | null;
   displayName: string | null;
+  /** Phase 5 (item 17): up to 150 characters, plain text; null when none. */
+  bio: string | null;
   /** A6: pending users may only set up their profile; removed users are signed out. */
   status: UserStatus;
 }
@@ -33,11 +35,12 @@ interface UserRow {
   avatar_at: string | null;
   created_at: string | null;
   display_name: string | null;
+  bio: string | null;
   status: UserStatus;
 }
 
 /** The users columns `toAppUser` reads (prefix each with an alias as needed). */
-export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_at, created_at, display_name, status';
+export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_at, created_at, display_name, bio, status';
 
 const SETTINGS_KEYS = Object.keys(DEFAULT_USER_SETTINGS) as (keyof UserSettings)[];
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -81,6 +84,7 @@ export function toAppUser(row: UserRow, adminEmail: string | undefined): AppUser
     avatarAt: row.avatar_at ?? null,
     createdAt: row.created_at ?? null,
     displayName: row.display_name ?? null,
+    bio: row.bio ?? null,
     status: row.status,
     settings: loadSettings(row.settings_json),
   };

@@ -9,6 +9,8 @@ export interface Me {
   settings: UserSettings;
   avatarAt: string | null;
   displayName: string | null;
+  /** Phase 5 (item 17): up to 150 characters; null or absent when none (rows cached before Phase 5 lack it). */
+  bio?: string | null;
   createdAt: string | null;
   /** Phase 4b (A6): 'pending' until Dan approves; a removed user never gets a /api/me answer. */
   status: 'pending' | 'active' | 'removed';

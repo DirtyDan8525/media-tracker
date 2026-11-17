@@ -55,9 +55,12 @@ describe('list order', () => {
     ] });
     renderApp('/list/anime');
     await screen.findByText('Old');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Release date');
+    // phone: Sort lives in the Filters sheet
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Release date' }));
     expect(titles()).toEqual(['New', 'Old', 'None']);
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Title');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Title' }));
     expect(titles()).toEqual(['New', 'None', 'Old']);
   });
 });
@@ -90,7 +93,7 @@ describe('adding an entry', () => {
     const d = await openAdd(/^Add album$/i);
     await userEvent.type(within(d).getByRole('textbox', { name: 'Album' }), 'Abbey Road');
     await userEvent.type(within(d).getByRole('textbox', { name: /^Artist/ }), 'The Beatles');
-    await userEvent.type(within(d).getByRole('spinbutton', { name: 'or type a number' }), '9.5');
+    await userEvent.type(within(d).getByRole('spinbutton', { name: 'Rating' }), '9.5');
     await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(calls.some((c) => c.path === '/api/lookup')).toBe(true));
     expect(calls.find((c) => c.path === '/api/entries')?.body).toMatchObject({ title: 'Abbey Road', creator: 'The Beatles', rating: 9.5 });
@@ -99,7 +102,7 @@ describe('adding an entry', () => {
     });
   });
 
-  it('leaves a title unrated unless a tier or number is given, and hides empty creator for categories without one', async () => {
+  it('leaves a title unrated unless a number is given, and hides empty creator for categories without one', async () => {
     const { calls } = fakeBackend();
     renderApp('/list/tv');
     const d = await openAdd(/^Add TV show$/i);
@@ -120,7 +123,7 @@ describe('adding an entry', () => {
     renderApp('/list/movies');
     const d2 = await openAdd(/^Add movie$/i);
     expect(within(d2).queryByRole('button', { name: 'Completed' })).not.toBeInTheDocument();
-    expect(within(d2).getByRole('group', { name: 'Tier' })).toBeInTheDocument();
+    expect(within(d2).getByRole('spinbutton', { name: 'Rating' })).toBeInTheDocument();
   });
 
   it('sends the chosen status', async () => {
@@ -523,19 +526,19 @@ describe('search and filters', () => {
     makeEntry({ title: 'Pokémon', rating: 7, status: 'On Hold', genres: 'Adventure' }),
     makeEntry({ title: 'Bleach', rating: 8, status: 'Dropped', genres: 'Action' }),
   ] });
-  // B6: only the PC list has a filter box (the phone uses the global Search screen).
   const openSearch = () => screen.findByRole('searchbox', { name: 'Filter Anime' });
   beforeEach(() => setViewportWidth(1200));
 
-  it('phone: no Search button or field in the list header, and a ?q= is ignored', async () => {
+  it('phone: one row with a search box, a Filters button and the Plan to watch switch; ?q= filters', async () => {
     setViewportWidth(390);
     three();
     renderApp('/list/anime?q=bleach');
-    await screen.findByText('Frieren');
-    expect(titles()).toEqual(['Frieren', 'Bleach', 'Pokémon']);
-    expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
-    expect(screen.getByText('3 titles · 3 rated')).toBeInTheDocument();
+    await screen.findByText('Bleach');
+    expect(titles()).toEqual(['Bleach']);
+    expect(screen.getByRole('searchbox', { name: 'Search Anime' })).toHaveValue('bleach');
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Plan to watch' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText('1 of 3 titles')).toBeInTheDocument();
   });
 
   it('PC still filters with ?q=', async () => {

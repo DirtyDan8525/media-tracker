@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import { validateEntryInput, validateSeasonInput } from '../src/api/entries';
 import type { Env } from '../src/env';
-import { priorFromScore, type Entry, type Season } from '@media-tracker/shared';
+import { type Entry, type Season } from '@media-tracker/shared';
 
 const A = 'a@example.com';
 const B = 'b@example.com';
@@ -303,8 +303,8 @@ describe('seasons', () => {
 
     const pr = await as(A, `/api/seasons/${s.id}`, 'PATCH', { rating: 9, label: 'Season 1' });
     expect(pr.status).toBe(200);
-    const p9 = priorFromScore(9, [9, 10]); // a typed number picks its tier and prior
-    expect(await pr.json()).toEqual({ ...s, rating: 9, label: 'Season 1', tier: 3, priorMean: p9, strength: p9 });
+    // A typed number is the truth (N1): typed = rating = 9, tier from it, prior_mean = typed.
+    expect(await pr.json()).toEqual({ ...s, rating: 9, typed: 9, label: 'Season 1', tier: 3, priorMean: 9, strength: 9 });
     expect((await as(A, `/api/seasons/${s.id}`, 'PATCH', { rating: null })).status).toBe(200);
 
     expect((await as(A, `/api/seasons/${s.id}`, 'DELETE')).status).toBe(204);

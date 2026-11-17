@@ -1,34 +1,30 @@
 import { Hono } from 'hono';
 import {
-  DEFAULT_TIERS,
+  PLAN_STATUS,
   RATINGS_SAVE_MAX_DONE,
   RATINGS_SAVE_MAX_MOVES,
   RATINGS_SAVE_MAX_PICKS,
   RATING_SETS,
-  seasonSetOf,
-  tierRange,
+  closePairs,
+  closeQuestionsFor,
+  countClosePairs,
   tiersFor,
-  validateTierSet,
-  type Category,
+  type CloseItem,
   type Entry,
   type PickInput,
   type RatingSet,
   type SavePayload,
   type Tier,
-  type TierSet,
-  type UserSettings,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
-import {
-  changedOf, isSeasonSet, loadSet, loadSets, planSave, refitTouched, runBatch, setWriteStatements, toSetItem,
-} from '../ratings/store';
-import { activityForRatingsSave, ratingsSaveActivityRows } from './activity';
+import { isSeasonSet, loadSet, loadSets, planSave, runBatch, setWriteStatements, toSetItem, type LoadedItem } from '../ratings/store';
 import { ENTRY_SELECT, rowToEntry, type EntryRow } from './entries';
-import { CATEGORIES, isTier } from './entryValidation';
+import { isTier } from './entryValidation';
 
 /**
- * Tier ratings (spec v1.2 §5.2). Everything here is scoped to the signed-in user: comparisons
- * are never readable or writable by anyone else, and ids that aren't the user's are dropped.
+ * Ratings (number-first, docs/plans/2026-11-16-phase5-number-first.md). Everything here is scoped
+ * to the signed-in user: comparisons are never readable or writable by anyone else, and ids that
+ * aren't the user's are dropped.
  */
 export const ratings = new Hono<AppEnv>();
 
@@ -73,6 +69,47 @@ export function parseSavePayload(body: unknown): SavePayload | null {
   return { picks: outPicks, moves: outMoves, done: done as string[] };
 }
 
+/** Most pairs one Sharpen session loads (N7). */
+export const SHARPEN_MAX_PAIRS = 200;
+
+const closeItem = (i: LoadedItem): CloseItem => ({ id: i.id, title: i.title, typed: i.typed, planned: i.status === PLAN_STATUS });
+
+// 4-13 queries: sign-in (1-3), then 1 batch of 10 (the nine sets' titles, their comparisons). N7.
+// Registered before /:set so the static path is never read as a set name.
+ratings.get('/close-counts', async (c) => {
+  const settings = c.var.user.settings;
+  const loaded = await loadSets(c.env.DB, c.var.user.id, [...RATING_SETS], (s) => tiersFor(settings, s));
+  const counts: Partial<Record<RatingSet, number>> = {};
+  for (const l of loaded) counts[l.set] = countClosePairs(l.items.map(closeItem), l.comparisons);
+  return c.json({ counts });
+});
+
+// 3-5 queries: sign-in (1-3), then 1 batch of 2. A Sharpen session's questions (N7): the set's
+// unanswered close pairs, nearest numbers first, at most SHARPEN_MAX_PAIRS, with their titles.
+ratings.get('/:set/close', async (c) => {
+  const set = c.req.param('set');
+  if (!isSet(set)) return c.json(invalid, 400);
+  const loaded = await loadSet(c.env.DB, c.var.user.id, set, tiersFor(c.var.user.settings, set));
+  const items = loaded.items.map(closeItem);
+  const pairs = closePairs(items, loaded.comparisons, SHARPEN_MAX_PAIRS);
+  const named = new Set(pairs.flat());
+  return c.json({ pairs, total: countClosePairs(items, loaded.comparisons), items: loaded.items.filter((i) => named.has(i.id)).map(toSetItem) });
+});
+
+// 3-5 queries: sign-in (1-3), then 1 batch of 2. The close-call questions after `id` was rated
+// (N6): at most 2 titles close to it, nearest first, never answered, never planned.
+ratings.get('/:set/close/:id', async (c) => {
+  const set = c.req.param('set');
+  if (!isSet(set)) return c.json(invalid, 400);
+  const id = c.req.param('id');
+  const loaded = await loadSet(c.env.DB, c.var.user.id, set, tiersFor(c.var.user.settings, set));
+  const item = loaded.items.find((i) => i.id === id);
+  if (item === undefined) return c.json({ error: 'not_found' }, 404);
+  const others = closeQuestionsFor(id, loaded.items.map(closeItem), loaded.comparisons);
+  const byId = new Map(loaded.items.map((i) => [i.id, i]));
+  return c.json({ item: toSetItem(item), others: others.map((o) => toSetItem(byId.get(o)!)) });
+});
+
 // 3-5 queries: sign-in (1-3), then 1 batch of 2 (the set's titles, its comparisons)
 ratings.get('/:set', async (c) => {
   const set = c.req.param('set');
@@ -81,8 +118,8 @@ ratings.get('/:set', async (c) => {
   return c.json({ items: loaded.items.map(toSetItem), comparisons: loaded.comparisons });
 });
 
-// 3-10 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 5: comparisons INSERT, activity
-// INSERT, set UPDATE, queue DELETE, Entry re-select. Picks, rows and done ids each travel as one JSON
+// 3-9 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 4: comparisons INSERT, set UPDATE,
+// queue DELETE, Entry re-select. Picks, rows and done ids each travel as one JSON
 // parameter, so no statement binds more than 4 parameters however large the save.
 ratings.post('/:set/save', async (c) => {
   const set = c.req.param('set');
@@ -112,16 +149,7 @@ ratings.post('/:set/save', async (c) => {
          FROM json_each(?1)`,
     ).bind(json, userId, set));
   }
-  // Activity (spec §5.2 feed rule): titles this session named (a counted pick or a move) whose
-  // shown score moved by ≥ 0.5 or that changed tier; never rows changed only by the re-fit. Only
-  // list sets: activity rows name entries, so season picks log nothing. Before the set UPDATE,
-  // because each row reads the stored rating as its `from`.
-  if (!isSeasonSet(set)) {
-    const sessionIds = new Set<string>(payload.moves.map((m) => m.id));
-    for (const p of picks) if (!p.undone) sessionIds.add(p.winnerId).add(p.loserId);
-    const logged = ratingsSaveActivityRows(new Map(loaded.items.map((i) => [i.id, i])), changed, sessionIds);
-    if (logged.length > 0) stmts.push(activityForRatingsSave(db, userId, JSON.stringify(logged), new Date(base).toISOString()));
-  }
+  // No activity: a close-call pick moves a score by at most 0.2 (N4), never a feed post.
   stmts.push(...setWriteStatements(db, userId, set, changed, loaded.stored));
   if (payload.done.length > 0) {
     stmts.push(db.prepare('DELETE FROM compare_queue WHERE user_id = ?1 AND entry_id IN (SELECT value FROM json_each(?2))')
@@ -136,69 +164,4 @@ ratings.post('/:set/save', async (c) => {
   const res = stmts.length > 0 ? await runBatch(db, stmts) : [];
   const entries: Entry[] = entryIds.length > 0 ? (res[res.length - 1]!.results as EntryRow[]).map(rowToEntry) : [];
   return c.json({ items: changed.map(toSetItem), entries });
-});
-
-/** The tiers whose score range differs between two tier sets (a names-only change has none). */
-function rangeChanged(a: TierSet, b: TierSet): Tier[] {
-  return ([0, 1, 2, 3] as Tier[]).filter((t) => {
-    const [x0, x1] = tierRange(a, t), [y0, y1] = tierRange(b, t);
-    return x0 !== y0 || x1 !== y1;
-  });
-}
-
-// ≤ 10 queries: sign-in (1-3); when a range changed, 1 batch of 3 (the list's titles, its season
-// tab's titles, their comparisons); then 1 batch of ≤ 4: settings UPDATE, entries UPDATE, seasons
-// UPDATE, Entry re-select.
-//
-// Body `{ tiers: TierSet | null }` (null = back to the defaults; Ruling Q3). Changing a boundary
-// moves no title between tiers: priors stay, and the tiers whose range changed re-fit with
-// `rangeChanged`, so their scores spread over the new range (locked titles keep their numbers).
-// The list's season tab uses the same tiers (Q4) and re-fits with it.
-ratings.put('/tiers/:list', async (c) => {
-  const list = c.req.param('list');
-  if (!CATEGORIES.includes(list as Category)) return c.json(invalid, 400);
-  const cat = list as Category;
-  const body = await readJson(c.req.raw);
-  if (!isPlainObject(body) || !('tiers' in body)) return c.json(invalid, 400);
-  let chosen: TierSet | null = null;
-  if (body.tiers !== null) {
-    chosen = validateTierSet(body.tiers);
-    if (chosen === null) return c.json(invalid, 400);
-  }
-
-  const db = c.env.DB;
-  const userId = c.var.user.id;
-  const current = c.var.user.settings;
-  const oldTiers = tiersFor(current, cat);
-  const newTiers = chosen ?? DEFAULT_TIERS;
-  const tiers = { ...current.tiers };
-  if (chosen === null) delete tiers[cat];
-  else tiers[cat] = chosen;
-  const settings: UserSettings = { ...current, tiers };
-
-  const stmts: D1PreparedStatement[] = [
-    db.prepare('UPDATE users SET settings_json = ? WHERE id = ?').bind(JSON.stringify(settings), userId),
-  ];
-  let entryIds: string[] = [];
-  const touched = rangeChanged(oldTiers, newTiers);
-  if (touched.length > 0) {
-    const sets: RatingSet[] = [cat];
-    const seasons = seasonSetOf(cat);
-    if (seasons !== null) sets.push(seasons);
-    // Rows with no tier yet get theirs from the old tiers, so they too keep their tier.
-    for (const loaded of await loadSets(db, userId, sets, oldTiers)) {
-      const final = refitTouched(loaded.items, loaded.comparisons, newTiers, touched, { rangeChanged: true });
-      const changed = changedOf(final, loaded.stored);
-      stmts.push(...setWriteStatements(db, userId, loaded.set, changed, loaded.stored));
-      if (!isSeasonSet(loaded.set)) entryIds = changed.map((i) => i.id);
-    }
-  }
-  if (entryIds.length > 0) {
-    stmts.push(db.prepare(
-      `${ENTRY_SELECT} WHERE e.user_id = ?2 AND e.id IN (SELECT value FROM json_each(?1)) ORDER BY e.created_at, e.rowid`,
-    ).bind(JSON.stringify(entryIds), userId));
-  }
-  const res = await runBatch(db, stmts);
-  const entries: Entry[] = entryIds.length > 0 ? (res[res.length - 1]!.results as EntryRow[]).map(rowToEntry) : [];
-  return c.json({ settings, entries });
 });

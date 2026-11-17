@@ -1,46 +1,33 @@
-import { COMPARE_ASK } from '@media-tracker/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { makeMe, mockApi, type Call } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 
-
 const puts = (calls: Call[]) => calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings').map((c) => c.body);
-const withSettings = (over: Partial<ReturnType<typeof makeMe>['settings']>) => {
-  const me = makeMe();
-  return makeMe({ settings: { ...me.settings, ...over } });
-};
+const withAsk = (compareAsk: string) => { const me = makeMe(); return makeMe({ settings: { ...me.settings, compareAsk } }); };
+const toggle = async () => within(await screen.findByRole('region', { name: 'Ratings' })).getByRole('switch', { name: 'Ask me to compare close ratings' });
 
-describe('Settings: Comparing', () => {
-  it('shows only "Ask to compare", with its current value and every choice', async () => {
-    mockApi(withSettings({ compareAsk: 'Off' }));
-    renderApp('/settings/appearance');
-    const section = await screen.findByRole('region', { name: 'Comparing' });
-    const ask = within(section).getByRole('combobox', { name: 'Ask to compare' });
-    expect(ask).toHaveValue('Off');
-    expect(within(ask).getAllByRole('option').map((o) => o.textContent)).toEqual([...COMPARE_ASK]);
-    // The Sheet's other three options are gone (Ruling Q1).
-    expect(within(section).getAllByRole('combobox')).toHaveLength(1);
-    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
-    expect(within(section).queryByText(/Re-rating style|no room|Compare within/)).not.toBeInTheDocument();
+describe('Settings: Ask me to compare close ratings (N9)', () => {
+  it.each([['Both', true], ['Only for new ratings', true], ['Only when I start it', false], ['Off', false]])(
+    'compareAsk %s reads as %s', async (ask, on) => {
+      mockApi(withAsk(ask));
+      renderApp('/settings');
+      if (on) expect(await toggle()).toBeChecked(); else expect(await toggle()).not.toBeChecked();
+    });
+
+  it('turning it off saves Off; on saves Both', async () => {
+    const calls = mockApi(withAsk('Both'));
+    renderApp('/settings');
+    await userEvent.click(await toggle());
+    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { compareAsk: 'Off' } }]));
+    await userEvent.click(await toggle());
+    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { compareAsk: 'Off' } }, { settings: { compareAsk: 'Both' } }]));
   });
 
-  it('choosing Only for new ratings saves it', async () => {
-    const calls = mockApi(makeMe());
-    renderApp('/settings/appearance');
-    const select = await screen.findByRole('combobox', { name: 'Ask to compare' });
-    await userEvent.selectOptions(select, 'Only for new ratings');
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { compareAsk: 'Only for new ratings' } }]));
-    expect(select).toHaveValue('Only for new ratings');
-  });
-
-  it('a failed save shows the toast and the old value comes back', async () => {
-    mockApi(makeMe(), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings/appearance');
-    const select = await screen.findByRole('combobox', { name: 'Ask to compare' });
-    await userEvent.selectOptions(select, 'Off');
-    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
-    await waitFor(() => expect(select).toHaveValue('Both'));
+  it('links to Sharpen my ratings', async () => {
+    mockApi(makeMe());
+    renderApp('/settings');
+    expect(within(await screen.findByRole('region', { name: 'Ratings' })).getByRole('link', { name: 'Sharpen my ratings' })).toHaveAttribute('href', '/sharpen');
   });
 });

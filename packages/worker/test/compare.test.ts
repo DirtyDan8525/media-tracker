@@ -32,55 +32,22 @@ const queue = async (email: string) => {
 const setAsk = (email: string, compareAsk: string) =>
   as(email, '/api/me/settings', 'PUT', { settings: { compareAsk } });
 
-// Bulk insert straight into env.DB (users row is created by a first request).
-async function seedEntries(email: string, n: number): Promise<string[]> {
-  await as(email, '/api/compare/queue');
-  const u = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
-  const ids = Array.from({ length: n }, () => crypto.randomUUID());
-  const now = new Date().toISOString();
-  const stmts = [];
-  for (let i = 0; i < n; i += 10) {
-    const chunk = ids.slice(i, i + 10);
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO entries (id, user_id, category, title, created_at, updated_at) VALUES ${chunk.map(() => "(?, ?, 'anime', 't', ?, ?)").join(', ')}`,
-      ).bind(...chunk.flatMap((id) => [id, u!.id, now, now])),
-    );
-  }
-  await env.DB.batch(stmts);
-  return ids;
-}
-
 afterEach(async () => {
   await env.DB.exec('DELETE FROM users');
 });
 
+// Rows put straight into the queue (old clients filled it; nothing does now, Ruling N9).
+async function enqueue(email: string, entryId: string): Promise<void> {
+  const u = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
+  await env.DB.prepare('INSERT INTO compare_queue (user_id, entry_id, added_at) VALUES (?, ?, ?)')
+    .bind(u!.id, entryId, new Date().toISOString()).run();
+}
+
 describe('compare queue', () => {
-  it('queues a hand-typed rating and moves a re-rated title to the end', async () => {
-    const e1 = await mk(A);
-    const e2 = await mk(A);
-    await rate(A, e1.id, 8);
-    await rate(A, e2.id, 7);
-    await rate(A, e1.id, 8.5);
-    expect((await queue(A)).map((i) => i.entryId)).toEqual([e2.id, e1.id]);
-  });
-
-  it('queues on create with a rating, and reports the category', async () => {
-    const e = await mk(A, { rating: 9 });
-    expect(await queue(A)).toEqual([{ entryId: e.id, category: 'anime' }]);
-  });
-
-  it('queues when compareAsk is "Only for new ratings"', async () => {
-    await setAsk(A, 'Only for new ratings');
-    const e = await mk(A);
-    await rate(A, e.id, 6);
-    expect((await queue(A)).length).toBe(1);
-  });
-
-  it('does not queue when compareAsk is "Only when I start it" or "Off"', async () => {
-    for (const ask of ['Only when I start it', 'Off']) {
+  it('is no longer filled (N9): not by a typed rating, a create with a rating, or any Ask setting', async () => {
+    for (const ask of ['Both', 'Only for new ratings', 'Only when I start it', 'Off']) {
       expect((await setAsk(A, ask)).status).toBe(200);
-      const e = await mk(A);
+      const e = await mk(A, { rating: 9 });
       await rate(A, e.id, 8);
       expect(await queue(A)).toEqual([]);
     }
@@ -98,18 +65,11 @@ describe('compare queue', () => {
     expect(await queue(A)).toEqual([]);
   });
 
-  it('keeps only the 50 most recent', async () => {
-    const ids = await seedEntries(A, 52);
-    for (const id of ids) expect((await rate(A, id, 5)).status).toBe(200);
-    const q = (await queue(A)).map((i) => i.entryId);
-    expect(q).toEqual(ids.slice(2));
-  });
-
   it('hides queued titles that were unrated; deleting the entry removes them', async () => {
-    const e1 = await mk(A);
-    const e2 = await mk(A);
-    await rate(A, e1.id, 8);
-    await rate(A, e2.id, 7);
+    const e1 = await mk(A, { rating: 8 });
+    const e2 = await mk(A, { rating: 7 });
+    await enqueue(A, e1.id);
+    await enqueue(A, e2.id);
     await rate(A, e1.id, null);
     expect((await queue(A)).map((i) => i.entryId)).toEqual([e2.id]);
     await as(A, `/api/entries/${e2.id}`, 'DELETE');
@@ -120,6 +80,8 @@ describe('compare queue', () => {
 
   it('DELETE /queue/:entryId is 204, also when absent, and only touches your own row', async () => {
     const e = await mk(A, { rating: 8 });
+    await enqueue(A, e.id);
+    await as(B, '/api/compare/queue');
     expect((await as(B, `/api/compare/queue/${e.id}`, 'DELETE')).status).toBe(204);
     expect((await queue(A)).length).toBe(1);
     expect((await as(A, `/api/compare/queue/${e.id}`, 'DELETE')).status).toBe(204);
@@ -137,6 +99,6 @@ describe('compare save (deleted)', () => {
     }
     const row = await env.DB.prepare('SELECT rating FROM entries WHERE id = ?').bind(e.id).first<{ rating: number }>();
     expect(row!.rating).toBe(4);
-    expect((await queue(A)).map((i) => i.entryId)).toEqual([e.id]);
+    expect(await queue(A)).toEqual([]);
   });
 });

@@ -1,14 +1,11 @@
 import {
-  listOfSet, seasonSetOf, type Category, type Entry, type RatingSet, type SavePayload, type SetItem, type TierSet,
+  listOfSet, seasonSetOf, type Category, type Entry, type RatingSet, type SavePayload, type SetItem,
   type Comparison, type UserSettings,
 } from '@media-tracker/shared';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
-import type { Me } from '../api/types';
-import { COMPARE_QUEUE_KEY } from './compare';
 import { entryKey, writeEntry } from './entryCache';
 import { refreshCategories } from './useEntries';
-import { ME_KEY, normalizeMe, storeMe } from './useMe';
 
 /** GET /api/ratings/:set */
 export interface RatingSetData { items: SetItem[]; comparisons: Comparison[] }
@@ -75,8 +72,8 @@ async function refreshParents(qc: QueryClient, category: Category): Promise<void
 export type SaveResult = 'ok' | 'conflict' | 'failed';
 
 /**
- * Saves a rating session. Writes the returned entries to the entry cache and invalidates the set,
- * the queue and, for season sets, the seasons (a season save returns `entries: []`, so the parent
+ * Saves picks. Writes the returned entries to the entry cache and invalidates the set, the
+ * close-call counts and, for season sets, the seasons (a season save returns `entries: []`, so the parent
  * entries are refetched for their season average). Reloads and retries once on a 409.
  */
 export async function saveRatingsResult(qc: QueryClient, set: RatingSet, payload: SavePayload): Promise<SaveResult> {
@@ -90,7 +87,7 @@ export async function saveRatingsResult(qc: QueryClient, set: RatingSet, payload
   // Saved on the Worker: a cache write that throws must not report a failure (the reload below fixes the cache).
   writeEntries(qc, res.entries, listOfSet(set));
   void qc.invalidateQueries({ queryKey: ratingSetKey(set) });
-  void qc.invalidateQueries({ queryKey: COMPARE_QUEUE_KEY });
+  void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
   if (isSeasons(set)) {
     void qc.invalidateQueries({ queryKey: ['seasons'] });
     await refreshParents(qc, listOfSet(set));
@@ -103,42 +100,61 @@ export async function saveRatings(qc: QueryClient, set: RatingSet, payload: Save
   return (await saveRatingsResult(qc, set, payload)) === 'ok';
 }
 
+// ---- Close calls (number-first, docs/plans/2026-11-16-phase5-number-first.md N6, N7) ----------
+
+/** "Ask me to compare close ratings" (Ruling N9): on for Both and Only for new ratings. */
+export const askCloseCalls = (settings: Pick<UserSettings, 'compareAsk'>): boolean =>
+  settings.compareAsk === 'Both' || settings.compareAsk === 'Only for new ratings';
+
+/** GET /api/ratings/:set/close/:id: the title just rated and at most 2 close titles to ask about. */
+export interface CloseFor { item: SetItem; others: SetItem[] }
+export const fetchCloseFor = (set: RatingSet, id: string): Promise<CloseFor> =>
+  api.get<CloseFor>(`/api/ratings/${encodeURIComponent(set)}/close/${encodeURIComponent(id)}`);
+
+/** GET /api/ratings/:set/close: a Sharpen session's pairs, nearest numbers first. */
+export interface ClosePairsData { pairs: [string, string][]; total: number; items: SetItem[] }
+export const closePairsKey = (set: RatingSet) => ['close-pairs', set] as const;
+export function useClosePairs(set: RatingSet | null) {
+  return useQuery({
+    queryKey: closePairsKey(set ?? 'anime'),
+    queryFn: () => api.get<ClosePairsData>(`/api/ratings/${encodeURIComponent(set!)}/close`),
+    enabled: set !== null,
+    // A session works from the pairs as they were when it opened; reopening loads them fresh.
+    staleTime: Infinity, gcTime: 0,
+  });
+}
+
+export const CLOSE_COUNTS_KEY = ['close-counts'] as const;
+/** GET /api/ratings/close-counts: unanswered close pairs per rating set. */
+export function useCloseCounts() {
+  return useQuery({
+    queryKey: CLOSE_COUNTS_KEY,
+    queryFn: async () => (await api.get<{ counts: Partial<Record<RatingSet, number>> }>('/api/ratings/close-counts')).counts,
+  });
+}
+
+export interface ClosePick { winnerId: string; loserId: string; isTie: boolean }
+
 /**
- * Sets a list's tiers (null = the defaults). Writes the returned entries and settings; the list's
- * set and its seasons set reload. Reloads and retries once on a 409. False on failure.
+ * Saves one close-call answer at once (N6). Returns the titles whose shown numbers changed, or
+ * null when it failed (after one retry on a 409). Writes the returned entries to the caches.
  */
-export async function saveTiers(qc: QueryClient, list: Category, tiers: TierSet | null): Promise<boolean> {
-  let res: { settings: UserSettings; entries: Entry[] };
+export async function saveClosePick(qc: QueryClient, set: RatingSet, pick: ClosePick): Promise<SetItem[] | null> {
+  let res: { items: SetItem[]; entries: Entry[] };
   try {
-    res = await withConflictRetry(qc, list, () =>
-      api.put<{ settings: UserSettings; entries: Entry[] }>(`/api/ratings/tiers/${encodeURIComponent(list)}`, { tiers }));
+    res = await withConflictRetry(qc, set, () => api.post<{ items: SetItem[]; entries: Entry[] }>(
+      `/api/ratings/${encodeURIComponent(set)}/save`, { picks: [{ ...pick, undone: false }], moves: [], done: [] }));
   } catch {
-    return false;
+    return null;
   }
-  writeEntries(qc, res.entries, list);
-  try {
-    const prev = qc.getQueryData<Me>(ME_KEY);
-    if (prev) {
-      const next = normalizeMe({ ...prev, settings: res.settings });
-      qc.setQueryData(ME_KEY, next);
-      await storeMe(next);
-    } else {
-      void qc.invalidateQueries({ queryKey: ME_KEY });
-    }
-  } catch {
-    // Settings are saved on the Worker; a local cache write failing only leaves ME_KEY to refetch.
-    void qc.invalidateQueries({ queryKey: ME_KEY });
-  }
-  void qc.invalidateQueries({ queryKey: ratingSetKey(list) });
-  const seasons = seasonSetOf(list);
-  if (seasons !== null) {
-    // The Worker re-fitted the season tab too but returns no season rows: reload the seasons and
-    // the parent entries (their season averages).
-    void qc.invalidateQueries({ queryKey: ratingSetKey(seasons) });
+  writeEntries(qc, res.entries, listOfSet(set));
+  void qc.invalidateQueries({ queryKey: ratingSetKey(set) });
+  void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
+  if (isSeasons(set)) {
     void qc.invalidateQueries({ queryKey: ['seasons'] });
-    await refreshParents(qc, list);
+    void refreshParents(qc, listOfSet(set));
   }
-  return true;
+  return res.items;
 }
 
 /** Writes returned rows to the caches; if that throws, the list is reloaded instead. */

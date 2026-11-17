@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import {
   CATEGORY_CONFIG,
+  PLAN_ORDER_MAX,
+  PLAN_STATUS,
   findDuplicate,
   seasonSetOf,
   tiersFor,
@@ -14,9 +16,8 @@ import {
 import type { AppEnv } from '../auth/user';
 import {
   applyRatingEdit, loadSet, loadSets, planEdit, planRemove, ratedFields, rowToComparison, runBatch, setWriteStatements,
-  tierFieldsFor, type LoadedItem, type RatingEdit,
+  tierFieldsFor, typedOf, type LoadedItem, type RatingEdit,
 } from '../ratings/store';
-import { enqueueStatements } from './compare';
 import { activityForCreate, activityForPatch } from './activity';
 import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
 
@@ -37,10 +38,13 @@ export interface EntryRow {
   source: Entry['source']; source_id: string | null; lookup_state: Entry['lookupState'];
   import_id: string | null; season_avg: number | null; created_at: string; updated_at: string;
   tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
+  plan_order: number | null;
+  typed: number | null;
 }
 export interface SeasonRow {
   id: string; entry_id: string; label: string; rating: number | null; notes: string; created_at: string;
   tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
+  typed: number | null;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -54,6 +58,7 @@ export function rowToEntry(r: EntryRow): Entry {
     typedTitle: r.typed_title,
     status: r.status,
     rating: r.rating,
+    typed: r.typed ?? null,
     genres: r.genres,
     creator: r.creator,
     album: r.album,
@@ -75,6 +80,7 @@ export function rowToEntry(r: EntryRow): Entry {
     priorMean: r.prior_mean,
     strength: r.strength,
     scoreLocked: r.score_locked === 1,
+    planOrder: r.plan_order ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -82,7 +88,7 @@ export function rowToEntry(r: EntryRow): Entry {
 
 export function rowToSeason(r: SeasonRow): Season {
   return {
-    id: r.id, entryId: r.entry_id, label: r.label, rating: r.rating, notes: r.notes,
+    id: r.id, entryId: r.entry_id, label: r.label, rating: r.rating, typed: r.typed ?? null, notes: r.notes,
     tier: r.tier, priorMean: r.prior_mean, strength: r.strength, scoreLocked: r.score_locked === 1,
   };
 }
@@ -113,14 +119,14 @@ function splitRating<T extends { rating?: number | null; tier?: Tier; scoreLocke
 
 const unrated = (id: string, kind: LoadedItem['kind'], title: string): LoadedItem => ({
   id, kind, title, cover: '', square: false, status: null,
-  rating: null, tier: null, priorMean: null, strength: null, scoreLocked: false,
+  rating: null, typed: null, tier: null, priorMean: null, strength: null, scoreLocked: false,
 });
-const RATED_COLS = ['rating', 'tier', 'prior_mean', 'strength', 'score_locked'];
-const ratedValues = (i: RatedItem) => [i.rating, i.tier, i.priorMean, i.strength, i.scoreLocked ? 1 : 0];
+const RATED_COLS = ['rating', 'typed', 'tier', 'prior_mean', 'strength', 'score_locked'];
+const ratedValues = (i: RatedItem) => [i.rating, i.typed ?? null, i.tier, i.priorMean, i.strength, i.scoreLocked ? 1 : 0];
 
 /**
  * A rating edit on a title already stored: applied to its row as loaded with its set, then the
- * old and new tiers re-fit (Ruling Q9). Null when the edit changes nothing (e.g. the number
+ * whole set re-fits number-first (Rulings Q9, N10). Null when the edit changes nothing (e.g. the number
  * re-sent unchanged), 'invalid', or the statements and the title's final state.
  */
 async function editStored(
@@ -148,22 +154,69 @@ async function readJson(req: Request): Promise<unknown> {
 }
 
 /**
- * Q10 on read paths: a rated row the lazy backfill hasn't reached yet shows the tier, prior and
- * strength it will get (the same pure derivation), without writing anything.
+ * On read paths: a rated row the lazy backfill hasn't reached yet shows the tier it would get and
+ * its typed number (Rulings Q10, N2), without writing anything.
  */
 export function deriveEntry(e: Entry, settings: Pick<UserSettings, 'tiers'>): Entry {
-  if (e.tier !== null || e.rating === null) return e;
-  return { ...e, ...tierFieldsFor(e.rating, tiersFor(settings, e.category)) };
+  if (e.rating === null) return e;
+  const tiers = tiersFor(settings, e.category);
+  const withTier = e.tier !== null ? e : { ...e, ...tierFieldsFor(e.rating, tiers) };
+  return withTier.typed != null ? withTier : { ...withTier, typed: typedOf(rowFields(e), tiers) };
 }
 export function deriveSeason(s: Season, category: Category, settings: Pick<UserSettings, 'tiers'>): Season {
-  if (s.tier !== null || s.rating === null) return s;
-  return { ...s, ...tierFieldsFor(s.rating, tiersFor(settings, category)) };
+  if (s.rating === null) return s;
+  const tiers = tiersFor(settings, category);
+  const withTier = s.tier !== null ? s : { ...s, ...tierFieldsFor(s.rating, tiers) };
+  return withTier.typed != null ? withTier : { ...withTier, typed: typedOf(rowFields(s), tiers) };
 }
+const rowFields = (x: Pick<Entry, 'rating' | 'typed' | 'tier' | 'priorMean' | 'strength' | 'scoreLocked'>) =>
+  ({ rating: x.rating, typed: x.typed, tier: x.tier, prior_mean: x.priorMean, strength: x.strength, score_locked: x.scoreLocked ? 1 : 0 });
 
 async function loadEntry(db: D1Database, id: string, userId: string, settings: UserSettings): Promise<Entry | null> {
   const row = await db.prepare(`${ENTRY_SELECT} WHERE e.id = ? AND e.user_id = ?`).bind(id, userId).first<EntryRow>();
   return row ? deriveEntry(rowToEntry(row), settings) : null;
 }
+
+/**
+ * Plan to watch order (item 15). A title that is planned and has no place yet goes to the bottom
+ * (max + 1 in its list); one that is not planned has none. Both statements are no-ops when they
+ * don't apply, so they can follow any write that may have changed the status.
+ */
+function planOrderStatements(db: D1Database, userId: string, id: string, status: Entry['status'] | undefined): D1PreparedStatement[] {
+  if (status === undefined) return [];
+  if (status !== PLAN_STATUS) {
+    return [db.prepare('UPDATE entries SET plan_order = NULL WHERE id = ? AND user_id = ? AND plan_order IS NOT NULL').bind(id, userId)];
+  }
+  return [db.prepare(
+    `UPDATE entries SET plan_order = (
+       SELECT COALESCE(MAX(o.plan_order), 0) + 1 FROM entries o
+       WHERE o.user_id = entries.user_id AND o.category = entries.category AND o.status = ?3 AND o.id <> entries.id)
+     WHERE id = ?1 AND user_id = ?2 AND status = ?3 AND plan_order IS NULL`,
+  ).bind(id, userId, PLAN_STATUS)];
+}
+
+// 2 queries, plus sign-in (1-3): the count of your planned titles among the ids, then one UPDATE with json_each.
+// Registered before /entries/:id (a different method today, but a static path should never be shadowed).
+entries.put('/entries/plan-order', async (c) => {
+  const body = (await readJson(c.req.raw)) as { category?: unknown; ids?: unknown } | null;
+  const category = body?.category;
+  const ids = body?.ids;
+  if (typeof category !== 'string' || !CATEGORIES.includes(category as Category)) return c.json(invalid, 400);
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > PLAN_ORDER_MAX) return c.json(invalid, 400);
+  if (!ids.every((i) => typeof i === 'string' && i !== '') || new Set(ids).size !== ids.length) return c.json(invalid, 400);
+  const db = c.env.DB;
+  const userId = c.var.user.id;
+  const json = JSON.stringify(ids);
+  const found = await db.prepare(
+    `SELECT COUNT(*) AS n FROM entries WHERE user_id = ?1 AND category = ?2 AND status = ?3 AND id IN (SELECT value FROM json_each(?4))`,
+  ).bind(userId, category, PLAN_STATUS, json).first<{ n: number }>();
+  if (found?.n !== ids.length) return c.json(invalid, 400);
+  await db.prepare(
+    `UPDATE entries SET plan_order = j.key + 1 FROM json_each(?4) j
+     WHERE entries.id = j.value AND entries.user_id = ?1 AND entries.category = ?2 AND entries.status = ?3`,
+  ).bind(userId, category, PLAN_STATUS, json).run();
+  return c.body(null, 204);
+});
 
 // 1 query
 entries.get('/entries', async (c) => {
@@ -184,7 +237,7 @@ entries.get('/entries/:id', async (c) => {
 });
 
 // 3 queries, plus sign-in (1-3): duplicate candidates, insert + activity, re-select. A rated title
-// (a number or a tier) adds loadSet (2) and, in the insert's batch, the set UPDATE [+ enqueue, trim]: ≤ 9.
+// adds loadSet (2) and, in the insert's batch, the set UPDATE: ≤ 9.
 entries.post('/entries', async (c) => {
   const body = await readJson(c.req.raw);
   const category = (body as { category?: unknown } | null)?.category;
@@ -204,7 +257,7 @@ entries.post('/entries', async (c) => {
     lookupState: rest.lookupState ?? 'pending',
   };
 
-  // A typed number or a tier alone (Q8: tier needs no rating); a tier alone starts in the middle.
+  // A typed number (N10; a tier alone is ignored).
   const tiers = tiersFor(c.var.user.settings, cat);
   const fresh = unrated(id, 'entry', values.title!);
   const edited = applyRatingEdit(fresh, edit, tiers);
@@ -216,9 +269,9 @@ entries.post('/entries', async (c) => {
     .all<{ id: string; title: string; creator: string }>();
   const duplicateOf = findDuplicate(existing, { id, title: values.title!, creator: values.creator ?? '' }, cat);
 
-  // A new title can change its neighbours' shown scores (the two-decimal rule), so its tier re-fits.
+  // A new title can change its neighbours' shown scores (the two-decimal rule), so its set re-fits.
   let setStmts: D1PreparedStatement[] = [];
-  if (rated.tier !== null) {
+  if (rated.typed != null) {
     const loaded = await loadSet(db, userId, cat, tiers);
     const { changed, item } = planEdit(loaded, rated as LoadedItem, tiers);
     rated = item;
@@ -229,29 +282,28 @@ entries.post('/entries', async (c) => {
   const cols = ['id', 'user_id', 'category', ...keys.map((k) => COLUMNS[k]), ...RATED_COLS, 'created_at', 'updated_at'];
   const insert = db.prepare(`INSERT INTO entries (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
     .bind(id, userId, cat, ...keys.map((k) => dbValue(values[k])), ...ratedValues(rated), now, now);
-  // A tier-only rating counts as a new rating for the queue (Q15).
-  const queued = rated.rating !== null ? enqueueStatements(db, userId, id, c.var.user.settings.compareAsk) : [];
-  // Activity records the final rating (the middle score for a tier-only add, or the re-fitted
-  // value). It goes after the INSERT (foreign key); re-fitted neighbours in setStmts log nothing.
+  // Activity records the final rating (the re-fitted value). It goes after the INSERT (foreign
+  // key); re-fitted neighbours in setStmts log nothing. The compare queue is no longer filled (N9).
+  const queued: D1PreparedStatement[] = [];
   const logged = activityForCreate(db, userId, id, {
     rating: rated.rating !== null ? rated.rating : edit.rating,
     status: values.status,
   }, now);
-  await runBatch(db, [insert, logged, ...setStmts, ...queued]);
+  await runBatch(db, [insert, logged, ...setStmts, ...queued, ...planOrderStatements(db, userId, id, values.status)]);
 
   const entry = await loadEntry(db, id, userId, c.var.user.settings);
   return c.json({ entry, duplicateOf }, 201);
 });
 
 // 3 queries, plus sign-in (1-3): owner row, [activity x0-2,] update, re-select. A rating edit that
-// changes something adds loadSet (2) and, in the update's batch, the set UPDATE [+ enqueue, trim]: ≤ 8.
+// changes something adds loadSet (2) and, in the update's batch, the set UPDATE: ≤ 8.
 entries.patch('/entries/:id', async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
   const userId = c.var.user.id;
-  const owned = await db.prepare('SELECT category, rating, tier, prior_mean, strength, score_locked FROM entries WHERE id = ? AND user_id = ?')
+  const owned = await db.prepare('SELECT category, rating, typed, tier, prior_mean, strength, score_locked FROM entries WHERE id = ? AND user_id = ?')
     .bind(id, userId)
-    .first<{ category: Category; rating: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number }>();
+    .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number }>();
   if (!owned) return c.json(notFound, 404);
 
   const v = validateEntryInput(await readJson(c.req.raw), 'patch', owned.category);
@@ -259,9 +311,9 @@ entries.patch('/entries/:id', async (c) => {
   const { rest, edit, hasEdit } = splitRating(v.value);
 
   let ratingStmts: D1PreparedStatement[] = [];
-  let queued: D1PreparedStatement[] = [];
-  // The edited title's final rating, when the edit changed it (a typed number, re-fitted or not,
-  // or a tier-chip move). Neighbours re-written by ratingStmts never log.
+  const queued: D1PreparedStatement[] = [];
+  // The edited title's final rating, when a retype changed it (re-fitted or not). Neighbours
+  // re-written by ratingStmts never log.
   let loggedRating: number | undefined;
   if (hasEdit) {
     const tiers = tiersFor(c.var.user.settings, owned.category);
@@ -271,11 +323,7 @@ entries.patch('/entries/:id', async (c) => {
     if (r === 'gone') return c.json(notFound, 404);
     if (r !== null) {
       ratingStmts = r.stmts;
-      const ratingEdit = 'rating' in edit || edit.tier !== undefined;
-      if (ratingEdit && r.item.rating !== null && r.item.rating !== r.before.rating) loggedRating = r.item.rating;
-      // A newly typed number, or a first tier for an unrated title, joins the queue (Q15).
-      const isNew = (typeof edit.rating === 'number' && edit.rating !== r.before.rating) || (r.before.rating === null && r.item.rating !== null);
-      if (isNew) queued = enqueueStatements(db, userId, id, c.var.user.settings.compareAsk);
+      if (r.item.rating !== null && r.item.rating !== r.before.rating) loggedRating = r.item.rating;
     }
   }
 
@@ -287,7 +335,7 @@ entries.patch('/entries/:id', async (c) => {
   // Activity rows compare against the stored row, so they go first: before the update and the
   // set UPDATE in ratingStmts, in the same batch.
   const logged = activityForPatch(db, userId, id, { rating: loggedRating, status: rest.status }, now);
-  await runBatch(db, [...logged, update, ...ratingStmts, ...queued]);
+  await runBatch(db, [...logged, update, ...ratingStmts, ...queued, ...('status' in rest ? planOrderStatements(db, userId, id, rest.status) : [])]);
   return c.json(await loadEntry(db, id, userId, c.var.user.settings));
 });
 
@@ -334,11 +382,11 @@ entries.get('/entries/:id/seasons', async (c) => {
 });
 
 const seasonOf = (base: Pick<Season, 'id' | 'entryId' | 'label' | 'notes'>, r: RatedItem): Season => ({
-  ...base, rating: r.rating, tier: r.tier, priorMean: r.priorMean, strength: r.strength, scoreLocked: r.scoreLocked,
+  ...base, rating: r.rating, typed: r.typed ?? null, tier: r.tier, priorMean: r.priorMean, strength: r.strength, scoreLocked: r.scoreLocked,
 });
 
 // 2 queries, plus sign-in (1-3): owner, insert. A rated season adds loadSet of its season tab (2)
-// and the set UPDATE in the same batch: ≤ 5. Seasons never join the queue.
+// and the set UPDATE in the same batch: ≤ 5.
 entries.post('/entries/:id/seasons', async (c) => {
   const entryId = c.req.param('id');
   const db = c.env.DB;
@@ -358,14 +406,14 @@ entries.post('/entries/:id/seasons', async (c) => {
   if (edited === 'invalid') return c.json(invalid, 400);
   let rated: RatedItem = edited ?? fresh;
   let setStmts: D1PreparedStatement[] = [];
-  if (rated.tier !== null) {
+  if (rated.typed != null) {
     const loaded = await loadSet(db, userId, set, tiers);
     const { changed, item } = planEdit(loaded, rated as LoadedItem, tiers);
     rated = item;
     setStmts = setWriteStatements(db, userId, set, changed.filter((i) => i.id !== base.id), loaded.stored);
   }
   await runBatch(db, [
-    db.prepare(`INSERT INTO seasons (id, entry_id, label, notes, ${RATED_COLS.join(', ')}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    db.prepare(`INSERT INTO seasons (id, entry_id, label, notes, ${RATED_COLS.join(', ')}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(base.id, entryId, base.label, base.notes, ...ratedValues(rated), new Date().toISOString()),
     ...setStmts,
   ]);

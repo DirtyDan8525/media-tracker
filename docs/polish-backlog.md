@@ -50,3 +50,11 @@ Minor items that were noticed and deliberately not fixed (lean mode, 2026-11-16)
 ## Reported by Dan (2026-11-16)
 - ~~Entry detail on phone: Rating and Status tiles squished~~ — fixed: stacked below 640px.
 - **Checked:** the Phase 4 server folds 6 re-rates into one post (test `rerate.test.ts`); likely seen on the older version. Recheck after deploying Phase 4. Original report: re-rating Invincible several times before settling on 9.6 made 5–6 Activity posts. Edits to one title within 10 minutes should fold into one post (S5). Check which version was deployed and which path wrote the rows (detail PATCH, slider, or a Compare save).
+
+## Phase 5
+- Profile and Stats still show Loved/Liked counts (derived from the typed number) though tiers left the rest of the UI; replace with number bands or remove.
+- e2e: the first-run walkthrough once covered the Add button on Pixel 7 (passed on rerun); make the helper wait for and dismiss it reliably.
+- Titles fitted under Phase 3c get their typed number from the fitted value (a 10 may show 9.97); Dan can retype.
+- Sharpen on PC is only in Settings; add it to the side nav.
+- Home: tap Home on a list to scroll to top; Add-to could remember the last list; Activity's + opens the sheet in place.
+- Imported planned titles have no Plan to watch position until first reorder (listed last by date added).

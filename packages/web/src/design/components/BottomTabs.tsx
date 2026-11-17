@@ -3,17 +3,17 @@ import { SEARCH_PATH } from '../../nav';
 import { Icon } from './Icon';
 
 /** Screens reached from More: its tab stays current there. */
-const MORE_PATHS = ['/more', '/import', '/about', '/top5', '/stats'];
+const MORE_PATHS = ['/more', '/import', '/about', '/top5', '/stats', '/sharpen'];
 
 /** The unread count as shown: the server caps it at 99, which reads "99+". */
 export const countText = (n: number): string => (n > 99 ? '99+' : String(n));
 
 /**
- * Phone bottom bar (Home board): Home, Activity, Search (raised, centre), Compare (slot 4 is always
- * Compare, decisions 2026-11-15 Amendments), More. Five equal columns. Home (`/`) opens the last list
- * shown, so it is the current tab on every list screen. Add is the floating bubble (AddBubble).
+ * Phone bottom bar (Home board): Home, Activity, Search (raised), More. Four equal columns; Compare
+ * left with tiers (number-first, Ruling N9: Sharpen my ratings is in More). Home (`/`) opens the
+ * last list shown, so it is the current tab on every list screen. Add is the floating bubble (AddBubble).
  */
-export function BottomTabs({ compareCount, activityCount = 0 }: { compareCount: number; activityCount?: number }) {
+export function BottomTabs({ activityCount = 0 }: { activityCount?: number }) {
   const { pathname } = useLocation();
   const moreCurrent = MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const homeCurrent = pathname === '/' || pathname.startsWith('/list/');
@@ -33,13 +33,6 @@ export function BottomTabs({ compareCount, activityCount = 0 }: { compareCount: 
       <NavLink to={SEARCH_PATH} className="bottom-tabs__item bottom-tabs__search">
         <span className="bottom-tabs__search-circle"><Icon name="search" size={24} /></span>
         <span>Search</span>
-      </NavLink>
-      <NavLink to="/compare" className="bottom-tabs__item" aria-label={compareCount > 0 ? `Compare, ${compareCount} waiting` : undefined}>
-        <span className="bottom-tabs__icon">
-          <Icon name="compare" size={22} />
-          {compareCount > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{compareCount}</span>}
-        </span>
-        <span>Compare</span>
       </NavLink>
       <Link to="/more" className={`bottom-tabs__item${moreCurrent ? ' active' : ''}`} aria-current={moreCurrent ? 'page' : undefined}>
         <Icon name="more" size={22} />

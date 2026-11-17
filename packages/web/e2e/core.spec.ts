@@ -63,18 +63,18 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
   await expect(page.getByLabel('Rating 9.5').first()).toBeVisible();
 });
 
-// Adds an anime through the Add sheet with a typed rating (it joins the compare queue).
+// Adds an anime through the Add sheet with a typed rating.
 async function addRatedAnime(page: Page, title: string, rating: string) {
   await page.goto('/list/anime');
   await openAddAnime(page);
   await page.getByLabel('Title').fill(title);
-  await page.getByLabel('or type a number').fill(rating);
+  await page.getByRole('spinbutton', { name: 'Rating' }).fill(rating);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('link', { name: new RegExp(title, 'i') }).first()).toBeVisible();
 }
 
 // Makes sure an (unrated) anime with this title exists, through the API, so a test does not depend on what
-// an earlier test left behind. Unrated, so it never joins the compare queue.
+// an earlier test left behind.
 async function ensureAnime(page: Page, title: string) {
   const res = await page.request.get('/api/entries?category=anime');
   const rows = (await res.json()) as { title: string }[];
@@ -83,68 +83,50 @@ async function ensureAnime(page: Page, title: string) {
   expect(made.ok()).toBeTruthy();
 }
 
-const banner = (page: Page) => page.getByTestId('compare-banner-status');
+type Row = { id: string; title: string; rating: number | null; typed: number | null };
+const animeRows = async (page: Page) => (await (await page.request.get('/api/entries?category=anime')).json()) as Row[];
+const ratingOf = async (page: Page, re: RegExp) => (await animeRows(page)).find((r) => re.test(r.title))!;
 
-test('Compare: three new Liked ratings are placed and saved; a stopped run changes nothing', async ({ page }) => {
+test('close call: a second 3.0 asks "Which did you like more?" right after Add; the pick nudges both (3.02 / 2.98)', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
-  await ensureAnime(page, 'Frieren'); // the list checks below look for it
+  await addRatedAnime(page, 'bleach', '3');
+  // Nothing else sits within 0.3 of 3.0 yet: no sheet.
+  await expect(page.getByRole('dialog', { name: 'Close call' })).toBeHidden();
+  await addRatedAnime(page, 'naruto', '3');
 
-  // Start from an empty queue (the first test left a rating in it), so the count is exactly the three.
-  const queue = async () => ((await (await page.request.get('/api/compare/queue')).json()) as { items: { entryId: string }[] }).items;
-  for (const q of await queue()) expect((await page.request.delete(`/api/compare/queue/${q.entryId}`)).ok()).toBeTruthy();
+  const sheet = page.getByRole('dialog', { name: 'Close call' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('Which did you like more?')).toBeVisible();
+  await expect(sheet.getByText('1 of 1')).toBeVisible();
+  await sheet.getByRole('button', { name: /^Naruto/i }).click();
+  await expect(sheet.getByText('Nudged to break the tie.')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await expect(sheet).toBeHidden();
 
-  await addRatedAnime(page, 'bleach', '8');
-  await addRatedAnime(page, 'naruto', '8.1');
-  await addRatedAnime(page, 'trigun', '8.2');
+  const n = await ratingOf(page, /naruto/i), b = await ratingOf(page, /bleach/i);
+  expect([n.rating, n.typed, b.rating, b.typed]).toEqual([3.02, 3, 2.98, 3]);
+  await expect(page.getByLabel('Rating 3.02').first()).toBeVisible();
+});
 
-  await page.goto('/list/anime');
-  await expect(banner(page)).toContainText('3 new ratings to double-check');
+test('Sharpen my ratings (More): asks only the close pairs, then the list is all clear', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  // Trigun 3.1 is close to Bleach and Naruto (both typed 3.0); added through the API, so nothing is asked yet.
+  const made = await page.request.post('/api/entries', { data: { category: 'anime', title: 'Trigun', rating: 3.1 } });
+  expect(made.ok()).toBeTruthy();
 
-  // Compare: place each title, always answering with the first card, then save every review.
-  await banner(page).getByRole('link', { name: 'Compare' }).click();
-  const firstCard = page.getByRole('group', { name: 'Pick the better one' }).getByRole('button').first();
-  const save = page.getByRole('button', { name: /^Save (new ratings|picks)$/ });
-  const onward = page.getByRole('button', { name: /^(Close|Next)$/ });
-  const home = page.getByRole('heading', { level: 1, name: 'Fix my ratings' });
-  await expect(firstCard).toBeVisible(); // the first run has started (the loading screen has the home's heading too)
-  for (let i = 0; i < 100; i++) {
-    await expect(firstCard.or(save).or(onward).or(home).first()).toBeVisible();
-    // The home shows briefly between two runs while the next title loads: only an empty queue means done.
-    if (await home.isVisible()) {
-      if ((await queue()).length === 0) break;
-      await page.waitForTimeout(200);
-      continue;
-    }
-    if (await firstCard.isVisible()) await firstCard.click();
-    else if (await save.isVisible()) await save.click();
-    else await onward.click();
-  }
-  await expect(home).toBeVisible();
-
-  // Back on the list the banner is gone: the count is back to where it started.
-  await page.goto('/list/anime');
-  await expect(page.getByRole('link', { name: /Frieren/ }).first()).toBeVisible();
-  await expect(banner(page).getByText(/new rating/)).toBeHidden();
-  expect(await queue()).toEqual([]);
-
-  // Compare → Anime → Liked → one pick → "Belongs in another tier" → Loved → Stop and review → Don't save.
-  const entries = async () => JSON.stringify(await (await page.request.get('/api/entries?category=anime')).json());
-  const before = await entries();
-
-  await page.goto('/compare');
-  await page.getByRole('button', { name: /^Anime \(\d+\)$/ }).click();
-  await page.getByRole('button', { name: /^Liked \d+ titles?$/ }).click();
-  await expect(firstCard).toBeVisible();
-  await firstCard.click();
-  await expect(firstCard).toBeVisible(); // the next question
-  await page.getByRole('button', { name: /^Belongs in another tier/ }).first().click();
-  await page.getByRole('menuitem', { name: /^Loved/ }).click();
-  await page.getByRole('button', { name: 'Stop and review' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'New ratings' })).toBeVisible();
-  await page.getByRole('button', { name: "Don't save" }).click();
-  await expect(home).toBeVisible();
-
-  expect(await entries()).toEqual(before);
+  await page.goto('/more');
+  await page.getByRole('link', { name: 'Sharpen my ratings' }).click();
+  await expect(page.getByText('Pick a list. Only close ratings come up.')).toBeVisible();
+  await page.getByRole('link', { name: 'Anime, 2 close calls' }).click();
+  await expect(page.getByText('Close call 1 of 2')).toBeVisible();
+  await page.getByRole('button', { name: 'About the same' }).click();
+  await expect(page.getByText('Close call 2 of 2')).toBeVisible();
+  await page.getByRole('button', { name: 'About the same' }).click();
+  await expect(page.getByText('That was the last one')).toBeVisible();
+  await page.getByRole('main').getByRole('button', { name: 'Done' }).last().click();
+  await expect(page.getByRole('link', { name: 'Anime, 0 — all clear' })).toBeVisible();
+  // "About the same" never reorders: Trigun keeps its number.
+  expect((await ratingOf(page, /trigun/i)).rating).toBe(3.1);
 });
 
 test('search finds Frieren: the phone\'s bottom-bar Search, the PC list\'s filter box', async ({ page }) => {
@@ -229,29 +211,30 @@ test('Activity (You) shows "You added Frieren to Anime", reached from the Main n
   await expect(page.getByText(/You\s+added\s+Frieren\s+to\s+Anime/).first()).toBeVisible();
 });
 
-test('tier flow: add a title by tapping Loved; its tier shows on the entry and in the Profile tier counts', async ({ page }) => {
+test('number flow: a typed 9.7 counts as Loved in the Profile tier counts; Planned titles have no rating field', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
-  const lovedCount = async () =>
-    ((await (await page.request.get('/api/entries?category=anime')).json()) as { rating: number | null; tier: number | null }[])
-      .filter((e) => e.rating !== null && e.tier === 3).length;
+  const lovedCount = async () => (await animeRows(page)).filter((e) => e.rating !== null && e.rating >= 9).length;
   const before = await lovedCount();
 
-  await page.goto('/list/anime');
-  await openAddAnime(page);
-  await page.getByLabel('Title').fill('Monster');
-  await page.getByRole('group', { name: 'Tier' }).getByRole('button', { name: /^Loved/ }).click();
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByRole('link', { name: /Monster/i }).first()).toBeVisible();
+  await addRatedAnime(page, 'Monster', '9.7');
   expect(await lovedCount()).toBe(before + 1);
 
-  // The entry shows the tier it was added in.
+  // The entry has the Rating field (holding 9.7) and no tier chips or Lock.
   await page.getByRole('link', { name: /Monster/i }).first().click();
-  await expect(page.getByRole('group', { name: 'Tier' }).getByRole('button', { name: /^Loved/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'Rating' })).toHaveValue('9.7');
+  await expect(page.getByRole('group', { name: 'Tier' })).toHaveCount(0);
+  await expect(page.getByRole('switch', { name: 'Lock score' })).toHaveCount(0);
 
   // Profile: the tier bar and its line count it (Loved comes first in the line).
   await page.goto('/profile');
   await expect(page.getByRole('img', { name: new RegExp(`^Loved ${before + 1} · `) })).toBeVisible();
-  await expect(page.getByText(new RegExp(`^Loved ${before + 1} · Liked \\d+ · Fine \\d+ · Didn't like \\d+$`))).toBeVisible();
+
+  // The Add sheet hides the rating field for a planned title.
+  await page.goto('/list/anime');
+  await openAddAnime(page);
+  await expect(page.getByRole('spinbutton', { name: 'Rating' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Add' }).getByRole('button', { name: 'Plan to watch' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Rating' })).toHaveCount(0);
 });
 
 test('Profile → Log out ends the session (POST /api/auth/logout)', async ({ page }) => {

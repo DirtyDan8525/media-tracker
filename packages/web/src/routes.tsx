@@ -14,7 +14,6 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AppearanceScreen } from './screens/AppearanceScreen';
-import { TierEditor } from './screens/settings/TierEditor';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
 import { JoinScreen } from './screens/auth/JoinScreen';
@@ -31,32 +30,17 @@ const EntryDetail = lazy(() => import('./screens/EntryDetail').then((m) => ({ de
 // Import pulls in the spreadsheet reader, which the rest of the app never needs.
 const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ default: m.ImportScreen })));
 
-// Compare (and the shared engine it runs) only loads when opened.
-const CompareScreen = lazy(() => import('./screens/CompareScreen').then((m) => ({ default: m.CompareScreen })));
+// Sharpen my ratings (and its close-call cards) only loads when opened.
+const SharpenScreen = lazy(() => import('./screens/sharpen/SharpenScreen').then((m) => ({ default: m.SharpenScreen })));
 
-// Re-tier review loads on demand too.
-const RetierScreen = lazy(() => import('./screens/RetierScreen').then((m) => ({ default: m.RetierScreen })));
-
-function RetierRoute() {
+function SharpenRoute() {
   return (
     <Suspense fallback={
       <div className="screen" aria-busy="true" aria-label="Loading">
         <div className="screen__body"><Skeleton height={80} /></div>
       </div>
     }>
-      <RetierScreen />
-    </Suspense>
-  );
-}
-
-function CompareRoute() {
-  return (
-    <Suspense fallback={
-      <div className="screen" aria-busy="true" aria-label="Loading">
-        <div className="screen__body"><Skeleton height={80} /></div>
-      </div>
-    }>
-      <CompareScreen />
+      <SharpenScreen />
     </Suspense>
   );
 }
@@ -117,13 +101,15 @@ export const routes: RouteObject[] = [
           { path: 'add/:code', element: <AddByCodeScreen /> },
           { path: 'u/:username', element: <FriendProfile /> },
           { path: 'u/:username/entry/:id', element: <FriendEntryDetail /> },
-          { path: 'compare', element: <CompareRoute /> },
-          { path: 'retier/:set', element: <RetierRoute /> },
+          { path: 'sharpen', element: <SharpenRoute /> },
+          // Compare and Re-tier review left with tiers (Ruling N9): old links land on Sharpen.
+          { path: 'compare', element: <Navigate to="/sharpen" replace /> },
+          { path: 'retier/:set', element: <Navigate to="/sharpen" replace /> },
           { path: 'top5', element: <Top5Screen /> },
           { path: 'stats', element: <StatsScreen /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'settings/appearance', element: <AppearanceScreen /> },
-          { path: 'settings/tiers', element: <TierEditor /> },
+          { path: 'settings/tiers', element: <Navigate to="/settings" replace /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'whats-new', element: <WhatsNewScreen /> },
           { path: 'more', element: <MoreScreen /> },

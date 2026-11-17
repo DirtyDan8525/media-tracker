@@ -27,10 +27,13 @@ export interface RatedItem {
   /** The last fitted strength (= priorMean when the title has no counted picks). */
   strength: number | null;
   scoreLocked: boolean;
+  /** The number typed or imported: the truth (number-first, Ruling N1). Absent on 3c-era callers. */
+  typed?: number | null;
 }
 
 /** A rated item with what a rating screen shows. */
 export interface SetItem extends RatedItem {
+  typed: number | null;
   cover: string;
   square: boolean;
   status: Status | null;

@@ -18,11 +18,14 @@ import { useCurrentList } from '../shell/currentList';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import '../design/search.css';
+import { searchable, useUserSearch } from '../data/social';
+import { PeopleList } from './social/PeopleList';
+import { useDebounced } from './social/parts';
 
 /** Results per list before "Show N more". */
 const GROUP_LIMIT = 50;
 
-/** Global search (route /search): titles, creators, albums and genres across the lists, or just the current one. */
+/** Global search (route /search): people (Add / view profile) plus titles, creators, albums and genres across the lists, or just the current one. */
 export function SearchScreen() {
   const me = useSessionMe();
   const qc = useQueryClient();
@@ -49,6 +52,7 @@ export function SearchScreen() {
   const q = deferred.trim();
   const groups = useMemo(() => searchEntries(data, lists, deferred), [data, lists, deferred]);
   const loaded = lists.filter((c) => data[c]).length;
+  const people = usePeople(q);
 
   const setScope = (v: (typeof SEARCH_SCOPE)[number]) => { if (me.settings.searchScope !== v) save.mutate({ searchScope: v }); };
 
@@ -56,7 +60,7 @@ export function SearchScreen() {
   // Spoken politely when the result changes; empty while there is nothing to say yet.
   let announce = '';
   if (!q) {
-    body = <p className="search-hint">Search titles, creators, albums and genres.</p>;
+    body = <p className="search-hint">Search people, titles, creators, albums and genres.</p>;
   } else if (isError && loaded === 0) {
     body = (
       <EmptyState icon="info" title="Couldn't load your lists" body="Check your connection and try again."
@@ -64,6 +68,9 @@ export function SearchScreen() {
     );
   } else if (isPending && groups.length === 0 && lists.some((c) => !data[c])) {
     body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /></div>;
+  } else if (groups.length === 0 && people.length > 0) {
+    announce = `${people.length} ${people.length === 1 ? 'person' : 'people'}`;
+    body = null;
   } else if (groups.length === 0) {
     announce = 'No matches';
     body = (
@@ -111,11 +118,11 @@ export function SearchScreen() {
       <PageHeader title="Search" profile>
         <div className="search-screen__controls">
           <div className="search">
-            <label htmlFor="search-q" className="sr-only">Search your lists</label>
+            <label htmlFor="search-q" className="sr-only">Search people and your lists</label>
             <span className="search__icon" aria-hidden="true"><Icon name="search" size={20} /></span>
             <input
               id="search-q" ref={inputRef} type="search" className="search__input" autoComplete="off" spellCheck={false}
-              placeholder="Search your lists" value={text} onChange={(e) => setText(e.target.value)}
+              placeholder="Search people and your lists" value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Escape' && text) { e.preventDefault(); clear(); } }}
             />
             {text && (
@@ -132,6 +139,12 @@ export function SearchScreen() {
       </PageHeader>
       <div className="screen__body">
         <p role="status" aria-live="polite" className="sr-only">{announce}</p>
+        {people.length > 0 && (
+          <section aria-labelledby="search-people" className="search-group">
+            <h2 id="search-people" className="search-group__title">{`People · ${people.length}`}</h2>
+            <PeopleList users={people} label="People" linkProfiles />
+          </section>
+        )}
         {body}
       </div>
     </div>
@@ -154,4 +167,12 @@ function ResultRow({ entry: e }: { entry: Entry }) {
       </Link>
     </li>
   );
+}
+
+/** People whose username starts with the search (2+ characters, "@" optional): Add, or tap to view their profile. */
+function usePeople(q: string) {
+  const query = useDebounced(q);
+  const ok = query !== '' && searchable(query);
+  const search = useUserSearch(query, ok);
+  return ok ? search.data ?? [] : [];
 }

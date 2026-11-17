@@ -17,14 +17,33 @@ describe('SearchScreen', () => {
   it('an empty field shows the hint text', async () => {
     fakeBackend({ entries: sample() });
     renderApp('/search');
-    expect(await screen.findByText('Search titles, creators, albums and genres.')).toBeInTheDocument();
-    expect(screen.getByRole('searchbox', { name: 'Search your lists' })).toHaveFocus();
+    expect(await screen.findByText('Search people, titles, creators, albums and genres.')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search people and your lists' })).toHaveFocus();
+  });
+
+  it('typing a username shows People with Add and a link to their profile', async () => {
+    const { calls } = fakeBackend({
+      entries: sample(),
+      extra: {
+        'GET /api/users/search': { body: [{ id: 'id-ren', username: 'ren', displayName: 'Ren', avatarAt: null }] },
+        'GET /api/friends': { body: { friends: [], incoming: [], outgoing: [] } },
+        'POST /api/friends/requests': { body: { relation: 'pending_out' } },
+      },
+    });
+    renderApp('/search');
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search people and your lists' }), '@re');
+    const people = await screen.findByRole('list', { name: 'People' });
+    expect(screen.getByRole('heading', { name: 'People · 1' })).toBeInTheDocument();
+    expect(within(people).getByRole('link', { name: 'View @ren' })).toHaveAttribute('href', '/u/ren');
+    await userEvent.click(within(people).getByRole('button', { name: 'Add @ren' }));
+    expect(await within(people).findByText('Requested')).toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/api/users/search?q=re')).toBe(true);
   });
 
   it('typing "fri" shows Frieren under "Anime" and not Bleach, and the URL gets ?q=fri', async () => {
     fakeBackend({ entries: sample() });
     const { router } = renderApp('/search');
-    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search your lists' }), 'fri');
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search people and your lists' }), 'fri');
     const link = await screen.findByRole('link', { name: /Frieren/ });
     expect(link).toHaveAttribute('href', expect.stringMatching(/^\/entry\//));
     expect(screen.getByRole('heading', { name: 'Anime · 1' })).toBeInTheDocument();
@@ -38,7 +57,7 @@ describe('SearchScreen', () => {
     fakeBackend({ entries: sample() });
     renderApp('/search?q=bleach');
     expect(await screen.findByRole('link', { name: /Bleach/ })).toBeInTheDocument();
-    expect(screen.getByRole('searchbox', { name: 'Search your lists' })).toHaveValue('bleach');
+    expect(screen.getByRole('searchbox', { name: 'Search people and your lists' })).toHaveValue('bleach');
   });
 
   it('the toggle "All lists | Anime" saves searchScope current and narrows to the current list', async () => {
@@ -112,7 +131,7 @@ describe('SearchScreen', () => {
   it('announces the result count politely, and "No matches" when there are none', async () => {
     fakeBackend({ entries: sample() });
     renderApp('/search');
-    const input = await screen.findByRole('searchbox', { name: 'Search your lists' });
+    const input = await screen.findByRole('searchbox', { name: 'Search people and your lists' });
     await userEvent.type(input, 'fri');
     const live = await screen.findByText('2 results', { selector: '[role="status"]' });
     expect(live).toHaveAttribute('aria-live', 'polite');
@@ -124,7 +143,7 @@ describe('SearchScreen', () => {
   it('the loading placeholder has no aria-label on a role-less element', async () => {
     fakeBackend({ entries: sample(), extra: { 'GET /api/entries': () => new Promise(() => {}) } });
     const { container } = renderApp('/search?q=fri');
-    await screen.findByRole('searchbox', { name: 'Search your lists' });
+    await screen.findByRole('searchbox', { name: 'Search people and your lists' });
     await waitFor(() => expect(container.querySelector('.screen__body [aria-busy="true"]')).not.toBeNull());
     expect(container.querySelectorAll('.screen__body div[aria-label]:not([role])')).toHaveLength(0);
   });

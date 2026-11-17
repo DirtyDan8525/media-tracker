@@ -27,9 +27,10 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
   const [category, setCategory] = useState<Category>(initial);
   const cfg = CATEGORY_CONFIG[category];
   const lists = enabledLists(me.settings);
-  const ids = { title: useId(), creator: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
+  const ids = { title: useId(), creator: useId(), notes: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
   const [title, setTitle] = useState('');
   const [creator, setCreator] = useState('');
+  const [notes, setNotes] = useState('');
   /** The number box's text. */
   const [typed, setTyped] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
@@ -42,6 +43,7 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
     if (!canAdd) return;
     const input: AddInput = { title: title.trim(), creator: cfg.creatorLabel ? creator.trim() : '', status: cfg.hasStatus ? status : null, category };
     if (rating !== null) input.rating = rating;
+    if (notes.trim()) input.notes = notes.trim();
     onSubmit(input);
     onClose();
   }
@@ -118,6 +120,14 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
             </div>
           </fieldset>
         )}
+
+        <div className="field">
+          <label className="field-label" htmlFor={ids.notes}>
+            Note <span className="field-label__opt">(optional)</span>
+          </label>
+          <textarea id={ids.notes} className="input" rows={2} maxLength={5000} value={notes}
+            placeholder="Anything you want to remember" onChange={(e) => setNotes(e.target.value)} />
+        </div>
       </form>
     </Sheet>
   );

@@ -17,6 +17,8 @@ export interface AddInput {
   status?: Status | null;
   /** The list to add to (the Add sheet's "Add to"); default: the list the hook was made for. */
   category?: Category;
+  /** A note typed in the Add sheet (Dan, 2026-11-17). */
+  notes?: string;
 }
 
 export type AddState = 'idle' | 'looking' | 'choose' | 'saved';
@@ -104,6 +106,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
     const creator = cfg.creatorLabel ? (input.creator ?? '').trim() : '';
     const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: 'pending' };
     if (creator) body.creator = creator;
+    if (input.notes) body.notes = input.notes;
     if (cfg.hasStatus && input.status) body.status = input.status;
     if (input.rating !== undefined && input.rating !== null && body.status !== PLAN_STATUS) body.rating = input.rating;
 
@@ -112,7 +115,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
     const tempId = `tmp-${++tempCounter}`;
     const temp: Entry = {
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
-      rating: (body.rating as number | undefined) ?? null, typed: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: '',
+      rating: (body.rating as number | undefined) ?? null, typed: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: input.notes ?? '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
       source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
     };

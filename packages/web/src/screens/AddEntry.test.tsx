@@ -65,6 +65,17 @@ describe('the Add sheet: number-first rating (AddRate board)', () => {
     expect(posts(calls)[0]).not.toHaveProperty('tier');
   });
 
+  it('an optional Note is sent with the new title', async () => {
+    const { calls } = fakeBackend({ me: meWith() });
+    renderApp('/list/anime');
+    const d = await openAdd();
+    await typeTitle(d);
+    await userEvent.type(within(d).getByRole('textbox', { name: 'Note (optional)' }), 'rec from Ren');
+    await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]).toMatchObject({ title: 'Frieren', notes: 'rec from Ren' });
+  });
+
   it('a number outside 0–10 shows the rating error and blocks Add', async () => {
     const { calls } = fakeBackend({ me: meWith() });
     renderApp('/list/anime');

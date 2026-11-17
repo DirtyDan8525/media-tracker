@@ -106,7 +106,7 @@ describe('adding an entry', () => {
     const { calls } = fakeBackend();
     renderApp('/list/tv');
     const d = await openAdd(/^Add TV show$/i);
-    expect(within(d).queryByRole('textbox', { name: /optional/ })).not.toBeInTheDocument();
+    expect(within(d).queryByRole('textbox', { name: /^(?!Note).*optional/ })).not.toBeInTheDocument();
     await userEvent.type(within(d).getByRole('textbox', { name: 'Title' }), 'Dark');
     await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(calls.some((c) => c.path === '/api/entries' && c.method === 'POST')).toBe(true));

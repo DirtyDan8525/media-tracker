@@ -59,3 +59,7 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 ## Later (Dan, 2026-11-16)
 20. **Previews:** play a song preview (~30 s clip, e.g. from the iTunes Search API's preview URLs) and movie/TV/game trailers (e.g. TMDB videos → YouTube embed) on a title's page.
 21. **Restaurants list** (later): a new list for places — name, cuisine, area/city, status (Want to try / Been), rating, notes, maybe a map link. Fits the Phase 6 list builder; a lookup source for places (e.g. a maps/places API) would need its own key.
+
+## Progress and profile (Dan, 2026-11-16)
+22. **Episode progress** (like AniList): a "Progress" column in the PC list (e.g. "7 / 24") with − and + buttons, shown while a title is in progress (Watching / Reading); the same − / + control on the title's page on phones. Total from the lookup when known (episodes; chapters for manga), otherwise just the count. Reaching the total offers "Mark as Completed".
+23. **Profile on PC:** the banner should be taller; overall the PC profile needs a better layout.

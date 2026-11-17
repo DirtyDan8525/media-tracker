@@ -58,3 +58,4 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 
 ## Later (Dan, 2026-11-16)
 20. **Previews:** play a song preview (~30 s clip, e.g. from the iTunes Search API's preview URLs) and movie/TV/game trailers (e.g. TMDB videos → YouTube embed) on a title's page.
+21. **Restaurants list** (later): a new list for places — name, cuisine, area/city, status (Want to try / Been), rating, notes, maybe a map link. Fits the Phase 6 list builder; a lookup source for places (e.g. a maps/places API) would need its own key.

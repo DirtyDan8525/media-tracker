@@ -54,3 +54,6 @@
 
 ## Admin powers wireframes — approved 2026-11-17
 - `AdminHome`, `AdminSwitches`, `AdminLook`, `AdminContent`, `AdminTools` (`*.wf.dc.html`) approved with no changes (docs/plans/2026-11-17-phase6c-admin.md).
+
+## Friends tab and PC nav wireframes — approved 2026-11-17
+- `FriendsHub`, `MessagesFromFriends`, `PCNav` (`*.wf.dc.html`) approved with **option B**: Messages is a floating speech-bubble button bottom-right on the Friends tab (with unread badge), not a top-bar button. The top bar keeps Add friend.

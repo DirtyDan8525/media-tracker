@@ -679,6 +679,27 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Admin numbers, lookup tools, backup"
+    },
+    "FriendsHub.wf.dc.html": {
+      "x": 0,
+      "y": 24200,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Friends hub (tab 4)"
+    },
+    "MessagesFromFriends.wf.dc.html": {
+      "x": 470,
+      "y": 24200,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Messages from Friends"
+    },
+    "PCNav.wf.dc.html": {
+      "x": 940,
+      "y": 24200,
+      "w": 1440,
+      "h": 900,
+      "title": "Wireframe · PC side nav + Friends page"
     }
   },
   "order": [
@@ -775,7 +796,10 @@
     "AdminSwitches.wf.dc.html",
     "AdminLook.wf.dc.html",
     "AdminContent.wf.dc.html",
-    "AdminTools.wf.dc.html"
+    "AdminTools.wf.dc.html",
+    "FriendsHub.wf.dc.html",
+    "MessagesFromFriends.wf.dc.html",
+    "PCNav.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -1058,6 +1082,13 @@
       "text": "Wireframes — Admin powers (for Dan's review)",
       "kind": "title1",
       "maxW": 2300
+    },
+    "wffh": {
+      "x": 0,
+      "y": 24000,
+      "text": "Wireframes — Friends tab and PC nav (for Dan's review)",
+      "kind": "title1",
+      "maxW": 2400
     }
   },
   "designSystems": [],
@@ -1105,6 +1136,7 @@
     "wfp5r",
     "wfp5b",
     "wfp6m",
-    "wfp6a"
+    "wfp6a",
+    "wffh"
   ]
 }

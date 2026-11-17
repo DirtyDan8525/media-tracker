@@ -7,6 +7,8 @@ export interface EditableCellProps<T> {
   label: string;
   /** Names the button that starts editing (e.g. "Rating for Frieren: 9.5"). */
   viewLabel: string;
+  /** Shown on hover (e.g. the full note behind "…"). On the button: its ::after hit area covers the text. */
+  hoverText?: string;
   view: ReactNode;
   /** The text the editor starts with. */
   initial: string;
@@ -25,7 +27,7 @@ export interface EditableCellProps<T> {
  * cancels. A select saves as soon as an option is picked. An invalid value shows an inline error
  * (and is dropped, not saved, if focus leaves).
  */
-export function EditableCell<T>({ label, viewLabel, view, initial, col, kind, options, validate, onSave, maxLength }: EditableCellProps<T>) {
+export function EditableCell<T>({ label, viewLabel, hoverText, view, initial, col, kind, options, validate, onSave, maxLength }: EditableCellProps<T>) {
   const errId = useId();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(initial);
@@ -77,7 +79,7 @@ export function EditableCell<T>({ label, viewLabel, view, initial, col, kind, op
 
   if (!editing) {
     return (
-      <button ref={button} type="button" className="cell-btn" data-nav={col} aria-label={viewLabel} onClick={start}>
+      <button ref={button} type="button" className="cell-btn" data-nav={col} aria-label={viewLabel} title={hoverText || undefined} onClick={start}>
         {view}
       </button>
     );

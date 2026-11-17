@@ -450,6 +450,7 @@ describe('PC table', () => {
     expect(await screen.findByRole('button', { name: 'Status for Mob Psycho: On Hold' })).toBeInTheDocument();
     expect(lastPatch(calls)?.body).toEqual({ status: 'On Hold' });
 
+    expect(screen.getByRole('button', { name: 'Notes for Mob Psycho: wow' })).toHaveAttribute('title', 'wow'); // hover shows the full note
     await userEvent.click(screen.getByRole('button', { name: 'Notes for Mob Psycho: wow' }));
     const notes = screen.getByRole('textbox', { name: 'Notes for Mob Psycho' });
     await userEvent.clear(notes);

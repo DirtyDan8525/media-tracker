@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, formatRating, statusLabel, type Entry, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, PROGRESS_CATEGORIES, STATUSES, formatRating, showsProgress, statusLabel, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
@@ -10,6 +10,7 @@ import { useToast } from '../../design/components/Toast';
 import { StatusPill } from '../../design/components/StatusPill';
 import { parseRating } from '../../lists/validate';
 import { EditableCell } from './EditableCell';
+import { ProgressControl, progressText } from './ProgressControl';
 import { LookupNote } from './LookupNote';
 import { PrivateLock } from './PrivateLock';
 import { stagger, type RowActions } from './EntryCards';
@@ -39,6 +40,7 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
   const first = rows[0];
   if (!first) return null;
   const cfg = CATEGORY_CONFIG[first.category];
+  const hasProgress = PROGRESS_CATEGORIES.includes(first.category);
   return (
     <div className="table-wrap">
       <table className="entry-table" aria-label={label}>
@@ -48,6 +50,7 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
             <th scope="col" className="col-rating">Rating</th>
             <th scope="col">Title</th>
             {cfg.hasStatus && <th scope="col">Status</th>}
+            {hasProgress && <th scope="col" className="col-progress">Progress</th>}
             <th scope="col">Genres</th>
             {cfg.creatorLabel && <th scope="col">{cfg.creatorLabel}</th>}
             {showSeasonAvg && <th scope="col">Season Avg</th>}
@@ -55,14 +58,14 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
           </tr>
         </thead>
         <tbody onKeyDown={onGridKeyDown}>
-          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={showSeasonAvg} {...actions} />)}
+          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={showSeasonAvg} hasProgress={hasProgress} {...actions} />)}
         </tbody>
       </table>
     </div>
   );
 }
 
-function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean } & RowActions) {
+function TableRow({ entry: e, index, showSeasonAvg, hasProgress, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean } & RowActions) {
   const qc = useQueryClient();
   const toast = useToast();
   const cfg = CATEGORY_CONFIG[e.category];
@@ -106,6 +109,13 @@ function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry
           ) : (e.status && <StatusPill status={e.status} category={e.category} />)}
         </td>
       )}
+      {hasProgress && (
+        <td className="col-progress">
+          {editable && showsProgress(e)
+            ? <ProgressControl entry={e} />
+            : (e.progress ?? 0) > 0 && <span className="muted">{progressText(e.progress!, e.progressTotal)}</span>}
+        </td>
+      )}
       <td className="muted">{e.genres}</td>
       {cfg.creatorLabel && <td>{e.creator}</td>}
       {showSeasonAvg && <td className="muted">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
@@ -114,7 +124,8 @@ function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry
           <EditableCell
             col="notes" kind="text" label={`Notes for ${e.title}`} maxLength={5000}
             viewLabel={`Notes for ${e.title}: ${e.notes || 'empty'}`}
-            view={e.notes ? <span className="cell-notes" title={e.notes}>{e.notes}</span> : <span className="muted">Add a note</span>}
+            hoverText={e.notes}
+            view={e.notes ? <span className="cell-notes">{e.notes}</span> : <span className="muted">Add a note</span>}
             initial={e.notes}
             validate={(raw) => ({ ok: true, value: raw })} onSave={(notes) => save({ notes })}
           />

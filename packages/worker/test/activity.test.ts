@@ -530,7 +530,7 @@ describe('unread (S8)', () => {
     await befriend(A, B);
     const mine = await mk(A, { title: 'Mine', rating: 6 });
     expect((await as(A, '/api/activity/seen', 'POST')).status).toBe(204);
-    expect(await unread(A)).toEqual({ feed: 0, requests: 0 });
+    expect(await unread(A)).toEqual({ feed: 0, requests: 0, messages: 0 });
 
     // Push the seen time back so the writes below are clearly newer.
     await env.DB.prepare('UPDATE users SET feed_seen_at = ? WHERE email = ?').bind('2000-01-01T00:00:00.000Z', A).run();
@@ -546,14 +546,14 @@ describe('unread (S8)', () => {
       env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '🔥', ?3), ('r2', ?1, ?4, '🔥', ?3)")
         .bind(mine.id, a, at(0), b),
     ]);
-    expect(await unread(A)).toEqual({ feed: 3, requests: 0 }); // Theirs + B's comment + B's reaction
+    expect(await unread(A)).toEqual({ feed: 3, requests: 0, messages: 0 }); // Theirs + B's comment + B's reaction
 
     expect((await as(A, '/api/activity/seen', 'POST')).status).toBe(204);
     const seen = await env.DB.prepare('SELECT feed_seen_at FROM users WHERE email = ?').bind(A).first<{ feed_seen_at: string }>();
     expect(seen!.feed_seen_at).toMatch(/^\d{4}-\d\d-\d\dT/);
     // at(0) may lie after the real clock's "now": move those rows before the seen time.
     await env.DB.exec('UPDATE comments SET created_at = \'2001-01-01T00:00:00.000Z\'; UPDATE reactions SET created_at = \'2001-01-01T00:00:00.000Z\';');
-    expect(await unread(A)).toEqual({ feed: 0, requests: 0 });
+    expect(await unread(A)).toEqual({ feed: 0, requests: 0, messages: 0 });
   });
 
   it('requests counts incoming pending only; feed caps at 99; 1 query plus sign-in', async () => {
@@ -571,9 +571,9 @@ describe('unread (S8)', () => {
     }
     for (let i = 0; i < stmts.length; i += 40) await env.DB.batch(stmts.slice(i, i + 40));
     const spy = spyD1(env.DB);
-    expect(await unread(A, spy.db)).toEqual({ feed: 99, requests: 1 });
+    expect(await unread(A, spy.db)).toEqual({ feed: 99, requests: 1, messages: 0 });
     expect(spy.queries).toBeLessThanOrEqual(4);
-    expect(await unread(C)).toEqual({ feed: 0, requests: 0 }); // C's own request is outgoing
+    expect(await unread(C)).toEqual({ feed: 0, requests: 0, messages: 0 }); // C's own request is outgoing
   });
 });
 

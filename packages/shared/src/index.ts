@@ -14,3 +14,4 @@ export * from './ratings';
 export * from './social';
 export * from './compareFriends';
 export * from './bio';
+export * from './messages';

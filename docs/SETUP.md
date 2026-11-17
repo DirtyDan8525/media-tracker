@@ -64,7 +64,21 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0010_progress.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0011_messages.sql`) with a green check.
+
+## Pictures in messages (create the picture storage once, before step 7)
+
+Messages can carry pictures. They are stored in Cloudflare R2 (a bucket named `media-tracker-media`), and the app expects the bucket to exist when you deploy:
+
+```
+npm exec -w packages/worker -- wrangler r2 bucket create media-tracker-media
+```
+
+Cloudflare may ask you to add a payment method once before it turns R2 on. The free tier is 10 GB, far more than a few friends' pictures will use, so you are not charged for normal use.
+
+**Success:** it prints `Created bucket 'media-tracker-media'`. If it says the bucket already exists, that is fine.
+
+Then turn pictures on: in `packages/worker/wrangler.toml`, find the three commented lines under `# Pictures in messages` (`# [[env.production.r2_buckets]]`, `# binding = "MEDIA"`, `# bucket_name = "media-tracker-media"`) and remove the `# ` at the start of each, then deploy. (Until you do, everything else works and sending a picture says pictures aren't set up. With the lines uncommented but no bucket, the deploy stops with an error about `media-tracker-media`.)
 
 ## 7. Deploy the app
 
@@ -197,6 +211,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
    - `0008_plan_order.sql`: the order of your Plan to watch lists (a new `plan_order` column on titles; titles already planned are numbered in the order you added them) and the profile bio (a new `bio` column on users). Apply it **before** deploying: the new app reads and writes these columns.
+   - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.
    - `0010_progress.sql`: episode progress (two new columns on titles, `progress` and `progress_total`; titles you already have start with none). Apply it **before** deploying: the new app reads and writes these columns.
    - `0009_number_first.sql`: the number-first rating model (Phase 5). Apply it **before** deploying.
    - `0007_signup_links.sql`: the table behind pre-approved sign-up links (Admin > Sign-up links). Apply it **before** deploying.

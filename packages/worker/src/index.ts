@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { IMAGE_TYPES } from '@media-tracker/shared';
 import { requireUser, type AppEnv } from './auth/user';
 import { auth } from './api/auth';
 import { me } from './api/me';
@@ -10,6 +11,7 @@ import { cover } from './api/cover';
 import { importApi } from './api/import';
 import { ratings } from './api/ratings';
 import { social } from './api/social';
+import { messages } from './api/messages';
 import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
 import { admin } from './api/admin';
@@ -35,7 +37,11 @@ app.use('/api/*', async (c, next) => {
   const site = c.req.header('Sec-Fetch-Site');
   if (site === 'cross-site') return c.json({ error: 'forbidden' }, 403);
   const type = c.req.header('Content-Type');
-  const isJson = type !== undefined && type.split(';')[0]!.trim().toLowerCase() === 'application/json';
+  const mime = type?.split(';')[0]!.trim().toLowerCase();
+  // A picture upload is the one raw body: an image type, which a cross-site <form> cannot send without a preflight.
+  const isImageUpload = method === 'POST' && mime !== undefined && (IMAGE_TYPES as readonly string[]).includes(mime)
+    && /^\/api\/conversations\/[^/]+\/messages\/image$/.test(new URL(c.req.url).pathname);
+  const isJson = mime === 'application/json' || isImageUpload;
   const sameOrigin = site === undefined || site === 'same-origin' || site === 'none';
   if (!isJson && !(method === 'DELETE' && type === undefined && sameOrigin)) {
     return c.json({ error: 'unsupported_media_type' }, 415);
@@ -69,6 +75,7 @@ api.route('/activity', activity);
 api.route('/cover', cover);
 api.route('/ratings', ratings);
 api.route('/', social);
+api.route('/', messages);
 api.route('/admin', admin);
 app.route('/api', api);
 

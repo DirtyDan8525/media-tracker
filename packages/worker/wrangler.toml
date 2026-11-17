@@ -16,6 +16,11 @@ database_name = "media-tracker"
 database_id = "00000000-0000-0000-0000-000000000000" # local dev only; the real id goes in [env.production] below
 migrations_dir = "migrations"
 
+# Pictures in messages (Phase 6). Dev uses a local R2 emulation; production needs the bucket created first (docs/SETUP.md).
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "media-tracker-media"
+
 [vars]
 ENVIRONMENT = "dev"
 ADMIN_EMAIL = ""
@@ -43,6 +48,12 @@ binding = "DB"
 database_name = "media-tracker"
 database_id = "a0e8ea97-58e8-4669-bbb8-fc3616d53da8" # from `wrangler d1 create media-tracker`
 migrations_dir = "migrations"
+
+# Pictures in messages (Phase 6). Uncomment after creating the bucket (docs/SETUP.md "Pictures in messages");
+# with the lines in place, a deploy fails until the bucket exists. Without them, pictures answer "not set up".
+# [[env.production.r2_buckets]]
+# binding = "MEDIA"
+# bucket_name = "media-tracker-media"
 
 [env.production.vars]
 ENVIRONMENT = "prod"

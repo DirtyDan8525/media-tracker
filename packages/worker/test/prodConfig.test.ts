@@ -38,6 +38,12 @@ describe('wrangler.toml production vars', () => {
     expect(lines.slice(start).join('\n')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
   });
 
+  it('binds the MEDIA R2 bucket in dev and production (Phase 6 pictures)', () => {
+    expect(toml).toMatch(/\[\[r2_buckets\]\]\s*binding = "MEDIA"\s*bucket_name = "media-tracker-media"/);
+    // Production's lines stay commented until the bucket exists (a deploy fails otherwise).
+    expect(toml).toMatch(/# \[\[env\.production\.r2_buckets\]\]\s*# binding = "MEDIA"\s*# bucket_name = "media-tracker-media"/);
+  });
+
   it('turns off preview URLs in production', () => {
     expect(section('env.production')).toMatch(/preview_urls\s*=\s*false/);
   });

@@ -208,11 +208,11 @@ describe('unread requests count pending signups for the admin (A7)', () => {
   it('admin: friend requests + pending signups; others: friend requests only', async () => {
     const ren = await signup('ren');
     await signup('vance');
-    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2 });
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2, messages: 0 });
     await env.DB.prepare("UPDATE users SET status = 'active' WHERE id = ?").bind(ren.id).run();
-    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 1 });
-    expect(await json(await asCookie(ren.token, '/api/activity/unread'))).toEqual({ feed: 0, requests: 0 });
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 1, messages: 0 });
+    expect(await json(await asCookie(ren.token, '/api/activity/unread'))).toEqual({ feed: 0, requests: 0, messages: 0 });
     expect((await asCookie(ren.token, '/api/friends/requests', 'POST', { username: 'dan' })).status).toBe(200);
-    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2 });
+    expect(await json(await asAdmin('/api/activity/unread'))).toEqual({ feed: 0, requests: 2, messages: 0 });
   });
 });

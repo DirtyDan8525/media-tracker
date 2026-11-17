@@ -609,6 +609,41 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Profile bio"
+    },
+    "MessagesList.wf.dc.html": {
+      "x": 0,
+      "y": 21600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Messages list"
+    },
+    "Chat.wf.dc.html": {
+      "x": 470,
+      "y": 21600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Chat (group, picture, rec card)"
+    },
+    "NewChat.wf.dc.html": {
+      "x": 940,
+      "y": 21600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · New chat"
+    },
+    "ShareRec.wf.dc.html": {
+      "x": 1410,
+      "y": 21600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Share a recommendation"
+    },
+    "Recommended.wf.dc.html": {
+      "x": 1880,
+      "y": 21600,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Recommended to you"
     }
   },
   "order": [
@@ -695,7 +730,12 @@
     "Sharpen.wf.dc.html",
     "ListHeader.wf.dc.html",
     "PlanToWatch.wf.dc.html",
-    "ProfileBio.wf.dc.html"
+    "ProfileBio.wf.dc.html",
+    "MessagesList.wf.dc.html",
+    "Chat.wf.dc.html",
+    "NewChat.wf.dc.html",
+    "ShareRec.wf.dc.html",
+    "Recommended.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -964,6 +1004,13 @@
       "text": "Wireframes — Plan to watch, filters, bio (for Dan's review)",
       "kind": "title1",
       "maxW": 1400
+    },
+    "wfp6m": {
+      "x": 0,
+      "y": 21400,
+      "text": "Wireframes — Messages (for Dan's review)",
+      "kind": "title1",
+      "maxW": 1400
     }
   },
   "designSystems": [],
@@ -1009,6 +1056,7 @@
     "wfp4b",
     "wfp5",
     "wfp5r",
-    "wfp5b"
+    "wfp5b",
+    "wfp6m"
   ]
 }

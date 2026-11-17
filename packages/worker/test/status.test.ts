@@ -102,7 +102,7 @@ describe('A8: only active users are seen', () => {
     expect(before.requests).toBe(1);
     await setStatus(b, 'removed');
     await setStatus(c, 'removed');
-    expect(await json(await as(A, '/api/activity/unread'))).toEqual({ feed: 0, requests: 0 });
+    expect(await json(await as(A, '/api/activity/unread'))).toEqual({ feed: 0, requests: 0, messages: 0 });
   });
 
   it('an invite code of a non-active user is 404; requests to them are 404', async () => {

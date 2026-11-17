@@ -298,9 +298,14 @@ activity.get('/unread', async (c) => {
     `SELECT MIN(${UNREAD_CAP}, ${capped(posts)} + ${capped(comments)} + ${capped(reactions)}) AS feed,
             (SELECT COUNT(*) FROM friendships f JOIN users ru ON ru.id = f.requested_by AND ru.status = 'active'
               WHERE (f.user_a = ?1 OR f.user_b = ?1) AND f.status = 'pending' AND f.requested_by <> ?1)
-            + CASE WHEN ?2 = 1 THEN (SELECT COUNT(*) FROM users WHERE status = 'pending') ELSE 0 END AS requests`,
-  ).bind(c.var.user.id, c.var.user.isAdmin ? 1 : 0).first<{ feed: number; requests: number }>();
-  return c.json({ feed: row?.feed ?? 0, requests: row?.requests ?? 0 });
+            + CASE WHEN ?2 = 1 THEN (SELECT COUNT(*) FROM users WHERE status = 'pending') ELSE 0 END AS requests,
+            -- Phase 6 (M3): chats with a message from someone else (active) after your last_read_at, deleted ones not counted.
+            MIN(${UNREAD_CAP}, (SELECT COUNT(*) FROM conversation_members m WHERE m.user_id = ?1 AND EXISTS (
+              SELECT 1 FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
+               WHERE x.conversation_id = m.conversation_id AND x.sender_id <> ?1 AND x.deleted_at IS NULL
+                 AND (m.last_read_at IS NULL OR x.created_at > m.last_read_at)))) AS messages`,
+  ).bind(c.var.user.id, c.var.user.isAdmin ? 1 : 0).first<{ feed: number; requests: number; messages: number }>();
+  return c.json({ feed: row?.feed ?? 0, requests: row?.requests ?? 0, messages: row?.messages ?? 0 });
 });
 
 // 1 query, plus sign-in (1-3).

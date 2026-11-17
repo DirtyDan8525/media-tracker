@@ -63,3 +63,8 @@
 @media (min-width: 1440px) {
   .frame--wide .profile__banner, .frame--wide .page-header.has-backdrop.profile__banner { min-height: clamp(320px, 24vw, 360px); }
 }
+
+/* A friend's profile on PC: Lists, Top 5, Stats and Compare use the page's full width (Dan, 2026-11-17). */
+@media (min-width: 1024px) {
+  .frame--wide .friend-page .friend-panel { max-width: none; }
+}

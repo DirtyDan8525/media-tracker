@@ -149,7 +149,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
         <BackButton to="/friends" />
         <MoreMenu user={user} friends={friends.data} />
       </div>
-      <div className="screen__body social-page">
+      <div className="screen__body social-page friend-page">
         <div className="friend-id">
           <PersonAvatar user={user} size={80} />
           <h1>{who(user)}</h1>

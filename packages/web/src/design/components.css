@@ -167,12 +167,17 @@
 .side-nav__profile:hover { background: var(--alt-row); }
 .side-nav__profile.active { background: var(--panel); }
 .side-nav__username { font-size: var(--fs-body); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side-nav__add { width: 100%; margin: var(--space-3) 0 var(--space-4); gap: var(--space-4); text-decoration: none; }
+.side-nav__brand {
+  display: flex; align-items: center; gap: var(--space-5); min-height: var(--tap); padding: 0 var(--space-6) var(--space-2);
+  color: var(--bright-text); text-decoration: none; border-radius: var(--radius-md); font-size: var(--fs-body);
+}
+.side-nav__brand b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-nav__label { padding: var(--space-2) var(--space-6) 0; font-size: var(--fs-meta); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted-text); }
 .side-nav__divider { height: 1px; margin: var(--space-4) var(--space-3); background: var(--grid-line); }
 .side-nav__list {
   display: flex; justify-content: space-between; align-items: center;
-  min-height: var(--tap); padding: 0 var(--space-6); border-radius: var(--radius-md);
-  color: var(--text); text-decoration: none; font-size: var(--fs-body); font-weight: 500;
+  min-height: 36px; padding: 0 var(--space-6); border-radius: var(--radius-md);
+  color: var(--text); text-decoration: none; font-size: var(--fs-sm); font-weight: 500;
   transition: background var(--dur-fast) var(--ease);
 }
 .side-nav__list:hover { background: var(--alt-row); }
@@ -183,7 +188,7 @@
   border-top: 1px solid var(--grid-line); padding-top: var(--space-6);
 }
 .side-nav__link {
-  display: flex; align-items: center; min-height: var(--tap); padding: 0 var(--space-6);
+  display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-6);
   border-radius: var(--radius-md); color: var(--text); text-decoration: none; font-size: var(--fs-sm);
 }
 .side-nav__link-start { display: flex; align-items: center; gap: var(--space-5); }

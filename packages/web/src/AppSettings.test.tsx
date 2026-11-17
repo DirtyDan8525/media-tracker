@@ -6,6 +6,7 @@ import { api } from './api/client';
 import { authBackend } from './test/authBackend';
 import { publicSettings } from './test/appSettings';
 import { fakeBackend } from './test/fakeBackend';
+import { friendsOf, REN } from './test/friends';
 import { makeMe } from './test/mockApi';
 import { renderApp } from './test/renderApp';
 import { setViewportWidth } from './test/viewport';
@@ -73,13 +74,31 @@ describe('sign-ups (AD2)', () => {
 });
 
 describe('feature switches hide their UI (AD2)', () => {
-  it('Messages off: no Messages tab; /messages goes home', async () => {
-    fakeBackend({ extra: app({ features: { messages: false } }) });
-    const { router } = renderApp('/messages');
-    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/list\//));
+  it('Messages off: no Messages anywhere (bar, Friends bubble, Message buttons); the Friends tab stays; /messages goes home', async () => {
+    fakeBackend({ extra: { ...app({ features: { messages: false } }), 'GET /api/friends': { body: friendsOf(REN) } } });
+    const { router } = renderApp('/friends');
+    expect(await screen.findByRole('link', { name: 'Ren, open profile' })).toBeInTheDocument();
     const nav = await main();
     expect(within(nav).queryByRole('link', { name: /Messages/ })).not.toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Friends/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Activity/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Messages/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Message Ren' })).not.toBeInTheDocument();
+    router.navigate('/messages');
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/list\//));
+  });
+
+  it('Friends off but Messages on: tab 4 is Messages itself', async () => {
+    fakeBackend({ extra: app({ features: { friends: false } }) });
+    renderApp('/list/anime');
+    const nav = await main();
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'Messages', 'More']);
+  });
+
+  it('Friends and Messages both off: the bar is Home, Activity, Search, More', async () => {
+    fakeBackend({ extra: app({ features: { friends: false, messages: false } }) });
+    renderApp('/list/anime');
+    expect(within(await main()).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'More']);
   });
 
   it('Feed off: no Activity tab; /activity goes home', async () => {
@@ -87,7 +106,7 @@ describe('feature switches hide their UI (AD2)', () => {
     const { router } = renderApp('/activity');
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/list\//));
     expect(within(await main()).queryByRole('link', { name: /Activity/ })).not.toBeInTheDocument();
-    expect(within(await main()).getByRole('link', { name: /Messages/ })).toBeInTheDocument();
+    expect(within(await main()).getByRole('link', { name: /Friends/ })).toBeInTheDocument();
   });
 
   it('Friends off: the Profile page has no Friends tile or Add friend; /friends goes home', async () => {

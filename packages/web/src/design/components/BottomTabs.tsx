@@ -8,19 +8,27 @@ const MORE_PATHS = ['/more', '/import', '/about', '/stats', '/sharpen', '/top5']
 /** The unread count as shown: the server caps it at 99, which reads "99+". */
 export const countText = (n: number): string => (n > 99 ? '99+' : String(n));
 
+/** Screens under the Friends tab: the hub, friends' profiles and titles, the chats, invite links. */
+const FRIENDS_PATHS = ['/friends', '/messages', '/u', '/add'];
+
 /**
- * Phone bottom bar: Home, Activity, Search (raised, centre), Messages, More. Five equal columns (Dan,
- * 2026-11-17, Phase 6 M8: Messages replaces Top 5, which is back in More; the unread badge sits on the Messages tab). Compare left with tiers (number-first, Ruling N9: Sharpen my ratings is in More). Home (`/`) opens the
- * last list shown, so it is the current tab on every list screen. Add is the floating bubble (AddBubble).
+ * Phone bottom bar: Home, Activity, Search (raised, centre), Friends, More (Dan, 2026-11-17, option B: Friends replaces
+ * Messages; its badge is unread messages + incoming friend requests, and Messages is the floating bubble on the Friends hub).
+ * With Friends switched off but Messages on, tab 4 is Messages itself. Home (`/`) opens the last list shown, so it is the
+ * current tab on every list screen. Add is the floating bubble (AddBubble).
  */
-export function BottomTabs({ activityCount = 0, messagesCount = 0, showActivity = true, showMessages = true }: {
+export function BottomTabs({ activityCount = 0, messagesCount = 0, friendsCount = 0, showActivity = true, showMessages = true, showFriends = true }: {
   activityCount?: number; messagesCount?: number;
-  /** The admin can switch the feed and messages off (AD2): their tabs go. */
-  showActivity?: boolean; showMessages?: boolean;
+  /** Incoming friend requests (the Friends badge adds the unread messages to them). */
+  friendsCount?: number;
+  /** The admin can switch the feed, friends and messages off (AD2): their tabs go. */
+  showActivity?: boolean; showMessages?: boolean; showFriends?: boolean;
 }) {
   const { pathname } = useLocation();
   const moreCurrent = MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const homeCurrent = pathname === '/' || pathname.startsWith('/list/');
+  const friendsCurrent = FRIENDS_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const badge = friendsCount + (showMessages ? messagesCount : 0);
   return (
     <nav aria-label="Main" className="bottom-tabs">
       <Link to="/" className={`bottom-tabs__item${homeCurrent ? ' active' : ''}`} aria-current={homeCurrent ? 'page' : undefined}>
@@ -38,13 +46,24 @@ export function BottomTabs({ activityCount = 0, messagesCount = 0, showActivity 
         <span className="bottom-tabs__search-circle"><Icon name="search" size={24} /></span>
         <span>Search</span>
       </NavLink>
-      {showMessages && <NavLink to="/messages" className="bottom-tabs__item" aria-label={messagesCount > 0 ? `Messages, ${countText(messagesCount)} unread` : undefined}>
-        <span className="bottom-tabs__icon">
-          <Icon name="messages" size={22} />
-          {messagesCount > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{countText(messagesCount)}</span>}
-        </span>
-        <span>Messages</span>
-      </NavLink>}
+      {showFriends ? (
+        <Link to="/friends" className={`bottom-tabs__item${friendsCurrent ? ' active' : ''}`} aria-current={friendsCurrent ? 'page' : undefined}
+          aria-label={badge > 0 ? `Friends, ${countText(badge)} new` : undefined}>
+          <span className="bottom-tabs__icon">
+            <Icon name="user" size={22} />
+            {badge > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{countText(badge)}</span>}
+          </span>
+          <span>Friends</span>
+        </Link>
+      ) : showMessages && (
+        <NavLink to="/messages" className="bottom-tabs__item" aria-label={messagesCount > 0 ? `Messages, ${countText(messagesCount)} unread` : undefined}>
+          <span className="bottom-tabs__icon">
+            <Icon name="messages" size={22} />
+            {messagesCount > 0 && <span className="count-pill bottom-tabs__count" aria-hidden="true">{countText(messagesCount)}</span>}
+          </span>
+          <span>Messages</span>
+        </NavLink>
+      )}
       <Link to="/more" className={`bottom-tabs__item${moreCurrent ? ' active' : ''}`} aria-current={moreCurrent ? 'page' : undefined}>
         <Icon name="more" size={22} />
         <span>More</span>

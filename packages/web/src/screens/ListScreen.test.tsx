@@ -375,13 +375,22 @@ describe('the picker', () => {
 describe('PC table', () => {
   const rows = (over: Partial<Entry> = {}) => [makeEntry({ title: 'Mob Psycho', rating: 9.4, status: 'Completed', notes: 'wow', ...over })];
 
-  it('shows a table with the Season Avg column only while the Anime Seasons tab is on', async () => {
+  it('shows a table with the Season Avg column only while the Anime Seasons tab is on and some title has seasons', async () => {
     setViewportWidth(1024);
-    fakeBackend({ entries: rows() });
+    const [mob] = rows();
+    fakeBackend({ entries: [mob!], seasons: [{ id: 's1', entryId: mob!.id, label: 'Season 1', rating: 8.5, notes: '', tier: null, priorMean: null, strength: null, scoreLocked: false }] as never });
     renderApp('/list/anime');
     expect(await screen.findByRole('table')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Season Avg' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Studio' })).toBeInTheDocument();
+  });
+
+  it('omits Season Avg when no title on the list has season ratings', async () => {
+    setViewportWidth(1024);
+    fakeBackend({ entries: rows().map((r) => ({ ...r, seasonAvg: null })) });
+    renderApp('/list/anime');
+    await screen.findByRole('table');
+    expect(screen.queryByRole('columnheader', { name: 'Season Avg' })).not.toBeInTheDocument();
   });
 
   it('omits Season Avg when the seasons tab is off, and Status for movies', async () => {

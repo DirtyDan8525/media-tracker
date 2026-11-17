@@ -57,7 +57,8 @@ describe('Profile: info, tiles, strip, rows', () => {
     fakeBackend({ me: ME(), entries: rows().filter((e) => e.id !== 'a2'), extra: FRIENDS(3) });
     renderApp('/profile');
     await screen.findByText('@dan');
-    const value = async (label: string) => (await screen.findByText(label)).closest('div')!.textContent;
+    const inMain = () => within(screen.getByRole('main'));
+    const value = async (label: string) => (await inMain().findByText(label)).closest('div')!.textContent;
     await waitFor(async () => expect(await value('Titles')).toBe('Titles3'));
     expect(await value('Rated')).toBe('Rated2');
     expect(await value('Avg')).toBe('Avg8.8');
@@ -67,7 +68,7 @@ describe('Profile: info, tiles, strip, rows', () => {
   it('the Friends tile links to /friends and a pending request shows a line that does too', async () => {
     fakeBackend({ me: ME(), extra: FRIENDS(3, 2) });
     renderApp('/profile');
-    const tile = (await screen.findByText('Friends')).closest('a')!;
+    const tile = (await within(await screen.findByRole('main')).findByText('Friends')).closest('a')!;
     expect(tile).toHaveAttribute('href', '/friends');
     const line = await screen.findByRole('link', { name: '2 friend requests' });
     expect(line).toHaveAttribute('href', '/friends');
@@ -77,7 +78,7 @@ describe('Profile: info, tiles, strip, rows', () => {
     fakeBackend({ me: ME(), extra: FRIENDS(1, 0) });
     renderApp('/profile');
     await screen.findByText('@dan');
-    await waitFor(async () => expect((await screen.findByText('Friends')).closest('div')!.textContent).toBe('Friends1'));
+    await waitFor(async () => expect((await within(screen.getByRole('main')).findByText('Friends')).closest('div')!.textContent).toBe('Friends1'));
     expect(screen.queryByRole('link', { name: /friend request/ })).not.toBeInTheDocument();
   });
 

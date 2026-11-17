@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { fakeBackend } from '../../test/fakeBackend';
 import { friendsOf, REN } from '../../test/friends';
@@ -57,12 +58,13 @@ describe('Messages list', () => {
     expect(await screen.findByRole('link', { name: /^Ren, unread\./ })).toBeInTheDocument();
   });
 
-  it('empty: "No messages yet" with a Message a friend action; New and Recommended to you are always there', async () => {
+  it('empty: "No messages yet" with a Message a friend action; New chat, New group and Recommended to you are always there', async () => {
     setup({ conversations: [] });
     renderApp('/messages');
     expect(await screen.findByText('No messages yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Message a friend' })).toHaveAttribute('href', '/messages/new');
-    expect(screen.getByRole('link', { name: 'New' })).toHaveAttribute('href', '/messages/new');
+    expect(screen.getByRole('link', { name: 'New chat' })).toHaveAttribute('href', '/messages/new');
+    expect(screen.getByRole('link', { name: 'New group' })).toHaveAttribute('href', '/messages/new?group=1');
     expect(screen.getByRole('link', { name: /^Recommended to you/ })).toHaveAttribute('href', '/messages/recommended');
   });
 
@@ -77,5 +79,12 @@ describe('Messages list', () => {
     renderApp('/messages');
     expect(await screen.findByText("Couldn't load your messages")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('phone: a Back arrow returns to Friends (Messages lives under the Friends tab)', async () => {
+    setup({ conversations: [] });
+    const { router } = renderApp('/messages');
+    await userEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/friends'));
   });
 });

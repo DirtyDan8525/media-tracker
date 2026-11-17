@@ -29,6 +29,13 @@ function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
   }
 }
 
+/** Fixed column widths in px (mirrors lists.css); Notes takes the rest but never less than NOTES_MIN. */
+export const COL_WIDTHS = { cover: 56, rating: 72, title: 220, status: 132, progress: 196, genres: 140, creator: 140, avg: 80 } as const;
+const NOTES_MIN = 140;
+export function tableMinWidth(cols: (keyof typeof COL_WIDTHS)[]): number {
+  return cols.reduce((n, c) => n + COL_WIDTHS[c], NOTES_MIN);
+}
+
 export interface EntryTableProps extends RowActions {
   rows: Entry[];
   label: string;
@@ -40,25 +47,32 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
   const first = rows[0];
   if (!first) return null;
   const cfg = CATEGORY_CONFIG[first.category];
-  const hasProgress = PROGRESS_CATEGORIES.includes(first.category);
+  // Columns with nothing to show on this list are left out, so Notes keeps its room (Dan, 2026-11-17).
+  const hasProgress = PROGRESS_CATEGORIES.includes(first.category) && rows.some((r) => showsProgress(r) || (r.progress ?? 0) > 0);
+  const cols: (keyof typeof COL_WIDTHS)[] = ['cover', 'rating', 'title', 'genres'];
+  if (cfg.hasStatus) cols.push('status');
+  if (hasProgress) cols.push('progress');
+  if (cfg.creatorLabel) cols.push('creator');
+  const withAvg = showSeasonAvg && rows.some((r) => r.seasonAvg != null);
+  if (withAvg) cols.push('avg');
   return (
     <div className="table-wrap">
-      <table className="entry-table" aria-label={label}>
+      <table className="entry-table" aria-label={label} style={{ minWidth: tableMinWidth(cols) }}>
         <thead>
           <tr>
             <th scope="col" className="col-cover">Cover</th>
             <th scope="col" className="col-rating">Rating</th>
-            <th scope="col">Title</th>
-            {cfg.hasStatus && <th scope="col">Status</th>}
+            <th scope="col" className="col-title">Title</th>
+            {cfg.hasStatus && <th scope="col" className="col-status">Status</th>}
             {hasProgress && <th scope="col" className="col-progress">Progress</th>}
-            <th scope="col">Genres</th>
-            {cfg.creatorLabel && <th scope="col">{cfg.creatorLabel}</th>}
-            {showSeasonAvg && <th scope="col">Season Avg</th>}
+            <th scope="col" className="col-genres">Genres</th>
+            {cfg.creatorLabel && <th scope="col" className="col-creator">{cfg.creatorLabel}</th>}
+            {withAvg && <th scope="col" className="col-avg">Season Avg</th>}
             <th scope="col">Notes</th>
           </tr>
         </thead>
         <tbody onKeyDown={onGridKeyDown}>
-          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={showSeasonAvg} hasProgress={hasProgress} {...actions} />)}
+          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} {...actions} />)}
         </tbody>
       </table>
     </div>
@@ -116,9 +130,9 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, ...actions }: {
             : (e.progress ?? 0) > 0 && <span className="muted">{progressText(e.progress!, e.progressTotal)}</span>}
         </td>
       )}
-      <td className="muted">{e.genres}</td>
-      {cfg.creatorLabel && <td>{e.creator}</td>}
-      {showSeasonAvg && <td className="muted">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
+      <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
+      {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
+      {showSeasonAvg && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
       <td>
         {editable ? (
           <EditableCell

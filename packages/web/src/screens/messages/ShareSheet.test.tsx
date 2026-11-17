@@ -22,7 +22,10 @@ describe('Share on a title page', () => {
   it('your title: Share opens a sheet with friends and groups to check, a note, and "Send to N"', async () => {
     const { calls } = setup();
     renderApp('/entry/f1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Share' }));
+    const share = await screen.findByRole('button', { name: 'Share Frieren' });
+    expect(share).toHaveTextContent('Share'); // a text label next to the icon, not just an icon
+    expect(share.querySelector('svg')).not.toBeNull();
+    await userEvent.click(share);
     const sheet = await screen.findByRole('dialog', { name: 'Recommend Frieren' });
     expect(sheet).toHaveTextContent('your rating 9.0 shows on the card');
     expect(await within(sheet).findByRole('checkbox', { name: /Ren/ })).toBeInTheDocument();
@@ -47,7 +50,7 @@ describe('Share on a title page', () => {
   it('closing the sheet with Escape sends nothing and returns focus to Share', async () => {
     const { calls } = setup();
     renderApp('/entry/f1');
-    const share = await screen.findByRole('button', { name: 'Share' });
+    const share = await screen.findByRole('button', { name: /^Share / });
     await userEvent.click(share);
     await screen.findByRole('dialog', { name: 'Recommend Frieren' });
     await userEvent.keyboard('{Escape}');
@@ -59,7 +62,7 @@ describe('Share on a title page', () => {
   it('a rate limit on every send says so and keeps the sheet open', async () => {
     setup({ 'POST /api/conversations/:id/messages': { status: 429, body: { error: 'rate_limited' } } });
     renderApp('/entry/f1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Share' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Share / }));
     const sheet = await screen.findByRole('dialog', { name: 'Recommend Frieren' });
     await userEvent.click(await within(sheet).findByRole('checkbox', { name: /Ren/ }));
     await userEvent.click(within(sheet).getByRole('button', { name: 'Send to 1' }));
@@ -72,7 +75,7 @@ describe('Share on a title page', () => {
       'GET /api/users/:username/entries/:id': { body: { entry: makeFriendEntry({ id: 'fe1', title: 'Heat', category: 'movies', rating: 7 }), seasons: [] } },
     });
     renderApp('/u/ren/entry/fe1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Share' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Share / }));
     const sheet = await screen.findByRole('dialog', { name: 'Recommend Heat' });
     await userEvent.click(await within(sheet).findByRole('checkbox', { name: /Ren/ }));
     await userEvent.click(within(sheet).getByRole('button', { name: 'Send to 1' }));

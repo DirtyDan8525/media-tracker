@@ -229,54 +229,33 @@ describe('Chat', () => {
       expect(field).toHaveValue('spam');
     });
 
-    it('+ offers Photo and Recommend a title; Photo resizes, shows the sending state and uploads the JPEG', async () => {
-      let release: () => void = () => {};
-      const gate = new Promise<void>((r) => { release = r; });
-      const { calls } = setup({}, {
-        'POST /api/conversations/:id/messages/image': async () => { await gate; return { status: 201, body: makeMessage({ senderId: ME.id, kind: 'image', text: '', image: true, id: 'newpic' }) }; },
-      });
+    it('no picture option: the composer has no Photo item and no file input (sending pictures is hidden)', async () => {
+      setup();
       renderApp('/messages/c1');
       await screen.findByRole('textbox', { name: 'Message' });
-      await userEvent.click(screen.getByRole('button', { name: 'Add to message' }));
-      expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Photo', 'Recommend a title']);
-      const input = screen.getByLabelText('Choose a photo') as HTMLInputElement;
-      expect(input).toHaveAttribute('accept', 'image/*');
-      await userEvent.upload(input, new File([new Uint8Array(50)], 'big.png', { type: 'image/png' }));
-      expect(await screen.findByText('Sending picture…')).toBeInTheDocument();
-      release();
-      expect(await screen.findByRole('img', { name: 'Picture from You' })).toHaveAttribute('src', '/api/messages/newpic/image');
-      expect(screen.queryByText('Sending picture…')).not.toBeInTheDocument();
-      const post = calls.find((c) => c.path === '/api/conversations/c1/messages/image')!;
-      expect((post.init?.headers as Record<string, string>)['content-type']).toBe('image/jpeg');
-      expect(post.init?.body).toBeInstanceOf(Blob);
+      expect(screen.queryByRole('button', { name: 'Add to message' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Photo')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Choose a photo')).not.toBeInTheDocument();
+      expect(document.querySelector('input[type="file"]')).toBeNull();
     });
 
-    it('503 not_configured: "Pictures need setup", and the Photo item says so after', async () => {
-      setup({}, { 'POST /api/conversations/:id/messages/image': { status: 503, body: { error: 'not_configured' } } });
-      renderApp('/messages/c1');
-      await screen.findByRole('textbox', { name: 'Message' });
-      await userEvent.click(screen.getByRole('button', { name: 'Add to message' }));
-      await userEvent.upload(screen.getByLabelText('Choose a photo'), new File([new Uint8Array(50)], 'a.jpg', { type: 'image/jpeg' }));
-      expect(await screen.findByText('Pictures need setup.')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Add to message' }));
-      expect(screen.getByRole('menuitem', { name: 'Pictures need setup' })).toBeDisabled();
-    });
-
-    it('Recommend a title: a picker over your lists sends the chosen title with your rating', async () => {
+    it('Recommend: one button opens a picker that searches ALL your lists and sends the title with your rating and a note', async () => {
       const entries = [makeEntry({ id: 'a1', category: 'anime', title: 'Cowboy Bebop', rating: 8.5, creator: 'Sunrise' }), makeEntry({ id: 'm1', category: 'movies', title: 'Heat', rating: 7 })];
       const { calls } = setup({}, {}, entries);
       renderApp('/messages/c1');
       await screen.findByRole('textbox', { name: 'Message' });
-      await userEvent.click(screen.getByRole('button', { name: 'Add to message' }));
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Recommend a title' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Recommend' }));
       const picker = await screen.findByRole('dialog', { name: 'Recommend a title' });
-      await userEvent.click(await within(picker).findByRole('button', { name: 'Movies' }));
-      expect(within(picker).queryByText('Cowboy Bebop')).not.toBeInTheDocument();
-      await userEvent.click(within(picker).getByRole('button', { name: 'All' }));
+      // no list chips: titles of every list are in one list, and the search filters across them
+      expect(within(picker).queryByRole('group', { name: 'List' })).not.toBeInTheDocument();
+      expect(await within(picker).findByRole('button', { name: /^Heat/ })).toBeInTheDocument();
+      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Search your lists' }), 'bebop');
+      expect(within(picker).queryByRole('button', { name: /^Heat/ })).not.toBeInTheDocument();
+      await userEvent.type(within(picker).getByRole('textbox', { name: 'Add a note (optional)' }), 'watch it!');
       await userEvent.click(await within(picker).findByRole('button', { name: /^Cowboy Bebop/ }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       const post = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages')!;
-      expect(post.body).toMatchObject({ rec: { category: 'anime', title: 'Cowboy Bebop', rating: 8.5, creator: 'Sunrise' } });
+      expect(post.body).toMatchObject({ text: 'watch it!', rec: { category: 'anime', title: 'Cowboy Bebop', rating: 8.5, creator: 'Sunrise' } });
       expect(await screen.findByRole('article', { name: 'Recommendation: Cowboy Bebop' })).toBeInTheDocument();
     });
   });

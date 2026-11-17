@@ -6,9 +6,7 @@
 .profile__col { display: contents; }
 
 @media (min-width: 1024px) {
-  .frame--wide .screen__body { max-width: 1120px; }
-  /* The feed is a reading column, not a spreadsheet. */
-  .frame--wide .screen:has(.feed-post) .screen__body { max-width: 760px; }
+  .frame--wide .screen__body { max-width: 1200px; }
 
   /* Profile: id card across, four tiles across, then two columns (ProfilePC.wf). */
   .frame--wide .profile .profile__body {
@@ -52,8 +50,7 @@
 }
 
 @media (min-width: 1440px) {
-  .frame--wide .screen__body { max-width: 1280px; }
-  .frame--wide .screen:has(.feed-post) .screen__body { max-width: 820px; }
+  .frame--wide .screen__body { max-width: 1400px; }
   .frame--wide .stats, .frame--wide .wide-cols, .frame--wide .social-page, .frame--wide .top5 {
     --fs-body: 16px; --fs-sm: 15px; --fs-meta: 14px; --fs-lg: 17px;
   }
@@ -67,4 +64,29 @@
 /* A friend's profile on PC: Lists, Top 5, Stats and Compare use the page's full width (Dan, 2026-11-17). */
 @media (min-width: 1024px) {
   .frame--wide .friend-page .friend-panel { max-width: none; }
+}
+
+/* PC layout pass (item 26, Dan 2026-11-17): no thin columns; reading text keeps a comfortable line. */
+@media (min-width: 1024px) {
+  /* Activity: posts in two columns per day. */
+  .frame--wide .activity__day > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); align-items: start; }
+  .frame--wide .activity-filter, .frame--wide .search-screen__controls { max-width: 720px; }
+  /* Search: each list's results in two columns. */
+  .frame--wide .search-group > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); }
+  .frame--wide .search-screen__results { display: flex; flex-direction: column; gap: var(--space-9); }
+
+  /* Title page: facts and text on the left, rating / status / progress tiles on the right. */
+  .frame--wide .detail { display: grid; grid-template-columns: minmax(0, 780px) 400px; justify-content: start; column-gap: var(--space-14); row-gap: var(--space-8); align-items: start; max-width: none; }
+  .frame--wide .detail > * { grid-column: 1; min-width: 0; }
+  .frame--wide .detail > .tiles { grid-column: 2; grid-row: 1 / span 3; grid-template-columns: minmax(0, 1fr); }
+  .frame--wide .detail .synopsis { max-width: 75ch; }
+  .frame--wide .friend-panel { max-width: none; }
+
+  /* Admin: the home page's sections in two columns; sub-pages are forms, kept to a readable width. */
+  .frame--wide .social-page:has(> .group):not(.friends-page):not(.friend-page) { display: block; column-count: 2; column-gap: var(--space-12); }
+  .frame--wide .social-page:has(> .group):not(.friends-page):not(.friend-page) > .group { break-inside: avoid; margin-bottom: var(--space-9); }
+  .frame--wide .social-page:has(> .group):not(.friends-page):not(.friend-page) > :not(.group) { column-span: all; margin-bottom: var(--space-6); }
+  .frame--wide .admin-page { max-width: 880px; }
+  .frame--wide .sharpen { max-width: 880px; }
+  .frame--wide .about__body { max-width: 760px; }
 }

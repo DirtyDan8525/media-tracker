@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useFeature } from '../../data/appSettings';
 import { conversationTitle, useConversations, useRecommended } from '../../data/messages';
 import { EmptyState } from '../../design/components/EmptyState';
 import { Icon } from '../../design/components/Icon';
@@ -17,8 +18,14 @@ export function MessagesScreen() {
   const recs = useRecommended();
   const now = useNow();
   const recCount = recs.data?.length ?? 0;
-  const header = (
-    <PageHeader title="Messages" profile actions={<Link to="/messages/new" className="btn btn--primary">New</Link>} />
+  // Phone: Messages sits under the Friends tab, so its back arrow goes to Friends (without Friends it keeps the profile button).
+  const friendsOn = useFeature('friends');
+  const header = <PageHeader title="Messages" {...(friendsOn ? { backTo: '/friends' } : { profile: true })} />;
+  const newRow = (
+    <div className="messages-new" role="group" aria-label="Start a chat">
+      <Link to="/messages/new" className="btn btn--primary"><Icon name="plus" size={18} />New chat</Link>
+      <Link to="/messages/new?group=1" className="btn btn--secondary"><Icon name="group" size={18} />New group</Link>
+    </div>
   );
   if (list.isPending) {
     return (
@@ -42,6 +49,7 @@ export function MessagesScreen() {
     <div className="screen">
       {header}
       <div className="screen__body stack-10 messages-page">
+        {newRow}
         <Link to="/messages/recommended" className="group__row messages-rec-link">
           <span className="group__row-start"><span className="tile-icon"><Icon name="share" size={18} /></span>Recommended to you{recCount > 0 ? ` · ${recCount}` : ''}</span>
           <span className="group__chev"><Icon name="chevron" size={18} /></span>

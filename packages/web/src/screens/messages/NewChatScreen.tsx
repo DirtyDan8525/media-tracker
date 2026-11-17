@@ -1,6 +1,6 @@
 import { GROUP_MAX, GROUP_NAME_MAX } from '@media-tracker/shared';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useCreateConversation } from '../../data/messages';
 import { useFriends } from '../../data/social';
 import { Button } from '../../design/components/Button';
@@ -14,6 +14,7 @@ import '../../design/messages.css';
 /** New chat (route /messages/new): pick friends. One opens a direct chat; two or more make a group (optional name). */
 export function NewChatScreen() {
   const navigate = useNavigate();
+  const wantsGroup = useSearchParams()[0].get('group') === '1';
   const toast = useToast();
   const friends = useFriends();
   const create = useCreateConversation();
@@ -31,7 +32,7 @@ export function NewChatScreen() {
     }
   }
 
-  const header = <PageHeader title="New chat" backTo="/messages" backUsesHistory />;
+  const header = <PageHeader title={wantsGroup ? 'New group' : 'New chat'} backTo="/messages" backUsesHistory />;
   if (friends.isPending) {
     return <div className="screen" aria-busy="true" aria-label="Loading">{header}<div className="screen__body stack-10"><Skeleton height={56} /><Skeleton height={56} /></div></div>;
   }
@@ -57,9 +58,9 @@ export function NewChatScreen() {
           </div>
         )}
         <p className="hint" role="status">
-          {picked.length === 0 ? 'Pick a friend, or several for a group.' : picked.length === 1 ? '1 picked · direct chat' : `${picked.length} picked · group`}
+          {picked.length === 0 ? (wantsGroup ? 'Pick two or more friends for a group.' : 'Pick a friend, or several for a group.') : picked.length === 1 ? '1 picked · direct chat' : `${picked.length} picked · group`}
         </p>
-        <Button variant="primary" className="btn--big" disabled={picked.length === 0 || create.isPending} onClick={() => void start()}>Start chat</Button>
+        <Button variant="primary" className="btn--big" disabled={picked.length === 0 || (wantsGroup && picked.length < 2) || create.isPending} onClick={() => void start()}>{wantsGroup ? 'Start group' : 'Start chat'}</Button>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
-/** Opens the Add sheet for anime: the floating Add bubble (phone) or the side nav's Add link (PC). */
+/** Opens the Add sheet for anime: the floating Add bubble (phone, a link) or the list header's Add button (PC). */
 async function openAddAnime(page: Page) {
-  await page.getByRole('link', { name: 'Add anime' }).click();
+  await page.getByRole('link', { name: 'Add anime' }).or(page.getByRole('button', { name: 'Add anime' })).first().click();
   await expect(page.getByRole('dialog', { name: 'Add' })).toBeVisible();
 }
 
@@ -116,7 +116,7 @@ test('Sharpen my ratings (More): asks only the close pairs, then the list is all
   expect(made.ok()).toBeTruthy();
 
   await page.goto('/more');
-  await page.getByRole('link', { name: 'Sharpen my ratings' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Sharpen my ratings' }).click();
   await expect(page.getByText('Pick a list. Only close ratings come up.')).toBeVisible();
   await page.getByRole('link', { name: 'Anime, 2 close calls' }).click();
   await expect(page.getByText('Close call 1 of 2')).toBeVisible();
@@ -321,22 +321,33 @@ test('Top 5: Share Anime Top 5 previews a 1080 × 1350 PNG and Save image downlo
   await expect(page.getByText('Image saved')).toBeVisible();
 });
 
-test('Messages: it has its own place in the nav (phone bottom bar, PC side nav) and Top 5 is not in the phone bar', async ({ page }) => {
+test('Friends and Messages: Friends is tab 4 on the phone (Messages is its floating bubble) and a side-nav row on PC; Top 5 is in More on the phone', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/list/anime');
   const nav = page.getByRole('navigation', { name: 'Main' });
-  await expect(nav.getByRole('link', { name: 'Messages' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: /^Friends/ })).toBeVisible();
   const phone = await page.locator('.bottom-tabs').isVisible();
   if (phone) {
-    // Phone: Home, Activity, Search, Messages, More; Top 5 lives in More.
+    // Phone: Home, Activity, Search, Friends, More. No Messages or Top 5 tab; Top 5 lives in More.
+    await expect(nav.getByRole('link', { name: /^Messages/ })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: /Top 5/ })).toHaveCount(0);
     await nav.getByRole('link', { name: 'More' }).click();
     await expect(page.getByRole('link', { name: 'Top 5' })).toBeVisible();
+    await nav.getByRole('link', { name: /^Friends/ }).click();
+    await expect(page).toHaveURL(/\/friends$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible();
+    // Option B: the floating speech bubble opens Messages.
+    await page.getByRole('link', { name: /^Messages/ }).click();
+  } else {
+    // PC: Friends, Messages, Top 5, Stats and Sharpen my ratings are side-nav rows.
+    for (const n of ['Top 5', 'Stats', 'Sharpen my ratings']) await expect(nav.getByRole('link', { name: n })).toBeVisible();
+    await nav.getByRole('link', { name: /^Friends/ }).click();
+    await expect(page).toHaveURL(/\/friends$/);
+    await nav.getByRole('link', { name: /^Messages/ }).click();
   }
-  await nav.getByRole('link', { name: 'Messages' }).click();
   await expect(page).toHaveURL(/\/messages$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Messages' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Recommended to you' })).toBeVisible();
-  await page.getByRole('link', { name: 'New' }).click();
+  await page.getByRole('link', { name: 'New chat' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'New chat' })).toBeVisible();
 });

@@ -54,14 +54,25 @@ a.entry-card__title { line-height: var(--tap); }
 
 /* PC table (v2: 40 × 60 covers) */
 .table-wrap { overflow-x: auto; border-radius: var(--radius-xl); border: 1px solid var(--grid-line); background: var(--bg); }
-.entry-table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: var(--fs-sm); }
+.entry-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-sm); }
+.entry-table th, .entry-table td { box-sizing: border-box; }
 .entry-table th { padding: 13px var(--space-7); text-align: left; font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); background: var(--header-row); }
 .entry-table td { padding: 5px var(--space-7); vertical-align: middle; }
 .entry-table tbody tr { border-top: 1px solid var(--grid-line); background: var(--bg); transition: background 0.15s var(--ease); }
 .entry-table tbody tr:nth-child(even) { background: var(--alt-row); }
 .entry-table tbody tr:hover { background: var(--panel); }
-.entry-table .col-cover { width: 66px; }
-.entry-table .col-rating { width: 96px; }
+/* Fixed column widths (item 27); Notes, with no width, takes whatever is left. Keep in step with COL_WIDTHS in EntryTable.tsx. */
+.entry-table .col-cover { width: 56px; padding-inline: var(--space-4); }
+.entry-table .col-rating { width: 72px; padding-inline: var(--space-4); text-align: center; }
+.entry-table .col-year { width: 64px; }
+.entry-table .col-title { width: 220px; }
+.entry-table .col-status { width: 132px; }
+.entry-table .col-genres { width: 140px; }
+.entry-table .col-creator { width: 140px; }
+.entry-table .col-avg { width: 80px; }
+.entry-table td.col-genres, .entry-table td.col-creator, .entry-table td.col-year { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-table td:last-child { overflow: hidden; }
+.entry-table td:last-child .cell-btn { max-width: 100%; }
 .cell-title { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; font-weight: 600; }
 .cell-title a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--bright-text); font-size: var(--fs-body); text-decoration: none; }
 .cell-title a:hover { text-decoration: underline; }
@@ -209,7 +220,7 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .search__input { -webkit-appearance: none; appearance: none; }
 
 /* Episode progress (item 22): "7 / 24" with − and + */
-.entry-table .col-progress { width: 250px; white-space: nowrap; }
+.entry-table .col-progress { width: 196px; white-space: nowrap; }
 .ep-progress { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
 .ep-progress__row { display: inline-flex; align-items: center; gap: var(--space-2); }
 .ep-progress__btn {

@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { publicSettings } from './test/appSettings';
 import { fakeBackend, makeEntry } from './test/fakeBackend';
 import { makeMe, mockApi } from './test/mockApi';
 import { renderApp } from './test/renderApp';
@@ -15,11 +16,11 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('the Main nav\'s links read Home, Activity, Search, Messages, More: Messages replaced Top 5 (Phase 6, M8)', async () => {
+    it('the Main nav\'s links read Home, Activity, Search, Friends, More: Friends is tab 4, Messages is not in the bar (Dan, 2026-11-17)', async () => {
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await mainNav();
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Messages', 'More']);
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Friends', 'More']);
       expect(within(nav).queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
       const cells = Array.from(nav.children);
       expect(cells).toHaveLength(5);
@@ -51,20 +52,23 @@ describe('app shell', () => {
       await waitFor(() => expect(within(nav).getByRole('link', { name: 'Activity' }).querySelector('.count-pill')).toBeNull());
     });
 
-    it('the Messages tab carries the unread badge: "Messages, 2 unread", nothing at 0, "99+" above 99; Top 5 is not in the bar', async () => {
-      const unread = { feed: 0, requests: 0, messages: 2 };
+    it('the Friends tab badge is unread messages + incoming friend requests: "Friends, 3 new", nothing at 0, "99+" above 99; Messages and Top 5 are not in the bar', async () => {
+      const unread = { feed: 0, requests: 1, messages: 2 };
       mockApi(makeMe(), { 'GET /api/activity/unread': () => ({ body: unread }) });
       const { queryClient } = renderApp('/list/anime');
       const nav = await mainNav();
-      const tab = await within(nav).findByRole('link', { name: 'Messages, 2 unread' });
-      expect(tab.querySelector('.count-pill')).toHaveTextContent('2');
+      const tab = await within(nav).findByRole('link', { name: 'Friends, 3 new' });
+      expect(tab).toHaveAttribute('href', '/friends');
+      expect(tab.querySelector('.count-pill')).toHaveTextContent('3');
+      expect(within(nav).queryByRole('link', { name: /Messages/ })).not.toBeInTheDocument();
       expect(within(nav).queryByRole('link', { name: /Top 5/ })).not.toBeInTheDocument();
       unread.messages = 120;
       await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
-      expect(await within(nav).findByRole('link', { name: 'Messages, 99+ unread' })).toBeInTheDocument();
+      expect(await within(nav).findByRole('link', { name: 'Friends, 99+ new' })).toBeInTheDocument();
       unread.messages = 0;
+      unread.requests = 0;
       await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
-      await waitFor(() => expect(within(nav).getByRole('link', { name: 'Messages' }).querySelector('.count-pill')).toBeNull());
+      await waitFor(() => expect(within(nav).getByRole('link', { name: 'Friends' }).querySelector('.count-pill')).toBeNull());
     });
 
     it('the profile button has a dot and reads "Profile, 1 friend request" when requests is 1', async () => {
@@ -128,7 +132,7 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Messages', 'More']);
+      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Friends', 'More']);
       expect(nav.children).toHaveLength(5);
     });
 
@@ -139,8 +143,9 @@ describe('app shell', () => {
       ['/import', 'More'],
       ['/about', 'More'],
       ['/top5', 'More'],
-      ['/messages', 'Messages'],
-      ['/messages/new', 'Messages'],
+      ['/friends', 'Friends'],
+      ['/messages', 'Friends'],
+      ['/messages/new', 'Friends'],
       ['/stats', 'More'],
       ['/sharpen', 'More'],
     ])('on %s the current tab is %s', async (path, tab) => {
@@ -256,43 +261,61 @@ describe('app shell', () => {
       expect(row.querySelector('.count-pill')).toHaveTextContent('3');
     });
 
-    it('reads Profile, Add anime, Search, Activity, the enabled lists, then Import, Export my data, About (no Compare, N9)', async () => {
+    it('reads the PCNav board: brand, Home, Search, Activity, Friends, Messages, Top 5, Stats, Sharpen, the Lists group, Settings, More / About, profile (no Compare, N9)', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
       const nav = await sideNav();
-      // every row, in document order: links and the Export button
+      // every row, in document order
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity', 'Messages',
+        'About Media Tracker', 'Home', 'Search', 'Activity', 'Friends', 'Messages', 'Top 5', 'Stats', 'Sharpen my ratings',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube',
-        'Import', 'Export my data', 'About',
+        'Settings', 'More / About', 'Profile, @dan',
       ]);
+      expect(nav.querySelector('.side-nav__label')).toHaveTextContent('Lists');
+      expect(nav.querySelectorAll('.side-nav__divider')).toHaveLength(1);
+      expect(nav.querySelector('.side-nav__footer')?.lastElementChild).toHaveAttribute('href', '/profile');
       await screen.findByText('No anime yet');
       expect(nav.querySelector('.count-pill')).toBeNull();
     });
 
-    it('PC: the side nav has a Messages row with the unread badge, after Activity', async () => {
+    it('PC: Friends and Messages rows carry their own badges (requests, unread), after Activity', async () => {
       setViewportWidth(1280);
-      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 0, messages: 3 } } });
+      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 1, messages: 3 } } });
       renderApp('/list/anime');
       const nav = await sideNav();
+      const friends = await within(nav).findByRole('link', { name: 'Friends, 1 new' });
+      expect(friends).toHaveAttribute('href', '/friends');
       const row = await within(nav).findByRole('link', { name: 'Messages, 3 unread' });
       expect(row).toHaveAttribute('href', '/messages');
       const names = within(nav).getAllByRole('link').map((a) => a.textContent ?? '');
-      expect(names.findIndex((n) => n.startsWith('Messages'))).toBe(names.findIndex((n) => n.startsWith('Activity')) + 1);
+      const at = (label: string) => names.findIndex((n) => n.startsWith(label));
+      expect(at('Friends')).toBe(at('Activity') + 1);
+      expect(at('Messages')).toBe(at('Friends') + 1);
     });
 
-    it('no navigation is still called "Lists" on PC, and Top 5, Stats and Settings are not in the side nav', async () => {
+    it('Top 5, Stats, Sharpen my ratings and Settings are side-nav links; there is no navigation called "Lists"', async () => {
       setViewportWidth(1280);
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(screen.queryByRole('navigation', { name: 'Lists' })).not.toBeInTheDocument();
-      for (const n of ['Top 5', 'Stats', 'Settings']) expect(within(nav).queryByRole('link', { name: new RegExp(`^${n}`) })).not.toBeInTheDocument();
+      for (const [n, href] of [['Top 5', '/top5'], ['Stats', '/stats'], ['Sharpen my ratings', '/sharpen'], ['Settings', '/settings'], ['More / About', '/more']] as const) {
+        expect(within(nav).getByRole('link', { name: n })).toHaveAttribute('href', href);
+      }
     });
 
-    it('the Profile row is named "Profile, @dan" (contains its visible text), links to /profile and shows a 32 px avatar and @dan', async () => {
+    it('switched-off features leave the side nav: Friends, Messages, Activity and Sharpen my ratings', async () => {
+      setViewportWidth(1280);
+      fakeBackend({ extra: { 'GET /api/app': { body: publicSettings({ features: { friends: false, messages: false, feed: false, closeCalls: false } }) } } as never });
+      renderApp('/list/anime');
+      const nav = await sideNav();
+      await within(nav).findByRole('link', { name: 'Top 5' });
+      for (const n of ['Friends', 'Messages', 'Activity', 'Sharpen my ratings']) expect(within(nav).queryByRole('link', { name: new RegExp(`^${n}`) })).not.toBeInTheDocument();
+    });
+
+    it('the Profile row is named "Profile, @dan" (contains its visible text), links to /profile and shows a 36 px avatar and @dan', async () => {
       setViewportWidth(1280);
       mockApi(makeMe());
       renderApp('/list/anime');
@@ -300,7 +323,7 @@ describe('app shell', () => {
       expect(profile).toHaveAttribute('href', '/profile');
       expect(profile).toHaveTextContent('@dan');
       const avatar = profile.querySelector<HTMLElement>('.avatar')!;
-      expect(avatar).toHaveStyle({ width: '32px', height: '32px' });
+      expect(avatar).toHaveStyle({ width: '36px', height: '36px' });
       expect(avatar).toHaveTextContent('D');
     });
 
@@ -312,30 +335,6 @@ describe('app shell', () => {
       expect(profile.querySelector('img')).toHaveAttribute('src', `/api/me/avatar?v=${encodeURIComponent('2026-11-15T10:00:00Z')}`);
     });
 
-    it('Add is a button-styled link to the current list\'s Add sheet', async () => {
-      setViewportWidth(1280);
-      mockApi(makeMe());
-      const { router } = renderApp('/list/movies');
-      const add = within(await sideNav()).getByRole('link', { name: 'Add movie' });
-      expect(add).toHaveAttribute('href', '/list/movies?add=1');
-      expect(add).toHaveClass('btn', 'btn--primary');
-      await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
-      expect(router.state.location.search).toBe('');
-    });
-
-    it('Add on the current list keeps its Status and Genre filters (PC)', async () => {
-      setViewportWidth(1280);
-      fakeBackend({ entries: [makeEntry({ title: 'Frieren', status: 'Completed', genres: 'Fantasy' })] });
-      const { router } = renderApp('/list/anime?status=Completed&genre=Fantasy');
-      await screen.findByText('Frieren');
-      const add = within(await sideNav()).getByRole('link', { name: 'Add anime' });
-      expect(add).toHaveAttribute('href', '/list/anime?status=Completed&genre=Fantasy&add=1');
-      await userEvent.click(add);
-      expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
-      await waitFor(() => expect(router.state.location.search).toBe('?status=Completed&genre=Fantasy'));
-    });
-
     it('a header with only the (phone-only) profile button renders no empty actions box on PC', async () => {
       setViewportWidth(1280);
       fakeBackend({ entries: [makeEntry({ rating: 8 })] });
@@ -344,12 +343,12 @@ describe('app shell', () => {
       expect(document.querySelector('.page-header__actions')).toBeNull();
     });
 
-    it('with every list off there is no Add row', async () => {
+    it('with every list off there is no Lists group', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false, manga: false, youtube: false }));
       renderApp('/activity');
       const nav = await sideNav();
-      expect(within(nav).queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
+      expect(nav.querySelector('.side-nav__label')).toBeNull();
       expect(within(nav).getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
     });
 
@@ -363,30 +362,13 @@ describe('app shell', () => {
       expect(within(nav).getByRole('link', { name: 'Search' })).not.toHaveAttribute('aria-current');
     });
 
-    it('Export my data is the real export button', async () => {
-      setViewportWidth(1280);
-      const calls = mockApi(makeMe(), { 'GET /api/export': { body: { entries: [] } } });
-      renderApp('/list/anime');
-      await userEvent.click(within(await sideNav()).getByRole('button', { name: 'Export my data' }));
-      await waitFor(() => expect(calls.some((c) => c.path === '/api/export')).toBe(true));
-    });
-
-    it('has no Compare row (Sharpen my ratings is in More and Settings)', async () => {
-      setViewportWidth(1280);
-      mockApi(makeMe({}, { songs: false }));
-      renderApp('/list/anime');
-      const nav = await sideNav();
-      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Messages', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube', 'Import', 'About']);
-      expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
-    });
-
     it('season tabs never appear as list rows', async () => {
       setViewportWidth(1280);
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(6 + 9 + 2); // Profile, Add, Home, Search, Activity, Messages + 9 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(1 + 8 + 9 + 3); // brand, Home..Sharpen (8), 9 lists, Settings, More / About, Profile
     });
   });
 

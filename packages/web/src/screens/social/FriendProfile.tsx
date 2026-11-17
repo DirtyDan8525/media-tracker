@@ -1,5 +1,6 @@
 import { CATEGORY_CONFIG, formatRating, statusLabel, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { COL_WIDTHS, tableMinWidth } from '../list/EntryTable';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useAccept, useFriendEntries, useFriends, useProfile, useRemoveFriend, useSendRequest, type FriendsData,
@@ -221,18 +222,22 @@ function ListsPanel({ username, rows }: { username: string; rows: FriendEntry[] 
 
 function FriendTable({ username, rows }: { username: string; rows: FriendEntry[] }) {
   const cfg = CATEGORY_CONFIG[rows[0]!.category];
+  const cols: (keyof typeof COL_WIDTHS)[] = ['cover', 'rating', 'title', 'genres'];
+  if (cfg.hasStatus) cols.push('status');
+  if (cfg.creatorLabel) cols.push('creator');
+  if (cfg.hasSeasons) cols.push('avg');
   return (
     <div className="table-wrap">
-      <table className="entry-table" aria-label={`${LIST_LABEL[rows[0]!.category]}, @${username}`}>
+      <table className="entry-table" aria-label={`${LIST_LABEL[rows[0]!.category]}, @${username}`} style={{ minWidth: tableMinWidth(cols) }}>
         <thead>
           <tr>
             <th scope="col" className="col-cover">Cover</th>
             <th scope="col" className="col-rating">Rating</th>
-            <th scope="col">Title</th>
-            {cfg.hasStatus && <th scope="col">Status</th>}
-            <th scope="col">Genres</th>
-            {cfg.creatorLabel && <th scope="col">{cfg.creatorLabel}</th>}
-            {cfg.hasSeasons && <th scope="col">Season Avg</th>}
+            <th scope="col" className="col-title">Title</th>
+            {cfg.hasStatus && <th scope="col" className="col-status">Status</th>}
+            <th scope="col" className="col-genres">Genres</th>
+            {cfg.creatorLabel && <th scope="col" className="col-creator">{cfg.creatorLabel}</th>}
+            {cfg.hasSeasons && <th scope="col" className="col-avg">Season Avg</th>}
             <th scope="col">Notes</th>
           </tr>
         </thead>
@@ -243,9 +248,9 @@ function FriendTable({ username, rows }: { username: string; rows: FriendEntry[]
               <td><RatingBadge rating={e.rating} size="sm" /></td>
               <td><div className="cell-title"><Link to={entryLink(username, e.id)} data-role="title">{e.title}</Link></div></td>
               {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
-              <td className="muted">{e.genres}</td>
-              {cfg.creatorLabel && <td>{e.creator}</td>}
-              {cfg.hasSeasons && <td className="muted">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
+              <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
+              {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
+              {cfg.hasSeasons && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
               <td><span className="cell-notes" title={e.notes || undefined}>{e.notes ?? ''}</span></td>
             </tr>
           ))}

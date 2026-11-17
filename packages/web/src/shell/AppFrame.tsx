@@ -37,12 +37,15 @@ function FrameLayout() {
   const { features } = useAppSettings();
   const unread = useUnread().data;
   const activityCount = unread?.feed ?? 0;
-  const messagesCount = unread?.messages ?? 0;
+  const messagesCount = features.messages ? unread?.messages ?? 0 : 0;
+  // Incoming friend requests. The phone's Friends badge adds the unread messages (BottomTabs); PC has a Messages row of its own.
+  const requestsCount = features.friends ? unread?.requests ?? 0 : 0;
   const current = useCurrentList();
   if (wide) {
     return (
       <div className="frame frame--wide">
-        <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} showActivity={features.feed} showMessages={features.messages} current={current} me={me} />
+        <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} friendsCount={requestsCount}
+          showActivity={features.feed} showMessages={features.messages} showFriends={features.friends} showSharpen={features.closeCalls} me={me} />
         <main className="frame__main">
           <Outlet />
         </main>
@@ -55,7 +58,7 @@ function FrameLayout() {
         <Outlet />
       </main>
       <AddBubble current={current} />
-      <BottomTabs activityCount={activityCount} messagesCount={messagesCount} showActivity={features.feed} showMessages={features.messages} />
+      <BottomTabs activityCount={activityCount} messagesCount={messagesCount} friendsCount={requestsCount} showActivity={features.feed} showMessages={features.messages} showFriends={features.friends} />
     </div>
   );
 }

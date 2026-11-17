@@ -33,7 +33,8 @@ describe('progress on the PC table', () => {
     fakeBackend({ entries: [watching(), makeEntry({ id: 'p2', title: 'Done', status: 'Completed', progress: 24, progressTotal: 24 })] });
     renderApp('/list/anime');
     expect(await screen.findByRole('columnheader', { name: 'Progress' })).toBeInTheDocument();
-    expect(await screen.findByText('7 / 24')).toBeInTheDocument();
+    expect(await screen.findByRole('spinbutton', { name: 'Episodes watched for Frieren' })).toHaveValue(7);
+    expect(screen.getByRole('spinbutton', { name: 'Total episodes for Frieren' })).toHaveValue(24);
     expect(screen.getByRole('button', { name: 'Decrease progress for Frieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Increase progress for Frieren' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Increase progress for Done' })).not.toBeInTheDocument();
@@ -42,7 +43,20 @@ describe('progress on the PC table', () => {
   it('shows just the count when the total is unknown', async () => {
     fakeBackend({ entries: [watching({ progress: 3, progressTotal: null })] });
     renderApp('/list/anime');
-    expect(await screen.findByText('3')).toBeInTheDocument();
+    expect(await screen.findByRole('spinbutton', { name: 'Episodes watched for Frieren' })).toHaveValue(3);
+    expect(screen.getByRole('spinbutton', { name: 'Total episodes for Frieren' })).toHaveValue(null);
+  });
+
+  it('typing a count saves it (clamped to the total); typing a total saves it', async () => {
+    const { calls } = fakeBackend({ entries: [watching({ progress: 3, progressTotal: null })] });
+    renderApp('/list/anime');
+    const count = await screen.findByRole('spinbutton', { name: 'Episodes watched for Frieren' });
+    await userEvent.clear(count);
+    await userEvent.type(count, '312{Enter}');
+    await waitFor(() => expect(progressPatches(calls)).toContainEqual({ progress: 312 }));
+    const total = screen.getByRole('spinbutton', { name: 'Total episodes for Frieren' });
+    await userEvent.type(total, '300{Enter}');
+    await waitFor(() => expect(progressPatches(calls)).toContainEqual({ progressTotal: 300, progress: 300 }));
   });
 
   it('rapid taps show at once and are saved as one PATCH with the final count', async () => {
@@ -50,7 +64,7 @@ describe('progress on the PC table', () => {
     renderApp('/list/anime');
     const inc = await screen.findByRole('button', { name: 'Increase progress for Frieren' });
     await userEvent.click(inc); await userEvent.click(inc); await userEvent.click(inc);
-    expect(screen.getByText('10 / 24')).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Episodes watched for Frieren' })).toHaveValue(10);
     await waitFor(() => expect(progressPatches(calls)).toEqual([{ progress: 10 }]));
   });
 
@@ -65,9 +79,10 @@ describe('progress on the PC table', () => {
     fakeBackend({ entries: [watching()], patchFail: () => ({ status: 400, body: { error: 'invalid' } }) });
     renderApp('/list/anime');
     await userEvent.click(await screen.findByRole('button', { name: 'Increase progress for Frieren' }));
-    expect(screen.getByText('8 / 24')).toBeInTheDocument();
+    const count = screen.getByRole('spinbutton', { name: 'Episodes watched for Frieren' });
+    expect(count).toHaveValue(8);
     expect(await screen.findByText("Couldn't save that change")).toBeInTheDocument();
-    expect(screen.getByText('7 / 24')).toBeInTheDocument();
+    await waitFor(() => expect(count).toHaveValue(7));
   });
 
   it('offers "Mark as Completed" at the total; one tap sets Completed and the control goes away', async () => {

@@ -68,14 +68,42 @@ export function useProgress(entry: Entry) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), PROGRESS_DEBOUNCE_MS);
   };
-  return { shown, total, bump };
+  /** A typed count (the text box): clamped, shown at once, saved right away. */
+  const setTo = (n: number) => {
+    const next = clampProgress(Math.max(0, Math.floor(n)), latest.current.progressTotal);
+    shownRef.current = next;
+    setShown(next);
+    void flush();
+  };
+  return { shown, total, bump, setTo };
+}
+
+/** A small number box that commits on blur or Enter; Escape puts the value back. */
+function NumberBox({ value, label, placeholder, onCommit }: { value: number | null; label: string; placeholder?: string; onCommit: (n: number | null) => void }) {
+  const [draft, setDraft] = useState(value === null ? '' : String(value));
+  useEffect(() => { setDraft(value === null ? '' : String(value)); }, [value]);
+  const commit = () => {
+    const t = draft.trim();
+    if (t === '') { onCommit(null); return; }
+    const n = Number(t);
+    if (!Number.isFinite(n) || n < 0) { setDraft(value === null ? '' : String(value)); return; }
+    onCommit(Math.min(100000, Math.floor(n)));
+  };
+  return (
+    <input type="number" inputMode="numeric" min={0} max={100000} step={1} className="ep-progress__input" aria-label={label}
+      placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { setDraft(value === null ? '' : String(value)); e.currentTarget.blur(); }
+      }} />
+  );
 }
 
 /** "7 / 24" with − and + (44px targets), and "Finished? Mark as Completed" at the total. Renders nothing off the in-progress statuses. */
 export function ProgressControl({ entry, className = '' }: { entry: Entry; className?: string }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const { shown, total, bump } = useProgress(entry);
+  const { shown, total, bump, setTo } = useProgress(entry);
   if (!showsProgress(entry)) return null;
   const done = total !== null && shown >= total;
   return (
@@ -83,9 +111,16 @@ export function ProgressControl({ entry, className = '' }: { entry: Entry; class
       <div className="ep-progress__row">
         <button type="button" className="ep-progress__btn" aria-label={`Decrease progress for ${entry.title}`}
           disabled={shown <= 0} onClick={() => bump(-1)}>−</button>
-        <span className="ep-progress__value" aria-label={`Progress for ${entry.title}: ${total !== null ? `${shown} of ${total}` : shown}`}>
-          {progressText(shown, total)}
-        </span>
+        {/* Typed boxes too (Dan, 2026-11-17: shows with hundreds of episodes): "count / total". */}
+        <NumberBox value={shown} label={`Episodes watched for ${entry.title}`} onCommit={(n) => setTo(n ?? 0)} />
+        <span className="ep-progress__of" aria-hidden="true">/</span>
+        <NumberBox value={total} label={`Total episodes for ${entry.title}`} placeholder="?"
+          onCommit={(n) => {
+            if (n === total) return;
+            const patch: Partial<Entry> = { progressTotal: n };
+            if (n !== null && shown > n) patch.progress = n;
+            void saveEntryChange(qc, entry, patch, () => toast.show(SAVE_FAILED));
+          }} />
         <button type="button" className="ep-progress__btn" aria-label={`Increase progress for ${entry.title}`}
           disabled={done} onClick={() => bump(1)}>+</button>
       </div>

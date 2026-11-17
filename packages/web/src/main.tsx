@@ -31,4 +31,16 @@ Promise.race([cachedMe(), timeout])
   .catch(() => {})
   .finally(render);
 
-registerSW({ immediate: true });
+// Look for a new version every 30 minutes while the app is open, and whenever it comes back to the
+// front (Dan, 2026-11-17: friends shouldn't have to close and reopen it). With autoUpdate, a new
+// version found this way installs and the page reloads into it.
+const UPDATE_EVERY_MS = 30 * 60 * 1000;
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registration) {
+    if (!registration) return;
+    const check = () => { if (navigator.onLine !== false) void registration.update().catch(() => {}); };
+    setInterval(check, UPDATE_EVERY_MS);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  },
+});

@@ -10,8 +10,10 @@ export function InstallSteps({ open, onClose, closeLabel = 'Not now' }: { open: 
     <section aria-labelledby="install-ios" className="install__block">
       <h3 id="install-ios" className="install__heading">iPhone / iPad (Safari)</h3>
       <ol className="install__steps">
-        <li>Tap <strong>Share</strong> at the bottom</li>
-        <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong></li>
+        <li>Tap <strong>⋯</strong> next to the address bar, then <strong>Share</strong> (older iPhones: tap <strong>Share</strong> at the bottom)</li>
+        <li>Scroll down the list (tap <strong>View More</strong> if you see it) and choose <strong>Add to Home Screen</strong></li>
+        <li>Not there? At the very bottom tap <strong>Edit Actions</strong>, add <strong>Add to Home Screen</strong>, then choose it</li>
+        <li>Keep <strong>Open as Web App</strong> on and tap <strong>Add</strong></li>
       </ol>
     </section>
   );

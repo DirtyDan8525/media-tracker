@@ -75,7 +75,8 @@ describe('Install steps', () => {
   it('shows both platforms with the manual steps when there is no install event', () => {
     render(<InstallSteps open onClose={() => {}} />);
     const d = within(screen.getByRole('dialog', { name: 'Install the app' }));
-    expect(d.getByText('Add to Home Screen')).toBeInTheDocument();
+    expect(d.getAllByText('Add to Home Screen').length).toBeGreaterThan(0);
+    expect(d.getByText('Edit Actions')).toBeInTheDocument();
     expect(d.getByText('Install app')).toBeInTheDocument();
     expect(d.queryByRole('button', { name: 'Install' })).not.toBeInTheDocument();
   });

@@ -320,3 +320,23 @@ test('Top 5: Share Anime Top 5 previews a 1080 × 1350 PNG and Save image downlo
   expect((await download).suggestedFilename()).toBe('top5-anime.png');
   await expect(page.getByText('Image saved')).toBeVisible();
 });
+
+test('Messages: it has its own place in the nav (phone bottom bar, PC side nav) and Top 5 is not in the phone bar', async ({ page }) => {
+  await signInAndSetUsername(page, 'e2e_user');
+  await page.goto('/list/anime');
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  await expect(nav.getByRole('link', { name: 'Messages' })).toBeVisible();
+  const phone = await page.locator('.bottom-tabs').isVisible();
+  if (phone) {
+    // Phone: Home, Activity, Search, Messages, More; Top 5 lives in More.
+    await expect(nav.getByRole('link', { name: /Top 5/ })).toHaveCount(0);
+    await nav.getByRole('link', { name: 'More' }).click();
+    await expect(page.getByRole('link', { name: 'Top 5' })).toBeVisible();
+  }
+  await nav.getByRole('link', { name: 'Messages' }).click();
+  await expect(page).toHaveURL(/\/messages$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Messages' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Recommended to you' })).toBeVisible();
+  await page.getByRole('link', { name: 'New' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'New chat' })).toBeVisible();
+});

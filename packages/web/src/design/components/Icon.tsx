@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { Category } from '@media-tracker/shared';
 
 export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down';
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -42,6 +42,9 @@ const PATHS: Record<IconName, ReactElement> = {
   'eye-off': <><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.5 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
   home: <path d="M3 11l9-8 9 8M5 9.5V21h5v-6h4v6h5V9.5" />,
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  messages: <path d="M4 5h16v11H9l-5 4z" />,
+  send: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
+  group: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
   share: <path d="M12 15V3M7 8l5-5 5 5M5 12v8h14v-8" />,
 };
 

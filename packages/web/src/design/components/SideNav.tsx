@@ -14,10 +14,11 @@ import { Icon } from './Icon';
  * enabled list with its cached count, then Import, Export my data and About at the foot. Top 5, Stats,
  * Sharpen my ratings and Settings are reached through Profile and More (Compare left with tiers, N9).
  */
-export function SideNav({ lists, counts, activityCount = 0, current, me }: {
+export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, current, me }: {
   lists: Category[];
   counts: Partial<Record<Category, number>>;
   activityCount?: number;
+  messagesCount?: number;
   current: Category | null;
   me: Pick<Me, 'username' | 'email' | 'avatarAt'> & Partial<Pick<Me, 'isAdmin'>>;
 }) {
@@ -45,6 +46,10 @@ export function SideNav({ lists, counts, activityCount = 0, current, me }: {
       <NavLink to="/activity" className="side-nav__link side-nav__link--split" aria-label={activityCount > 0 ? `Activity, ${countText(activityCount)} new` : undefined}>
         <span className="side-nav__link-start"><Icon name="activity" size={18} />Activity</span>
         {activityCount > 0 && <span className="count-pill">{countText(activityCount)}</span>}
+      </NavLink>
+      <NavLink to="/messages" className="side-nav__link side-nav__link--split" aria-label={messagesCount > 0 ? `Messages, ${countText(messagesCount)} unread` : undefined}>
+        <span className="side-nav__link-start"><Icon name="messages" size={18} />Messages</span>
+        {messagesCount > 0 && <span className="count-pill">{countText(messagesCount)}</span>}
       </NavLink>
       <div className="side-nav__divider" role="presentation" />
       {lists.map((c) => (

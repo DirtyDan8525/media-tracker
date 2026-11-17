@@ -58,3 +58,9 @@ Minor items that were noticed and deliberately not fixed (lean mode, 2026-11-16)
 - Sharpen on PC is only in Settings; add it to the side nav.
 - Home: tap Home on a list to scroll to top; Add-to could remember the last list; Activity's + opens the sheet in place.
 - Imported planned titles have no Plan to watch position until first reorder (listed last by date added).
+
+## Phase 6 messages
+- Chat list preview for a recommendation says "Recommended a title" (the server snippet has no title); include the title.
+- "Recommended to you · N" counts all recs, not unread ones.
+- Admin Delete account leaves that user's message pictures in R2 (rows cascade); an emptied group stays as an empty row.
+- Real R2 pictures and the phone chat height against the bottom bar weren't checked on a device.

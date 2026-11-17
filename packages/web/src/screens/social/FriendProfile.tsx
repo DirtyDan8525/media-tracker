@@ -23,6 +23,7 @@ import { useSessionMe } from '../../shell/SessionGate';
 import { ListCard } from '../StatsScreen';
 import { TopRow } from '../Top5Screen';
 import { CompareWithFriend } from './CompareWithFriend';
+import { MessageButton } from '../messages/MessageButton';
 import { CategoryChips, PersonAvatar, Tabs, who, type TabDef } from './parts';
 import '../../design/ratings.css';
 import '../../design/social.css';
@@ -155,6 +156,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
           <h1>{who(user)}</h1>
           {user.displayName && <span className="friend-id__user">@{user.username}</span>}
           {bio && <p className="friend-id__bio">{bio}</p>}
+          <MessageButton user={user} />
         </div>
         <dl className="friend-tiles">
           {tiles.map(([label, value]) => (

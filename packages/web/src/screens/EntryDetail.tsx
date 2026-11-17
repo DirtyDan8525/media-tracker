@@ -27,6 +27,8 @@ import { buildLookupQuery, isHttpUrl } from '../lookup/query';
 import { refetchEntry } from '../lookup/refetch';
 import { LIST_LABEL, seasonsEnabled } from '../nav';
 import { BackButton } from '../shell/BackButton';
+import { recFromEntry } from '../data/messages';
+import { ShareButton } from './messages/ShareButton';
 import { useSessionMe } from '../shell/SessionGate';
 import { ProgressControl } from './list/ProgressControl';
 import { DetailField } from './entry/DetailField';
@@ -109,7 +111,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory /></div>
+      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory /><ShareButton rec={recFromEntry(entry)} /></div>
       <div className="screen__body detail">
         <div className="detail__top">
           <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />

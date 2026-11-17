@@ -27,6 +27,14 @@ function backend(over: Record<string, never> | Record<string, unknown> = {}) {
 }
 
 describe('Friend profile', () => {
+  it('has a Message button that opens (or creates) the direct chat', async () => {
+    const calls = backend({ 'POST /api/conversations': { status: 201, body: { id: 'chat9', kind: 'direct', name: null, createdBy: 'u1', createdAt: '2026-11-17T00:00:00Z', members: [], readOnly: false } } }).calls;
+    const { router } = renderApp('/u/ren');
+    await userEvent.click(await screen.findByRole('button', { name: 'Message Ren' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/messages/chat9'));
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/conversations')?.body).toEqual({ userIds: ['id-ren'] });
+  });
+
   it('shows tabs Lists / Top 5 / Stats / Compare and read-only rows without edit controls', async () => {
     backend();
     renderApp('/u/ren');

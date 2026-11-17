@@ -6,6 +6,10 @@ import { AddByCodeScreen } from './screens/social/AddByCodeScreen';
 import { FriendEntryDetail } from './screens/social/FriendEntryDetail';
 import { FriendProfile } from './screens/social/FriendProfile';
 import { FriendsScreen } from './screens/social/FriendsScreen';
+import { ChatScreen } from './screens/messages/ChatScreen';
+import { MessagesScreen } from './screens/messages/MessagesScreen';
+import { NewChatScreen } from './screens/messages/NewChatScreen';
+import { RecommendedScreen } from './screens/messages/RecommendedScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { ListScreen } from './screens/ListScreen';
@@ -96,6 +100,10 @@ export const routes: RouteObject[] = [
           { path: 'import', element: <ImportRoute /> },
           { path: 'activity', element: <ActivityScreen /> },
           { path: 'search', element: <SearchScreen /> },
+          { path: 'messages', element: <MessagesScreen /> },
+          { path: 'messages/new', element: <NewChatScreen /> },
+          { path: 'messages/recommended', element: <RecommendedScreen /> },
+          { path: 'messages/:id', element: <ChatScreen /> },
           { path: 'profile', element: <ProfileScreen /> },
           { path: 'friends', element: <FriendsScreen /> },
           { path: 'add/:code', element: <AddByCodeScreen /> },

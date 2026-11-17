@@ -15,11 +15,11 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('the Main nav\'s links read Home, Activity, Search, Top 5, More: Compare left with tiers (N9)', async () => {
+    it('the Main nav\'s links read Home, Activity, Search, Messages, More: Messages replaced Top 5 (Phase 6, M8)', async () => {
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await mainNav();
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Top ', 'More']);
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Messages', 'More']);
       expect(within(nav).queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
       const cells = Array.from(nav.children);
       expect(cells).toHaveLength(5);
@@ -49,6 +49,22 @@ describe('app shell', () => {
       unread.feed = 0;
       await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
       await waitFor(() => expect(within(nav).getByRole('link', { name: 'Activity' }).querySelector('.count-pill')).toBeNull());
+    });
+
+    it('the Messages tab carries the unread badge: "Messages, 2 unread", nothing at 0, "99+" above 99; Top 5 is not in the bar', async () => {
+      const unread = { feed: 0, requests: 0, messages: 2 };
+      mockApi(makeMe(), { 'GET /api/activity/unread': () => ({ body: unread }) });
+      const { queryClient } = renderApp('/list/anime');
+      const nav = await mainNav();
+      const tab = await within(nav).findByRole('link', { name: 'Messages, 2 unread' });
+      expect(tab.querySelector('.count-pill')).toHaveTextContent('2');
+      expect(within(nav).queryByRole('link', { name: /Top 5/ })).not.toBeInTheDocument();
+      unread.messages = 120;
+      await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
+      expect(await within(nav).findByRole('link', { name: 'Messages, 99+ unread' })).toBeInTheDocument();
+      unread.messages = 0;
+      await queryClient.invalidateQueries({ queryKey: ['activity-unread'] });
+      await waitFor(() => expect(within(nav).getByRole('link', { name: 'Messages' }).querySelector('.count-pill')).toBeNull());
     });
 
     it('the profile button has a dot and reads "Profile, 1 friend request" when requests is 1', async () => {
@@ -112,7 +128,7 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Top 5', 'More']);
+      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Messages', 'More']);
       expect(nav.children).toHaveLength(5);
     });
 
@@ -122,7 +138,9 @@ describe('app shell', () => {
       ['/more', 'More'],
       ['/import', 'More'],
       ['/about', 'More'],
-      ['/top5', 'Top 5'],
+      ['/top5', 'More'],
+      ['/messages', 'Messages'],
+      ['/messages/new', 'Messages'],
       ['/stats', 'More'],
       ['/sharpen', 'More'],
     ])('on %s the current tab is %s', async (path, tab) => {
@@ -246,12 +264,23 @@ describe('app shell', () => {
       // every row, in document order: links and the Export button
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity',
+        'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity', 'Messages',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube',
         'Import', 'Export my data', 'About',
       ]);
       await screen.findByText('No anime yet');
       expect(nav.querySelector('.count-pill')).toBeNull();
+    });
+
+    it('PC: the side nav has a Messages row with the unread badge, after Activity', async () => {
+      setViewportWidth(1280);
+      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 0, messages: 3 } } });
+      renderApp('/list/anime');
+      const nav = await sideNav();
+      const row = await within(nav).findByRole('link', { name: 'Messages, 3 unread' });
+      expect(row).toHaveAttribute('href', '/messages');
+      const names = within(nav).getAllByRole('link').map((a) => a.textContent ?? '');
+      expect(names.findIndex((n) => n.startsWith('Messages'))).toBe(names.findIndex((n) => n.startsWith('Activity')) + 1);
     });
 
     it('no navigation is still called "Lists" on PC, and Top 5, Stats and Settings are not in the side nav', async () => {
@@ -347,7 +376,7 @@ describe('app shell', () => {
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
       const nav = await sideNav();
-      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube', 'Import', 'About']);
+      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Messages', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube', 'Import', 'About']);
       expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
     });
 
@@ -357,7 +386,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(5 + 9 + 2); // Profile, Add, Home, Search, Activity + 9 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(6 + 9 + 2); // Profile, Add, Home, Search, Activity, Messages + 9 lists + Import, About
     });
   });
 

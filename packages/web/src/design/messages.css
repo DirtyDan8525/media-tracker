@@ -1,0 +1,109 @@
+/* Messages (Phase 6 wireframes: MessagesList, Chat, NewChat, ShareRec, Recommended; calm v2 look). */
+
+/* Shared bits */
+.btn-stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.btn--big { min-height: 56px; font-size: 17px; border-radius: var(--radius-xl); }
+.person--button { width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; }
+.person--button:hover { background: var(--panel); }
+.person--button:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.chat-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); color: var(--bright-text); }
+.check-row {
+  display: flex; align-items: center; gap: var(--space-6); min-height: 56px; padding: var(--space-4) var(--space-6); border-radius: var(--radius-xl);
+  cursor: pointer; position: relative;
+}
+.check-row:hover { background: var(--alt-row); }
+.check-row.is-checked { background: var(--panel); }
+.check-row__box { width: 24px; height: 24px; flex: none; accent-color: var(--highlight); margin: 0; }
+.check-row:has(:focus-visible) { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.new-chat .btn { width: 100%; }
+
+/* Messages list */
+.messages-rec-link { min-height: 56px; border-radius: var(--radius-xl); background: var(--card); text-decoration: none; color: var(--text); }
+.convo-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.convo {
+  display: flex; align-items: center; gap: var(--space-6); min-height: 72px; padding: var(--space-5) var(--space-6); border-radius: var(--radius-xl);
+  color: var(--text); text-decoration: none;
+}
+.convo:hover { background: var(--alt-row); }
+.convo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.convo__meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.convo__title { font-size: var(--fs-body); font-weight: 600; color: var(--bright-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convo__preview { font-size: var(--fs-sm); color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convo.is-unread .convo__title, .convo.is-unread .convo__preview { color: var(--bright-text); font-weight: 700; }
+.convo__end { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); flex: none; }
+.convo__time { font-size: var(--fs-meta); color: var(--muted-text); font-variant-numeric: tabular-nums; }
+
+/* Chat: a column that fills the space above the bottom bar; only the message list scrolls. */
+.chat { height: 100dvh; min-height: 0; overflow: hidden; }
+.frame--phone .chat { height: calc(100dvh - var(--bottom-tabs-h) - env(safe-area-inset-bottom)); flex: none; }
+.chat__top { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-4); border-bottom: 1px solid var(--grid-line); flex: none; }
+.frame--wide .chat__top { padding: var(--space-8) var(--space-16); }
+.chat__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat__title { margin: 0; font-size: 18px; font-weight: 700; color: var(--bright-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat__sub { font-size: var(--fs-meta); color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat__menu { position: relative; flex: none; }
+.chat__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; overscroll-behavior: contain; }
+.frame--wide .chat__scroll { padding: var(--space-6) var(--space-16); }
+.chat__list { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: var(--space-2); margin-top: auto; }
+.chat__older { align-self: center; margin-bottom: var(--space-6); }
+.chat__empty { text-align: center; margin: auto; }
+.chat__day { text-align: center; margin: var(--space-6) 0 var(--space-3); font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: .06em; }
+.chat__readonly { flex: none; margin: 0; padding: var(--space-8); border-top: 1px solid var(--grid-line); background: var(--header-row); text-align: center; font-size: var(--fs-sm); color: var(--muted-text); }
+.chat__full { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; border-radius: var(--radius-lg); }
+
+.bubble-row { display: flex; align-items: flex-end; gap: var(--space-4); }
+.bubble-row--mine { justify-content: flex-end; }
+.bubble-row__gap { width: 32px; flex: none; }
+.bubble-col { display: flex; flex-direction: column; gap: var(--space-2); max-width: min(82%, 520px); min-width: 0; }
+.bubble-row--mine .bubble-col { align-items: flex-end; }
+.bubble__who { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding-left: var(--space-4); }
+.bubble-wrap { display: flex; align-items: center; gap: var(--space-2); }
+.bubble-row--mine .bubble-wrap { flex-direction: row-reverse; }
+.bubble { position: relative; padding: var(--space-5) var(--space-7); border-radius: 18px; background: var(--card); color: var(--text); min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bubble--mine { background: var(--panel); border-bottom-right-radius: 6px; }
+.bubble-row:not(.bubble-row--mine) .bubble { border-bottom-left-radius: 6px; }
+.bubble--deleted { background: transparent; border: 1px dashed var(--grid-line); }
+.bubble--rec { padding: var(--space-4); background: var(--card); }
+.bubble__text { font-size: var(--fs-body); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--bright-text); }
+.bubble__deleted { font-size: var(--fs-sm); font-style: italic; color: var(--muted-text); }
+.bubble__time { align-self: flex-end; font-size: 11px; color: var(--muted-text); font-variant-numeric: tabular-nums; }
+.bubble__photo { all: unset; display: block; cursor: pointer; border-radius: var(--radius-lg); overflow: hidden; min-width: 44px; min-height: 44px; }
+.bubble__photo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.bubble__photo img { display: block; max-width: 100%; max-height: 280px; width: auto; height: auto; background: var(--panel); }
+.bubble__opts { flex: none; }
+
+/* A recommendation card (in a chat and in Recommended to you) */
+.rec-card { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5); border-radius: var(--radius-xl); background: var(--card); min-width: 220px; }
+.bubble--rec .rec-card { padding: var(--space-3); }
+.rec-card__main { display: flex; gap: var(--space-6); align-items: center; }
+.rec-card__meta { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.rec-card__title { font-size: var(--fs-body); font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
+.rec-card__sub { font-size: var(--fs-meta); color: var(--muted-text); }
+.rec-card__rated { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--muted-text); }
+.rec-card__note { margin: 0; font-size: var(--fs-sm); color: var(--bright-text); overflow-wrap: anywhere; }
+.rec-card__action { width: 100%; min-height: var(--tap); text-decoration: none; }
+.rec-item { display: flex; flex-direction: column; gap: var(--space-3); }
+.rec-item__from { font-size: var(--fs-meta); color: var(--muted-text); padding: 0 var(--space-2); }
+
+/* Composer */
+.composer { flex: none; padding: var(--space-4) var(--space-4) var(--space-5); border-top: 1px solid var(--grid-line); background: var(--header-row); }
+.frame--wide .composer { padding: var(--space-6) var(--space-16) var(--space-8); }
+.composer__row { display: flex; align-items: flex-end; gap: var(--space-4); max-width: 760px; margin: 0 auto; }
+.composer__plus { position: relative; flex: none; }
+.composer__menu { position: absolute; bottom: calc(100% + var(--space-3)); left: 0; min-width: 200px; z-index: 5; }
+.composer__field { flex: 1; min-width: 0; min-height: 44px; max-height: 140px; resize: none; field-sizing: content; }
+.composer__send { flex: none; }
+.composer__status, .composer__count { margin: 0 auto var(--space-3); max-width: 760px; font-size: var(--fs-meta); color: var(--muted-text); }
+.composer__count { text-align: right; margin: var(--space-3) auto 0; }
+.composer__count.is-over { color: var(--bright-text); background: var(--cf-dropped); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); }
+
+/* Friend profile: the Message button under the name */
+.friend-id__message { margin-top: var(--space-5); min-height: var(--tap); }
+
+/* Title pages: the Share button at the right of the top bar */
+.detail-top { display: flex; align-items: center; }
+.detail-top__share { margin-left: auto; position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bubble-row { animation: fade-in var(--dur, .15s) both; }
+}

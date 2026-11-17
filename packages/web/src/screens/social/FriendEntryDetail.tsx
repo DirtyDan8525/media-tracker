@@ -12,6 +12,8 @@ import { Skeleton } from '../../design/components/Skeleton';
 import { StatusPill } from '../../design/components/StatusPill';
 import { useToast } from '../../design/components/Toast';
 import { BackButton } from '../../shell/BackButton';
+import { recFromEntry } from '../../data/messages';
+import { ShareButton } from '../messages/ShareButton';
 import { EntrySocial } from './EntrySocial';
 import '../../design/social.css';
 
@@ -74,7 +76,7 @@ function Body({ username, entry, seasons }: {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/u/${username}`} useHistory /></div>
+      <div className="detail-top"><BackButton to={`/u/${username}`} useHistory /><ShareButton rec={recFromEntry({ ...entry, rating: null })} /></div>
       <div className="screen__body detail">
         <div className="detail__top">
           <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero" />

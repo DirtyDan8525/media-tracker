@@ -32,11 +32,14 @@ export function useFeed(scope: FeedScope) {
   });
 }
 
+/** The badge counts: `messages` is the number of conversations with something new (Phase 6; absent from an older Worker). */
+export interface Unread { feed: number; requests: number; messages?: number }
+
 /** S8: the badge counts. Refetches on window focus and every minute while visible. */
 export function useUnread() {
   return useQuery({
     queryKey: UNREAD_KEY,
-    queryFn: () => api.get<{ feed: number; requests: number }>('/api/activity/unread'),
+    queryFn: () => api.get<Unread>('/api/activity/unread'),
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
@@ -49,7 +52,7 @@ export function useMarkSeen() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<void>('/api/activity/seen'),
-    onSuccess: () => qc.setQueryData<{ feed: number; requests: number }>(UNREAD_KEY, (old) => (old ? { ...old, feed: 0 } : old)),
+    onSuccess: () => qc.setQueryData<Unread>(UNREAD_KEY, (old) => (old ? { ...old, feed: 0 } : old)),
   });
 }
 

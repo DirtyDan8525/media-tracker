@@ -33,12 +33,14 @@ function FrameLayout() {
   const wide = useIsWide();
   const counts = useListCounts().data ?? {};
   const lists = enabledLists(me.settings);
-  const activityCount = useUnread().data?.feed ?? 0;
+  const unread = useUnread().data;
+  const activityCount = unread?.feed ?? 0;
+  const messagesCount = unread?.messages ?? 0;
   const current = useCurrentList();
   if (wide) {
     return (
       <div className="frame frame--wide">
-        <SideNav lists={lists} counts={counts} activityCount={activityCount} current={current} me={me} />
+        <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} current={current} me={me} />
         <main className="frame__main">
           <Outlet />
         </main>
@@ -51,7 +53,7 @@ function FrameLayout() {
         <Outlet />
       </main>
       <AddBubble current={current} />
-      <BottomTabs activityCount={activityCount} />
+      <BottomTabs activityCount={activityCount} messagesCount={messagesCount} />
     </div>
   );
 }

@@ -74,7 +74,7 @@ describe('Add bubble (phone)', () => {
   });
 
   it.each([
-    '/profile', '/more', '/compare', '/settings', '/settings/appearance', '/settings/tiers', '/admin', '/friends', '/u/ren', '/about', '/top5', '/stats', '/import',
+    '/profile', '/more', '/compare', '/settings', '/settings/appearance', '/settings/tiers', '/admin', '/friends', '/u/ren', '/about', '/top5', '/stats', '/import', '/messages', '/messages/new', '/messages/recommended',
   ])('is hidden on %s', async (path) => {
     mockApi(makeMe({ isAdmin: true }), { ...empty, 'GET /api/friends': { body: { friends: [], incoming: [], outgoing: [] } } });
     renderApp(path);

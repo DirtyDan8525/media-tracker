@@ -39,3 +39,15 @@ describe('backfillOne: source failure vs nothing found (R51)', () => {
     expect(patch).not.toHaveBeenCalled();
   });
 });
+
+describe('backfillOne: progress total', () => {
+  it('fills the total from the lookup when the entry has none, and keeps a typed one', async () => {
+    const withTotal = { details: { ...DETAILS, progressTotal: 12 } };
+    const a = deps(async () => withTotal);
+    await backfillOne(makeEntry({ id: 'a', title: 'Frieren' }), a.d);
+    expect(a.patch).toHaveBeenCalledWith('a', expect.objectContaining({ progressTotal: 12 }));
+    const b = deps(async () => withTotal);
+    await backfillOne(makeEntry({ id: 'b', title: 'Frieren', progressTotal: 30 }), b.d);
+    expect(b.patch).not.toHaveBeenCalledWith('b', expect.objectContaining({ progressTotal: expect.anything() }));
+  });
+});

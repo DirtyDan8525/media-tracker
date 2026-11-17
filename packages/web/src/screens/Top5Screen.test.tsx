@@ -30,7 +30,7 @@ describe('Top 5 screen', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Top 5' })).toBeInTheDocument();
     await screen.findByRole('heading', { level: 2, name: 'Anime' });
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books']);
+    expect(headings).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga']);
 
     const anime = screen.getByRole('region', { name: 'Anime' });
     const items = within(within(anime).getByRole('list')).getAllByRole('listitem');

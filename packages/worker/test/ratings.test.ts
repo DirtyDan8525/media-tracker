@@ -430,31 +430,34 @@ describe('deletes re-fit the set', () => {
 });
 
 describe('rating edits (N10)', () => {
-  it('a retype becomes the truth; picks against titles no longer close stop counting, and count again when close', async () => {
+  it('a re-rate trumps old picks (Dan, 2026-11-16): picks naming the title are undone and it shows its new number', async () => {
     const uid = await userId(A);
     const [x, y] = await seed(uid, 'anime', [9.5, 9.5]);
     await save(A, 'anime', { picks: [pick(y!, x!)] });
     expect(await ratingsOf('entries', [x!, y!])).toEqual([9.48, 9.52]);
-    let r = await patch(A, x!, { rating: 9.6 }); // still close: the pick still counts (y > x), so they swap
+    const r = await patch(A, x!, { rating: 9.6 }); // still close, but the old pick no longer counts
     expect(r.status).toBe(200);
-    expect(r.entry).toMatchObject({ typed: 9.6 });
-    expect(await ratingsOf('entries', [x!, y!])).toEqual([9.5, 9.6]);
-    r = await patch(A, x!, { rating: 8.5 }); // not close: both show their typed numbers
-    expect(await ratingsOf('entries', [x!, y!])).toEqual([8.5, 9.5]);
-    r = await patch(A, x!, { rating: 9.5 }); // close again: the kept pick counts again
-    expect(await ratingsOf('entries', [x!, y!])).toEqual([9.48, 9.52]);
-    expect(await comparisonsOf(uid)).toHaveLength(1);
+    expect(r.entry).toMatchObject({ typed: 9.6, rating: 9.6 });
+    expect(await ratingsOf('entries', [x!, y!])).toEqual([9.6, 9.5]);
+    await patch(A, x!, { rating: 9.5 }); // back to a tie: no pick revives
+    expect(await ratingsOf('entries', [x!, y!])).toEqual([9.5, 9.5]);
+    const ks = await comparisonsOf(uid);
+    expect(ks).toHaveLength(1);
+    expect(ks[0]!.undone_at).not.toBeNull(); // kept for Export, but undone
   });
 
-  it('a rating equal to the typed number is not an edit (nothing re-fits); tier and scoreLocked are ignored', async () => {
+  it('typing the same number again is still a re-rate when picks name it; with no picks it costs no set load', async () => {
     const uid = await userId(A);
     const [x, y] = await seed(uid, 'anime', [9.5, 9.5]);
     await save(A, 'anime', { picks: [pick(y!, x!)] });
-    const spy = spyD1(env.DB);
-    const res = await as(A, `/api/entries/${x}`, 'PATCH', { rating: 9.5, tier: 0, scoreLocked: true, notes: 'n' }, spy.db);
+    const res = await as(A, `/api/entries/${x}`, 'PATCH', { rating: 9.5, tier: 0, scoreLocked: true, notes: 'n' });
     expect(res.status).toBe(200);
-    expect(spy.queries).toBeLessThanOrEqual(6); // no set load
-    expect(await res.json()).toMatchObject({ rating: 9.48, typed: 9.5, tier: 3, scoreLocked: false, notes: 'n' });
+    expect(await res.json()).toMatchObject({ rating: 9.5, typed: 9.5, tier: 3, scoreLocked: false, notes: 'n' });
+    expect(await ratingsOf('entries', [x!, y!])).toEqual([9.5, 9.5]);
+    const spy = spyD1(env.DB);
+    const again = await as(A, `/api/entries/${x}`, 'PATCH', { rating: 9.5, notes: 'm' }, spy.db);
+    expect(again.status).toBe(200);
+    expect(spy.queries).toBeLessThanOrEqual(8);
   });
 
   it('a new title with no picks shows exactly its number; neighbours are not touched', async () => {

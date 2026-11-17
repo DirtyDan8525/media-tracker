@@ -153,7 +153,7 @@ suite('formatDetails', () => {
 
   it('formats all four fields', () => {
     expect(formatDetails(frieren)).toEqual({
-      releaseDate: '2023-09-29', synopsis: 'A mage & her party. Second line.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023',
+      releaseDate: '2023-09-29', synopsis: 'A mage & her party. Second line.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023', progressTotal: 28,
     });
   });
 
@@ -170,7 +170,7 @@ suite('formatDetails', () => {
 
   it('omits missing pieces, never prints undefined', () => {
     expect(formatDetails({ id: 1, episodes: 1, format: 'MOVIE' })).toEqual({
-      releaseDate: '', synopsis: '', lengthLabel: '1 ep', origin: 'Movie',
+      releaseDate: '', synopsis: '', lengthLabel: '1 ep', origin: 'Movie', progressTotal: 1,
     });
     expect(formatDetails({ id: 1, duration: 90, seasonYear: 1999 })).toMatchObject({ lengthLabel: '90 min', origin: '1999' });
     expect(formatDetails({ id: 1 })).toEqual({ releaseDate: '', synopsis: '', lengthLabel: '', origin: '' });

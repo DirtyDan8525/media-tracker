@@ -207,3 +207,17 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .search__input::-webkit-search-cancel-button,
 .search__input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .search__input { -webkit-appearance: none; appearance: none; }
+
+/* Episode progress (item 22): "7 / 24" with − and + */
+.entry-table .col-progress { width: 190px; white-space: nowrap; }
+.progress { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.progress__row { display: inline-flex; align-items: center; gap: var(--space-2); }
+.progress__btn {
+  min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--grid-line); border-radius: var(--radius-lg);
+  background: var(--card); color: var(--bright-text); font: 600 var(--fs-body) var(--font); cursor: pointer;
+}
+.progress__btn:hover:not(:disabled) { background: var(--panel); }
+.progress__btn:disabled { opacity: 0.4; cursor: default; }
+.progress__value { min-width: 4.5ch; text-align: center; font-variant-numeric: tabular-nums; color: var(--bright-text); font-weight: 600; }
+.progress__done { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); color: var(--muted-text); }
+.tile--progress { margin-top: var(--space-5); }

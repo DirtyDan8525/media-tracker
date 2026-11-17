@@ -169,7 +169,10 @@ export function formatMangaDetails(a: MangaAttrs): Details {
   const base = formatDetails(a);
   const lengthLabel = a.volumeCount ? plural(a.volumeCount, 'volume') : a.chapterCount ? plural(a.chapterCount, 'chapter') : '';
   const origin = a.subtype ? FORMAT_LABEL[a.subtype.toLowerCase()] ?? a.subtype : '';
-  return { releaseDate: base.releaseDate, synopsis: base.synopsis, lengthLabel, origin };
+  return {
+    releaseDate: base.releaseDate, synopsis: base.synopsis, lengthLabel, origin,
+    ...(a.chapterCount && a.chapterCount > 0 ? { progressTotal: a.chapterCount } : {}),
+  };
 }
 
 // ---- details ----------------------------------------------------------------
@@ -184,7 +187,10 @@ export function formatDetails(a: KitsuAttrs): Details {
   const lengthLabel = [a.episodeCount ? `${a.episodeCount} ep` : '', a.episodeLength ? `${a.episodeLength} min` : ''].filter(Boolean).join(' · ');
   const subtype = a.subtype ? SUBTYPE_LABEL[a.subtype.toLowerCase()] ?? a.subtype : '';
   const origin = [subtype, yearOf(a)].filter(Boolean).join(' · ');
-  return { releaseDate, synopsis: a.synopsis ? trimSynopsis(a.synopsis, 600) : '', lengthLabel, origin };
+  return {
+    releaseDate, synopsis: a.synopsis ? trimSynopsis(a.synopsis, 600) : '', lengthLabel, origin,
+    ...(a.episodeCount && a.episodeCount > 0 ? { progressTotal: a.episodeCount } : {}),
+  };
 }
 
 export const details: DetailsFn = async (sourceId: string, d: LookupDeps): Promise<Details | null> => {

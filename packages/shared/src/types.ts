@@ -52,6 +52,8 @@ export interface Details {
   synopsis: string;
   lengthLabel: string;
   origin: string;
+  /** Episode or chapter total when the source knows it (anime episodes, manga chapters). Absent when unknown. */
+  progressTotal?: number;
 }
 
 export const ORIGIN_LABEL: Record<Category, string> = {
@@ -102,6 +104,10 @@ export interface Entry {
   typed?: number | null;
   /** Position in the list's Plan to watch order (1 = up next); null when not planned or not yet placed (absent on rows cached before Phase 5). */
   planOrder?: number | null;
+  /** Episodes watched / chapters read (anime, TV, manga); null when never counted (absent on rows cached before 0010). */
+  progress?: number | null;
+  /** Episode or chapter total when known (from a lookup or typed); null when unknown. */
+  progressTotal?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -196,3 +202,21 @@ export interface ImportPreview {
 export const PLAN_STATUS: Status = 'Plan to watch';
 /** Most titles one plan-order save may carry. */
 export const PLAN_ORDER_MAX = 500;
+
+/** Statuses that mean "in progress": the progress counter shows only for these (stored values). */
+export const PROGRESS_STATUSES: readonly Status[] = ['Watching / In Progress', 'Rewatching'];
+/** The most a progress count or total may be (API limit). */
+export const PROGRESS_MAX = 100000;
+/** Lists that count episodes or chapters. */
+export const PROGRESS_CATEGORIES: readonly Category[] = ['anime', 'tv', 'manga'];
+
+/** True when the progress control applies: a progress list and an in-progress status. */
+export function showsProgress(e: Pick<Entry, 'category' | 'status'>): boolean {
+  return PROGRESS_CATEGORIES.includes(e.category) && e.status !== null && PROGRESS_STATUSES.includes(e.status);
+}
+
+/** Clamps a progress count to 0..total (0..PROGRESS_MAX when the total is unknown). */
+export function clampProgress(n: number, total: number | null | undefined): number {
+  const max = total != null && total >= 0 ? total : PROGRESS_MAX;
+  return Math.min(Math.max(Math.trunc(n), 0), max);
+}

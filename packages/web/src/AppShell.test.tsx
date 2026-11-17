@@ -357,7 +357,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(5 + 7 + 2); // Profile, Add, Home, Search, Activity + 7 lists + Import, About
+      expect(linkNames(nav)).toHaveLength(5 + 8 + 2); // Profile, Add, Home, Search, Activity + 8 lists + Import, About
     });
   });
 

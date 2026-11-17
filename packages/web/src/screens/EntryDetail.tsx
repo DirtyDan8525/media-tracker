@@ -1,5 +1,5 @@
 import {
-  CATEGORY_CONFIG, ORIGIN_LABEL, PLAN_STATUS, STATUSES, formatRating, sourceUrl, statusLabel, type Entry, type LookupInfo, type Status,
+  CATEGORY_CONFIG, ORIGIN_LABEL, PLAN_STATUS, PROGRESS_CATEGORIES, PROGRESS_MAX, clampProgress, showsProgress, STATUSES, formatRating, sourceUrl, statusLabel, type Entry, type LookupInfo, type Status,
 } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
@@ -28,6 +28,7 @@ import { refetchEntry } from '../lookup/refetch';
 import { LIST_LABEL, seasonsEnabled } from '../nav';
 import { BackButton } from '../shell/BackButton';
 import { useSessionMe } from '../shell/SessionGate';
+import { ProgressControl } from './list/ProgressControl';
 import { DetailField } from './entry/DetailField';
 import { SeasonsEditor } from './entry/SeasonsEditor';
 import { useCloseCall } from './sharpen/CloseCallSheet';
@@ -163,6 +164,13 @@ function DetailBody({ entry }: { entry: Entry }) {
           )}
         </div>
 
+        {showsProgress(entry) && (
+          <div className="tile tile--progress" role="group" aria-label="Progress">
+            <span className="field-label">Progress</span>
+            <ProgressControl entry={entry} />
+          </div>
+        )}
+
         {entry.detailsState === 'needs_review' && <PickMatch entry={entry} />}
 
         {entry.synopsis && (
@@ -210,6 +218,17 @@ function DetailBody({ entry }: { entry: Entry }) {
               onSave={(coverUrl) => save({ coverUrl: coverUrl.trim() })} />
             <DetailField label="Release date" value={entry.releaseDate} placeholder="YYYY or YYYY-MM-DD"
               check={(v) => (v === '' || DATE_RE.test(v) ? null : 'Use YYYY or YYYY-MM-DD.')} onSave={(releaseDate) => save({ releaseDate })} />
+            {PROGRESS_CATEGORIES.includes(entry.category) && (
+              <DetailField label={entry.category === 'manga' ? 'Total chapters' : 'Total episodes'} type="number" placeholder="Unknown"
+                value={entry.progressTotal == null ? '' : String(entry.progressTotal)}
+                check={(v) => (v === '' || (/^\d+$/.test(v) && Number(v) <= PROGRESS_MAX) ? null : `Enter a whole number up to ${PROGRESS_MAX}, or leave it empty.`)}
+                onSave={(v) => {
+                  const progressTotal = v === '' ? null : Number(v);
+                  // A count above a new total comes down to it.
+                  const progress = progressTotal !== null && (entry.progress ?? 0) > progressTotal ? clampProgress(entry.progress ?? 0, progressTotal) : undefined;
+                  save({ progressTotal, ...(progress !== undefined ? { progress } : {}) });
+                }} />
+            )}
             <DetailField label="Length" value={entry.lengthLabel} maxLength={300} onSave={(lengthLabel) => save({ lengthLabel })} />
             <DetailField label={ORIGIN_LABEL[entry.category]} value={entry.origin} maxLength={300} onSave={(origin) => save({ origin })} />
             <DetailField label="Synopsis" multiline value={entry.synopsis} maxLength={5000} onSave={(synopsis) => save({ synopsis })} />

@@ -78,7 +78,7 @@ describe('mangaToInfo', () => {
 describe('formatMangaDetails', () => {
   it('year, trimmed synopsis, volumes else chapters, and the format', () => {
     expect(formatMangaDetails({ startDate: '1989-08-25', synopsis: 'Guts &amp; Griffith.', volumeCount: 41, chapterCount: 364, subtype: 'manga' })).toEqual({
-      releaseDate: '1989-08-25', synopsis: 'Guts & Griffith.', lengthLabel: '41 volumes', origin: 'Manga',
+      releaseDate: '1989-08-25', synopsis: 'Guts & Griffith.', lengthLabel: '41 volumes', origin: 'Manga', progressTotal: 364,
     });
     expect(formatMangaDetails({ volumeCount: 1 }).lengthLabel).toBe('1 volume');
     expect(formatMangaDetails({ volumeCount: 0, chapterCount: 12 }).lengthLabel).toBe('12 chapters');

@@ -18,12 +18,22 @@
   }
   .frame--wide .profile__body > * { grid-column: 1 / -1; }
   .frame--wide .profile__body > .profile__col { grid-column: auto; display: flex; flex-direction: column; gap: var(--space-8); }
+  /* Banner (item 23): a tall cover backdrop; the photo straddles its bottom edge with the name, @username and bio beside it. */
+  .frame--wide .profile__banner, .frame--wide .page-header.has-backdrop.profile__banner { min-height: 280px; padding-bottom: 0; }
   .frame--wide .profile__id {
-    flex-direction: row; align-items: center; gap: var(--space-14); margin-top: 0; text-align: left;
-    padding: var(--space-12) var(--space-14); border-radius: 18px; background: var(--header-row); border: 1px solid var(--grid-line);
+    display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; grid-template-rows: 56px auto auto auto auto;
+    column-gap: var(--space-10); row-gap: var(--space-1); align-items: start;
+    margin-top: -56px; text-align: left; padding: 0 var(--space-4); background: none; border: none;
   }
+  .frame--wide .profile__photo { grid-column: 1; grid-row: 1 / span 5; }
+  .frame--wide .profile__display, .frame--wide .profile__name, .frame--wide .profile__bio, .frame--wide .profile__since { grid-column: 2; text-align: left; }
+  .frame--wide .profile__display { grid-row: 2; font-size: var(--fs-title); }
+  .frame--wide .profile__name { grid-row: 3; font-size: 20px; color: var(--text); }
+  .frame--wide .profile__bio { grid-row: 4; max-width: 60ch; margin-top: var(--space-2); }
+  .frame--wide .profile__since { grid-row: 5; }
+  .frame--wide .profile__photo-actions { grid-column: 3; grid-row: 2; justify-content: flex-end; }
+  .frame--wide .profile__edit { grid-column: 3; grid-row: 3; justify-self: end; }
   .frame--wide .profile__photo .avatar { width: 112px !important; height: 112px !important; font-size: 48px !important; }
-  .frame--wide .profile__name { font-size: 34px; }
   .frame--wide .profile__since { font-size: 16px; }
   .frame--wide .profile__tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-8); }
   .frame--wide .profile-tile { padding: var(--space-8) var(--space-10); }
@@ -35,7 +45,8 @@
   .frame--wide .wide-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-9) var(--space-12); align-items: start; }
   .frame--wide .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); align-items: stretch; }
   .frame--wide .stats > .load-notice, .frame--wide .stats > .stats__lists, .frame--wide .stats > .stats__genres { grid-column: 1 / -1; }
-  .frame--wide .top5 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-12) var(--space-12); align-items: start; }
+  /* Columns only as many as fit (a friend's profile is narrower than the Top 5 page; Dan, 2026-11-17). */
+  .frame--wide .top5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: var(--space-12) var(--space-12); align-items: start; }
   .frame--wide .top5 > :not(.top5__block) { grid-column: 1 / -1; }
   .frame--wide .social-page .people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); }
 }
@@ -43,8 +54,12 @@
 @media (min-width: 1440px) {
   .frame--wide .screen__body { max-width: 1280px; }
   .frame--wide .screen:has(.feed-post) .screen__body { max-width: 820px; }
-  .frame--wide .top5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .frame--wide .stats, .frame--wide .wide-cols, .frame--wide .social-page, .frame--wide .top5 {
     --fs-body: 16px; --fs-sm: 15px; --fs-meta: 14px; --fs-lg: 17px;
   }
+}
+
+/* The banner grows with the screen: 280px from 1024px, up to 360px from 1440px. */
+@media (min-width: 1440px) {
+  .frame--wide .profile__banner, .frame--wide .page-header.has-backdrop.profile__banner { min-height: clamp(320px, 24vw, 360px); }
 }

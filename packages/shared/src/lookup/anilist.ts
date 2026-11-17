@@ -213,7 +213,10 @@ export function formatDetails(m: Media): Details {
   const season = [m.season ? titleCase(m.season) : '', m.seasonYear || ''].filter(Boolean).join(' ');
   const origin = [format, season].filter(Boolean).join(' · ');
 
-  return { releaseDate, synopsis: m.description ? trimSynopsis(m.description, 600) : '', lengthLabel, origin };
+  return {
+    releaseDate, synopsis: m.description ? trimSynopsis(m.description, 600) : '', lengthLabel, origin,
+    ...(m.episodes && m.episodes > 0 ? { progressTotal: m.episodes } : {}),
+  };
 }
 
 /** The four detail fields for an AniList id; null when AniList has no such entry. Throws SourceFailure when it could not answer. */

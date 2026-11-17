@@ -28,7 +28,7 @@ describe('fillDetails', () => {
     await fillDetails(makeQueryClient(), entry, { source: 'anilist', sourceId: '154587' });
     expect(serverDetails(calls)).toHaveLength(0);
     expect(patches(calls).map((c) => c.body)).toEqual([{
-      releaseDate: '2023-09-29', synopsis: 'An elf outlives her party.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023', detailsState: 'filled',
+      releaseDate: '2023-09-29', synopsis: 'An elf outlives her party.', lengthLabel: '28 ep · 24 min', origin: 'TV · Fall 2023', detailsState: 'filled', progressTotal: 28,
     }]);
   });
 

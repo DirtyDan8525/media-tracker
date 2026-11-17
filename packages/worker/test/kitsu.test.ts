@@ -91,7 +91,7 @@ describe('kitsu details', () => {
       startDate: '2023-09-29', synopsis: 'A <b>mage</b> &amp; her party.', episodeCount: 28, episodeLength: 24, subtype: 'TV',
     }) } });
     expect(await details('46474', deps(f))).toEqual({
-      releaseDate: '2023-09-29', synopsis: 'A mage & her party.', lengthLabel: '28 ep · 24 min', origin: 'TV · 2023',
+      releaseDate: '2023-09-29', synopsis: 'A mage & her party.', lengthLabel: '28 ep · 24 min', origin: 'TV · 2023', progressTotal: 28,
     });
   });
 

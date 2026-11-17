@@ -7,6 +7,7 @@ import {
   seasonSetOf,
   tiersFor,
   type Category,
+  type Comparison,
   type Entry,
   type RatedItem,
   type Season,
@@ -39,6 +40,7 @@ export interface EntryRow {
   import_id: string | null; season_avg: number | null; created_at: string; updated_at: string;
   tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
   plan_order: number | null;
+  progress: number | null; progress_total: number | null;
   typed: number | null;
 }
 export interface SeasonRow {
@@ -81,6 +83,8 @@ export function rowToEntry(r: EntryRow): Entry {
     strength: r.strength,
     scoreLocked: r.score_locked === 1,
     planOrder: r.plan_order ?? null,
+    progress: r.progress ?? null,
+    progressTotal: r.progress_total ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -103,7 +107,7 @@ const COLUMNS: Record<keyof PlainFields, string> = {
   creator: 'creator', album: 'album', coverUrl: 'cover_url', notes: 'notes', releaseDate: 'release_date',
   synopsis: 'synopsis', lengthLabel: 'length_label', origin: 'origin', detailsState: 'details_state',
   isPrivate: 'is_private', notesPrivate: 'notes_private', source: 'source', sourceId: 'source_id',
-  lookupState: 'lookup_state',
+  lookupState: 'lookup_state', progress: 'progress', progressTotal: 'progress_total',
 };
 const dbValue = (v: unknown) => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
 
@@ -133,16 +137,27 @@ async function editStored(
   db: D1Database, userId: string, set: Parameters<typeof loadSet>[2], tiers: Parameters<typeof loadSet>[3],
   current: RatedItem, id: string, edit: RatingEdit,
 ): Promise<null | 'invalid' | 'gone' | { stmts: D1PreparedStatement[]; before: RatedItem; item: RatedItem }> {
-  // Checked on the row first, so a no-op edit costs no extra queries.
+  // A typed number is a re-rate: it trumps every old pick naming this title (Dan, 2026-11-16 —
+  // amends N3: those picks are marked undone, not just ignored while far apart), even when the same
+  // number is typed again. Checked on the row first, so a no-op edit without picks costs no extra queries.
+  const rerate = typeof edit.rating === 'number';
   const pre = applyRatingEdit(current, edit, tiers);
-  if (pre === null || pre === 'invalid') return pre;
+  if (pre === 'invalid' || (pre === null && !rerate)) return pre;
   const loaded = await loadSet(db, userId, set, tiers);
   const before = loaded.items.find((i) => i.id === id);
   if (!before) return 'gone';
   const next = applyRatingEdit(before, edit, tiers);
-  if (next === null || next === 'invalid') return next;
-  const { changed, item } = planEdit(loaded, next, tiers);
-  return { stmts: setWriteStatements(db, userId, set, changed, loaded.stored), before, item };
+  if (next === 'invalid') return next;
+  const named = (k: Comparison) => k.winnerId === id || k.loserId === id;
+  const dropPicks = rerate && loaded.comparisons.some(named);
+  if (next === null && !dropPicks) return null;
+  const plan = dropPicks ? { ...loaded, comparisons: loaded.comparisons.filter((k) => !named(k)) } : loaded;
+  const { changed, item } = planEdit(plan, next ?? before, tiers);
+  const undo = dropPicks
+    ? [db.prepare('UPDATE comparisons SET undone_at = ?3 WHERE user_id = ?1 AND (winner_id = ?2 OR loser_id = ?2) AND undone_at IS NULL')
+      .bind(userId, id, new Date().toISOString())]
+    : [];
+  return { stmts: [...undo, ...setWriteStatements(db, userId, set, changed, loaded.stored)], before, item };
 }
 
 async function readJson(req: Request): Promise<unknown> {
@@ -306,14 +321,18 @@ entries.patch('/entries/:id', async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
   const userId = c.var.user.id;
-  const owned = await db.prepare('SELECT category, rating, typed, tier, prior_mean, strength, score_locked FROM entries WHERE id = ? AND user_id = ?')
+  const owned = await db.prepare('SELECT category, rating, typed, tier, prior_mean, strength, score_locked, progress, progress_total FROM entries WHERE id = ? AND user_id = ?')
     .bind(id, userId)
-    .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number }>();
+    .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number; progress: number | null; progress_total: number | null }>();
   if (!owned) return c.json(notFound, 404);
 
   const v = validateEntryInput(await readJson(c.req.raw), 'patch', owned.category);
   if (!v.ok) return c.json(invalid, 400);
   const { rest, edit, hasEdit } = splitRating(v.value);
+  // The count may not pass the total, whichever of the two this patch changes.
+  const nextProgress = 'progress' in rest ? rest.progress : owned.progress;
+  const nextTotal = 'progressTotal' in rest ? rest.progressTotal : owned.progress_total;
+  if (nextProgress != null && nextTotal != null && nextProgress > nextTotal) return c.json(invalid, 400);
 
   let ratingStmts: D1PreparedStatement[] = [];
   const queued: D1PreparedStatement[] = [];

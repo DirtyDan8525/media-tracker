@@ -6,7 +6,7 @@ export type BackfillResult = 'filled' | 'needs_review' | 'skipped';
 export type { LookupQuery };
 
 /** The body of PATCH /api/entries/:id: the four detail fields and detailsState, nothing else. */
-export type BackfillPatch = Partial<Pick<Entry, 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin'>> & {
+export type BackfillPatch = Partial<Pick<Entry, 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'progressTotal'>> & {
   detailsState: 'filled' | 'needs_review';
 };
 
@@ -50,6 +50,8 @@ export async function backfillOne(entry: Entry, deps: BackfillDeps): Promise<Bac
       const incoming = details?.[f];
       if (!entry[f] && incoming) body[f] = incoming;
     }
+    // The episode/chapter total: only when none is stored (a typed total is never overwritten).
+    if (details?.progressTotal && entry.progressTotal == null) body.progressTotal = details.progressTotal;
     // A confirmed match whose source answered with nothing (more) to add is still done: mark it filled so it isn't re-queried.
 
     await deps.patch(entry.id, body);

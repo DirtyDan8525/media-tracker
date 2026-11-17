@@ -73,7 +73,7 @@ describe('Stats screen', () => {
 
   it('shows a table by list on PC with column headers, a row per list and an All media row', async () => {
     setViewportWidth(1200);
-    fakeBackend({ entries: rows(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false }) });
+    fakeBackend({ entries: rows(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false, manga: false }) });
     renderApp('/stats');
     const table = await screen.findByRole('table', { name: 'Stats by list' });
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent);
@@ -124,7 +124,7 @@ describe('Stats screen', () => {
   });
 
   it('shows compact cards per list on a phone, not a table', async () => {
-    fakeBackend({ entries: rows(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false }) });
+    fakeBackend({ entries: rows(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false, manga: false }) });
     renderApp('/stats');
     const cards = await screen.findByRole('list', { name: 'Stats by list' });
     expect(screen.queryByRole('table', { name: 'Stats by list' })).not.toBeInTheDocument();
@@ -147,7 +147,7 @@ describe('Stats screen', () => {
     const { unmount } = renderApp('/stats');
     expect(await screen.findByText('Nothing to count yet')).toBeInTheDocument();
     unmount();
-    fakeBackend({ entries: [], me: makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false }) });
+    fakeBackend({ entries: [], me: makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false, manga: false }) });
     renderApp('/stats');
     expect(await screen.findByText('Turn a list on in Settings, then add some titles.')).toBeInTheDocument();
   });

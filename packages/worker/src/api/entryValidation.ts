@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, PROGRESS_MAX, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
 
 const SOURCES = ['anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb'];
 const LOOKUP_STATES = ['ok', 'not_found', 'pending'];
@@ -12,9 +12,9 @@ export type EntryFields = Partial<
     Entry,
     | 'title' | 'typedTitle' | 'status' | 'rating' | 'genres' | 'creator' | 'album' | 'coverUrl' | 'notes'
     | 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'detailsState' | 'isPrivate' | 'notesPrivate'
-    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked'
+    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked' | 'progressTotal'
   >
-> & { tier?: Tier };
+> & { tier?: Tier; progress?: number };
 
 export type EntryValidation = { ok: true; value: EntryFields } | { ok: false };
 export type SeasonFields = { label?: string; rating?: number | null; notes?: string; tier?: Tier; scoreLocked?: boolean };
@@ -46,6 +46,8 @@ function isCoverUrl(v: unknown): boolean {
   }
 }
 
+const isProgressInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= PROGRESS_MAX;
+
 // key -> validator for the simple, category-independent fields.
 const FIELD_CHECKS: Record<string, (v: unknown) => boolean> = {
   typedTitle: (v) => isStr(v, 300),
@@ -67,6 +69,8 @@ const FIELD_CHECKS: Record<string, (v: unknown) => boolean> = {
   rating: isValidRating,
   tier: isTier,
   scoreLocked: (v) => typeof v === 'boolean',
+  progress: isProgressInt,
+  progressTotal: (v) => v === null || isProgressInt(v),
 };
 
 /**
@@ -94,6 +98,8 @@ export function validateEntryInput(input: unknown, mode: 'create' | 'patch', cat
     if (s !== null && !CATEGORY_CONFIG[category].hasStatus) return { ok: false };
     out.status = s;
   }
+  // Both sent together: the count may not pass the total. (A patch sending one is checked against the stored other.)
+  if (typeof out.progress === 'number' && typeof out.progressTotal === 'number' && out.progress > out.progressTotal) return { ok: false };
   return { ok: true, value: out as EntryFields };
 }
 

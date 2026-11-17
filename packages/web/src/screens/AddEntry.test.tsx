@@ -173,7 +173,7 @@ describe('the Add sheet: "Add to" list dropdown', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(button);
     const items = within(screen.getByRole('menu', { name: 'Add to' })).getAllByRole('menuitemradio');
-    expect(items.map((i) => i.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books']);
+    expect(items.map((i) => i.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga']);
     expect(items.filter((i) => i.getAttribute('aria-checked') === 'true').map((i) => i.textContent)).toEqual(['Movies']);
   });
 

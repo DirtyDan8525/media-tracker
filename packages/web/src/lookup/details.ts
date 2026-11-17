@@ -27,6 +27,8 @@ export async function fillDetails(qc: QueryClient, entry: Entry, info: Pick<Look
       lengthLabel: clip(details.lengthLabel, 300),
       origin: clip(details.origin, 300),
       detailsState: 'filled',
+      // Only when none is stored: a total the person typed is never overwritten.
+      ...(details.progressTotal && entry.progressTotal == null ? { progressTotal: details.progressTotal } : {}),
     });
     writeEntry(qc, saved);
   } catch {

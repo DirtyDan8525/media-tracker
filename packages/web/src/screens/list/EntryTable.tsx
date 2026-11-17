@@ -114,11 +114,11 @@ function TableRow({ entry: e, index, showSeasonAvg, ...actions }: { entry: Entry
           <EditableCell
             col="notes" kind="text" label={`Notes for ${e.title}`} maxLength={5000}
             viewLabel={`Notes for ${e.title}: ${e.notes || 'empty'}`}
-            view={e.notes ? <span className="cell-notes">{e.notes}</span> : <span className="muted">Add a note</span>}
+            view={e.notes ? <span className="cell-notes" title={e.notes}>{e.notes}</span> : <span className="muted">Add a note</span>}
             initial={e.notes}
             validate={(raw) => ({ ok: true, value: raw })} onSave={(notes) => save({ notes })}
           />
-        ) : <span className="cell-notes">{e.notes}</span>}
+        ) : <span className="cell-notes" title={e.notes || undefined}>{e.notes}</span>}
       </td>
     </tr>
   );

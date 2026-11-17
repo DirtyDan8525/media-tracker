@@ -79,20 +79,20 @@ export function ProgressControl({ entry, className = '' }: { entry: Entry; class
   if (!showsProgress(entry)) return null;
   const done = total !== null && shown >= total;
   return (
-    <div className={`progress ${className}`.trim()}>
-      <div className="progress__row">
-        <button type="button" className="progress__btn" aria-label={`Decrease progress for ${entry.title}`}
+    <div className={`ep-progress ${className}`.trim()}>
+      <div className="ep-progress__row">
+        <button type="button" className="ep-progress__btn" aria-label={`Decrease progress for ${entry.title}`}
           disabled={shown <= 0} onClick={() => bump(-1)}>−</button>
-        <span className="progress__value" aria-label={`Progress for ${entry.title}: ${total !== null ? `${shown} of ${total}` : shown}`}>
+        <span className="ep-progress__value" aria-label={`Progress for ${entry.title}: ${total !== null ? `${shown} of ${total}` : shown}`}>
           {progressText(shown, total)}
         </span>
-        <button type="button" className="progress__btn" aria-label={`Increase progress for ${entry.title}`}
+        <button type="button" className="ep-progress__btn" aria-label={`Increase progress for ${entry.title}`}
           disabled={done} onClick={() => bump(1)}>+</button>
       </div>
       {done && (
-        <p className="progress__done">
+        <p className="ep-progress__done">
           <span>Finished?</span>{' '}
-          <button type="button" className="link-btn progress__finish" aria-label={`Mark ${entry.title} as Completed`}
+          <button type="button" className="link-btn ep-progress__finish" aria-label={`Mark ${entry.title} as Completed`}
             onClick={() => void saveEntryChange(qc, entry, { status: 'Completed' }, () => toast.show(SAVE_FAILED))}>
             Mark as Completed
           </button>

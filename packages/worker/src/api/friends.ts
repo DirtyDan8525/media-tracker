@@ -151,12 +151,13 @@ friends.delete('/:userId', async (c) => {
   return c.body(null, 204);
 });
 
-// 1 query (+ sign-in). Registered before /:username.
+// 1 query (+ sign-in). Registered before /:username. Empty q = everyone (Dan, 2026-11-16: the Add friend
+// sheet lists all accounts; a private friend group, so up to 200 by username).
 users.get('/search', async (c) => {
   const q = (c.req.query('q') ?? '').toLowerCase();
-  if (!USERNAME_Q_RE.test(q)) return c.json(invalid, 400);
+  if (q !== '' && !USERNAME_Q_RE.test(q)) return c.json(invalid, 400);
   const { results } = await c.env.DB.prepare(
-    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND status = 'active' AND id <> ?1 AND substr(username, 1, ?2) = ?3 ORDER BY username LIMIT 10`,
+    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND status = 'active' AND id <> ?1 AND substr(username, 1, ?2) = ?3 ORDER BY username LIMIT ${q === '' ? 200 : 10}`,
   )
     .bind(c.var.user.id, q.length, q)
     .all<PublicUserRow>();

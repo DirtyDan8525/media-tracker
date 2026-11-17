@@ -29,10 +29,20 @@ describe('Add friend sheet', () => {
     });
     const dialog = await openSheet();
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Username' }), 're');
+    await waitFor(() => expect(calls.some((c) => c.method === 'GET' && c.path === '/api/users/search?q=re')).toBe(true));
     await userEvent.click(await within(dialog).findByRole('button', { name: 'Add @ren' }));
     expect(await within(dialog).findByText('Requested')).toBeInTheDocument();
-    expect(calls.find((c) => c.method === 'GET' && c.path.startsWith('/api/users/search'))?.path).toBe('/api/users/search?q=re');
+    expect(calls.some((c) => c.method === 'GET' && c.path === '/api/users/search?q=re')).toBe(true);
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/friends/requests')?.body).toEqual({ username: 'ren' });
+  });
+
+  it('lists everyone before you type, each with Add', async () => {
+    const { calls } = open({ 'GET /api/users/search': { body: [U('alberto'), U('ren'), U('vance')] } });
+    const dialog = await openSheet();
+    const list = await within(dialog).findByRole('list', { name: 'Everyone' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(list).getByRole('button', { name: 'Add @vance' })).toBeInTheDocument();
+    expect(calls.find((c) => c.method === 'GET' && c.path.startsWith('/api/users/search'))?.path).toBe('/api/users/search?q=');
   });
 
   it('says so when nobody matches, and asks for 2 characters first', async () => {

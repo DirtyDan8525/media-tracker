@@ -163,6 +163,15 @@ describe('search and profile header', () => {
     expect(many).toHaveLength(10);
   });
 
+  it('an empty q lists everyone active but you, by username (Add friend list)', async () => {
+    await setName(A, 'rey');
+    const res = await json<{ username: string }[]>(await as(A, '/api/users/search?q='));
+    expect(res.map((u) => u.username)).toEqual([...res.map((u) => u.username)].sort());
+    expect(res.map((u) => u.username)).toContain('ren');
+    expect(res.map((u) => u.username)).not.toContain('rey');
+    expect((await as(A, '/api/users/search')).status).toBe(200);
+  });
+
   it('a stranger sees relation none and no entries field', async () => {
     await as(B, '/api/entries', 'POST', { category: 'anime', title: 'Secret', rating: 9 });
     const res = await as(A, '/api/users/ren');

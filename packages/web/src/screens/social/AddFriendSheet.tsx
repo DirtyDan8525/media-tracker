@@ -62,7 +62,7 @@ function AddFriendBody() {
     }
   }
 
-  const waiting = text.trim() !== '' && searchable(text) && (text !== query || search.isFetching) && !search.data;
+  const waiting = (text.trim() === '' || searchable(text)) && (text !== query || search.isFetching) && !search.data;
   return (
     <div className="add-friend">
       <div className="stack-10">
@@ -73,16 +73,16 @@ function AddFriendBody() {
             maxLength={21} enterKeyHint="search" aria-label="Username" onChange={(e) => setText(e.target.value)} />
         </div>
         <div aria-live="polite">
-          {text.trim() === '' ? null : !searchable(text) ? (
+          {text.trim() !== '' && !searchable(text) ? (
             <p className="hint">Type at least 2 letters or numbers of their username.</p>
           ) : waiting ? (
             <Skeleton height={64} />
           ) : search.isError ? (
             <p className="hint">Couldn't search. Check your connection and try again.</p>
           ) : search.data && search.data.length === 0 ? (
-            <p className="hint">No one has that username. Check the spelling, or send them your invite link below.</p>
+            <p className="hint">{text.trim() === '' ? 'No one else has an account yet. Send them your invite link below.' : 'No one has that username. Check the spelling, or send them your invite link below.'}</p>
           ) : (
-            <ul className="people plain-list" aria-label="Search results">
+            <ul className="people plain-list" aria-label={text.trim() === '' ? 'Everyone' : 'Search results'}>
               {search.data?.map((u) => {
                 const rel = relationOf(u.id);
                 return (

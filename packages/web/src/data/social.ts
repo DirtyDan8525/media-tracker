@@ -53,13 +53,13 @@ export function useRegenerateCode() {
   });
 }
 
-/** Search by username prefix (2-20 letters, numbers, _). Disabled for anything else. */
+/** Search by username prefix (2-20 letters, numbers, _); empty = everyone. Disabled for anything else. */
 export function useUserSearch(q: string) {
   const query = q.trim().replace(/^@/, '').toLowerCase();
   return useQuery({
     queryKey: [...SOCIAL_KEY, 'search', query],
     queryFn: () => api.get<PublicUser[]>(`/api/users/search?q=${encodeURIComponent(query)}`),
-    enabled: USERNAME_Q_RE.test(query),
+    enabled: query === '' || USERNAME_Q_RE.test(query),
     staleTime: STALE,
   });
 }

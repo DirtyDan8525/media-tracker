@@ -113,7 +113,7 @@ describe('design components: accessible names', () => {
       </MemoryRouter>,
     );
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'More']);
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Activity', 'Search', 'Top 5', 'More']);
     expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
     expect(within(nav).getByRole('link', { name: 'Activity' })).toHaveAttribute('aria-current', 'page');
   });

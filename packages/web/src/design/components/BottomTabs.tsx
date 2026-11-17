@@ -3,14 +3,14 @@ import { SEARCH_PATH } from '../../nav';
 import { Icon } from './Icon';
 
 /** Screens reached from More: its tab stays current there. */
-const MORE_PATHS = ['/more', '/import', '/about', '/top5', '/stats', '/sharpen'];
+const MORE_PATHS = ['/more', '/import', '/about', '/stats', '/sharpen'];
 
 /** The unread count as shown: the server caps it at 99, which reads "99+". */
 export const countText = (n: number): string => (n > 99 ? '99+' : String(n));
 
 /**
- * Phone bottom bar (Home board): Home, Activity, Search (raised), More. Four equal columns; Compare
- * left with tiers (number-first, Ruling N9: Sharpen my ratings is in More). Home (`/`) opens the
+ * Phone bottom bar: Home, Activity, Search (raised, centre), Top 5, More. Five equal columns (Dan,
+ * 2026-11-16: Top 5 fills the gap Compare left). Compare left with tiers (number-first, Ruling N9: Sharpen my ratings is in More). Home (`/`) opens the
  * last list shown, so it is the current tab on every list screen. Add is the floating bubble (AddBubble).
  */
 export function BottomTabs({ activityCount = 0 }: { activityCount?: number }) {
@@ -33,6 +33,10 @@ export function BottomTabs({ activityCount = 0 }: { activityCount?: number }) {
       <NavLink to={SEARCH_PATH} className="bottom-tabs__item bottom-tabs__search">
         <span className="bottom-tabs__search-circle"><Icon name="search" size={24} /></span>
         <span>Search</span>
+      </NavLink>
+      <NavLink to="/top5" className="bottom-tabs__item">
+        <Icon name="top5" size={22} />
+        <span>Top 5</span>
       </NavLink>
       <Link to="/more" className={`bottom-tabs__item${moreCurrent ? ' active' : ''}`} aria-current={moreCurrent ? 'page' : undefined}>
         <Icon name="more" size={22} />

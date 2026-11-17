@@ -15,14 +15,14 @@ describe('app shell', () => {
   describe('phone bottom bar (Main)', () => {
     const mainNav = () => screen.findByRole('navigation', { name: 'Main' });
 
-    it('the Main nav\'s links read Home, Activity, Search, More: Compare left with tiers (N9)', async () => {
+    it('the Main nav\'s links read Home, Activity, Search, Top 5, More: Compare left with tiers (N9)', async () => {
       mockApi(makeMe());
       renderApp('/list/anime');
       const nav = await mainNav();
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'More']);
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+/g, ''))).toEqual(['Home', 'Activity', 'Search', 'Top ', 'More']);
       expect(within(nav).queryByRole('link', { name: /Compare/ })).not.toBeInTheDocument();
       const cells = Array.from(nav.children);
-      expect(cells).toHaveLength(4);
+      expect(cells).toHaveLength(5);
       expect(cells[2]).toHaveTextContent('Search');
     });
 
@@ -112,8 +112,8 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
-      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'More']);
-      expect(nav.children).toHaveLength(4);
+      expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Top 5', 'More']);
+      expect(nav.children).toHaveLength(5);
     });
 
     it.each([
@@ -122,7 +122,7 @@ describe('app shell', () => {
       ['/more', 'More'],
       ['/import', 'More'],
       ['/about', 'More'],
-      ['/top5', 'More'],
+      ['/top5', 'Top 5'],
       ['/stats', 'More'],
       ['/sharpen', 'More'],
     ])('on %s the current tab is %s', async (path, tab) => {

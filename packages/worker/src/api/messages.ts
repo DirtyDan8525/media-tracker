@@ -11,6 +11,8 @@ import {
   type MessageKind, type MessagePage, type PublicUser, type RecSnapshot, type RecommendedItem, type SourceId,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
+import { pushNewMessage } from '../push/events';
+import { ctxOf } from '../push/send';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, pair, publicUser, type PublicUserRow } from '../social/visibility';
 
 export const messages = new Hono<AppEnv>();
@@ -371,6 +373,7 @@ messages.post('/conversations/:id/messages', async (c) => {
   const kind: MessageKind = rec ? 'rec' : 'text';
   await c.env.DB.batch(insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind, body: text, rec: rec ? JSON.stringify(rec) : null, image: null, now: gate.now }));
   const msg: Message = { id: msgId, conversationId: id, senderId: me, kind, text, rec, image: false, deleted: false, createdAt: gate.now };
+  pushNewMessage(c.env, ctxOf(c), id, c.var.user, kind, text);
   return c.json(msg, 201);
 });
 
@@ -429,6 +432,7 @@ messages.post('/conversations/:id/messages/image', async (c) => {
     throw e;
   }
   const msg: Message = { id: msgId, conversationId: id, senderId: me, kind: 'image', text: '', rec: null, image: true, deleted: false, createdAt: gate.now };
+  pushNewMessage(c.env, ctxOf(c), id, c.var.user, 'image', '');
   return c.json(msg, 201);
 });
 

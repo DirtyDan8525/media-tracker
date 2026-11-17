@@ -160,7 +160,12 @@ export interface UserSettings {
   searchScope: string;
   /** Rating tiers per list (missing = DEFAULT_TIERS). Written only by PUT /api/ratings/tiers/:list (Ruling Q3). */
   tiers: Partial<Record<Category, TierSet>>;
+  /** Which kinds of push notification this user wants (Phase 6b, P4). All on by default. */
+  notify: Record<NotifyKey, boolean>;
 }
+
+export const NOTIFY_KEYS = ['messages', 'friendRequests', 'comments', 'reactions', 'signups'] as const;
+export type NotifyKey = (typeof NOTIFY_KEYS)[number];
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   theme: 'Midnight',
@@ -172,6 +177,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   compareAsk: 'Both',
   searchScope: 'all',
   tiers: {},
+  notify: { messages: true, friendRequests: true, comments: true, reactions: true, signups: true },
 };
 
 // Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).

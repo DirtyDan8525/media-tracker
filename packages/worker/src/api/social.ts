@@ -8,6 +8,8 @@ import {
   type Target,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
+import { pushComment, pushReaction } from '../push/events';
+import { ctxOf } from '../push/send';
 import { canView, canViewPost, publicUser, relationOf } from '../social/visibility';
 
 export const social = new Hono<AppEnv>();
@@ -108,7 +110,8 @@ social.post('/reactions', async (c) => {
   const user = c.var.user;
   const db = c.env.DB;
 
-  if (!(await resolveTarget(db, user.id, target))) return c.json(notFound, 404);
+  const at = await resolveTarget(db, user.id, target);
+  if (!at) return c.json(notFound, 404);
 
   const column = col(target);
   const removed = await db
@@ -120,6 +123,7 @@ social.post('/reactions', async (c) => {
       .prepare(`INSERT OR IGNORE INTO reactions (id, ${column}, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)`)
       .bind(crypto.randomUUID(), idOf(target), user.id, emoji, new Date().toISOString())
       .run();
+    pushReaction(c.env, ctxOf(c), at.ownerId, user, idOf(target), emoji);
   }
   return c.json(await socialOf(db, user.id, target));
 });
@@ -177,13 +181,15 @@ social.post('/comments', async (c) => {
   const text = body.body.trim();
   if (text.length < 1 || text.length > COMMENT_MAX) return c.json(invalid, 400);
   const user = c.var.user;
-  if (!(await resolveTarget(c.env.DB, user.id, target))) return c.json(notFound, 404);
+  const at = await resolveTarget(c.env.DB, user.id, target);
+  if (!at) return c.json(notFound, 404);
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   await c.env.DB.prepare(`INSERT INTO comments (id, ${col(target)}, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)`)
     .bind(id, idOf(target), user.id, text, createdAt)
     .run();
+  pushComment(c.env, ctxOf(c), at.ownerId, user, idOf(target), text);
   const comment: Comment = {
     id,
     author: { id: user.id, username: user.username ?? '', displayName: user.displayName, avatarAt: user.avatarAt },

@@ -20,6 +20,7 @@
     "wrangler": "4.160.0"
   },
   "dependencies": {
+    "@pushforge/builder": "^2.0.5",
     "hono": "4.13.17"
   }
 }

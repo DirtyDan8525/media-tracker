@@ -37,6 +37,8 @@ export default defineConfig({
         // offline copy in IndexedDB), and covers load from their hosts.
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
+        // Push and notification clicks (Phase 6b): public/push-sw.js, loaded into the generated worker.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

@@ -15,6 +15,7 @@ import { messages } from './api/messages';
 import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
 import { admin } from './api/admin';
+import { push } from './api/push';
 
 export type { AppUser, AppEnv } from './auth/user';
 export type { Env } from './env';
@@ -77,6 +78,7 @@ api.route('/ratings', ratings);
 api.route('/', social);
 api.route('/', messages);
 api.route('/admin', admin);
+api.route('/push', push);
 app.route('/api', api);
 
 app.notFound((c) => {

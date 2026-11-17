@@ -19,6 +19,7 @@ export function normalizeMe(me: Me): Me {
       ...s,
       colors: { ...s.colors },
       tabs: { ...DEFAULT_USER_SETTINGS.tabs, ...s.tabs },
+      notify: { ...DEFAULT_USER_SETTINGS.notify, ...s.notify },
     },
   };
 }
@@ -86,6 +87,7 @@ export function useSaveSettings(opts: { errorToast?: string } = {}) {
             ...partial,
             tabs: { ...prev.settings.tabs, ...partial.tabs },
             colors: { ...prev.settings.colors, ...partial.colors },
+            notify: { ...prev.settings.notify, ...partial.notify },
           },
         });
       }

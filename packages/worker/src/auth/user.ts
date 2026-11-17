@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import { CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, validateTierSet, type Category, type UserSettings } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, validateTierSet, type Category, type UserSettings } from '@media-tracker/shared';
 import type { Env } from '../env';
 import { clearedCookie, readSessionToken, ROLL_AFTER_MS, expiryFrom, sessionCookie, sha256Hex } from './session';
 
@@ -66,8 +66,10 @@ export function loadSettings(json: string): UserSettings {
       if (t !== null) tiers[k as Category] = t;
     }
   }
+  const notify = { ...DEFAULT_USER_SETTINGS.notify };
+  if (isPlainObject(known.notify)) for (const k of NOTIFY_KEYS) if (typeof known.notify[k] === 'boolean') notify[k] = known.notify[k];
   // merge over defaults so older rows missing a key still get one
-  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers };
+  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify };
 }
 
 /**

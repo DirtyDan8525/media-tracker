@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0011_messages.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0012_push.sql`) with a green check.
 
 ## Pictures in messages (create the picture storage once, before step 7)
 
@@ -118,6 +118,30 @@ npm exec -w packages/worker -- wrangler secret put YOUTUBE_API_KEY --env product
 ```
 
 The free quota is 10,000 units a day. One title search costs 100 units, so that is about 100 searches a day (pasting a link costs nothing). Until the key is set, the app says "Paste a YouTube link (search needs setup)".
+
+### Notifications (optional)
+
+The app can send a notification to your phone or computer for new messages, friend requests, comments and reactions (and, for you as admin, a new sign-up waiting). Without these keys the app works exactly as before and Settings shows "Not set up yet" under Notifications.
+
+1. Make a pair of keys (one time). This prints a **Public Key** and a **Private Key (JWK)**, a single line starting with `{`:
+
+```
+npx @pushforge/builder vapid
+```
+
+2. Store three secrets. Paste the value when asked: the public key, the whole private key line, and `mailto:` plus your email address (for example `mailto:you@example.com`):
+
+```
+npm exec -w packages/worker -- wrangler secret put VAPID_PUBLIC_KEY --env production
+npm exec -w packages/worker -- wrangler secret put VAPID_PRIVATE_KEY --env production
+npm exec -w packages/worker -- wrangler secret put VAPID_SUBJECT --env production
+```
+
+3. Deploy again (`npm run deploy`, as in step 7) so the app has the notifications screen, then open Settings > Notifications and turn on **Notifications on this device**. Each person does this on each phone or computer they want notifications on.
+
+**iPhone and iPad:** notifications only work in the app installed on the Home Screen (iOS 16.4 or newer; see step 10), and the browser asks permission only after you tap the switch. In Safari, Settings shows "Install the app to get notifications" instead.
+
+Keep the private key secret and do not replace the keys later: a new pair silently stops every device's notifications until each one turns the switch off and on again.
 
 ## 9. Create your account
 
@@ -211,6 +235,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
    - `0008_plan_order.sql`: the order of your Plan to watch lists (a new `plan_order` column on titles; titles already planned are numbered in the order you added them) and the profile bio (a new `bio` column on users). Apply it **before** deploying: the new app reads and writes these columns.
+   - `0012_push.sql`: notifications (new tables `push_subscriptions` and `push_throttle`). Apply it **before** deploying. Turning notifications on is optional: see "Notifications (optional)" after step 8.
    - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.
    - `0010_progress.sql`: episode progress (two new columns on titles, `progress` and `progress_total`; titles you already have start with none). Apply it **before** deploying: the new app reads and writes these columns.
    - `0009_number_first.sql`: the number-first rating model (Phase 5). Apply it **before** deploying.

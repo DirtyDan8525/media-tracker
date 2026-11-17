@@ -17,4 +17,10 @@ export interface Env {
   IGDB_SECRET?: string;
   /** YouTube Data API v3 key (title search on the YouTube list). Worker secret; never sent to the browser. A pasted link needs no key. */
   YOUTUBE_API_KEY?: string;
+  /** Web push (Phase 6b). All three needed, else push is "not set up". Public key: base64url, from `npx @pushforge/builder vapid`. */
+  VAPID_PUBLIC_KEY?: string;
+  /** The private key as the JWK JSON line the same command prints. Worker secret. */
+  VAPID_PRIVATE_KEY?: string;
+  /** `mailto:` address push services may contact. */
+  VAPID_SUBJECT?: string;
 }

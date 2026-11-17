@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { CATEGORY_CONFIG, type FriendEntry, type PublicUser, type Relation } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
+import { pushFriendAccepted, pushFriendRequest } from '../push/events';
+import { ctxOf } from '../push/send';
 import { ENTRY_SELECT, type EntryRow } from './entries';
 import {
   PUBLIC_USER_COLS,
@@ -126,6 +128,8 @@ friends.post('/requests', async (c) => {
   const [a, b] = pair(me, target.id);
   await c.env.DB.prepare(REQUEST_SQL).bind(a, b, me, new Date().toISOString()).run();
   const after = await relationOf(c.env.DB, me, target.id);
+  if (after === 'friend') pushFriendAccepted(c.env, ctxOf(c), target.id, c.var.user);
+  else pushFriendRequest(c.env, ctxOf(c), target.id, c.var.user);
   return c.json({ relation: after === 'friend' ? ('friend' as const) : ('pending_out' as const) });
 });
 
@@ -140,6 +144,7 @@ friends.post('/:userId/accept', async (c) => {
     .bind(new Date().toISOString(), a, b, other)
     .run();
   if (!res.meta.changes) return c.json(notFound, 404);
+  pushFriendAccepted(c.env, ctxOf(c), other, c.var.user);
   return c.body(null, 204);
 });
 

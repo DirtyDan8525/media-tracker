@@ -3,6 +3,7 @@ import {
   COMMENT_MAX,
   isReaction,
   type Comment,
+  type PublicUser,
   type PostSocial,
   type Reaction,
   type Target,
@@ -11,6 +12,7 @@ import type { AppEnv } from '../auth/user';
 import { pushComment, pushReaction } from '../push/events';
 import { ctxOf } from '../push/send';
 import { canView, canViewPost, publicUser, relationOf } from '../social/visibility';
+import { featureOn } from '../settings/appSettings';
 
 export const social = new Hono<AppEnv>();
 
@@ -101,7 +103,7 @@ async function socialOf(db: D1Database, viewerId: string, target: Target): Promi
 }
 
 // POST /reactions: 3-5 queries (+ sign-in): target (1) + friendship (0-1) + delete (1) + insert (0-1) + summary (1).
-social.post('/reactions', async (c) => {
+social.post('/reactions', featureOn('reactions'), async (c) => {
   const body = await readJson(c.req.raw);
   if (!body) return c.json(invalid, 400);
   const target = parseTarget(body);
@@ -134,6 +136,32 @@ social.get('/reactions', async (c) => {
   if (!target) return c.json(invalid, 400);
   if (!(await resolveTarget(c.env.DB, c.var.user.id, target))) return c.json(notFound, 404);
   return c.json(await socialOf(c.env.DB, c.var.user.id, target));
+});
+
+// GET /reactions/who?entryId=|activityId=: 2-3 queries (+ sign-in): target (1-2) + reactions with people (1).
+// One group per emoji: most reactions first, ties by who reacted first. People within a group: oldest reaction first.
+social.get('/reactions/who', async (c) => {
+  const target = parseTarget(c.req.query());
+  if (!target) return c.json(invalid, 400);
+  if (!(await resolveTarget(c.env.DB, c.var.user.id, target))) return c.json(notFound, 404);
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.emoji, u.id, u.username, u.display_name, u.avatar_at
+     FROM reactions r JOIN users u ON u.id = r.user_id
+     WHERE r.${col(target)} = ? AND u.status = 'active'
+     ORDER BY r.created_at, r.id`,
+  )
+    .bind(idOf(target))
+    .all<{ emoji: string; id: string; username: string | null; display_name: string | null; avatar_at: string | null }>();
+  const groups = new Map<string, PublicUser[]>(); // Map keeps first-seen order = first reaction time
+  for (const r of results) {
+    if (!isReaction(r.emoji)) continue;
+    const users = groups.get(r.emoji) ?? [];
+    users.push(publicUser({ id: r.id, username: r.username, display_name: r.display_name, avatar_at: r.avatar_at }));
+    groups.set(r.emoji, users);
+  }
+  const out = [...groups].map(([emoji, users]) => ({ emoji, users }));
+  out.sort((a, b) => b.users.length - a.users.length); // stable: ties keep first-reaction order
+  return c.json(out);
 });
 
 interface CommentRow {
@@ -173,7 +201,7 @@ social.get('/comments', async (c) => {
 });
 
 // POST /comments: 3-4 queries (+ sign-in): target (1) + friendship (0-1) + insert (1).
-social.post('/comments', async (c) => {
+social.post('/comments', featureOn('comments'), async (c) => {
   const body = await readJson(c.req.raw);
   if (!body) return c.json(invalid, 400);
   const target = parseTarget(body);
@@ -213,12 +241,15 @@ social.delete('/comments/:id', async (c) => {
     .bind(c.req.param('id'))
     .first<{ author: string; deleted_at: string | null; activity_id: string | null; owner: string; is_private: number; owner_status: string }>();
   if (!row || row.deleted_at !== null) return c.json(notFound, 404);
-  // A post's thread is open to any active user's non-private post (Dan 2026-11-16); an entry's stays friends-only.
-  const visible = row.activity_id !== null
-    ? canViewPost(user.id, { ownerId: row.owner, isPrivate: row.is_private === 1, ownerStatus: row.owner_status })
-    : canView(await relationOf(c.env.DB, user.id, row.owner), { isPrivate: row.is_private === 1 });
-  if (!visible) return c.json(notFound, 404);
-  if (row.author !== user.id && row.owner !== user.id) return c.json({ error: 'forbidden' }, 403);
+  // AD7: the admin moderates any comment, private posts included.
+  if (!user.isAdmin) {
+    // A post's thread is open to any active user's non-private post (Dan 2026-11-16); an entry's stays friends-only.
+    const visible = row.activity_id !== null
+      ? canViewPost(user.id, { ownerId: row.owner, isPrivate: row.is_private === 1, ownerStatus: row.owner_status })
+      : canView(await relationOf(c.env.DB, user.id, row.owner), { isPrivate: row.is_private === 1 });
+    if (!visible) return c.json(notFound, 404);
+    if (row.author !== user.id && row.owner !== user.id) return c.json({ error: 'forbidden' }, 403);
+  }
   await c.env.DB.prepare('UPDATE comments SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL')
     .bind(new Date().toISOString(), c.req.param('id'))
     .run();

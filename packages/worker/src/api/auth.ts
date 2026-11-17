@@ -3,7 +3,8 @@
  * requireUser, so these answer signed-out callers. The Origin check in index.ts still applies.
  */
 import { Hono } from 'hono';
-import { DEFAULT_USER_SETTINGS } from '@media-tracker/shared';
+import { DEFAULT_USER_SETTINGS, tabsFor, type UserSettings } from '@media-tracker/shared';
+import { loadAppSettings } from '../settings/appSettings';
 import { USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
 import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
 import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
@@ -48,7 +49,8 @@ const linkLive = (hash: string, now: string) =>
 
 const INSERT_SESSION = 'INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_used_at)';
 
-// POST /api/auth/signup { username, password, displayName?, joinToken? } -> 201 Me + cookie. 3 queries, 4 with a sign-up link (one batch).
+// POST /api/auth/signup { username, password, displayName?, joinToken? } -> 201 Me + cookie. 4 queries, 5 with a sign-up link (the app settings, then one batch).
+// Sign-ups switched off (AD2): 403 feature_off unless a live sign-up link comes with it.
 // The first account on an empty database is the active admin; everyone after waits for approval,
 // unless they carry a live sign-up link: then they are active and the link is used up in the same
 // batch (a link taken a moment earlier just means pending, with joinLink: 'invalid').
@@ -63,6 +65,16 @@ auth.post('/signup', async (c) => {
   const joinHash = typeof body.joinToken === 'string' && isToken(body.joinToken) ? await sha256Hex(body.joinToken) : null;
 
   const db = c.env.DB;
+  // AD2/AD6: the sign-up switch and the defaults a new person starts with (1 query).
+  const app = await loadAppSettings(db);
+  const closed = !app.features.signups;
+  // Closed: only a sign-up link gets in (a plain sign-up is refused before anything is written).
+  if (closed && !joinHash) return c.json({ error: 'feature_off' }, 403);
+  const startSettings: UserSettings = {
+    ...DEFAULT_USER_SETTINGS,
+    theme: app.defaults.theme,
+    tabs: tabsFor(app.defaults.lists, DEFAULT_USER_SETTINGS.tabs),
+  };
   const id = crypto.randomUUID();
   const passwordHash = await hashPassword(body.password);
   const s = await freshSession();
@@ -75,8 +87,9 @@ auth.post('/signup', async (c) => {
         `INSERT INTO users (id, email, username, display_name, settings_json, is_admin, status, password_hash, created_at)
          SELECT ?1, 'u:' || ?1, ?2, ?3, ?4, f.first,
                 CASE WHEN f.first = 1 OR EXISTS (SELECT 1 FROM signup_links WHERE ${linkLive('?7', '?6')}) THEN 'active' ELSE 'pending' END, ?5, ?6
-           FROM (SELECT NOT EXISTS (SELECT 1 FROM users) AS first) f`,
-      ).bind(id, username, displayName, JSON.stringify(DEFAULT_USER_SETTINGS), passwordHash, s.created, joinHash),
+           FROM (SELECT NOT EXISTS (SELECT 1 FROM users) AS first) f
+          WHERE ?8 = 0 OR f.first = 1 OR EXISTS (SELECT 1 FROM signup_links WHERE ${linkLive('?7', '?6')})`,
+      ).bind(id, username, displayName, JSON.stringify(startSettings), passwordHash, s.created, joinHash, closed ? 1 : 0),
       db.prepare(`${INSERT_SESSION} VALUES (?, ?, ?, ?, ?)`).bind(s.hash, id, s.created, s.expires, s.created),
       db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).bind(id),
       // Claim the link (single use); only when a well-formed token came along. At most one signup can win it.
@@ -88,8 +101,16 @@ auth.post('/signup', async (c) => {
     joined = (results[3]?.meta.changes ?? 0) > 0;
   } catch (err) {
     // The UNIQUE (NOCASE) index on username is the guard; the whole batch rolled back.
-    if (/UNIQUE/i.test(String(err instanceof Error ? err.message : err))) return c.json({ error: 'taken' }, 409);
+    const message = String(err instanceof Error ? err.message : err);
+    if (/UNIQUE/i.test(message)) return c.json({ error: 'taken' }, 409);
+    // Sign-ups closed and the link was not live: the insert wrote no user, so the session insert failed (the batch rolled back).
+    if (closed && /FOREIGN KEY/i.test(message)) return c.json({ error: 'feature_off' }, 403);
     throw err;
+  }
+  if (!created && closed) {
+    // Foreign keys off: the session row went in without a user; drop it.
+    await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(s.hash).run();
+    return c.json({ error: 'feature_off' }, 403);
   }
   if (!created) throw new Error('signup: user not created');
   const me = meBody(toAppUser(created, c.env.ADMIN_EMAIL));

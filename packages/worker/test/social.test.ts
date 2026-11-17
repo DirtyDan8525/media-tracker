@@ -115,6 +115,67 @@ describe('reactions', () => {
   });
 });
 
+describe('GET /reactions/who', () => {
+  type Who = { emoji: string; users: { id: string; username: string; displayName: string | null; avatarAt: string | null }[] }[];
+  const put = (id: string, act: string | null, ent: string | null, user: string, emoji: string, at: string) =>
+    env.DB.prepare('INSERT INTO reactions (id, activity_id, entry_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, act, ent, user, emoji, at);
+
+  it('groups by emoji: most first, ties by first reaction; people oldest first', async () => {
+    await env.DB.batch([
+      put('r1', 'postPub', null, 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
+      put('r2', 'postPub', null, 'uG', '❤️', '2026-11-16T12:00:02.000Z'),
+      put('r3', 'postPub', null, 'uO', '❤️', '2026-11-16T12:00:03.000Z'),
+      put('r4', 'postPub', null, 'uG', '👏', '2026-11-16T12:00:04.000Z'),
+      put('r5', 'postPub', null, 'uF', '👏', '2026-11-16T12:00:05.000Z'),
+      put('r6', 'postPub', null, 'uF', '❤️', '2026-11-16T12:00:06.000Z'),
+      put('r7', 'postPub', null, 'uG', '🎉', '2026-11-16T12:00:00.500Z'),
+    ]);
+    const res = await as('F', '/api/reactions/who?activityId=postPub');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Who;
+    // ❤️ has 3, 👏 has 2, then the two singles by who came first.
+    expect(body.map((g) => [g.emoji, g.users.map((u) => u.id)])).toEqual([
+      ['❤️', ['uG', 'uO', 'uF']],
+      ['👏', ['uG', 'uF']],
+      ['🎉', ['uG']], // ties on 1: 🎉 reacted first (:00.5)
+      ['🔥', ['uF']],
+    ]);
+    expect(body[0]!.users[0]).toEqual({ id: 'uG', username: 'gname', displayName: null, avatarAt: null });
+  });
+
+  it('works for an entry, leaves out removed people, and answers [] with no reactions', async () => {
+    expect(await (await as('F', '/api/reactions/who?entryId=pub')).json()).toEqual([]);
+    await env.DB.batch([
+      put('r1', null, 'pub', 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
+      put('r2', null, 'pub', 'uG', '🔥', '2026-11-16T12:00:02.000Z'),
+    ]);
+    await env.DB.exec("UPDATE users SET status = 'removed' WHERE id = 'uG'");
+    const body = (await (await as('O', '/api/reactions/who?entryId=pub')).json()) as Who;
+    expect(body).toEqual([{ emoji: '🔥', users: [{ id: 'uF', username: 'fname', displayName: null, avatarAt: null }] }]);
+  });
+
+  it('is hidden like the reactions route: not visible or missing is 404, a bad target 400', async () => {
+    await env.DB.batch([put('r1', 'postPriv', null, 'uO', '🔥', now)]);
+    expect((await as('F', '/api/reactions/who?activityId=postPriv')).status).toBe(404);
+    expect((await as('S', '/api/reactions/who?entryId=priv')).status).toBe(404);
+    expect((await as('S', '/api/reactions/who?entryId=pub')).status).toBe(404); // entry targets are friends-only
+    expect((await as('F', '/api/reactions/who?activityId=nope')).status).toBe(404);
+    expect((await as('F', '/api/reactions/who?activityId=postPubChild')).status).toBe(404); // not an anchor
+    expect((await as('F', '/api/reactions/who')).status).toBe(400);
+    expect((await as('F', '/api/reactions/who?activityId=postPub&entryId=pub')).status).toBe(400);
+  });
+
+  it('stays within 4 D1 queries (sign-in 1 + target 1-2 + reactions 1)', async () => {
+    await env.DB.batch([put('r1', 'postPub', null, 'uG', '🔥', now), put('r2', null, 'pub', 'uG', '🔥', now)]);
+    for (const q of ['activityId=postPub', 'entryId=pub']) {
+      const spy = spyD1(env.DB);
+      expect((await as('F', `/api/reactions/who?${q}`, 'GET', undefined, spy.db)).status).toBe(200);
+      expect(spy.queries).toBeLessThanOrEqual(4);
+    }
+  });
+});
+
 describe('visibility of the thread', () => {
   it.each(['S', 'P'] as const)('%s (stranger / pending) gets 404 on the entry thread but may react, list and comment on the post (Dan 2026-11-16)', async (k) => {
     expect((await react(k, entry)).status).toBe(404);

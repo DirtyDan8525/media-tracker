@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { makeMe, mockApi } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 
+// The feature is paused in the app (NOTIFICATIONS_ENABLED = false); these tests run with it on.
+vi.mock('./NotificationsSection', async (orig) => ({ ...(await orig<typeof import('./NotificationsSection')>()), NOTIFICATIONS_ENABLED: true }));
+
 // Phase 6b (P4, P6): the Notifications section of Settings.
 const KEY = 'BINvd_szNWQK5NNn9-5QvOD88cFM-aabMgjQUNKdD7d6FOE--6hMQzLfIJn6vGWKgieYqMZmC2ro_Wf4q8vspU4';
 const SUB_JSON = { endpoint: 'https://push.test/send/abc', keys: { p256dh: 'p', auth: 'a' } };

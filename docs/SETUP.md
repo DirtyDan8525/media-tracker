@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0012_push.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0013_app_settings.sql`) with a green check.
 
 ## Pictures in messages (create the picture storage once, before step 7)
 
@@ -235,6 +235,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0004_avatars.sql`: the `avatars` table and `users.avatar_at` (your profile photo).
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
    - `0008_plan_order.sql`: the order of your Plan to watch lists (a new `plan_order` column on titles; titles already planned are numbered in the order you added them) and the profile bio (a new `bio` column on users). Apply it **before** deploying: the new app reads and writes these columns.
+   - `0013_app_settings.sql`: the admin's app settings (a new table, `app_settings`: announcement, switches, app text and look, defaults for new people). Apply it **before** deploying.
    - `0012_push.sql`: notifications (new tables `push_subscriptions` and `push_throttle`). Apply it **before** deploying. Turning notifications on is optional: see "Notifications (optional)" after step 8.
    - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.
    - `0010_progress.sql`: episode progress (two new columns on titles, `progress` and `progress_total`; titles you already have start with none). Apply it **before** deploying: the new app reads and writes these columns.
@@ -284,6 +285,23 @@ Until now Cloudflare Access (the emailed code) guarded the app. From Phase 4b th
 8. Reinstall the app on your phone if it keeps showing a Cloudflare page: remove the home-screen icon, open the address in the browser, sign in, and install again (step 10).
    **Success:** the icon opens the app signed in.
 9. Tell your friends the address. They create an account and you approve them (section 12).
+
+## Backing up and restoring
+
+Two kinds of backup. **Keep the SQL one**; the JSON one is for reading.
+
+1. **Full backup (this is the one you can restore from).** In PowerShell, in the project folder:
+   ```
+   npm exec -w packages/worker -- wrangler d1 export media-tracker --remote --env production --output media-tracker-backup.sql
+   ```
+   **Success:** a file `media-tracker-backup.sql` appears in the folder. It has everything, including password and sign-in data, so keep it private (not in a shared folder, not in Git).
+2. **JSON backup (for reading and keeping).** In the app: Admin > Backup > Download a backup. It holds every list, friendship, post, comment, message and setting, but **not** secrets: password hashes, sign-in sessions, reset links, sign-up link codes, push addresses and keys, and profile picture bytes. People cannot sign in from it, and it cannot be loaded back as is. Use it to look something up or to keep a copy of everyone's lists.
+
+**Restoring the SQL backup** (only into an empty database, for example after a mistake or a move). Make a new database first (step 5, with a new name, and update `database_id` in the `[env.production]` section of `packages/worker/wrangler.toml`), then:
+```
+npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --file media-tracker-backup.sql
+```
+**Success:** it reports the number of queries run and no error. The export already contains the table definitions and the migration record, so do **not** run `migrations apply` first on that database. Pictures sent in messages live in the separate storage bucket and are not in either backup.
 
 ## The three most likely problems
 

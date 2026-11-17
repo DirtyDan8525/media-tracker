@@ -1,3 +1,4 @@
+import { loadAppSettings } from '../settings/appSettings';
 import { Hono } from 'hono';
 import {
   CATEGORY_CONFIG,
@@ -251,8 +252,8 @@ entries.get('/entries/:id', async (c) => {
   return entry ? c.json(entry) : c.json(notFound, 404);
 });
 
-// 3 queries, plus sign-in (1-3): duplicate candidates, insert + activity, re-select. A rated title
-// adds loadSet (2) and, in the insert's batch, the set UPDATE: ≤ 9.
+// 4 queries, plus sign-in (1-3): app defaults, duplicate candidates, insert + activity, re-select. A rated title
+// adds loadSet (2) and, in the insert's batch, the set UPDATE: ≤ 10.
 entries.post('/entries', async (c) => {
   const body = await readJson(c.req.raw);
   const category = (body as { category?: unknown } | null)?.category;
@@ -271,6 +272,11 @@ entries.post('/entries', async (c) => {
     typedTitle: rest.typedTitle ?? rest.title,
     lookupState: rest.lookupState ?? 'pending',
   };
+
+  // AD6: privacy the person did not choose starts as the admin's default for new titles (1 query).
+  const { defaults } = await loadAppSettings(db);
+  if (values.isPrivate === undefined && defaults.privateByDefault) values.isPrivate = true;
+  if (values.notesPrivate === undefined && defaults.notesPrivateByDefault) values.notesPrivate = true;
 
   // A typed number (N10; a tier alone is ignored).
   const tiers = tiersFor(c.var.user.settings, cat);

@@ -16,6 +16,7 @@ import { RatingConflict } from './ratings/store';
 import { lookup } from './lookup/routes';
 import { admin } from './api/admin';
 import { push } from './api/push';
+import { appInfo } from './api/app';
 
 export type { AppUser, AppEnv } from './auth/user';
 export type { Env } from './env';
@@ -60,6 +61,9 @@ app.get('/api/auth/reauth', () =>
 
 // Sign up, sign in, sign out, password reset: answered for signed-out callers (A1-A7).
 app.route('/api/auth', auth);
+
+// The public subset of the admin's app settings, readable signed out (the sign-in page uses it). Read-only.
+app.route('/api/app', appInfo);
 
 // Everything else under /api requires a signed-in user. Later tasks mount
 // their routers here: api.route('/entries', entries), etc.

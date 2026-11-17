@@ -140,10 +140,10 @@ describe('signup (A1)', () => {
     expect(await count('SELECT COUNT(*) AS n FROM sessions')).toBe(1);
   });
 
-  it('runs at most 3 queries', async () => {
+  it('runs at most 4 queries (the app settings, then the batch of 3)', async () => {
     const spy = spyD1(env.DB);
     expect((await signup('dan', PW, {}, { db: spy.db })).status).toBe(201);
-    expect(spy.queries).toBeLessThanOrEqual(3);
+    expect(spy.queries).toBeLessThanOrEqual(4);
   });
 });
 

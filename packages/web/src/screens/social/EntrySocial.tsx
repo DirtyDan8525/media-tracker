@@ -12,7 +12,7 @@ const NONE = { reactions: {}, mine: [], comments: 0 };
  * can't be read (the friend can no longer see the title). `ownerId` is the entry's owner; the server
  * decides who may delete a comment (`canDelete`).
  */
-export function EntrySocial({ entryId, ownerId }: { entryId: string; ownerId: string }) {
+export function EntrySocial({ entryId, ownerId, title }: { entryId: string; ownerId: string; title: string }) {
   void ownerId;
   const social = useEntrySocial(entryId);
   const react = useReact();
@@ -21,7 +21,7 @@ export function EntrySocial({ entryId, ownerId }: { entryId: string; ownerId: st
   const target = { entryId } as const;
   return (
     <section className="entry-social" aria-label="Reactions and comments">
-      <ReactionChips social={s} onToggle={(emoji) => react.mutate({ target, emoji })} />
+      <ReactionChips social={s} onToggle={(emoji) => react.mutate({ target, emoji })} who={{ target, title }} />
       <div className="entry-social__actions">
         <ReactButton mine={s.mine} onPick={(emoji) => react.mutate({ target, emoji })} />
         <Button variant="secondary" className="entry-social__comments" onClick={() => setOpen(true)}>

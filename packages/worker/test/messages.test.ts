@@ -583,8 +583,8 @@ describe('query counts (+ sign-in 1)', () => {
     ['GET /conversations/:id', 2],
     ['GET messages (first page)', 2],
     ['GET messages (older page)', 2],
-    ['POST message', 1],
-    ['POST picture', 1],
+    ['POST message', 2], // the feature switch read (AD2) + the membership gate
+    ['POST picture', 2],
     ['GET image', 1],
     ['DELETE message', 2],
     ['GET recommended', 1],

@@ -644,6 +644,41 @@
       "w": 390,
       "h": 844,
       "title": "Wireframe · Recommended to you"
+    },
+    "AdminHome.wf.dc.html": {
+      "x": 0,
+      "y": 22900,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin home (compact + sub-page rows)"
+    },
+    "AdminSwitches.wf.dc.html": {
+      "x": 470,
+      "y": 22900,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin switches + announcement"
+    },
+    "AdminLook.wf.dc.html": {
+      "x": 940,
+      "y": 22900,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin app text and look, lists, defaults"
+    },
+    "AdminContent.wf.dc.html": {
+      "x": 1410,
+      "y": 22900,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin What's new / Coming soon / About + moderation"
+    },
+    "AdminTools.wf.dc.html": {
+      "x": 1880,
+      "y": 22900,
+      "w": 390,
+      "h": 844,
+      "title": "Wireframe · Admin numbers, lookup tools, backup"
     }
   },
   "order": [
@@ -735,7 +770,12 @@
     "Chat.wf.dc.html",
     "NewChat.wf.dc.html",
     "ShareRec.wf.dc.html",
-    "Recommended.wf.dc.html"
+    "Recommended.wf.dc.html",
+    "AdminHome.wf.dc.html",
+    "AdminSwitches.wf.dc.html",
+    "AdminLook.wf.dc.html",
+    "AdminContent.wf.dc.html",
+    "AdminTools.wf.dc.html"
   ],
   "notes": {
     "t1": {
@@ -1011,6 +1051,13 @@
       "text": "Wireframes — Messages (for Dan's review)",
       "kind": "title1",
       "maxW": 1400
+    },
+    "wfp6a": {
+      "x": 0,
+      "y": 22700,
+      "text": "Wireframes — Admin powers (for Dan's review)",
+      "kind": "title1",
+      "maxW": 2300
     }
   },
   "designSystems": [],
@@ -1057,6 +1104,7 @@
     "wfp5",
     "wfp5r",
     "wfp5b",
-    "wfp6m"
+    "wfp6m",
+    "wfp6a"
   ]
 }

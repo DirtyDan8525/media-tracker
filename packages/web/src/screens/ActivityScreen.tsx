@@ -223,7 +223,7 @@ function FeedPost({ line, now, social, who, friend, select, onComments, onDelete
         {(line.rating || Object.keys(social.reactions).length > 0) && (
           <div className="feed-post__chips">
             {line.rating && <RatingBadge rating={line.rating.to} size="xs" />}
-            <ReactionChips social={social} onToggle={toggle} />
+            <ReactionChips social={social} onToggle={toggle} who={{ target, title: line.title }} />
           </div>
         )}
       </ActivityRow>

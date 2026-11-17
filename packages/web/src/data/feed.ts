@@ -1,5 +1,5 @@
 import {
-  type ActivityPage, type Comment, type FeedScope, type PostSocial, type Reaction, type Target,
+  type ActivityPage, type Comment, type FeedScope, type PostSocial, type PublicUser, type Reaction, type Target,
 } from '@media-tracker/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../api/client';
@@ -70,6 +70,18 @@ export function useComments(target: Target | null) {
     queryKey: ['comments', target ? targetKey(target) : null],
     enabled: target !== null,
     queryFn: () => api.get<Comment[]>(`/api/comments?${targetQuery(target!)}`),
+  });
+}
+
+export interface ReactionGroup { emoji: string; users: PublicUser[] }
+
+/** Who reacted, per emoji (most first). Only fetched while `target` is given (the sheet is open). */
+export function useReactionsWho(target: Target | null) {
+  return useQuery({
+    queryKey: ['reactions-who', target ? targetKey(target) : null],
+    enabled: target !== null,
+    queryFn: () => api.get<ReactionGroup[]>(`/api/reactions/who?${targetQuery(target!)}`),
+    gcTime: 0,
   });
 }
 

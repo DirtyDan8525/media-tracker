@@ -15,3 +15,4 @@ export * from './social';
 export * from './compareFriends';
 export * from './bio';
 export * from './messages';
+export * from './appSettings';

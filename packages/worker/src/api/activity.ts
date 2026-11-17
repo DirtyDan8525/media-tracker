@@ -315,21 +315,22 @@ activity.post('/seen', async (c) => {
 });
 
 /** The ids of `ids` that are the viewer's own anchor posts (post_id IS NULL), as a JSON param. */
-const OWN_ANCHORS = `SELECT a.id FROM activity a WHERE a.user_id = ?1 AND a.post_id IS NULL AND a.id IN (SELECT value FROM json_each(?2))`;
+const OWN_ANCHORS = `SELECT a.id FROM activity a WHERE (?1 IS NULL OR a.user_id = ?1) AND a.post_id IS NULL AND a.id IN (SELECT value FROM json_each(?2))`;
 
 /**
  * Deletes the viewer's own posts by anchor id: every row of the post (post_id = anchor) and the
  * anchor, plus the posts' reactions and comments (explicit, not left to the cascade). Ids that are
  * not the viewer's anchors are ignored; returns how many posts went. One batch of 4.
+ * `viewerId` null (the admin, AD7) means any post.
  */
-async function deletePosts(db: D1Database, viewerId: string, ids: string[]): Promise<number> {
+async function deletePosts(db: D1Database, viewerId: string | null, ids: string[]): Promise<number> {
   const json = JSON.stringify(ids);
   const [found] = await db.batch([
     db.prepare(`SELECT COUNT(*) AS n FROM (${OWN_ANCHORS})`).bind(viewerId, json),
     db.prepare(`DELETE FROM reactions WHERE activity_id IN (${OWN_ANCHORS})`).bind(viewerId, json),
     db.prepare(`DELETE FROM comments WHERE activity_id IN (${OWN_ANCHORS})`).bind(viewerId, json),
     db.prepare(
-      `DELETE FROM activity WHERE user_id = ?1
+      `DELETE FROM activity WHERE (?1 IS NULL OR user_id = ?1)
           AND (COALESCE(post_id, id) IN (SELECT value FROM json_each(?2)))`,
     ).bind(viewerId, json),
   ]);
@@ -350,8 +351,8 @@ activity.post('/delete', async (c) => {
   return c.json({ deleted });
 });
 
-// DELETE /api/activity/:postId: owner only, the anchor id; 404 when it isn't your post. The entry stays.
+// DELETE /api/activity/:postId: owner (or, AD7, the admin: any post), the anchor id; 404 when it isn't your post. The entry stays.
 activity.delete('/:postId', async (c) => {
-  const deleted = await deletePosts(c.env.DB, c.var.user.id, [c.req.param('postId')]);
+  const deleted = await deletePosts(c.env.DB, c.var.user.isAdmin ? null : c.var.user.id, [c.req.param('postId')]);
   return deleted === 0 ? c.json({ error: 'not_found' }, 404) : c.body(null, 204);
 });

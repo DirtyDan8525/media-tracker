@@ -13,6 +13,7 @@ import {
 import type { AppEnv } from '../auth/user';
 import { pushNewMessage } from '../push/events';
 import { ctxOf } from '../push/send';
+import { featureOn } from '../settings/appSettings';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, pair, publicUser, type PublicUserRow } from '../social/visibility';
 
 export const messages = new Hono<AppEnv>();
@@ -184,7 +185,7 @@ messages.get('/conversations', async (c) => {
 
 // Create: 1 id = a direct chat with a friend (the existing one when there is one: 200), 2-19 = a group (201).
 // Friend check 1 query, create batch of 3-4, then 2 to read it back (+ sign-in).
-messages.post('/conversations', async (c) => {
+messages.post('/conversations', featureOn('messages'), async (c) => {
   const me = c.var.user.id;
   const db = c.env.DB;
   const body = await readJson(c.req.raw);
@@ -357,7 +358,7 @@ const insertMessage = (db: D1Database, m: { id: string; conv: string; sender: st
 ];
 
 // Send text, or a rec with an optional note: 1 query + a batch of 3 (+ sign-in). 201 with the message.
-messages.post('/conversations/:id/messages', async (c) => {
+messages.post('/conversations/:id/messages', featureOn('messages'), async (c) => {
   const me = c.var.user.id;
   const id = c.req.param('id');
   const gate = await sendGate(c, id, false);
@@ -411,7 +412,7 @@ async function readCapped(req: Request, max: number): Promise<Uint8Array | null>
 }
 
 // A picture (raw body): 1 query + a batch of 3 (+ sign-in), plus the R2 put. 201 with the message.
-messages.post('/conversations/:id/messages/image', async (c) => {
+messages.post('/conversations/:id/messages/image', featureOn('messages'), async (c) => {
   const me = c.var.user.id;
   const id = c.req.param('id');
   const gate = await sendGate(c, id, true);
@@ -477,16 +478,20 @@ messages.get('/messages/:id/image', async (c) => {
 messages.delete('/messages/:id', async (c) => {
   const me = c.var.user.id;
   const id = c.req.param('id');
+  // AD7: the admin may delete any message, in a chat they are not in too.
+  const asAdmin = c.var.user.isAdmin;
   const row = await c.env.DB.prepare(
-    `SELECT m.sender_id, m.image_key, m.deleted_at FROM messages m
-       JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?2 WHERE m.id = ?1`,
-  ).bind(id, me).first<{ sender_id: string; image_key: string | null; deleted_at: string | null }>();
+    asAdmin
+      ? 'SELECT sender_id, image_key, deleted_at FROM messages WHERE id = ?1'
+      : `SELECT m.sender_id, m.image_key, m.deleted_at FROM messages m
+           JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?2 WHERE m.id = ?1`,
+  ).bind(...(asAdmin ? [id] : [id, me])).first<{ sender_id: string; image_key: string | null; deleted_at: string | null }>();
   if (!row) return c.json(notFound, 404);
-  if (row.sender_id !== me) return c.json({ error: 'forbidden' }, 403);
+  if (row.sender_id !== me && !asAdmin) return c.json({ error: 'forbidden' }, 403);
   if (row.deleted_at !== null) return c.body(null, 204);
   await c.env.DB.prepare(
-    `UPDATE messages SET body = '', rec_json = NULL, image_key = NULL, deleted_at = ? WHERE id = ? AND sender_id = ? AND deleted_at IS NULL`,
-  ).bind(new Date().toISOString(), id, me).run();
+    `UPDATE messages SET body = '', rec_json = NULL, image_key = NULL, deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
+  ).bind(new Date().toISOString(), id).run();
   if (row.image_key && c.env.MEDIA) await c.env.MEDIA.delete(row.image_key).catch(() => undefined);
   return c.body(null, 204);
 });

@@ -101,3 +101,24 @@
 .feed-post__select input { width: 24px; height: 24px; margin: 0; accent-color: var(--highlight); }
 .activity__tools { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: flex-end; }
 .activity__confirm { display: flex; gap: var(--space-4); justify-content: flex-end; }
+
+/* Who reacted: a quiet text button by the chips, and the sheet's emoji tabs and people. */
+.who-btn {
+  all: unset; box-sizing: border-box; position: relative; display: inline-flex; align-items: center; min-height: var(--tap);
+  padding: 0 var(--space-3); font: 600 var(--fs-meta) var(--font); color: var(--muted-text); cursor: pointer;
+}
+.who-btn:hover { color: var(--bright-text); text-decoration: underline; }
+.who-btn:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.feed-post__chips .who-btn { z-index: 1; }
+.who-tabs { display: flex; gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-4); }
+.who-tab {
+  all: unset; box-sizing: border-box; flex: none; min-height: var(--tap); padding: 0 var(--space-6); border-radius: 22px;
+  border: 1px solid var(--grid-line); background: var(--panel); color: var(--text); font: 600 var(--fs-sm) var(--font);
+  display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.who-tab[aria-selected='true'] { border-color: var(--highlight); color: var(--highlight); font-weight: 700; }
+.who-tab:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.who-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.who-row { min-height: var(--tap); }
+.who-row__emoji { font-size: var(--fs-body); }
+.entry-social .who-btn { align-self: flex-start; }

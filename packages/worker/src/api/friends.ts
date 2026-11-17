@@ -3,6 +3,7 @@ import { CATEGORY_CONFIG, type FriendEntry, type PublicUser, type Relation } fro
 import type { AppEnv } from '../auth/user';
 import { pushFriendAccepted, pushFriendRequest } from '../push/events';
 import { ctxOf } from '../push/send';
+import { featureOn } from '../settings/appSettings';
 import { ENTRY_SELECT, type EntryRow } from './entries';
 import {
   PUBLIC_USER_COLS,
@@ -96,7 +97,7 @@ friends.get('/code/:code', async (c) => {
 });
 
 // 2 queries (owner of the code, then the upsert) (+ sign-in). The link owner consented by sharing it: accepted at once.
-friends.post('/add/:code', async (c) => {
+friends.post('/add/:code', featureOn('friends'), async (c) => {
   const code = c.req.param('code');
   if (!CODE_RE.test(code)) return c.json(notFound, 404);
   const row = await c.env.DB.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE invite_code = ? AND status = 'active'`).bind(code).first<PublicUserRow>();
@@ -115,7 +116,7 @@ friends.post('/add/:code', async (c) => {
 });
 
 // 4 queries at most: the target, the current relation, the upsert, the read-back (+ sign-in)
-friends.post('/requests', async (c) => {
+friends.post('/requests', featureOn('friends'), async (c) => {
   const body = await readJson(c.req.raw);
   if (!body || typeof body.username !== 'string') return c.json(invalid, 400);
   const target = await userByUsername(c.env.DB, body.username.trim());
@@ -134,7 +135,7 @@ friends.post('/requests', async (c) => {
 });
 
 // 1 query (+ sign-in). Only the receiver of a pending request can accept it.
-friends.post('/:userId/accept', async (c) => {
+friends.post('/:userId/accept', featureOn('friends'), async (c) => {
   const me = c.var.user.id;
   const other = c.req.param('userId');
   const [a, b] = pair(me, other);

@@ -9,7 +9,7 @@ import { PageHeader } from '../shell/PageHeader';
 import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
 import { CompareOptions } from './settings/CompareOptions';
-import { NotificationsSection } from './settings/NotificationsSection';
+import { NOTIFICATIONS_ENABLED, NotificationsSection } from './settings/NotificationsSection';
 import { SettingsLinks } from './settings/SettingsLinks';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
@@ -92,7 +92,7 @@ export function SettingsScreen() {
           </div>
         </section>
 
-        <NotificationsSection />
+        {NOTIFICATIONS_ENABLED && <NotificationsSection />}
 
         <section aria-labelledby="set-ratings" className="group">
           <h2 id="set-ratings" className="group__title">Ratings</h2>

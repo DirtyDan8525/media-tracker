@@ -134,7 +134,7 @@ function Body({ username, entry, seasons }: {
             </section>
           )}
 
-          <EntrySocial entryId={entry.id} ownerId={entry.userId} />
+          <EntrySocial entryId={entry.id} ownerId={entry.userId} title={entry.title} />
 
           <div className="friend-detail__actions">
             {dup ? (

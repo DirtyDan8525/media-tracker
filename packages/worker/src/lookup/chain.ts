@@ -52,12 +52,15 @@ const TIMED_OUT = Symbol('timeout');
 // Runs one source; any throw, null or timeout becomes null (logged). Never throws.
 async function runSource(id: SourceId, q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> {
   const entry = SOURCES[id];
+  const step = (results: number, rest: { chosen?: string; reason?: string }) => d.trace?.push({ source: id, query: q.term, results, ...rest });
   if (!entry) {
     logLine(d, `${id}: skipped (not registered)`);
+    step(0, { reason: 'not registered' });
     return null;
   }
   if (!keysPresent(id, entry, d.env)) {
     logLine(d, `${id}: skipped (no key)`);
+    step(0, { reason: 'not set up (no key)' });
     return null;
   }
   const limit = d.sourceTimeoutMs ?? CHAIN_SOURCE_TIMEOUT_MS;
@@ -71,19 +74,22 @@ async function runSource(id: SourceId, q: LookupQuery, d: LookupDeps): Promise<L
     ]);
     if (result === TIMED_OUT) {
       logLine(d, `${id}: timeout after ${limit} ms`);
+      step(0, { reason: `timed out after ${limit} ms` });
       return null;
     }
     logLine(d, result ? `${id}: found "${result.title}"` : `${id}: no match`);
+    step(result ? 1 : 0, result ? { chosen: result.title } : { reason: 'no match' });
     return result;
   } catch (err) {
     logLine(d, `${id}: threw ${String(err instanceof Error ? err.message : err).slice(0, 200)}`);
+    step(0, { reason: `failed: ${String(err instanceof Error ? err.message : err).slice(0, 200)}` });
     return null;
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function runChain(category: Category, q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> {
+export async function runChain(category: Category, q: LookupQuery, d: LookupDeps): Promise<LookupInfo | null> {
   const link = parseSpotifyLink(q.term);
   if (link) {
     // As in the script, a Spotify link goes to Spotify only; no text search on a URL.

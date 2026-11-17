@@ -31,6 +31,17 @@ export interface LookupDeps {
   log?: string[];
   /** Per-source wall-clock limit inside lookupChain (default CHAIN_SOURCE_TIMEOUT_MS). */
   sourceTimeoutMs?: number;
+  /** When present, the chain adds one step per source it tries (AD8, "Why didn't it find this?"). Never changes what the chain does. */
+  trace?: TraceStep[];
+}
+
+/** One source the chain tried: what it was asked, how many matches came back (0 or 1: a source answers with its best), the one chosen, or why not. */
+export interface TraceStep {
+  source: SourceId;
+  query: string;
+  results: number;
+  chosen?: string;
+  reason?: string;
 }
 
 export type SourceFn = (q: LookupQuery, d: LookupDeps) => Promise<LookupInfo | null>;

@@ -203,7 +203,7 @@ function DetailBody({ entry }: { entry: Entry }) {
             onSave={(notes) => save({ notes })} />
         </section>
 
-        {!entry.isPrivate && <EntrySocial entryId={entry.id} ownerId={me.id} />}
+        {!entry.isPrivate && <EntrySocial entryId={entry.id} ownerId={me.id} title={entry.title} />}
 
         <section className="detail__section" aria-label="Privacy">
           <h2 className="detail__h">Privacy</h2>

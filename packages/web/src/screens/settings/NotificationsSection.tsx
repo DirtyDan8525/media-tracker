@@ -7,6 +7,12 @@ import { useToast } from '../../design/components/Toast';
 import { useSessionMe } from '../../shell/SessionGate';
 import { InstallSteps } from '../onboarding/InstallSteps';
 
+/**
+ * Dan, 2026-11-17: "I don't want them just yet". Turns the Settings section (and so every notification
+ * prompt in the app) off. The server is untouched; flip to true to bring it all back.
+ */
+export const NOTIFICATIONS_ENABLED = false;
+
 const LABELS: Record<NotifyKey, string> = {
   messages: 'Messages',
   friendRequests: 'Friend requests',

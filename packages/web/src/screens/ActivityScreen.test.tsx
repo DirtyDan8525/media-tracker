@@ -375,7 +375,6 @@ describe('ActivityScreen: everyone and deleting posts', () => {
     const row = (await screen.findByRole('link', { name: 'Bleach' })).closest('li')!;
     expect(screen.getAllByRole('button', { name: /^Options for/ })).toHaveLength(2);
     await userEvent.click(within(row).getByRole('button', { name: 'Options for Bleach' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
     const sheet = await screen.findByRole('dialog', { name: 'Delete this post?' });
     expect(sheet).toHaveTextContent('The title stays on your list.');
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
@@ -395,12 +394,10 @@ describe('ActivityScreen: everyone and deleting posts', () => {
     } });
     renderApp('/activity');
     await userEvent.click(await screen.findByRole('button', { name: 'Options for Bleach' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Options for Bleach' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete post' }));
     expect(await screen.findByText("Couldn't delete that. Try again.")).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();

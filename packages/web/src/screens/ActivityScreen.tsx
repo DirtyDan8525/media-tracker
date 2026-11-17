@@ -248,27 +248,14 @@ function FeedPost({ line, now, social, who, friend, select, onComments, onDelete
   );
 }
 
-/** ⋯ on your own post: a menu with "Delete post" (the confirm sheet is the screen's). */
+/**
+ * ⋯ on your own post. Its only action is Delete, so it opens the confirm sheet straight away: big
+ * phone-sized buttons instead of a tiny pop-up menu (Dan, 2026-11-17).
+ */
 function PostMenu({ title, onDelete }: { title: string; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', away);
-    return () => document.removeEventListener('mousedown', away);
-  }, [open]);
   return (
-    <div className="feed-post__menu" ref={box} onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}>
-      <IconButton label={`Options for ${title}`} icon="more" look="plain" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} />
-      {open && (
-        <div role="menu" aria-label={`Options for ${title}`} className="list-menu__panel feed-post__panel">
-          <button type="button" role="menuitem" className="list-menu__item" autoFocus
-            onClick={() => { setOpen(false); onDelete(); }}>
-            Delete post
-          </button>
-        </div>
-      )}
+    <div className="feed-post__menu">
+      <IconButton label={`Options for ${title}`} icon="more" look="plain" aria-haspopup="dialog" onClick={onDelete} />
     </div>
   );
 }

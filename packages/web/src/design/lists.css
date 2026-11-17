@@ -228,3 +228,6 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .ep-progress__value { min-width: 4.5ch; text-align: center; font-variant-numeric: tabular-nums; color: var(--bright-text); font-weight: 600; }
 .ep-progress__done { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); color: var(--muted-text); }
 .tile--progress { margin-top: var(--space-5); }
+
+/* "Watch on YouTube" on a video's page. */
+.detail__watch { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-height: var(--tap); margin-top: var(--space-4); padding: 0 var(--space-8); text-decoration: none; }

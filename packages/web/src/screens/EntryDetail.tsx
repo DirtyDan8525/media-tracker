@@ -118,6 +118,12 @@ function DetailBody({ entry }: { entry: Entry }) {
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
             {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
+            {entry.category === 'youtube' && sourceUrl(entry.source, entry.sourceId) && (
+              // Dan, 2026-11-17: a video links straight to YouTube.
+              <a className="btn btn--primary detail__watch" href={sourceUrl(entry.source, entry.sourceId)!} target="_blank" rel="noopener noreferrer">
+                Watch on YouTube
+              </a>
+            )}
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>

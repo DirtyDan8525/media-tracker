@@ -483,4 +483,14 @@ describe('entry details: number-first rating tile (Rulings N1, N6, N8)', () => {
     await screen.findByRole('combobox', { name: 'Status' });
     expect(screen.queryByRole('spinbutton', { name: 'Rating' })).not.toBeInTheDocument();
   });
+
+describe('YouTube', () => {
+  it('a video has a "Watch on YouTube" link to the video', async () => {
+    fakeBackend({ entries: [makeEntry({ id: 'yt1', category: 'youtube', title: 'Never Gonna Give You Up', source: 'youtube', sourceId: 'dQw4w9WgXcQ' })] });
+    renderApp('/entry/yt1');
+    const link = await screen.findByRole('link', { name: 'Watch on YouTube' });
+    expect(link).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+});
 });

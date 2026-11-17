@@ -17,6 +17,7 @@ import { sortEntries } from '../../lists/sort';
 import { LIST_LABEL, LIST_ORDER } from '../../nav';
 import { computeStats } from '../../ratings/stats';
 import { topFive } from '../../ratings/topFive';
+import { useIsWide } from '../../hooks';
 import { BackButton } from '../../shell/BackButton';
 import { useSessionMe } from '../../shell/SessionGate';
 import { ListCard } from '../StatsScreen';
@@ -26,6 +27,7 @@ import { CategoryChips, PersonAvatar, Tabs, who, type TabDef } from './parts';
 import '../../design/ratings.css';
 import '../../design/social.css';
 import '../../design/plan.css';
+import '../../design/lists.css';
 
 const TABS: TabDef<'lists' | 'top5' | 'stats' | 'compare'>[] = [
   { id: 'lists', label: 'Lists' }, { id: 'top5', label: 'Top 5' }, { id: 'stats', label: 'Stats' }, { id: 'compare', label: 'Compare' },
@@ -189,6 +191,9 @@ const entryLink = (username: string, id: string) => `/u/${username}/entry/${id}`
 
 function ListsPanel({ username, rows }: { username: string; rows: FriendEntry[] }) {
   const sorted = useMemo(() => sortEntries(rows, 'rating'), [rows]);
+  const wide = useIsWide();
+  // PC: the same rows as your own list table (Dan, 2026-11-17), read-only.
+  if (wide && sorted[0]) return <FriendTable username={username} rows={sorted} />;
   return (
     <ul className="people plain-list">
       {sorted.map((e) => {
@@ -209,6 +214,42 @@ function ListsPanel({ username, rows }: { username: string; rows: FriendEntry[] 
         );
       })}
     </ul>
+  );
+}
+
+function FriendTable({ username, rows }: { username: string; rows: FriendEntry[] }) {
+  const cfg = CATEGORY_CONFIG[rows[0]!.category];
+  return (
+    <div className="table-wrap">
+      <table className="entry-table" aria-label={`${LIST_LABEL[rows[0]!.category]}, @${username}`}>
+        <thead>
+          <tr>
+            <th scope="col" className="col-cover">Cover</th>
+            <th scope="col" className="col-rating">Rating</th>
+            <th scope="col">Title</th>
+            {cfg.hasStatus && <th scope="col">Status</th>}
+            <th scope="col">Genres</th>
+            {cfg.creatorLabel && <th scope="col">{cfg.creatorLabel}</th>}
+            {cfg.hasSeasons && <th scope="col">Season Avg</th>}
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((e) => (
+            <tr key={e.id}>
+              <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
+              <td><RatingBadge rating={e.rating} size="sm" /></td>
+              <td><div className="cell-title"><Link to={entryLink(username, e.id)} data-role="title">{e.title}</Link></div></td>
+              {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
+              <td className="muted">{e.genres}</td>
+              {cfg.creatorLabel && <td>{e.creator}</td>}
+              {cfg.hasSeasons && <td className="muted">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
+              <td><span className="cell-notes" title={e.notes || undefined}>{e.notes ?? ''}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

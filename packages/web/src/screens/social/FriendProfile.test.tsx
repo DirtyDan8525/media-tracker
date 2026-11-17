@@ -5,6 +5,7 @@ import { fakeBackend, makeEntry } from '../../test/fakeBackend';
 import { friendsOf, makeFriendEntry, REN } from '../../test/friends';
 import { makeMe } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
+import { setViewportWidth } from '../../test/viewport';
 
 const PROFILE = { user: REN, memberSince: '2026-10-01T00:00:00Z', relation: 'friend' };
 const ENTRIES = () => [
@@ -38,6 +39,20 @@ describe('Friend profile', () => {
     expect(screen.getByRole('link', { name: 'Mob Psycho 100, Watching / In Progress, rated 8.5' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit|delete/i })).not.toBeInTheDocument();
+  });
+
+  it('on PC the Lists tab is a read-only table like your own list, with notes', async () => {
+    setViewportWidth(1280);
+    try {
+      backend({ 'GET /api/users/:username/entries': { body: [makeFriendEntry({ id: 'f1', title: 'Frieren', status: 'Completed', rating: 9, category: 'anime', notes: 'peak' })] } });
+      renderApp('/u/ren');
+      const table = await screen.findByRole('table', { name: 'Anime, @ren' });
+      expect(within(table).getByRole('link', { name: 'Frieren' })).toHaveAttribute('href', '/u/ren/entry/f1');
+      expect(within(table).getByText('peak')).toHaveAttribute('title', 'peak');
+      expect(within(table).queryByRole('textbox')).not.toBeInTheDocument();
+    } finally {
+      setViewportWidth(390);
+    }
   });
 
   it('tiles count titles, rated, average and the month you became friends', async () => {

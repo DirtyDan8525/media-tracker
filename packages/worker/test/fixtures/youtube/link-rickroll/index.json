@@ -1,0 +1,7 @@
+{
+  "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&format=json": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

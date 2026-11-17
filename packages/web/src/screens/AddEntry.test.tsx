@@ -184,7 +184,7 @@ describe('the Add sheet: "Add to" list dropdown', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(button);
     const items = within(screen.getByRole('menu', { name: 'Add to' })).getAllByRole('menuitemradio');
-    expect(items.map((i) => i.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga']);
+    expect(items.map((i) => i.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga', 'YouTube']);
     expect(items.filter((i) => i.getAttribute('aria-checked') === 'true').map((i) => i.textContent)).toEqual(['Movies']);
   });
 
@@ -229,5 +229,20 @@ describe('the Add sheet: "Add to" list dropdown', () => {
     await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(posts(calls)[0]).toMatchObject({ category: 'anime' }));
     expect(screen.queryByText(/^Added to/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Add sheet for YouTube', () => {
+  it('labels the fields Video and Channel and says a link can be pasted', async () => {
+    fakeBackend({ me: meWith() });
+    renderApp('/list/youtube');
+    await screen.findByRole('navigation', { name: 'Main' });
+    await userEvent.click(await screen.findByRole('link', { name: 'Add video' }));
+    const d = await screen.findByRole('dialog', { name: 'Add' });
+    expect(within(d).getByRole('textbox', { name: 'Video' })).toBeInTheDocument();
+    expect(within(d).getByRole('textbox', { name: /Channel/ })).toBeInTheDocument();
+    expect(within(d).getByText(/paste a YouTube link/i)).toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: 'Watched' })).toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: 'Plan to watch' })).toBeInTheDocument();
   });
 });

@@ -1,9 +1,9 @@
 import type { Tier, TierSet } from './ratings/types';
 
-export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books' | 'manga';
+export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books' | 'manga' | 'youtube';
 
 export type SourceId =
-  | 'anilist' | 'kitsu' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb';
+  | 'anilist' | 'kitsu' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb' | 'youtube';
 
 export const STATUSES = [
   'Completed',
@@ -31,6 +31,7 @@ export const STATUS_ALIASES: Readonly<Record<string, Status>> = {
   'planned': 'Plan to watch',
   'plan to read': 'Plan to watch',
   'plan to play': 'Plan to watch',
+  'watched': 'Completed',
 };
 
 export interface LookupInfo {
@@ -65,6 +66,7 @@ export const ORIGIN_LABEL: Record<Category, string> = {
   games: 'Platforms',
   books: 'Publisher',
   manga: 'Format',
+  youtube: 'Source',
 };
 
 export interface Entry {
@@ -127,8 +129,8 @@ export interface Season {
 }
 
 export interface CategoryConfig {
-  titleLabel: 'Title' | 'Album' | 'Song';
-  creatorLabel: 'Studio' | 'Director' | 'Artist' | 'Author' | 'Developer' | null;
+  titleLabel: 'Title' | 'Album' | 'Song' | 'Video';
+  creatorLabel: 'Studio' | 'Director' | 'Artist' | 'Author' | 'Developer' | 'Channel' | null;
   hasStatus: boolean;
   creatorIsSearchHint: boolean;
   square: boolean;
@@ -145,6 +147,8 @@ export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
   books:  { titleLabel: 'Title', creatorLabel: 'Author',    hasStatus: true,  creatorIsSearchHint: true,  square: false, hasSeasons: false },
   // Series-level only: no volume entries, no seasons. The author is not a search hint (Kitsu's text search is by title).
   manga:  { titleLabel: 'Title', creatorLabel: 'Author',    hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: false },
+  // One video at a time: found by pasting a link or by title; thumbnails are 16:9, shown in the square frame (no wide cover shape).
+  youtube: { titleLabel: 'Video', creatorLabel: 'Channel', hasStatus: true, creatorIsSearchHint: false, square: true, hasSeasons: false },
 };
 
 export interface UserSettings {
@@ -162,7 +166,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   theme: 'Midnight',
   colors: {},
   tabs: {
-    anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true, manga: true,
+    anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true, manga: true, youtube: true,
     animeSeasons: true, tvSeasons: true,
   },
   compareAsk: 'Both',

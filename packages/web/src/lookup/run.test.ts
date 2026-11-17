@@ -2,7 +2,7 @@ import type { LookupInfo } from '@media-tracker/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockFetch, type Call } from '../test/mockApi';
 import { buildLookupQuery } from './query';
-import { runLookup } from './run';
+import { runLookup, searchNeedsSetup } from './run';
 
 const ANILIST = 'POST https://graphql.anilist.co/';
 const media = (id: number, english: string) => ({ id, title: { romaji: english, english }, popularity: 1 });
@@ -14,6 +14,18 @@ const serverCalls = (calls: Call[]) => calls.filter((c) => c.path === '/api/look
 const requested = () => vi.mocked(fetch).mock.calls.map(([u]) => String(u));
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('runLookup notConfigured', () => {
+  it('remembers that YouTube search needs setup, and forgets it after a hit', async () => {
+    const q = buildLookupQuery('youtube', 'some title', '');
+    mockFetch({ 'POST /api/lookup': { body: { info: null, notConfigured: true } } });
+    expect(await runLookup(q)).toBeNull();
+    expect(searchNeedsSetup('youtube')).toBe(true);
+    mockFetch({ 'POST /api/lookup': { body: { info: serverInfo } } });
+    expect(await runLookup(q)).toEqual(serverInfo);
+    expect(searchNeedsSetup('youtube')).toBe(false);
+  });
+});
 
 describe('runLookup (anime tries AniList on the device first)', () => {
   it('a device hit is returned without calling the server', async () => {

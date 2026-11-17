@@ -32,12 +32,13 @@ const TAB_LABELS: Record<string, string> = {
   'games': 'games',
   'books': 'books',
   'manga': 'manga',
+  'youtube': 'youtube',
 };
 const COLOR_ROLES = Object.keys(THEMES.Midnight!);
 
 type Kind = Category | 'animeSeasons' | 'tvSeasons';
 const KIND_LABEL: Record<Kind, string> = {
-  anime: 'Anime', movies: 'Movies', tv: 'TV', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books', manga: 'Manga',
+  anime: 'Anime', movies: 'Movies', tv: 'TV', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books', manga: 'Manga', youtube: 'YouTube',
   animeSeasons: 'Anime Seasons', tvSeasons: 'TV Seasons',
 };
 
@@ -55,6 +56,7 @@ function classify(headers: string[], tab = ''): Kind | null {
   const has = (h: string) => headers.includes(h);
   if (headers[0] === 'anime' && headers.slice(1).some((h) => h.startsWith('season'))) return 'animeSeasons';
   if (headers[0] === 'show' && headers.slice(1).some((h) => h.startsWith('season'))) return 'tvSeasons';
+  if (norm(tab) === 'youtube' && (has('title') || has('video'))) return 'youtube'; // Video / Channel columns, told apart by the tab's name
   if (has('title')) {
     if (norm(tab) === 'manga') return 'manga'; // same columns as Books (Author), told apart by the tab's name
     if (has('studio')) return 'anime';
@@ -176,7 +178,7 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
 
     const cfg = CATEGORY_CONFIG[kind];
     const col = (name: string) => headers.indexOf(name);
-    const titleCol = col(cfg.titleLabel.toLowerCase());
+    const titleCol = col(cfg.titleLabel.toLowerCase()) >= 0 ? col(cfg.titleLabel.toLowerCase()) : col('title');
     const c = {
       rating: col('rating'),
       status: cfg.hasStatus ? col('status') : -1,

@@ -4,6 +4,7 @@ DEV_EMAIL=dan@example.com
 # TMDB_KEY=
 # IGDB_ID=
 # IGDB_SECRET=
+# YOUTUBE_API_KEY=   # optional: YouTube title search (a pasted link needs no key)
 # Only for recording the Spotify fixture (npm run record): a Spotify album link for Clairo – Live at Electric Lady.
 # SPOTIFY_ALBUM_URL=
 # Leave DEV_EMAIL out to try the real sign-in screen locally (sign up; the first account is the admin).

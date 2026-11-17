@@ -86,6 +86,7 @@ describe('CHAINS', () => {
       albums: ['deezer', 'itunes'],
       books: ['openlibrary', 'itunes'],
       manga: ['kitsu'],
+      youtube: ['youtube'],
     });
   });
 
@@ -308,6 +309,13 @@ describe('chain cache', () => {
     expect(spotify.search).toHaveBeenCalledTimes(1);
   });
 
+  it('a YouTube link keys on its canonical URL with the id case preserved (ids are case-sensitive)', () => {
+    const key = (t: string) => chainCacheKey({ term: t, hint: '', typedTitle: '' });
+    expect(key('https://youtu.be/AbCdEfGhIjK?si=x')).toBe('["https://www.youtube.com/watch?v=AbCdEfGhIjK","",""]');
+    expect(key('https://m.youtube.com/watch?v=AbCdEfGhIjK&t=5')).toBe(key('https://youtu.be/AbCdEfGhIjK'));
+    expect(key('https://youtu.be/abcdefghijk')).not.toBe(key('https://youtu.be/AbCdEfGhIjK'));
+  });
+
   it('a stale row (> 30 days) is ignored and overwritten', async () => {
     register({ tmdb: fixed('tmdb', info('tmdb', 'Fresh')) });
     const old = new Date(Date.now() - 31 * 864e5).toISOString();
@@ -370,6 +378,21 @@ describe('POST /api/lookup', () => {
     expect(spy).not.toHaveBeenCalled();
     const row = await env.DB.prepare('SELECT source, query_key FROM lookup_cache').first();
     expect(row).toEqual({ source: 'chain:movies', query_key: '["speed racer","","speed racer"]' });
+  });
+
+  it('youtube title search without YOUTUBE_API_KEY: info null and notConfigured, no fetch; a pasted link still looks up', async () => {
+    const youtube: SourceEntry = { search: vi.fn(async (qq: LookupQuery) => info('youtube', qq.term)) };
+    register({ youtube });
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const r = await post(USER, '/api/lookup', { category: 'youtube', term: 'some video title' }, { YOUTUBE_API_KEY: undefined });
+    expect(await r.json()).toEqual({ info: null, notConfigured: true });
+    expect(youtube.search).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
+    const link = await post(USER, '/api/lookup', { category: 'youtube', term: 'https://youtu.be/dQw4w9WgXcQ' }, { YOUTUBE_API_KEY: undefined });
+    expect(await link.json()).toMatchObject({ info: { source: 'youtube' } });
+    const keyed = await post(USER, '/api/lookup', { category: 'youtube', term: 'some video title' }, { YOUTUBE_API_KEY: 'K' });
+    expect(await keyed.json()).toMatchObject({ info: { source: 'youtube' } });
+    expect(await (await post(USER, '/api/lookup', { category: 'movies', term: 'x' }, { YOUTUBE_API_KEY: undefined })).json()).not.toHaveProperty('notConfigured');
   });
 
   it('a non-admin debug:true gets no log', async () => {

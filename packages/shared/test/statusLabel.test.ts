@@ -23,6 +23,13 @@ describe('statusLabel', () => {
     expect(statusLabel('Plan to watch', 'manga')).toBe('Plan to read');
     for (const s of ['Completed', 'On Hold', 'Dropped'] as const) expect(statusLabel(s, 'manga')).toBe(s);
   });
+  it('says Watched for a finished video and keeps the watch wording otherwise', () => {
+    expect(statusLabel('Completed', 'youtube')).toBe('Watched');
+    expect(statusLabel('Plan to watch', 'youtube')).toBe('Plan to watch');
+    expect(statusLabel('Watching / In Progress', 'youtube')).toBe('Watching / In Progress');
+    for (const s of ['On Hold', 'Dropped', 'Rewatching'] as const) expect(statusLabel(s, 'youtube')).toBe(s);
+    expect(statusLabel('Completed', 'movies')).toBe('Completed');
+  });
   it('keeps stored wording on lists without a Status column', () => {
     for (const c of ['movies', 'albums', 'songs'] as Category[]) for (const s of STATUSES) expect(statusLabel(s, c)).toBe(s);
   });

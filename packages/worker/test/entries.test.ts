@@ -193,6 +193,14 @@ describe('entries create / list / get', () => {
     expect(seasons.res.status).toBeGreaterThanOrEqual(400); // series-level only: no seasons
   });
 
+  it('accepts the youtube list and a YouTube match (sourceId = video id); it has a status and no seasons', async () => {
+    const e = await mk(A, { category: 'youtube', title: 'Never Gonna Give You Up', status: 'Completed', creator: 'Rick Astley', source: 'youtube', sourceId: 'dQw4w9WgXcQ' });
+    expect(e).toMatchObject({ category: 'youtube', status: 'Completed', source: 'youtube', sourceId: 'dQw4w9WgXcQ' });
+    const list = (await (await as(A, '/api/entries?category=youtube')).json()) as Entry[];
+    expect(list.map((x) => x.title)).toEqual(['Never Gonna Give You Up']);
+    expect((await addSeason(A, e.id, { label: 'Part 1' })).res.status).toBeGreaterThanOrEqual(400);
+  });
+
   it('400 on bad status; non-null status is rejected where hasStatus is false', async () => {
     expect((await create(A, { category: 'anime', title: 't', status: 'Finished' })).res.status).toBe(400);
     expect((await create(A, { category: 'albums', title: 't', status: 'Completed' })).res.status).toBe(400);

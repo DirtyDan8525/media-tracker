@@ -37,7 +37,7 @@ const PickerSheet = lazy(() => import('./PickerSheet').then((m) => ({ default: m
 const PasteImageSheet = lazy(() => import('./PasteImageSheet').then((m) => ({ default: m.PasteImageSheet })));
 
 const NOUN: Record<Category, string> = {
-  anime: 'anime', movies: 'movies', tv: 'TV shows', albums: 'albums', songs: 'songs', games: 'games', books: 'books', manga: 'manga',
+  anime: 'anime', movies: 'movies', tv: 'TV shows', albums: 'albums', songs: 'songs', games: 'games', books: 'books', manga: 'manga', youtube: 'videos',
 };
 
 /** While a sheet's code loads: an empty sheet with skeleton lines, so the tap answers at once. */

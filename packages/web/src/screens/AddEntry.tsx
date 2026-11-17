@@ -80,6 +80,7 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
           <span className="field-hint">
             Typos are fine. The official title and cover{cfg.creatorLabel ? ` and ${lower(cfg.creatorLabel)}` : ''} fill in for you.
             {spotify && ' You can also paste a Spotify link.'}
+            {category === 'youtube' && ' You can also paste a YouTube link.'}
           </span>
         </div>
 

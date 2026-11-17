@@ -7,6 +7,7 @@ import { CATEGORIES } from '../api/entryValidation';
 import { getCached, putCached } from './cache';
 import { lookupChain } from './chain';
 import { envSecrets, redactSecrets } from './http';
+import { parseYouTubeLink } from './sources/youtube';
 import { SOURCE_IDS, SOURCES, keysPresent, type LookupDeps } from './sources/index';
 
 export const lookup = new Hono<AppEnv>();
@@ -72,6 +73,8 @@ lookup.post('/', async (c) => {
 
   const log: string[] = [];
   const cat = category as Category;
+  // A YouTube title search needs the API key; tell the app so it can say a pasted link still works.
+  if (cat === 'youtube' && !c.env.YOUTUBE_API_KEY && !parseYouTubeLink(term)) return c.json({ info: null, notConfigured: true });
   const info = await lookupChain(cat, { term, typedTitle, hint, category: cat }, depsFor(c.env, log));
   if (debug === true && c.var.user.isAdmin) {
     const secrets = envSecrets(c.env);

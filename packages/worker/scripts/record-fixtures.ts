@@ -38,6 +38,7 @@ function envFrom(vars: Record<string, string>): Env {
     TMDB_KEY: vars.TMDB_KEY || undefined,
     IGDB_ID: vars.IGDB_ID || undefined,
     IGDB_SECRET: vars.IGDB_SECRET || undefined,
+    YOUTUBE_API_KEY: vars.YOUTUBE_API_KEY || undefined,
   } as unknown as Env; // ASSETS isn't used by lookups
 }
 

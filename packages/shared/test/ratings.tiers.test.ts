@@ -67,8 +67,8 @@ describe('tiers', () => {
     expect(tiersFor({} as never, 'books')).toBe(DEFAULT_TIERS);
   });
   test('rating sets: every list plus the two season tabs', () => {
-    expect(RATING_SETS).toEqual(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'anime_seasons', 'tv_seasons']);
-    expect(RATING_SETS.map(listOfSet)).toEqual(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'anime', 'tv']);
+    expect(RATING_SETS).toEqual(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'youtube', 'anime_seasons', 'tv_seasons']);
+    expect(RATING_SETS.map(listOfSet)).toEqual(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'youtube', 'anime', 'tv']);
     expect(seasonSetOf('anime')).toBe('anime_seasons');
     expect(seasonSetOf('tv')).toBe('tv_seasons');
     expect(seasonSetOf('movies')).toBeNull();

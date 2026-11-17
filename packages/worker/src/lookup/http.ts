@@ -5,7 +5,7 @@ import type { Env } from '../env';
 import type { LookupDeps } from './sources/index';
 
 /** Query params that carry credentials. Removed from every logged or recorded URL. */
-export const SECRET_PARAMS: readonly string[] = ['api_key', 'client_id', 'client_secret', 'access_token'];
+export const SECRET_PARAMS: readonly string[] = ['api_key', 'client_id', 'client_secret', 'access_token', 'key'];
 
 const SECRET_PARAM_RE = new RegExp(`\\b(${SECRET_PARAMS.join('|')})=[^&\\s#"']*`, 'gi');
 
@@ -56,7 +56,7 @@ export function redactSecrets(text: string, secrets: readonly string[]): string 
 
 /** The credential values in env (empty ones skipped). */
 export function envSecrets(env: Env): string[] {
-  return [env.TMDB_KEY, env.IGDB_ID, env.IGDB_SECRET].filter((v): v is string => typeof v === 'string' && v !== '');
+  return [env.TMDB_KEY, env.IGDB_ID, env.IGDB_SECRET, env.YOUTUBE_API_KEY].filter((v): v is string => typeof v === 'string' && v !== '');
 }
 
 /** Appends a line to the lookup log (if one is being kept), with credential params and env secrets scrubbed. */

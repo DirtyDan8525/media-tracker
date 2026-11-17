@@ -42,6 +42,8 @@ export function sourceUrl(source: SourceId | null | undefined, sourceId: string 
       return /^OL\d{1,12}W$/.test(sourceId) ? `https://openlibrary.org/works/${sourceId}` : null;
     case 'steam':
       return /^\d{1,12}$/.test(sourceId) ? `https://store.steampowered.com/app/${sourceId}/` : null;
+    case 'youtube':
+      return /^[A-Za-z0-9_-]{11}$/.test(sourceId) ? `https://www.youtube.com/watch?v=${sourceId}` : null;
     default:
       return null; // igdb, itunes: no stable public page from the stored id
   }

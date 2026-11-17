@@ -25,6 +25,12 @@ export const CASES: FixtureCase[] = [
   // Kitsu manga (the Manga list): a manga:<id> source id; no key. The recorded file in the repo is hand-written until this is run.
   { source: 'kitsu', case: 'manga-berserk',
     query: { term: 'berserk', typedTitle: 'berserk', hint: '', category: 'manga' } },
+  // YouTube (the YouTube list). A pasted link goes through oEmbed, which needs no key; the recorded file is hand-written until this is run.
+  { source: 'youtube', case: 'link-rickroll',
+    query: { term: 'https://youtu.be/dQw4w9WgXcQ', typedTitle: 'https://youtu.be/dQw4w9WgXcQ', hint: '', category: 'youtube' } },
+  // Title search needs YOUTUBE_API_KEY in .dev.vars (skipped by the chain without it); its fixture is hand-written until recorded.
+  { source: 'youtube', case: 'search-rickroll',
+    query: { term: 'never gonna give you up', typedTitle: 'never gonna give you up', hint: '', category: 'youtube' }, detailsFromSearch: true },
   // TMDB needs a key in .dev.vars. The wiki cases call the wiki source directly, so they need none.
   { source: 'tmdb', case: 'speed-racer-2008',
     query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer 2008', hint: '', category: 'movies' } },

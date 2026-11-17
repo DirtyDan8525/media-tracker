@@ -267,3 +267,22 @@ describe('Manga tab', () => {
     expect(p.settings).toEqual({ theme: 'Ocean', tabs: { manga: false, books: true } });
   });
 });
+
+describe('YouTube tab', () => {
+  it('a tab named YouTube maps to youtube (Video and Channel columns, Watched is Completed)', async () => {
+    const p = await parseRows([
+      { name: 'YouTube', rows: [['Video', 'Channel', 'Status', 'Rating'], ['Some Video', 'Some Channel', 'Watched', 8.5], ['Later', '', 'Plan to watch', null]] },
+    ]);
+    expect(p.counts).toEqual({ youtube: 2 });
+    expect(p.rows[0]).toMatchObject({ category: 'youtube', title: 'Some Video', creator: 'Some Channel', status: 'Completed', rating: 8.5 });
+    expect(p.rows[1]).toMatchObject({ category: 'youtube', status: 'Plan to watch' });
+  });
+  it('a Title column also works, and a YouTube switch on Settings is read', async () => {
+    const p = await parseRows([
+      { name: 'youtube', rows: [['Title', 'Channel'], ['A', 'B']] },
+      { name: 'Settings', rows: [[null, 'Theme', 'Ocean'], [null, 'YouTube', false]] },
+    ]);
+    expect(p.rows).toMatchObject([{ category: 'youtube', title: 'A', creator: 'B' }]);
+    expect(p.settings).toEqual({ theme: 'Ocean', tabs: { youtube: false } });
+  });
+});

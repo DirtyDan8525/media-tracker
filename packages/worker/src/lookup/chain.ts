@@ -2,6 +2,7 @@
 import type { Category, LookupInfo, SourceId } from '@media-tracker/shared';
 import { getCached, putCached } from './cache';
 import { isDegraded, logLine } from './http';
+import { parseYouTubeLink } from './sources/youtube';
 import { SOURCES, keysPresent, type LookupDeps, type LookupQuery } from './sources/index';
 
 /** Sources tried in order per tab, exactly as lookup_ does after the Spotify check. */
@@ -14,6 +15,7 @@ export const CHAINS: Record<Category, SourceId[]> = {
   albums: ['deezer', 'itunes'],
   books: ['openlibrary', 'itunes'],
   manga: ['kitsu'], // the kitsu adapter searches /manga when q.category === 'manga'
+  youtube: ['youtube'], // a pasted link goes to oEmbed (no key); a title search needs YOUTUBE_API_KEY
 };
 
 /** A source that hasn't answered within this long is abandoned and the chain moves on. */
@@ -40,7 +42,8 @@ export function parseSpotifyLink(term: string): { kind: 'album' | 'track'; id: s
  */
 export function chainCacheKey(q: Pick<LookupQuery, 'term' | 'hint' | 'typedTitle'>): string {
   const norm = (s: string) => s.trim().toLowerCase();
-  const term = parseSpotifyLink(q.term)?.url ?? norm(q.term);
+  // YouTube ids are case-sensitive too: key a pasted link on its canonical URL.
+  const term = parseSpotifyLink(q.term)?.url ?? parseYouTubeLink(q.term)?.url ?? norm(q.term);
   return JSON.stringify([term, norm(q.hint), norm(q.typedTitle)]);
 }
 

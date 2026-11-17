@@ -16,7 +16,7 @@ async function sheet(field: { role: 'textbox'; name: string | RegExp }, dialogNa
   await screen.findByRole(field.role, { name: field.name });
   return screen.getByRole('dialog', { name: dialogName });
 }
-const findAddSheet = () => sheet({ role: 'textbox', name: /^(Title|Album|Song)$/ }, /^Add$/);
+const findAddSheet = () => sheet({ role: 'textbox', name: /^(Title|Album|Song|Video)$/ }, /^Add$/);
 const findPicker = () => sheet({ role: 'textbox', name: 'Search again' }, 'Which one did you mean?');
 const findPaste = () => sheet({ role: 'textbox', name: 'Image link' }, 'Paste image link');
 
@@ -29,7 +29,7 @@ async function openAdd(label = /^Add anime$/i) {
 
 async function addTitle(typed: string, dialog?: HTMLElement) {
   const d = dialog ?? (await openAdd());
-  await userEvent.type(within(d).getByRole('textbox', { name: /^(Title|Album|Song)$/ }), typed);
+  await userEvent.type(within(d).getByRole('textbox', { name: /^(Title|Album|Song|Video)$/ }), typed);
   await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
 }
 
@@ -547,6 +547,31 @@ describe('manga list', () => {
     renderApp('/list/manga');
     await screen.findByRole('heading', { name: 'Manga' });
     expect(screen.getAllByRole('link', { name: 'Add manga' }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('youtube list', () => {
+  it('shows videos with Channel, Watched for a finished one, no seasons; on by default; add says video', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ id: 'y1', category: 'youtube', title: 'A Video', creator: 'Some Channel', status: 'Completed', lengthLabel: '12:34' }),
+      makeEntry({ id: 'y2', category: 'youtube', title: 'Later Video', status: 'Plan to watch' }),
+    ] });
+    renderApp('/list/youtube');
+    await screen.findByRole('heading', { name: 'YouTube' });
+    expect(await screen.findByText('A Video')).toBeInTheDocument();
+    expect(screen.getByText('Watched', { selector: '.status-pill' })).toBeInTheDocument();
+    expect(screen.getByText('Plan to watch', { selector: '.status-pill' })).toBeInTheDocument();
+    expect(screen.queryByText(/season/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Add video' }).length).toBeGreaterThan(0);
+    expect(localStorage.getItem('mt-current-list')).toBe('youtube');
+  });
+
+  it('a search that the server says is not set up explains that a pasted link still works', async () => {
+    fakeBackend({ lookup: () => ({ body: { info: null, notConfigured: true } }) });
+    renderApp('/list/youtube');
+    await addTitle('some video title', await openAdd(/^Add video$/i));
+    expect(await screen.findByText('Paste a YouTube link (search needs setup)')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't find it")).not.toBeInTheDocument();
   });
 });
 

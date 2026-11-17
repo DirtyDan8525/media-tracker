@@ -14,6 +14,7 @@ import * as steam from './steam';
 import * as tmdb from './tmdb';
 import * as tvmaze from './tvmaze';
 import * as wiki from './wiki';
+import * as youtube from './youtube';
 
 export interface LookupQuery {
   term: string;
@@ -45,7 +46,7 @@ export interface SourceEntry {
 }
 
 export const SOURCE_IDS: readonly SourceId[] = [
-  'anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb',
+  'anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb', 'youtube',
 ];
 
 export const hasTmdbKey = (env: Env): boolean => !!env.TMDB_KEY;
@@ -70,6 +71,8 @@ export const SOURCES: Partial<Record<SourceId, SourceEntry>> = {
   openlibrary: { search: openlibrary.search, details: openlibrary.details },
   igdb: { search: igdb.search, details: igdb.details },
   steam: { search: steam.search, details: steam.details },
+  // No needsKey: a pasted link works without a key; the adapter itself skips a title search when YOUTUBE_API_KEY is unset.
+  youtube: { search: youtube.search, details: youtube.details },
 };
 
 /** Whether a registered source can run with this env: its own needsKey, else KEY_CHECKS. */

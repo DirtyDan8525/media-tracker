@@ -70,6 +70,21 @@ describe('status wording on the phone Filters sheet', () => {
   });
 });
 
+describe('status wording on YouTube', () => {
+  beforeEach(() => setViewportWidth(1200));
+
+  it('Completed reads Watched; the stored value is what is saved', async () => {
+    const { calls } = fakeBackend({ entries: [makeEntry({ id: 'v1', category: 'youtube', title: 'Alpha', status: 'Plan to watch' })] });
+    renderApp('/entry/v1');
+    const select = await screen.findByLabelText('Status');
+    expect(within(select).getByRole('option', { name: 'Watched' })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Completed' })).not.toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Plan to watch' })).toBeInTheDocument();
+    await userEvent.selectOptions(select, 'Watched');
+    await waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && (c.body as { status?: string }).status === 'Completed')).toBe(true));
+  });
+});
+
 describe('status wording on anime', () => {
   beforeEach(() => setViewportWidth(1200));
 

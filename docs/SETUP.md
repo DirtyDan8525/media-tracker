@@ -90,6 +90,21 @@ The Worker exists now (step 7), so these attach to it. Secrets take effect right
 
 **Success:** each command prints `Success! Uploaded secret ...`.
 
+### YouTube search (optional)
+
+The YouTube list works without any setup when you paste a video link (the title, channel and thumbnail fill in). Searching by title needs a free Google key:
+
+1. Go to <https://console.cloud.google.com/> and create a project.
+2. Open "APIs & Services" > "Library", find **YouTube Data API v3** and click Enable.
+3. Open "APIs & Services" > "Credentials", click "Create credentials" > "API key", then restrict the key to the YouTube Data API v3 only.
+4. Store it as a secret (paste the key when asked):
+
+```
+npm exec -w packages/worker -- wrangler secret put YOUTUBE_API_KEY --env production
+```
+
+The free quota is 10,000 units a day. One title search costs 100 units, so that is about 100 searches a day (pasting a link costs nothing). Until the key is set, the app says "Paste a YouTube link (search needs setup)".
+
 ## 9. Create your account
 
 1. Open your workers.dev address in a browser.

@@ -92,7 +92,7 @@ describe('Add bubble (phone)', () => {
   });
 
   it('is not shown when every list is off', async () => {
-    const off = Object.fromEntries(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga'].map((c) => [c, false]));
+    const off = Object.fromEntries(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'youtube'].map((c) => [c, false]));
     mockApi(makeMe({}, off), empty);
     renderApp('/activity');
     await screen.findByRole('navigation', { name: 'Main' });

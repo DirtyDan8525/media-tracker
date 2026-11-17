@@ -4,7 +4,7 @@ import { CATEGORY_CONFIG, COMPARE_ASK, DEFAULT_USER_SETTINGS, ORIGIN_LABEL } fro
 describe('DEFAULT_USER_SETTINGS', () => {
   it('has every Sheet tab switch, including the season tabs', () => {
     expect(DEFAULT_USER_SETTINGS.tabs).toEqual({
-      anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true, manga: true,
+      anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true, manga: true, youtube: true,
       animeSeasons: true, tvSeasons: true,
     });
   });
@@ -22,5 +22,14 @@ describe('manga category', () => {
       titleLabel: 'Title', creatorLabel: 'Author', hasStatus: true, creatorIsSearchHint: false, square: false, hasSeasons: false,
     });
     expect(ORIGIN_LABEL.manga).toBe('Format');
+  });
+});
+
+describe('youtube category', () => {
+  it('is Video by Channel, has a status, no seasons, square thumbnails', () => {
+    expect(CATEGORY_CONFIG.youtube).toEqual({
+      titleLabel: 'Video', creatorLabel: 'Channel', hasStatus: true, creatorIsSearchHint: false, square: true, hasSeasons: false,
+    });
+    expect(ORIGIN_LABEL.youtube).toBe('Source');
   });
 });

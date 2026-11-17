@@ -28,7 +28,7 @@ describe('list title dropdown (phone and PC)', () => {
     const menu = screen.getByRole('menu', { name: 'Switch list' });
     expect(button).toHaveAttribute('aria-controls', menu.id);
     const items = within(menu).getAllByRole('menuitem');
-    expect(items.map((i) => i.querySelector('.list-menu__label')?.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga']);
+    expect(items.map((i) => i.querySelector('.list-menu__label')?.textContent)).toEqual(['Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube']);
     expect(within(menu).getByRole('menuitem', { name: /^Anime/ })).toHaveTextContent('2');
     expect(within(menu).getByRole('menuitem', { name: /^Books/ })).toHaveTextContent('1');
     expect(items.filter((i) => i.getAttribute('aria-current') === 'true').map((i) => i.getAttribute('href'))).toEqual(['/list/movies']);

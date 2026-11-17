@@ -36,7 +36,7 @@ describe('useCurrentList', () => {
   });
 
   it('all lists off → null', () => {
-    const off = { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false, manga: false };
+    const off = { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false, manga: false, youtube: false };
     expect(setup(off).result.current).toBeNull();
   });
 

@@ -1,0 +1,12 @@
+{
+  "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=never%20gonna%20give%20you%20up&maxResults=8": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  },
+  "https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=dQw4w9WgXcQ": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

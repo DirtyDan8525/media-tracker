@@ -13,4 +13,6 @@ export interface Env {
   TMDB_KEY?: string;
   IGDB_ID?: string;
   IGDB_SECRET?: string;
+  /** YouTube Data API v3 key (title search on the YouTube list). Worker secret; never sent to the browser. A pasted link needs no key. */
+  YOUTUBE_API_KEY?: string;
 }

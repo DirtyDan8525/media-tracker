@@ -64,3 +64,8 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 22. **Episode progress** (like AniList): a "Progress" column in the PC list (e.g. "7 / 24") with − and + buttons, shown while a title is in progress (Watching / Reading); the same − / + control on the title's page on phones. Total from the lookup when known (episodes; chapters for manga), otherwise just the count. Reaching the total offers "Mark as Completed".
 23. **Profile on PC:** the banner should be taller; overall the PC profile needs a better layout.
 24. **Import from AniList** (later): enter an AniList username → read their public anime and manga lists (AniList GraphQL `MediaListCollection`, no login needed for public lists) → map status, score (converted to 0–10), progress, notes, start/finish dates; preview, skip duplicates, then import like the Sheet import (with Undo).
+
+## PC pass (Dan, 2026-11-17)
+25. **PC side nav:** keep the lists, Messages, Activity; add **Top 5**, **Friends** (a Friends page listing your friends → their profiles → Compare etc.), and Sharpen/Stats as fits. Phone navigation stays exactly as it is.
+26. **PC screens too narrow:** audit every screen at 1280 and 1600 px wide and let content use the space (no thin centred columns where a wider layout fits).
+27. **PC list table column widths:** Notes gets the most room; Year, Studio/Creator, Status, Rating stay compact (Year especially narrow); title readable; no column wider than its content needs except Notes.

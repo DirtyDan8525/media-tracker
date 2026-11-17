@@ -29,6 +29,15 @@ export function DetailField({ label, value, onSave, check, multiline, type = 'te
   // Follow outside changes (a Re-fetch, a rollback) unless the person is typing.
   useEffect(() => { if (!focused.current) setDraft(value); }, [value]);
 
+  // Multiline (Notes) grows with its text so long notes wrap in full (Dan, 2026-11-16), never a scroll box.
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [draft, multiline]);
+
   function commit() {
     focused.current = false;
     if (draft === value) { setError(''); return; }
@@ -52,7 +61,7 @@ export function DetailField({ label, value, onSave, check, multiline, type = 'te
     <div className={['field', className].filter(Boolean).join(' ')}>
       <label className={hideLabel ? 'sr-only' : 'field-label'} htmlFor={id}>{label}</label>
       {multiline
-        ? <textarea {...shared} rows={3} />
+        ? <textarea {...shared} ref={areaRef} rows={3} style={{ overflow: 'hidden', resize: 'none' }} />
         : (
           <input
             {...shared} type={type}

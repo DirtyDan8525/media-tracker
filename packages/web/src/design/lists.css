@@ -73,7 +73,8 @@ a.entry-card__title { line-height: var(--tap); }
 /* 32 px + 6 px above and below = a 44 px hit area (table rows are 48 px, so these never overlap) */
 .cell-btn::after { content: ''; position: absolute; inset: -6px 0; }
 .cell-btn:hover { border-color: var(--grid-line); background: var(--card); }
-.cell-notes { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-text); }
+/* Dan, 2026-11-16: notes wrap instead of cutting off with "…". */
+.cell-notes { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted-text); }
 .cell-edit { display: flex; flex-direction: column; gap: var(--space-2); }
 
 /* form controls */

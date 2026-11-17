@@ -528,6 +528,27 @@ describe('current list', () => {
   });
 });
 
+describe('manga list', () => {
+  it('shows series with Author, the manga wording for status, and no seasons or volumes', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ id: 'm1', category: 'manga', title: 'Berserk', creator: 'Kentaro Miura', status: 'Plan to watch', lengthLabel: '41 volumes' }),
+    ] });
+    renderApp('/list/manga');
+    await screen.findByRole('heading', { name: 'Manga' });
+    expect(await screen.findByText('Berserk')).toBeInTheDocument();
+    expect(screen.getByText('Plan to read', { selector: '.status-pill' })).toBeInTheDocument();
+    expect(screen.queryByText(/season/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem('mt-current-list')).toBe('manga');
+  });
+
+  it('is on for everyone by default: it is in the list menu and the add button says manga', async () => {
+    fakeBackend({ entries: [] });
+    renderApp('/list/manga');
+    await screen.findByRole('heading', { name: 'Manga' });
+    expect(screen.getAllByRole('link', { name: 'Add manga' }).length).toBeGreaterThan(0);
+  });
+});
+
 describe('search and filters', () => {
   const three = () => fakeBackend({ entries: [
     makeEntry({ title: 'Frieren', rating: 9, status: 'Completed', genres: 'Fantasy, Adventure', creator: 'Madhouse' }),

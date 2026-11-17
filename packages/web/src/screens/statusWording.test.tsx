@@ -8,6 +8,7 @@ import { setViewportWidth } from '../test/viewport';
 const CASES = [
   { category: 'games', list: 'Games', plan: 'Plan to play', active: 'Playing', again: 'Replaying' },
   { category: 'books', list: 'Books', plan: 'Plan to read', active: 'Reading', again: 'Rereading' },
+  { category: 'manga', list: 'Manga', plan: 'Plan to read', active: 'Reading', again: 'Rereading' },
 ] as const;
 
 describe.each(CASES)('status wording on $list', ({ category, plan, active, again }) => {

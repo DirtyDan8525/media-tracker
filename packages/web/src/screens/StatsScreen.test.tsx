@@ -38,7 +38,7 @@ describe('Stats screen', () => {
 
   it('the PC table puts the same line under the list name, and All media has none', async () => {
     setViewportWidth(1200);
-    fakeBackend({ entries: tiered(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false }) });
+    fakeBackend({ entries: tiered(), me: makeMe({}, { tv: false, albums: false, songs: false, games: false, books: false, manga: false }) });
     renderApp('/stats');
     const table = await screen.findByRole('table', { name: 'Stats by list' });
     const anime = within(table).getByRole('row', { name: /^Anime/ });

@@ -107,7 +107,7 @@ describe('app shell', () => {
     });
 
     it('all lists off → no Add bubble (Home still shows)', async () => {
-      const off = Object.fromEntries(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books'].map((c) => [c, false]));
+      const off = Object.fromEntries(['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga'].map((c) => [c, false]));
       mockApi(makeMe({}, off));
       renderApp('/activity');
       const nav = await mainNav();
@@ -247,7 +247,7 @@ describe('app shell', () => {
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
         'Profile, @dan', 'Add anime', 'Home', 'Search', 'Activity',
-        'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books',
+        'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga',
         'Import', 'Export my data', 'About',
       ]);
       await screen.findByText('No anime yet');
@@ -317,7 +317,7 @@ describe('app shell', () => {
 
     it('with every list off there is no Add row', async () => {
       setViewportWidth(1280);
-      mockApi(makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false }));
+      mockApi(makeMe({}, { anime: false, movies: false, tv: false, albums: false, songs: false, games: false, books: false, manga: false }));
       renderApp('/activity');
       const nav = await sideNav();
       expect(within(nav).queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
@@ -347,7 +347,7 @@ describe('app shell', () => {
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
       const nav = await sideNav();
-      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Import', 'About']);
+      expect(linkNames(nav)).toEqual(['D@dan', 'Add anime', 'Home', 'Search', 'Activity', 'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'Import', 'About']);
       expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument();
     });
 

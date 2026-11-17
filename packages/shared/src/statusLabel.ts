@@ -5,6 +5,7 @@ type Verbs = { active: string; again: string; plan: string };
 const VERBS: Partial<Record<Category, Verbs>> = {
   games: { active: 'Playing', again: 'Replaying', plan: 'Plan to play' },
   books: { active: 'Reading', again: 'Rereading', plan: 'Plan to read' },
+  manga: { active: 'Reading', again: 'Rereading', plan: 'Plan to read' },
 };
 
 /**

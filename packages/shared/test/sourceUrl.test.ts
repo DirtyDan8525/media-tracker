@@ -5,6 +5,7 @@ describe('sourceUrl', () => {
   it.each([
     ['anilist', '154587', 'https://anilist.co/anime/154587'],
     ['kitsu', '46474', 'https://kitsu.io/anime/46474'],
+    ['kitsu', 'manga:38', 'https://kitsu.io/manga/38'],
     ['tmdb', '1234', 'https://www.themoviedb.org/movie/1234'],
     ['wiki', 'Q42', 'https://www.wikidata.org/wiki/Q42'],
     ['wiki', '77', 'https://en.wikipedia.org/?curid=77'],

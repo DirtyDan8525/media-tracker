@@ -22,6 +22,9 @@ export const CASES: FixtureCase[] = [
     query: { term: 'jojos bizzare', typedTitle: 'jojos bizzare', hint: '', category: 'anime' } },
   // Frieren's AniList media id (public); the recording shows whether it is right.
   { source: 'anilist', case: 'details-154587', details: '154587' },
+  // Kitsu manga (the Manga list): a manga:<id> source id; no key. The recorded file in the repo is hand-written until this is run.
+  { source: 'kitsu', case: 'manga-berserk',
+    query: { term: 'berserk', typedTitle: 'berserk', hint: '', category: 'manga' } },
   // TMDB needs a key in .dev.vars. The wiki cases call the wiki source directly, so they need none.
   { source: 'tmdb', case: 'speed-racer-2008',
     query: { term: 'Speed Racer 2008', typedTitle: 'Speed Racer 2008', hint: '', category: 'movies' } },

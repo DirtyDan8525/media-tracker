@@ -183,6 +183,16 @@ describe('entries create / list / get', () => {
     expect((await create(A, { category: 'anime', title: 't2', rating: null })).res.status).toBe(201);
   });
 
+  it('accepts the manga list and a Kitsu manga match (sourceId manga:<id>); manga has a status', async () => {
+    const e = await mk(A, { category: 'manga', title: 'Berserk', status: 'Plan to watch', creator: 'Kentaro Miura', source: 'kitsu', sourceId: 'manga:38' });
+    expect(e).toMatchObject({ category: 'manga', status: 'Plan to watch', source: 'kitsu', sourceId: 'manga:38' });
+    const list = (await (await as(A, '/api/entries?category=manga')).json()) as Entry[];
+    expect(list.map((x) => x.title)).toEqual(['Berserk']);
+    expect((await create(A, { category: 'manga', title: 'Bad', status: 'Finished' })).res.status).toBe(400);
+    const seasons = await addSeason(A, e.id, { label: 'Volume 1' });
+    expect(seasons.res.status).toBeGreaterThanOrEqual(400); // series-level only: no seasons
+  });
+
   it('400 on bad status; non-null status is rejected where hasStatus is false', async () => {
     expect((await create(A, { category: 'anime', title: 't', status: 'Finished' })).res.status).toBe(400);
     expect((await create(A, { category: 'albums', title: 't', status: 'Completed' })).res.status).toBe(400);

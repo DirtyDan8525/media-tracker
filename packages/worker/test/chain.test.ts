@@ -85,6 +85,7 @@ describe('CHAINS', () => {
       tv: ['tvmaze', 'wiki'],
       albums: ['deezer', 'itunes'],
       books: ['openlibrary', 'itunes'],
+      manga: ['kitsu'],
     });
   });
 

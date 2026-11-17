@@ -13,6 +13,7 @@ export const CHAINS: Record<Category, SourceId[]> = {
   tv: ['tvmaze', 'wiki'],
   albums: ['deezer', 'itunes'],
   books: ['openlibrary', 'itunes'],
+  manga: ['kitsu'], // the kitsu adapter searches /manga when q.category === 'manga'
 };
 
 /** A source that hasn't answered within this long is abandoned and the chain moves on. */

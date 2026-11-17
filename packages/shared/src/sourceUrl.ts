@@ -21,6 +21,7 @@ export function sourceUrl(source: SourceId | null | undefined, sourceId: string 
     case 'anilist':
       return /^\d{1,9}$/.test(sourceId) ? `https://anilist.co/anime/${sourceId}` : null;
     case 'kitsu':
+      if (sourceId.startsWith('manga:')) return /^\d{1,9}$/.test(sourceId.slice(6)) ? `https://kitsu.io/manga/${sourceId.slice(6)}` : null;
       return /^\d{1,9}$/.test(sourceId) ? `https://kitsu.io/anime/${sourceId}` : null;
     case 'tmdb':
       return /^\d{1,9}$/.test(sourceId) ? `https://www.themoviedb.org/movie/${sourceId}` : null;

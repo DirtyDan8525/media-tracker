@@ -1,0 +1,7 @@
+{
+  "https://kitsu.io/api/edge/manga?filter[text]=berserk&page[limit]=10&include=categories,staff.person": {
+    "file": "1.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

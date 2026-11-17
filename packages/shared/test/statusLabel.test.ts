@@ -17,6 +17,12 @@ describe('statusLabel', () => {
     expect(statusLabel('Plan to watch', 'books')).toBe('Plan to read');
     for (const s of ['Completed', 'On Hold', 'Dropped'] as const) expect(statusLabel(s, 'books')).toBe(s);
   });
+  it('uses read wording for manga', () => {
+    expect(statusLabel('Watching / In Progress', 'manga')).toBe('Reading');
+    expect(statusLabel('Rewatching', 'manga')).toBe('Rereading');
+    expect(statusLabel('Plan to watch', 'manga')).toBe('Plan to read');
+    for (const s of ['Completed', 'On Hold', 'Dropped'] as const) expect(statusLabel(s, 'manga')).toBe(s);
+  });
   it('keeps stored wording on lists without a Status column', () => {
     for (const c of ['movies', 'albums', 'songs'] as Category[]) for (const s of STATUSES) expect(statusLabel(s, c)).toBe(s);
   });

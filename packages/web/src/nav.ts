@@ -1,10 +1,10 @@
 import type { Category, UserSettings } from '@media-tracker/shared';
 
 /** List tabs in nav order. Season tabs (animeSeasons, tvSeasons) are settings, not lists. */
-export const LIST_ORDER: readonly Category[] = ['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books'];
+export const LIST_ORDER: readonly Category[] = ['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga'];
 
 export const LIST_LABEL: Record<Category, string> = {
-  anime: 'Anime', movies: 'Movies', tv: 'TV Shows', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books',
+  anime: 'Anime', movies: 'Movies', tv: 'TV Shows', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books', manga: 'Manga',
 };
 
 /** Every switch on the Settings Tabs card, in the Sheet's order. */
@@ -39,7 +39,7 @@ export function seasonsEnabled(settings: Pick<UserSettings, 'tabs'>, category: C
 
 /** "Add anime", "Add TV show": the singular used on the add button. */
 export const ADD_NOUN: Record<Category, string> = {
-  anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book',
+  anime: 'anime', movies: 'movie', tv: 'TV show', albums: 'album', songs: 'song', games: 'game', books: 'book', manga: 'manga',
 };
 
 /**

@@ -1,6 +1,6 @@
 import type { Tier, TierSet } from './ratings/types';
 
-export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books';
+export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books' | 'manga';
 
 export type SourceId =
   | 'anilist' | 'kitsu' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb';
@@ -62,6 +62,7 @@ export const ORIGIN_LABEL: Record<Category, string> = {
   songs: 'Label',
   games: 'Platforms',
   books: 'Publisher',
+  manga: 'Format',
 };
 
 export interface Entry {
@@ -136,6 +137,8 @@ export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
   songs:  { titleLabel: 'Song',  creatorLabel: 'Artist',    hasStatus: false, creatorIsSearchHint: true,  square: true,  hasSeasons: false },
   games:  { titleLabel: 'Title', creatorLabel: 'Developer', hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: false },
   books:  { titleLabel: 'Title', creatorLabel: 'Author',    hasStatus: true,  creatorIsSearchHint: true,  square: false, hasSeasons: false },
+  // Series-level only: no volume entries, no seasons. The author is not a search hint (Kitsu's text search is by title).
+  manga:  { titleLabel: 'Title', creatorLabel: 'Author',    hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: false },
 };
 
 export interface UserSettings {
@@ -153,7 +156,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   theme: 'Midnight',
   colors: {},
   tabs: {
-    anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true,
+    anime: true, movies: true, tv: true, albums: true, songs: true, games: true, books: true, manga: true,
     animeSeasons: true, tvSeasons: true,
   },
   compareAsk: 'Both',

@@ -31,12 +31,13 @@ const TAB_LABELS: Record<string, string> = {
   'songs': 'songs',
   'games': 'games',
   'books': 'books',
+  'manga': 'manga',
 };
 const COLOR_ROLES = Object.keys(THEMES.Midnight!);
 
 type Kind = Category | 'animeSeasons' | 'tvSeasons';
 const KIND_LABEL: Record<Kind, string> = {
-  anime: 'Anime', movies: 'Movies', tv: 'TV', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books',
+  anime: 'Anime', movies: 'Movies', tv: 'TV', albums: 'Albums', songs: 'Songs', games: 'Games', books: 'Books', manga: 'Manga',
   animeSeasons: 'Anime Seasons', tvSeasons: 'TV Seasons',
 };
 
@@ -50,11 +51,12 @@ function text(v: Raw): string {
   return '';
 }
 
-function classify(headers: string[]): Kind | null {
+function classify(headers: string[], tab = ''): Kind | null {
   const has = (h: string) => headers.includes(h);
   if (headers[0] === 'anime' && headers.slice(1).some((h) => h.startsWith('season'))) return 'animeSeasons';
   if (headers[0] === 'show' && headers.slice(1).some((h) => h.startsWith('season'))) return 'tvSeasons';
   if (has('title')) {
+    if (norm(tab) === 'manga') return 'manga'; // same columns as Books (Author), told apart by the tab's name
     if (has('studio')) return 'anime';
     if (has('director')) return 'movies';
     if (has('developer')) return 'games';
@@ -66,10 +68,10 @@ function classify(headers: string[]): Kind | null {
   return null;
 }
 
-function findHeader(grid: Grid): { kind: Kind; headerIdx: number; headers: string[] } | null {
+function findHeader(grid: Grid, tab: string): { kind: Kind; headerIdx: number; headers: string[] } | null {
   for (let i = 0; i < Math.min(HEADER_SCAN_ROWS, grid.length); i++) {
     const headers = (grid[i] ?? []).map(norm);
-    const kind = classify(headers);
+    const kind = classify(headers, tab);
     if (kind) return { kind, headerIdx: i, headers };
   }
   return null;
@@ -156,7 +158,7 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
 
   for (const { sheet: tab, data } of sheets) {
     const grid = data as Grid;
-    const found = findHeader(grid);
+    const found = findHeader(grid, tab);
     if (!found) {
       const sc = settingsScore(grid);
       if (sc.theme || sc.labels > 0) settingsCandidates.push({ tab, grid, ...sc });

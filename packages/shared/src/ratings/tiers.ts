@@ -5,7 +5,7 @@ import type { RatingSet, Tier, TierSet } from './types';
 export const DEFAULT_TIERS: TierSet = { names: ["Didn't like", 'Fine', 'Liked', 'Loved'], bounds: [6, 7.5, 9] };
 
 export const RATING_SETS: readonly RatingSet[] = [
-  'anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'anime_seasons', 'tv_seasons',
+  'anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'anime_seasons', 'tv_seasons',
 ];
 
 /** The list whose tiers a rating set uses (season tabs use their parent list's; Ruling Q4). */

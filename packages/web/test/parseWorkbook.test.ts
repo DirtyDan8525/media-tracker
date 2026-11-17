@@ -241,3 +241,29 @@ describe('parseWorkbook edge cases', () => {
     expect(r.seasons).toBeUndefined();
   });
 });
+
+describe('Manga tab', () => {
+  const head: Cell[] = ['Title', 'Author', 'Status', 'Rating', 'Genres', 'Notes'];
+
+  it('a tab named Manga maps to manga (series rows, Author as creator), while Books keeps books', async () => {
+    const p = await parseRows([
+      { name: 'Manga', rows: [head, ['Berserk', 'Kentaro Miura', 'Plan to read', 9.5, 'Dark Fantasy', 'n']] },
+      { name: 'Books', rows: [head, ['Dune', 'Frank Herbert', 'Completed', 8, '', '']] },
+    ]);
+    expect(p.counts).toEqual({ manga: 1, books: 1 });
+    expect(p.rows.find((r) => r.title === 'Berserk')).toMatchObject({
+      category: 'manga', creator: 'Kentaro Miura', status: 'Plan to watch', rating: 9.5, genres: 'Dark Fantasy',
+    });
+    expect(p.rows.find((r) => r.title === 'Dune')).toMatchObject({ category: 'books' });
+  });
+
+  it('the tab name is case-insensitive and a Manga tab without an Author column still imports', async () => {
+    const p = await parseRows([{ name: ' MANGA ', rows: [['Title', 'Rating'], ['Monster', 9]] }]);
+    expect(p.rows).toMatchObject([{ category: 'manga', title: 'Monster', rating: 9, creator: '' }]);
+  });
+
+  it('a Manga switch on the Settings tab is read', async () => {
+    const p = await parseRows([{ name: 'Settings', rows: [[null, 'Theme', 'Ocean'], [null, 'Manga', false], [null, 'Books', true]] }]);
+    expect(p.settings).toEqual({ theme: 'Ocean', tabs: { manga: false, books: true } });
+  });
+});

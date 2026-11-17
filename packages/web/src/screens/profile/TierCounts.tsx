@@ -2,7 +2,7 @@ import { DEFAULT_TIERS, tierFor, tiersFor, type Category, type Entry, type Tier,
 import { useMemo } from 'react';
 import { useAllEntries } from '../../data/useEntries';
 import { TIERS_TOP_FIRST } from '../../design/components/TierPicker';
-import { enabledLists } from '../../nav';
+import { useEnabledLists } from '../../shell/useLists';
 import { useSessionMe } from '../../shell/SessionGate';
 
 export interface TierCount { name: string; count: number }
@@ -38,7 +38,7 @@ const FILL = [
 /** Profile board: a small tier bar over one muted line, "Loved 14 · Liked 22 · Fine 8 · Didn't like 4". Nothing until a title is rated. */
 export function TierCounts() {
   const me = useSessionMe();
-  const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
+  const lists = useEnabledLists();
   const { data } = useAllEntries(lists);
   const counts = useMemo(() => tierCounts(data, lists, me.settings), [data, lists, me.settings]);
   if (counts.every((c) => c.count === 0)) return null;

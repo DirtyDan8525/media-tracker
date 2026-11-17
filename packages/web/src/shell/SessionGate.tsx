@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthState } from '../api/auth';
 import { AFTER_SETUP_KEY } from '../data/social';
+import { useAppSettings } from '../data/appSettings';
 import { useMe } from '../data/useMe';
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { RemovedScreen, WaitingScreen } from '../screens/auth/WaitingScreen';
@@ -43,10 +44,11 @@ export function SessionGate() {
   const { pathname, search } = useLocation();
   const auth = useAuthState();
   const settings = me?.settings;
+  const accent = useAppSettings().brand.accent;
 
   useEffect(() => {
-    if (settings) applyTheme(settings);
-  }, [settings]);
+    if (settings) applyTheme(settings, document.documentElement, accent);
+  }, [settings, accent]);
 
   // Setup is done and the user is somewhere else: the remembered path has been used.
   useEffect(() => {

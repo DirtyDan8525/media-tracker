@@ -13,7 +13,8 @@ import { Icon } from '../design/components/Icon';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet, useThemeColors } from '../design/ThemeContext';
-import { enabledLists, LIST_LABEL } from '../nav';
+import { LIST_LABEL } from '../nav';
+import { useEnabledLists } from '../shell/useLists';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import type { CardSpec } from '../share/shareImage';
@@ -41,7 +42,7 @@ export function Top5Screen() {
 function MineTop5({ toggle }: { toggle: ReactNode }) {
   const me = useSessionMe();
   const qc = useQueryClient();
-  const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
+  const lists = useEnabledLists();
   const { data, isPending, isError } = useAllEntries(lists);
   const colors = useThemeColors();
   const cf = useCfSet();

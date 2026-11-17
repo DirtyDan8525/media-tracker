@@ -1,4 +1,4 @@
-import type { Category, UserSettings } from '@media-tracker/shared';
+import type { Category, ListsSetting, UserSettings } from '@media-tracker/shared';
 
 /** List tabs in nav order. Season tabs (animeSeasons, tvSeasons) are settings, not lists. */
 export const LIST_ORDER: readonly Category[] = ['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'youtube'];
@@ -16,13 +16,24 @@ export const TAB_SWITCHES: { key: string; label: string }[] = [
 
 export const isCategory = (s: string | undefined): s is Category => LIST_ORDER.includes(s as Category);
 
-export function enabledLists(settings: Pick<UserSettings, 'tabs'>): Category[] {
-  return LIST_ORDER.filter((c) => settings.tabs[c] !== false);
+/**
+ * The lists a person sees, in order. With the admin's `lists` setting (AD11): its order, minus the lists hidden
+ * for everyone; a person's own Settings can still turn lists off, but not back on.
+ */
+export function enabledLists(settings: Pick<UserSettings, 'tabs'>, lists?: ListsSetting): Category[] {
+  const order = lists ? lists.order.filter((c) => LIST_ORDER.includes(c)) : LIST_ORDER;
+  return order.filter((c) => settings.tabs[c] !== false && !lists?.hidden.includes(c));
+}
+
+/** Settings → Tabs: the admin's order, without the lists hidden for everyone; the season switches follow. */
+export function tabSwitches(lists?: ListsSetting): { key: string; label: string }[] {
+  const shown = (lists ? lists.order : LIST_ORDER).filter((c) => !lists?.hidden.includes(c));
+  return [...shown.map((c) => ({ key: c as string, label: LIST_LABEL[c] })), ...TAB_SWITCHES.slice(LIST_ORDER.length)];
 }
 
 /** Where `/` lands: the first enabled list, or Settings if every list is off. */
-export function homePath(settings: Pick<UserSettings, 'tabs'>): string {
-  const first = enabledLists(settings)[0];
+export function homePath(settings: Pick<UserSettings, 'tabs'>, lists?: ListsSetting): string {
+  const first = enabledLists(settings, lists)[0];
   return first ? `/list/${first}` : '/settings';
 }
 

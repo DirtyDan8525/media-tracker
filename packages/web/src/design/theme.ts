@@ -66,6 +66,11 @@ export function contrastWarnings(colors: ThemeColors): ContrastWarning[] {
   return out;
 }
 
+/** Does an admin-chosen accent reach 4.5:1 as text on the theme's Background and Cards? */
+export function accentReadable(accent: string, colors: ThemeColors): boolean {
+  return (['Background', 'Cards'] as const).every((surface) => contrast(accent, colors[surface] ?? MIDNIGHT[surface]!) >= 4.5);
+}
+
 /** Roles a label on a coloured fill may use, in order of preference. */
 const LABEL_ROLES = ['Bright text', 'Text', 'Background', 'Header row'] as const;
 
@@ -100,8 +105,10 @@ export function cfFor(s: Pick<UserSettings, 'theme' | 'colors'>): CfSet {
  * Sets the theme's 10 role colors, the CF set and `--on-highlight` (text on Highlight-filled
  * buttons: whichever of Header row / Background / Bright text reads best) on :root.
  */
-export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTMLElement = document.documentElement): void {
-  const colors = themeColors(s);
+export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTMLElement = document.documentElement, accent: string | null = null): void {
+  const colors = { ...themeColors(s) };
+  // AD5: the admin's accent replaces Highlight (not on a Custom theme, which the person coloured themselves) only where it reads at AA (4.5:1) on Background and Cards.
+  if (accent && s.theme !== 'Custom' && accentReadable(accent, colors)) colors.Highlight = accent;
   for (const [role, v] of Object.entries(ROLE_VARS)) root.style.setProperty(v, colors[role] ?? MIDNIGHT[role]!);
   const cf = cfFor(s);
   for (const [k, v] of Object.entries(CF_VARS)) root.style.setProperty(v, cf[k as keyof CfSet]);

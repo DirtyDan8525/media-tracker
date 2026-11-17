@@ -18,3 +18,7 @@ export const markWalkthroughSeen = (userId: string): void => write(SEEN_PREFIX +
 
 export const installDismissed = (): boolean => read(INSTALL_DISMISSED);
 export const dismissInstall = (): void => write(INSTALL_DISMISSED);
+
+const ANNOUNCEMENT_PREFIX = 'mt-announcement-dismissed:';
+export const announcementDismissed = (id: string): boolean => read(ANNOUNCEMENT_PREFIX + id);
+export const dismissAnnouncement = (id: string): void => write(ANNOUNCEMENT_PREFIX + id);

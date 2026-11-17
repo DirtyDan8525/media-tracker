@@ -6,7 +6,8 @@ import { useAllEntries } from '../../data/useEntries';
 import { CoverImage } from '../../design/components/CoverImage';
 import { EmptyState } from '../../design/components/EmptyState';
 import { Skeleton } from '../../design/components/Skeleton';
-import { enabledLists, LIST_LABEL } from '../../nav';
+import { LIST_LABEL } from '../../nav';
+import { useEnabledLists } from '../../shell/useLists';
 import { PageHeader } from '../../shell/PageHeader';
 import { useAddFriend } from '../../shell/AddFriendHost';
 import { useSessionMe } from '../../shell/SessionGate';
@@ -17,7 +18,7 @@ export function GroupTop5({ toggle }: { toggle: ReactNode }) {
   const me = useSessionMe();
   const qc = useQueryClient();
   const addFriend = useAddFriend();
-  const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
+  const lists = useEnabledLists();
   const mine = useAllEntries(lists);
   const theirs = useFriendsEntries();
   const friends = useFriends();

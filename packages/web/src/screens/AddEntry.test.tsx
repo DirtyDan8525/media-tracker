@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBackend, makeEntry, makeInfo } from '../test/fakeBackend';
 import { makeMe } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
+import { setCoarsePointer } from '../test/viewport';
 
 
 function meWith(ask = 'Both', tiers?: Partial<Record<Category, TierSet>>) {
@@ -40,6 +41,20 @@ function closeRoutes() {
     },
   };
 }
+
+describe('the Add sheet: focus on open', () => {
+  it('on a touch screen no field is focused (no keyboard pops up); with a mouse the Title field is', async () => {
+    fakeBackend({ me: meWith() });
+    setCoarsePointer(true);
+    try {
+      renderApp('/list/anime');
+      const d = await openAdd();
+      expect(d).toHaveFocus();
+    } finally {
+      setCoarsePointer(false);
+    }
+  });
+});
 
 describe('the Add sheet: number-first rating (AddRate board)', () => {
   it('has one Rating number box with the board\'s hint, and no tier buttons or "Add and place it"', async () => {

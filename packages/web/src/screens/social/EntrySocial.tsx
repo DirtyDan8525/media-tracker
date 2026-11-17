@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAppSettings } from '../../data/appSettings';
 import { useEntrySocial, useReact } from '../../data/feed';
 import { Button } from '../../design/components/Button';
 import { ReactButton, ReactionChips } from './ReactionBar';
@@ -17,16 +18,20 @@ export function EntrySocial({ entryId, ownerId, title }: { entryId: string; owne
   const social = useEntrySocial(entryId);
   const react = useReact();
   const [open, setOpen] = useState(false);
+  const { features } = useAppSettings();
   const s = social.data ?? NONE;
   const target = { entryId } as const;
+  if (!features.reactions && !features.comments) return null;
   return (
     <section className="entry-social" aria-label="Reactions and comments">
-      <ReactionChips social={s} onToggle={(emoji) => react.mutate({ target, emoji })} who={{ target, title }} />
+      {features.reactions && <ReactionChips social={s} onToggle={(emoji) => react.mutate({ target, emoji })} who={{ target, title }} />}
       <div className="entry-social__actions">
-        <ReactButton mine={s.mine} onPick={(emoji) => react.mutate({ target, emoji })} />
-        <Button variant="secondary" className="entry-social__comments" onClick={() => setOpen(true)}>
-          {s.comments === 0 ? 'Comment' : `Comment (${s.comments})`}
-        </Button>
+        {features.reactions && <ReactButton mine={s.mine} onPick={(emoji) => react.mutate({ target, emoji })} />}
+        {features.comments && (
+          <Button variant="secondary" className="entry-social__comments" onClick={() => setOpen(true)}>
+            {s.comments === 0 ? 'Comment' : `Comment (${s.comments})`}
+          </Button>
+        )}
       </div>
       <CommentsSheet target={target} open={open} onClose={() => setOpen(false)} />
     </section>

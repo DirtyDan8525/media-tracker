@@ -1,6 +1,7 @@
 import type { Category } from '@media-tracker/shared';
 import { useMemo, useSyncExternalStore } from 'react';
-import { enabledLists, isCategory } from '../nav';
+import { isCategory } from '../nav';
+import { useEnabledLists } from './useLists';
 import { useSessionMe } from './SessionGate';
 
 export const CURRENT_LIST_KEY = 'mt-current-list';
@@ -41,6 +42,6 @@ function subscribe(onChange: () => void): () => void {
 export function useCurrentList(): Category | null {
   const me = useSessionMe();
   const stored = useSyncExternalStore(subscribe, read, () => null);
-  const key = enabledLists(me.settings).join(',');
+  const key = useEnabledLists().join(',');
   return useMemo(() => resolveCurrentList(stored, key ? (key.split(',') as Category[]) : []), [stored, key]);
 }

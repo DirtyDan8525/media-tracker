@@ -1,11 +1,12 @@
 import { Outlet } from 'react-router';
 import { BackfillProvider } from '../backfill/useBackfill';
+import { useAppSettings } from '../data/appSettings';
 import { useUnread } from '../data/feed';
 import { useListCounts } from '../data/useEntries';
 import { BottomTabs } from '../design/components/BottomTabs';
 import { SideNav } from '../design/components/SideNav';
 import { useIsWide } from '../hooks';
-import { enabledLists } from '../nav';
+import { useEnabledLists } from './useLists';
 import { useCurrentList } from './currentList';
 import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
@@ -32,7 +33,8 @@ function FrameLayout() {
   const me = useSessionMe();
   const wide = useIsWide();
   const counts = useListCounts().data ?? {};
-  const lists = enabledLists(me.settings);
+  const lists = useEnabledLists();
+  const { features } = useAppSettings();
   const unread = useUnread().data;
   const activityCount = unread?.feed ?? 0;
   const messagesCount = unread?.messages ?? 0;
@@ -40,7 +42,7 @@ function FrameLayout() {
   if (wide) {
     return (
       <div className="frame frame--wide">
-        <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} current={current} me={me} />
+        <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} showActivity={features.feed} showMessages={features.messages} current={current} me={me} />
         <main className="frame__main">
           <Outlet />
         </main>
@@ -53,7 +55,7 @@ function FrameLayout() {
         <Outlet />
       </main>
       <AddBubble current={current} />
-      <BottomTabs activityCount={activityCount} messagesCount={messagesCount} />
+      <BottomTabs activityCount={activityCount} messagesCount={messagesCount} showActivity={features.feed} showMessages={features.messages} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { handleSignedOut } from './auth';
+import { reportFeatureOff } from './featureOff';
 
 /** A failed API call. `error` is the server's `{error}` code (e.g. 'taken'), or `http_<status>`. */
 export class ApiError extends Error {
@@ -32,6 +33,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
   // A 401 anywhere sends the app back to sign-in, except from /api/auth/* (a wrong password is just an error).
   if (res.status === 401 && !path.startsWith('/api/auth/')) handleSignedOut(code === 'removed');
+  // A switched-off feature (AD2), except while signing up (that screen says it in its own words).
+  if (res.status === 403 && code === 'feature_off' && !path.startsWith('/api/auth/')) reportFeatureOff();
   if (!res.ok) throw new ApiError(res.status, code, data);
   return data as T;
 }

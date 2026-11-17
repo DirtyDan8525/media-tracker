@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { localDb } from '../db/local';
 import { forgetCurrentList } from '../shell/currentList';
+import { APP_KEY } from './appSettings';
 import { cachedMe, ME_KEY, normalizeMe, storeMe } from './useMe';
 
 export const PASSWORD_MIN = 8;
@@ -39,7 +40,8 @@ export async function finishSignIn(qc: QueryClient, me: Me): Promise<void> {
     forgetCurrentList();
   }
   const next = normalizeMe(me);
-  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
+  // The app settings are the same for everyone, so they stay.
+  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] && q.queryKey[0] !== APP_KEY[0] });
   qc.setQueryData(ME_KEY, next);
   qc.setQueryData(['me-cache'], next);
   await storeMe(next);

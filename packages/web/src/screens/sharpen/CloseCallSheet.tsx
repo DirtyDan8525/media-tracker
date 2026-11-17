@@ -1,6 +1,7 @@
 import { formatRating, type RatingSet, type SetItem } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type ReactNode } from 'react';
+import { useFeature } from '../../data/appSettings';
 import { askCloseCalls, fetchCloseFor, saveClosePick } from '../../data/ratings';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
@@ -92,7 +93,8 @@ export function CloseCallSheet({ set, item, others, onClose }: { set: RatingSet;
  */
 export function useCloseCall(): { ask: (set: RatingSet, id: string) => Promise<void>; element: ReactNode } {
   const me = useSessionMe();
-  const on = askCloseCalls(me.settings);
+  const featureOn = useFeature('closeCalls');
+  const on = featureOn && askCloseCalls(me.settings);
   const [open, setOpen] = useState<{ set: RatingSet; item: SetItem; others: SetItem[] } | null>(null);
   const ask = useCallback(async (set: RatingSet, id: string) => {
     if (!on) return;

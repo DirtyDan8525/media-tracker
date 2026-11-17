@@ -9,7 +9,8 @@ import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet } from '../design/ThemeContext';
 import { useIsWide } from '../hooks';
-import { enabledLists, LIST_LABEL } from '../nav';
+import { LIST_LABEL } from '../nav';
+import { useEnabledLists } from '../shell/useLists';
 import { computeStats, ratingDistribution, type ListStats } from '../ratings/stats';
 import { TIERS_TOP_FIRST } from '../design/components/TierPicker';
 import { PageHeader } from '../shell/PageHeader';
@@ -30,7 +31,7 @@ export function StatsScreen() {
   const me = useSessionMe();
   const qc = useQueryClient();
   const cf = useCfSet();
-  const lists = useMemo(() => enabledLists(me.settings), [me.settings]);
+  const lists = useEnabledLists();
   const { data, isPending, isError } = useAllEntries(lists);
   const wide = useIsWide();
   const [allGenres, setAllGenres] = useState(false);

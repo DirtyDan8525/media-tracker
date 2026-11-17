@@ -34,3 +34,12 @@ button.group__row:hover { background: var(--alt-row); }
 .whatsnew__release { padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-4); }
 .whatsnew__version { font-size: var(--fs-lg); font-weight: 700; color: var(--bright-text); }
 .whatsnew__list { margin: 0; padding-left: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--fs-body); }
+
+/* AD3: the admin's announcement at the top of Home */
+.announcement {
+  display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) var(--space-8) 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  background: var(--card); border: 1px solid var(--highlight); border-radius: var(--radius-lg);
+}
+.announcement__text { flex: 1; min-width: 0; margin: 0; color: var(--bright-text); overflow-wrap: anywhere; }
+.announcement__link { color: var(--highlight); font-weight: 600; }

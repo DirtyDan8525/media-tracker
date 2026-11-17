@@ -1,3 +1,4 @@
+import { useAppSettings } from '../data/appSettings';
 import { PageHeader } from '../shell/PageHeader';
 import { COMING_SOON, WHATS_NEW } from '../whatsNew';
 import '../design/onboarding.css';
@@ -10,13 +11,17 @@ function releaseDate(iso: string): string {
 
 /** More → What's new / Coming soon (/whats-new): two plain lists, both from whatsNew.ts. */
 export function WhatsNewScreen() {
+  // AD4: the admin's text when there is any, else the built-in release notes.
+  const app = useAppSettings();
+  const releases = app.whatsNew ?? WHATS_NEW;
+  const soon = app.comingSoon ?? COMING_SOON;
   return (
     <div className="screen">
       <PageHeader title="What's new" backTo="/more" backUsesHistory />
       <div className="screen__body stack-18 whatsnew">
         <section aria-labelledby="wn-new" className="group">
           <h2 id="wn-new" className="group__title">What's new</h2>
-          {WHATS_NEW.map((r) => (
+          {releases.map((r) => (
             <div key={r.version} className="group__card whatsnew__release">
               <h3 className="whatsnew__version">{r.version} <span className="muted">· {releaseDate(r.date)}</span></h3>
               <ul className="whatsnew__list">
@@ -29,7 +34,7 @@ export function WhatsNewScreen() {
           <h2 id="wn-soon" className="group__title">Coming soon</h2>
           <div className="group__card whatsnew__release">
             <ul className="whatsnew__list">
-              {COMING_SOON.map((item) => <li key={item}>{item}</li>)}
+              {soon.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
         </section>

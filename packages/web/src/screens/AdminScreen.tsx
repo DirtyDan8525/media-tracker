@@ -8,9 +8,14 @@ import { IconButton } from '../design/components/IconButton';
 import { Sheet } from '../design/components/Sheet';
 import { Skeleton } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
+import { useAdminApp, useAdminNumbers } from '../data/adminApp';
+import { accentName } from './admin/parts';
+import { Icon } from '../design/components/Icon';
+import { Link } from 'react-router';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { PersonAvatar } from './social/parts';
+import '../design/admin.css';
 import '../design/social.css';
 
 const DONE: Record<AdminAction | 'restore', string> = { approve: 'Approved', decline: 'Declined', remove: 'Removed', restore: 'Restored', delete: 'Deleted' };
@@ -216,6 +221,8 @@ export function AdminScreen() {
           )}
         </Section>
 
+        <SignupLinks />
+
         <Section id="admin-members" title="Members" count={data.active.length}>
           <ul className="people plain-list">
             {data.active.map((u) => (
@@ -238,8 +245,6 @@ export function AdminScreen() {
           )}
         </Section>
 
-        <SignupLinks />
-
         {data.removed.length > 0 && (
           <Section id="admin-removed" title="Removed" count={data.removed.length}>
             <ul className="people plain-list">
@@ -251,6 +256,8 @@ export function AdminScreen() {
             </ul>
           </Section>
         )}
+
+        <AdminHub />
       </div>
 
       {confirm && (
@@ -299,5 +306,42 @@ function RowMenu({ user, disabled, onReset, onRemove, onDelete }: { user: Public
         </div>
       )}
     </div>
+  );
+}
+
+/** The rest of Admin, one row per sub-page with a one-line summary (AdminHome): each opens /admin/<section>. */
+function AdminHub() {
+  const app = useAdminApp().data;
+  const numbers = useAdminNumbers().data;
+  const st = app?.settings;
+  const offCount = st ? Object.values(st.features).filter((v) => !v).length : null;
+  const customContent = app ? ['whatsNew', 'comingSoon', 'about'].some((k) => app.set.includes(k as never)) : null;
+  const rows: { to: string; title: string; sub: string | null }[] = [
+    { to: '/admin/numbers', title: 'Numbers', sub: numbers ? `${numbers.members} members · ${numbers.active7} active this week` : null },
+    { to: '/admin/announcement', title: 'Announcement', sub: st ? (st.announcement.text ? 'On' : 'Off') : null },
+    { to: '/admin/switches', title: 'Switches', sub: offCount === null ? null : offCount === 0 ? 'All on' : `${offCount} off` },
+    { to: '/admin/lists', title: 'Lists', sub: st ? `${st.lists.order.length - st.lists.hidden.length} shown` : null },
+    { to: '/admin/look', title: 'App text and look', sub: st ? `${st.defaults.theme} · ${st.brand.accent ? `${accentName(st.brand.accent).toLowerCase()} accent` : 'theme accent'}` : null },
+    { to: '/admin/defaults', title: 'Defaults for new people', sub: st ? `${st.defaults.lists.length} lists on · private titles ${st.defaults.privateByDefault ? 'on' : 'off'}` : null },
+    { to: '/admin/content', title: "What's new / Coming soon / About", sub: customContent === null ? null : customContent ? 'Custom text' : 'Built-in text' },
+    { to: '/admin/moderation', title: 'Moderation', sub: 'Recent comments' },
+    { to: '/admin/lookup', title: 'Lookup tools', sub: 'Check sources, why a title was missed' },
+    { to: '/admin/backup', title: 'Backup', sub: 'Download a copy of everything' },
+  ];
+  return (
+    <section aria-labelledby="admin-more" className="group">
+      <h2 id="admin-more" className="group__title">More</h2>
+      <nav aria-label="Admin sections" className="group__card admin-hub">
+        {rows.map((r) => (
+          <Link key={r.to} to={r.to} className="admin-hub__row">
+            <span className="admin-hub__text">
+              <span className="admin-hub__title">{r.title}</span>
+              {r.sub && <span className="admin-hub__sub">{r.sub}</span>}
+            </span>
+            <span className="group__chev"><Icon name="chevron" size={18} /></span>
+          </Link>
+        ))}
+      </nav>
+    </section>
   );
 }

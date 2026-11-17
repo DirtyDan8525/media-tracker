@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { Link } from 'react-router';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { Icon, type IconName } from '../design/components/Icon';
+import { useAppName } from '../data/appSettings';
 import { useIsWide } from '../hooks';
 import { BackButton } from './BackButton';
 import { ProfileButton } from './ProfileButton';
@@ -35,6 +36,7 @@ export interface PageHeaderProps {
 /** Screen title block: 26 px bold title (28 px on PC), muted sub-line, optional actions on the right. */
 export function PageHeader({ title, sub, backTo, backUsesHistory, actions, children, backdrop, titleRef, className, icon, profile, titleSlot }: PageHeaderProps) {
   const wide = useIsWide();
+  const appName = useAppName();
   const h1 = titleSlot ?? <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="page-title">{title}</h1>;
   // ProfileButton is phone-only: on PC a header with no other actions gets no (empty) actions box.
   const showProfile = profile && !wide;
@@ -46,7 +48,7 @@ export function PageHeader({ title, sub, backTo, backUsesHistory, actions, child
     return (
       <>
         <header className={['page-header', 'page-header--bar', 'page-header--centered', className].filter(Boolean).join(' ')}>
-          <Link to="/about" className="page-header__logo" aria-label="About Media Tracker">
+          <Link to="/about" className="page-header__logo" aria-label={`About ${appName}`}>
             <img src="/favicon.svg" alt="" width={32} height={32} />
           </Link>
           <div className="page-header__center">{titleSlot}</div>

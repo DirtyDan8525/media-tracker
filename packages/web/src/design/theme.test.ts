@@ -103,3 +103,23 @@ describe('barTextColor (B22)', () => {
     expect(css('--bar-text')).toBe('#111111');
   });
 });
+
+describe('applyTheme with the admin accent (AD5)', () => {
+  it('sets Highlight and a readable label colour when the accent reads at AA on the theme', () => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Midnight' }, document.documentElement, '#ff9f43');
+    expect(document.documentElement.style.getPropertyValue('--highlight')).toBe('#ff9f43');
+    expect(contrast(document.documentElement.style.getPropertyValue('--on-highlight'), '#ff9f43')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('ignores an accent that does not reach 4.5:1 on Background and Cards', () => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Midnight' }, document.documentElement, '#9b671a');
+    expect(document.documentElement.style.getPropertyValue('--highlight')).toBe('#ffd166');
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Sakura' }, document.documentElement, '#5fd4ff');
+    expect(document.documentElement.style.getPropertyValue('--highlight')).toBe('#ce2e68');
+  });
+
+  it("leaves a Custom theme's own Highlight alone", () => {
+    applyTheme({ ...DEFAULT_USER_SETTINGS, theme: 'Custom', colors: { Highlight: '#ff00aa' } }, document.documentElement, '#ff9f43');
+    expect(document.documentElement.style.getPropertyValue('--highlight')).toBe('#ff00aa');
+  });
+});

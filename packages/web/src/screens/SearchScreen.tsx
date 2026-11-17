@@ -13,7 +13,8 @@ import { RatingBadge } from '../design/components/RatingBadge';
 import { SkeletonRow } from '../design/components/Skeleton';
 import { searchEntries } from '../lists/search';
 import { useUrlText } from '../lists/useUrlText';
-import { enabledLists, LIST_LABEL } from '../nav';
+import { LIST_LABEL } from '../nav';
+import { useEnabledLists } from '../shell/useLists';
 import { useCurrentList } from '../shell/currentList';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
@@ -38,7 +39,7 @@ export function SearchScreen() {
   const [expanded, setExpanded] = useState<ReadonlySet<Category>>(new Set());
 
   const scope = current !== null && me.settings.searchScope === 'current' ? 'current' : 'all';
-  const enabledKey = enabledLists(me.settings).join(',');
+  const enabledKey = useEnabledLists().join(',');
   // A stable array: the queries behind useAllEntries are keyed by it.
   const lists = useMemo<Category[]>(() => {
     const on = enabledKey ? (enabledKey.split(',') as Category[]) : [];

@@ -8,6 +8,14 @@
 }
 .list-menu__trigger > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-menu__trigger:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+/* The list title on phones looks like a select box (Dan, 2026-11-17): a rounded outline around the name and arrow. */
+@media (max-width: 1023px) {
+  .list-menu__h1 .list-menu__trigger {
+    padding: 0 var(--space-4) 0 var(--space-6); border: 1px solid var(--muted-text); border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--card) 70%, transparent);
+  }
+  .list-menu__h1 .list-menu__trigger:hover { border-color: var(--bright-text); }
+}
 /* The Add sheet's field: a full-width bordered box like the other inputs. */
 .list-menu--field { align-self: stretch; width: 100%; }
 .list-menu--field .list-menu__trigger {

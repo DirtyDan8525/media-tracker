@@ -1,6 +1,9 @@
 /** jsdom has no layout: a fake matchMedia that answers (min-width: Npx) from a settable width. */
 type Listener = (e: MediaQueryListEvent) => void;
 let width = 390;
+let coarse = false;
+/** Pretend the device is (or isn't) a touch screen: answers (pointer: coarse). */
+export function setCoarsePointer(v: boolean): void { coarse = v; }
 const lists = new Set<{ query: string; listeners: Set<Listener>; mql: MediaQueryList }>();
 
 function evaluate(query: string): boolean {
@@ -8,6 +11,7 @@ function evaluate(query: string): boolean {
   if (min) return width >= Number(min[1]);
   const max = /\(max-width:\s*(\d+)px\)/.exec(query);
   if (max) return width <= Number(max[1]);
+  if (/\(pointer:\s*coarse\)/.test(query)) return coarse;
   return false; // e.g. prefers-reduced-motion
 }
 

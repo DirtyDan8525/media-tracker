@@ -4,7 +4,8 @@ import { inviteLink, useCopy, useInviteCode, useSaveDisplayName } from '../data/
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
-import { TAB_SWITCHES } from '../nav';
+import { useAppSettings } from '../data/appSettings';
+import { tabSwitches } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
@@ -27,6 +28,7 @@ export function SettingsScreen() {
   const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const toast = useToast();
   const [editingName, setEditingName] = useState(false);
+  const app = useAppSettings();
 
   function toggle(key: string, on: boolean) {
     save.mutate({ tabs: { [key]: on } });
@@ -39,7 +41,7 @@ export function SettingsScreen() {
         <section aria-labelledby="set-tabs" className="group">
           <h2 id="set-tabs" className="group__title">Tabs</h2>
           <div className="group__card switch-grid">
-            {TAB_SWITCHES.map(({ key, label }) => (
+            {tabSwitches(app.lists).map(({ key, label }) => (
               <label key={key} className="switch-row">
                 <input type="checkbox" role="switch" checked={me.settings.tabs[key] !== false}
                   onChange={(e) => toggle(key, e.target.checked)} />
@@ -94,10 +96,12 @@ export function SettingsScreen() {
 
         {NOTIFICATIONS_ENABLED && <NotificationsSection />}
 
-        <section aria-labelledby="set-ratings" className="group">
-          <h2 id="set-ratings" className="group__title">Ratings</h2>
-          <CompareOptions />
-        </section>
+        {app.features.closeCalls && (
+          <section aria-labelledby="set-ratings" className="group">
+            <h2 id="set-ratings" className="group__title">Ratings</h2>
+            <CompareOptions />
+          </section>
+        )}
 
         <section aria-labelledby="set-look" className="group">
           <h2 id="set-look" className="group__title">Appearance</h2>

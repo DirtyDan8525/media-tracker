@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError, api } from '../../api/client';
+import { useAppName } from '../../data/appSettings';
 import { finishSignIn, PASSWORD_MIN, resetPassword } from '../../data/auth';
 import { Button } from '../../design/components/Button';
 import { Skeleton } from '../../design/components/Skeleton';
@@ -13,6 +14,7 @@ const EXPIRED = 'This link has expired. Ask Dan for a new one.';
 
 /** /reset/:token, works signed out: the link from Dan sets a new password and signs this device in. */
 export function ResetScreen() {
+  const appName = useAppName();
   const { token = '' } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -78,7 +80,7 @@ export function ResetScreen() {
   return (
     <main className="auth">
       <div className="auth__card">
-        <span className="brand-mark auth__brand">Media Tracker</span>
+        <span className="brand-mark auth__brand">{appName}</span>
         {body}
       </div>
     </main>

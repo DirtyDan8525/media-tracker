@@ -1,7 +1,8 @@
-import { seasonSetOf, type RatingSet, type SetItem } from '@media-tracker/shared';
+import { seasonSetOf, type ListsSetting, type RatingSet, type SetItem } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { useAppSettings } from '../../data/appSettings';
 import { CLOSE_COUNTS_KEY, saveClosePick, useCloseCounts, useClosePairs } from '../../data/ratings';
 import { Button } from '../../design/components/Button';
 import { EmptyState } from '../../design/components/EmptyState';
@@ -24,8 +25,8 @@ const countLine = (n: number | undefined): string =>
   n === undefined ? '' : n === 0 ? '0 — all clear' : n === 1 ? '1 close call' : `${n} close calls`;
 
 /** The enabled lists, each followed by its season tab when that tab is on. */
-function setsOf(settings: Parameters<typeof enabledLists>[0]): RatingSet[] {
-  return enabledLists(settings).flatMap((c) => {
+function setsOf(settings: Parameters<typeof enabledLists>[0], lists: ListsSetting): RatingSet[] {
+  return enabledLists(settings, lists).flatMap((c) => {
     const s = seasonSetOf(c);
     return s !== null && seasonsEnabled(settings, c) ? [c, s] : [c];
   });
@@ -38,7 +39,8 @@ function setsOf(settings: Parameters<typeof enabledLists>[0]): RatingSet[] {
 export function SharpenScreen() {
   const [params, setParams] = useSearchParams();
   const me = useSessionMe();
-  const sets = setsOf(me.settings);
+  const { lists } = useAppSettings();
+  const sets = setsOf(me.settings, lists);
   const chosen = params.get('list') as RatingSet | null;
   if (chosen !== null && sets.includes(chosen)) {
     return <SharpenSession key={chosen} set={chosen} onDone={() => setParams({}, { replace: false })} />;

@@ -18,12 +18,14 @@ import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, 
 import { planRows, readPlanView, writePlanView } from '../lists/plan';
 import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
-import { ADD_NOUN, enabledLists, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
+import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
 import { rememberList } from '../shell/currentList';
 import { ListMenu } from '../shell/ListMenu';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { useCloseCall } from './sharpen/CloseCallSheet';
+import { useEnabledLists } from '../shell/useLists';
+import { AnnouncementBanner } from './AnnouncementBanner';
 import { InstallBanner } from './onboarding/InstallBanner';
 import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
@@ -59,6 +61,7 @@ function ListBody({ category }: { category: Category }) {
   const qc = useQueryClient();
   const toast = useToast();
   const me = useSessionMe();
+  const lists = useEnabledLists();
   const wide = useIsWide();
   const { data, isPending, isError } = useEntries(category);
   const counts = useListCounts().data ?? {};
@@ -217,7 +220,7 @@ function ListBody({ category }: { category: Category }) {
       <PageHeader
         title={LIST_LABEL[category]} sub={sub} icon={category} profile
         titleSlot={(
-          <ListMenu lists={enabledLists(me.settings)} value={category} counts={counts} menuLabel="Switch list" to={(c) => `/list/${c}`} heading>
+          <ListMenu lists={lists} value={category} counts={counts} menuLabel="Switch list" to={(c) => `/list/${c}`} heading>
             {LIST_LABEL[category]}
           </ListMenu>
         )}
@@ -246,7 +249,7 @@ function ListBody({ category }: { category: Category }) {
           />
         )}
       </PageHeader>
-      <div className="screen__body list"><InstallBanner />{body}</div>
+      <div className="screen__body list"><AnnouncementBanner /><InstallBanner />{body}</div>
 
       {filtersOpen && (
         <FilterSheet

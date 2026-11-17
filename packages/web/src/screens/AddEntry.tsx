@@ -3,7 +3,8 @@ import { useId, useState, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
 import { parseRating } from '../lists/validate';
-import { enabledLists, LIST_LABEL } from '../nav';
+import { LIST_LABEL } from '../nav';
+import { useEnabledLists } from '../shell/useLists';
 import { ListMenu } from '../shell/ListMenu';
 import { useSessionMe } from '../shell/SessionGate';
 import type { AddInput } from '../hooks/useAddEntry';
@@ -26,7 +27,7 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
   /** "Add to": starts on the current list; the field label and status words follow it. */
   const [category, setCategory] = useState<Category>(initial);
   const cfg = CATEGORY_CONFIG[category];
-  const lists = enabledLists(me.settings);
+  const lists = useEnabledLists();
   const ids = { title: useId(), creator: useId(), notes: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
   const [title, setTitle] = useState('');
   const [creator, setCreator] = useState('');

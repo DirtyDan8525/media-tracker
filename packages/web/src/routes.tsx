@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react';
+import type { FeatureKey } from '@media-tracker/shared';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
 import { WhatsNewScreen } from './screens/WhatsNewScreen';
@@ -12,6 +13,15 @@ import { NewChatScreen } from './screens/messages/NewChatScreen';
 import { RecommendedScreen } from './screens/messages/RecommendedScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { AdminScreen } from './screens/AdminScreen';
+import { AnnouncementScreen } from './screens/admin/Announcement';
+import { BackupScreen } from './screens/admin/Backup';
+import { ContentScreen } from './screens/admin/Content';
+import { ListsScreen } from './screens/admin/Lists';
+import { LookupToolsScreen } from './screens/admin/LookupTools';
+import { DefaultsScreen, LookScreen } from './screens/admin/Look';
+import { ModerationScreen } from './screens/admin/Moderation';
+import { NumbersScreen } from './screens/admin/Numbers';
+import { SwitchesScreen } from './screens/admin/Switches';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -23,6 +33,7 @@ import { Top5Screen } from './screens/Top5Screen';
 import { JoinScreen } from './screens/auth/JoinScreen';
 import { ResetScreen } from './screens/auth/ResetScreen';
 import { UsernameSetup } from './screens/UsernameSetup';
+import { useFeature } from './data/appSettings';
 import { Skeleton } from './design/components/Skeleton';
 import { AppFrame } from './shell/AppFrame';
 import { HomeRedirect } from './shell/HomeRedirect';
@@ -38,6 +49,8 @@ const ImportScreen = lazy(() => import('./screens/ImportScreen').then((m) => ({ 
 const SharpenScreen = lazy(() => import('./screens/sharpen/SharpenScreen').then((m) => ({ default: m.SharpenScreen })));
 
 function SharpenRoute() {
+  // Close-call questions switched off (AD2): nothing to sharpen here.
+  if (!useFeature('closeCalls')) return <Navigate to="/more" replace />;
   return (
     <Suspense fallback={
       <div className="screen" aria-busy="true" aria-label="Loading">
@@ -73,9 +86,14 @@ function EntryRoute() {
   );
 }
 
+/** A screen of a feature the admin switched off (AD2) sends people home instead. */
+function FeatureRoute({ feature, children }: { feature: FeatureKey; children: ReactNode }) {
+  return useFeature(feature) ? <>{children}</> : <Navigate to="/" replace />;
+}
+
 /** Admin is for the admin only (the Worker enforces it too): anyone else lands on `/`. */
-function AdminRoute() {
-  return useSessionMe().isAdmin ? <AdminScreen /> : <Navigate to="/" replace />;
+function AdminRoute({ children }: { children: ReactNode }) {
+  return useSessionMe().isAdmin ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 /**
@@ -98,15 +116,15 @@ export const routes: RouteObject[] = [
           { path: 'list/:category', element: <ListScreen /> },
           { path: 'entry/:id', element: <EntryRoute /> },
           { path: 'import', element: <ImportRoute /> },
-          { path: 'activity', element: <ActivityScreen /> },
+          { path: 'activity', element: <FeatureRoute feature="feed"><ActivityScreen /></FeatureRoute> },
           { path: 'search', element: <SearchScreen /> },
-          { path: 'messages', element: <MessagesScreen /> },
-          { path: 'messages/new', element: <NewChatScreen /> },
-          { path: 'messages/recommended', element: <RecommendedScreen /> },
-          { path: 'messages/:id', element: <ChatScreen /> },
+          { path: 'messages', element: <FeatureRoute feature="messages"><MessagesScreen /></FeatureRoute> },
+          { path: 'messages/new', element: <FeatureRoute feature="messages"><NewChatScreen /></FeatureRoute> },
+          { path: 'messages/recommended', element: <FeatureRoute feature="messages"><RecommendedScreen /></FeatureRoute> },
+          { path: 'messages/:id', element: <FeatureRoute feature="messages"><ChatScreen /></FeatureRoute> },
           { path: 'profile', element: <ProfileScreen /> },
-          { path: 'friends', element: <FriendsScreen /> },
-          { path: 'add/:code', element: <AddByCodeScreen /> },
+          { path: 'friends', element: <FeatureRoute feature="friends"><FriendsScreen /></FeatureRoute> },
+          { path: 'add/:code', element: <FeatureRoute feature="friends"><AddByCodeScreen /></FeatureRoute> },
           { path: 'u/:username', element: <FriendProfile /> },
           { path: 'u/:username/entry/:id', element: <FriendEntryDetail /> },
           { path: 'sharpen', element: <SharpenRoute /> },
@@ -121,7 +139,17 @@ export const routes: RouteObject[] = [
           { path: 'about', element: <AboutScreen /> },
           { path: 'whats-new', element: <WhatsNewScreen /> },
           { path: 'more', element: <MoreScreen /> },
-          { path: 'admin', element: <AdminRoute /> },
+          { path: 'admin', element: <AdminRoute><AdminScreen /></AdminRoute> },
+          { path: 'admin/numbers', element: <AdminRoute><NumbersScreen /></AdminRoute> },
+          { path: 'admin/announcement', element: <AdminRoute><AnnouncementScreen /></AdminRoute> },
+          { path: 'admin/switches', element: <AdminRoute><SwitchesScreen /></AdminRoute> },
+          { path: 'admin/lists', element: <AdminRoute><ListsScreen /></AdminRoute> },
+          { path: 'admin/look', element: <AdminRoute><LookScreen /></AdminRoute> },
+          { path: 'admin/defaults', element: <AdminRoute><DefaultsScreen /></AdminRoute> },
+          { path: 'admin/content', element: <AdminRoute><ContentScreen /></AdminRoute> },
+          { path: 'admin/moderation', element: <AdminRoute><ModerationScreen /></AdminRoute> },
+          { path: 'admin/lookup', element: <AdminRoute><LookupToolsScreen /></AdminRoute> },
+          { path: 'admin/backup', element: <AdminRoute><BackupScreen /></AdminRoute> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },

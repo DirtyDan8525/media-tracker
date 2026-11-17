@@ -1,8 +1,9 @@
 import {
-  CATEGORY_CONFIG, formatRating, nameOf, statusLabel, foldPosts, type ActivityLine, type PostSocial, type PublicUser, type Reaction, type Status,
+  CATEGORY_CONFIG, formatRating, nameOf, statusLabel, foldPosts, type ActivityLine, type Features, type PostSocial, type PublicUser, type Reaction, type Status,
 } from '@media-tracker/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { useAppSettings } from '../data/appSettings';
 import { useDeletePosts, useFeed, useMarkSeen, useReact } from '../data/feed';
 import { Button } from '../design/components/Button';
 import { IconButton } from '../design/components/IconButton';
@@ -27,13 +28,13 @@ import '../design/activity.css';
 import '../design/feed.css';
 import '../design/list-menu.css';
 
-const FILTERS: readonly { value: ActivityFilter; label: string }[] = [
+const ALL_FILTERS: readonly { value: ActivityFilter; label: string }[] = [
   { value: 'everyone', label: 'Everyone' },
   { value: 'friends', label: 'Friends' },
   { value: 'you', label: 'You' },
 ];
 
-const isFilter = (v: string | null): v is ActivityFilter => FILTERS.some((f) => f.value === v);
+const isFilter = (v: string | null): v is ActivityFilter => ALL_FILTERS.some((f) => f.value === v);
 
 const NO_SOCIAL: PostSocial = { reactions: {}, mine: [], comments: 0 };
 
@@ -51,13 +52,16 @@ export function ActivityScreen() {
   const toast = useToast();
   const current = useCurrentList();
   const addFriend = useAddFriend();
+  const { features } = useAppSettings();
+  // AD2: with Friends switched off there is no Friends view.
+  const FILTERS = features.friends ? ALL_FILTERS : ALL_FILTERS.filter((f) => f.value !== 'friends');
   const [params, setParams] = useSearchParams();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [confirm, setConfirm] = useState<{ ids: string[]; batch: boolean } | null>(null);
+  const [confirm, setConfirm] = useState<{ ids: string[]; batch: boolean; /** The admin deleting someone else's post. */ others?: boolean } | null>(null);
   const deletePosts = useDeletePosts();
   const shown = params.get('show');
-  const filter: ActivityFilter = isFilter(shown) ? shown : 'everyone';
+  const filter: ActivityFilter = isFilter(shown) && FILTERS.some((f) => f.value === shown) ? shown : 'everyone';
   const setFilter = (v: ActivityFilter) => {
     setSelecting(false);
     setSelected(new Set());
@@ -119,8 +123,8 @@ export function ActivityScreen() {
     body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>;
   } else if (lines.length === 0 && !hasNextPage && filter !== 'you') {
     body = (
-      <EmptyState icon="activity" title="Nothing here yet" body="Add a friend to see what they rate."
-        actionLabel="Add friend" onAction={addFriend} />
+      <EmptyState icon="activity" title="Nothing here yet" body={features.friends ? 'Add a friend to see what they rate.' : 'Rate something and it shows up here.'}
+        actionLabel={features.friends ? 'Add friend' : undefined} onAction={features.friends ? addFriend : undefined} />
     );
   } else if (lines.length === 0 && !hasNextPage) {
     body = (
@@ -161,9 +165,9 @@ export function ActivityScreen() {
               {d.lines.map((line) => (
                 <FeedPost key={line.key} line={line} now={now} social={social[line.key] ?? NO_SOCIAL}
                   who={line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null }}
-                  friend={friends.has(line.userId)} onComments={() => setCommenting(line.key)}
+                  friend={friends.has(line.userId)} features={features} admin={me.isAdmin} onComments={() => setCommenting(line.key)}
                   select={selecting && line.userId === me.id ? { on: selected.has(line.key), toggle: () => toggleSelected(line.key), full: selected.size >= MAX_SELECT } : null}
-                  onDelete={() => setConfirm({ ids: [line.key], batch: false })} />
+                  onDelete={() => setConfirm({ ids: [line.key], batch: false, others: line.userId !== me.id })} />
               ))}
             </ul>
           </section>
@@ -198,7 +202,7 @@ export function ActivityScreen() {
               </Button>
             </div>
           }>
-          <p>{confirm.ids.length === 1 ? 'The title stays on your list.' : 'The titles stay on your list.'}</p>
+          <p>{confirm.others ? 'You are deleting someone else\'s post. The title stays on their list.' : confirm.ids.length === 1 ? 'The title stays on your list.' : 'The titles stay on your list.'}</p>
         </Sheet>
       )}
       {commenting && <CommentsSheet target={{ activityId: commenting }} open onClose={() => setCommenting(null)} />}
@@ -207,8 +211,11 @@ export function ActivityScreen() {
 }
 
 /** One post (FeedV2.wf): avatar, the line with name and time, rating badge + reaction chips, the cover; React and Comment under it. `who` is null for your own. */
-function FeedPost({ line, now, social, who, friend, select, onComments, onDelete }: {
+function FeedPost({ line, now, social, who, friend, features, admin, select, onComments, onDelete }: {
   line: ActivityLine; now: Date; social: PostSocial; who: PublicUser | null; friend: boolean;
+  features: Features;
+  /** The admin may delete anyone's post (AD7). */
+  admin: boolean;
   /** Select mode on your own post: the checkbox state; null otherwise. */
   select: { on: boolean; toggle: () => void; full: boolean } | null;
   onComments: () => void; onDelete: () => void;
@@ -220,10 +227,10 @@ function FeedPost({ line, now, social, who, friend, select, onComments, onDelete
   return (
     <li className="feed-post">
       <ActivityRow line={line} now={now} who={who} friend={friend}>
-        {(line.rating || Object.keys(social.reactions).length > 0) && (
+        {(line.rating || (features.reactions && Object.keys(social.reactions).length > 0)) && (
           <div className="feed-post__chips">
             {line.rating && <RatingBadge rating={line.rating.to} size="xs" />}
-            <ReactionChips social={social} onToggle={toggle} who={{ target, title: line.title }} />
+            {features.reactions && <ReactionChips social={social} onToggle={toggle} who={{ target, title: line.title }} />}
           </div>
         )}
       </ActivityRow>
@@ -234,14 +241,14 @@ function FeedPost({ line, now, social, who, friend, select, onComments, onDelete
         </label>
       ) : (
       <div className="feed-post__actions">
-        <ReactButton mine={social.mine} onPick={toggle} />
-        <Button variant="secondary" className="feed-post__comment" onClick={onComments}>
+        {features.reactions && <ReactButton mine={social.mine} onPick={toggle} />}
+        {features.comments && <Button variant="secondary" className="feed-post__comment" onClick={onComments}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 5h16v11H9l-5 4z" />
           </svg>
           {n === 0 ? 'Comment' : `Comment (${n})`}
-        </Button>
-        {who === null && <PostMenu title={line.title} onDelete={onDelete} />}
+        </Button>}
+        {(who === null || admin) && <PostMenu title={line.title} onDelete={onDelete} />}
       </div>
       )}
     </li>

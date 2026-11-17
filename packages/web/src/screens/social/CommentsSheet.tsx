@@ -6,6 +6,7 @@ import { useToast } from '../../design/components/Toast';
 import { useComments, useDeleteComment, usePostComment } from '../../data/feed';
 import { timeAgo } from '../activity/format';
 import { useNow } from '../../hooks';
+import { useMe } from '../../data/useMe';
 import '../../design/feed.css';
 
 /** The comment thread of one post or entry: oldest first, a composer pinned under it. */
@@ -66,6 +67,9 @@ function CommentRow({ comment, target }: { comment: Comment; target: Target }) {
   const now = useNow();
   const [asking, setAsking] = useState(false);
   const who = nameOf(comment.author);
+  // The admin may delete any comment (AD7); everyone else, what the server says.
+  const admin = useMe().data?.isAdmin === true;
+  const canDelete = comment.canDelete || admin;
   return (
     <li className="comment">
       <div className="comment__head">
@@ -73,7 +77,7 @@ function CommentRow({ comment, target }: { comment: Comment; target: Target }) {
         <time dateTime={comment.createdAt}>{timeAgo(comment.createdAt, now)}</time>
       </div>
       <p className="comment__body">{comment.body}</p>
-      {comment.canDelete && !asking && (
+      {canDelete && !asking && (
         <button type="button" className="link-btn comment__delete" aria-label={`Delete comment by ${who}`} onClick={() => setAsking(true)}>
           Delete
         </button>

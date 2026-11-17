@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAppName } from '../data/appSettings';
 import { ME_KEY } from '../data/useMe';
 import type { Me } from '../api/types';
 import { homePath } from '../nav';
@@ -8,12 +9,13 @@ import { UsernameForm } from './UsernameForm';
 
 /** First run: the user picks the username friends will find them by. */
 export function UsernameSetup() {
+  const appName = useAppName();
   const navigate = useNavigate();
   const qc = useQueryClient();
   return (
     <div className="setup">
       <div className="setup__card">
-        <span className="brand-mark">Media Tracker</span>
+        <span className="brand-mark">{appName}</span>
         <h1 className="page-title">Pick a username</h1>
         <p className="muted">This is how friends will find you. You can change it later in Settings.</p>
         <UsernameForm

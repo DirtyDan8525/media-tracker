@@ -79,4 +79,20 @@ describe('CommentsSheet', () => {
     expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/comments/c1')).toBe(true);
     expect(screen.getByText('Not mine to delete')).toBeInTheDocument();
   });
+
+  it('the admin sees Delete on anyone\'s comment (AD7)', async () => {
+    setup({
+      'GET /api/me': { body: { id: 'u1', username: 'dan', isAdmin: true, settings: {}, email: 'd@x', avatarAt: null, createdAt: null, displayName: null, status: 'active' } },
+      'GET /api/comments': { body: [comment({ canDelete: false })] },
+      'DELETE /api/comments/:id': { status: 204 },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete comment by Ren' }));
+    expect(screen.getByRole('group', { name: 'Delete this comment?' })).toBeInTheDocument();
+  });
+
+  it('a member does not see Delete on a comment the server says they cannot delete', async () => {
+    setup({ 'GET /api/comments': { body: [comment({ canDelete: false })] } });
+    await screen.findByText('Great pick');
+    expect(screen.queryByRole('button', { name: /Delete comment by/ })).not.toBeInTheDocument();
+  });
 });

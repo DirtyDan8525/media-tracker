@@ -1,11 +1,18 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeMe } from '../../test/mockApi';
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { makeMe, mockFetch } from '../../test/mockApi';
+import { publicSettings } from '../../test/appSettings';
+import { makeQueryClient } from '../../test/queryClient';
 import { InstallBanner } from './InstallBanner';
 import { InstallSteps } from './InstallSteps';
 import { OnboardingHost } from './OnboardingHost';
 import { Walkthrough } from './Walkthrough';
+
+/** The banner and the host read the admin's switches (GET /api/app), so they need a query client. */
+const Q = ({ children }: { children: ReactNode }) => <QueryClientProvider client={makeQueryClient()}>{children}</QueryClientProvider>;
 
 vi.mock('../../shell/SessionGate', () => ({ useSessionMe: () => makeMe() }));
 
@@ -45,20 +52,20 @@ describe('Walkthrough', () => {
 
 describe('OnboardingHost', () => {
   it('shows the walkthrough once, then the install steps, and never again for that user', async () => {
-    const { unmount } = render(<OnboardingHost />);
+    const { unmount } = render(<OnboardingHost />, { wrapper: Q });
     expect(screen.getByRole('dialog', { name: 'Your lists' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(screen.getByRole('dialog', { name: 'Install the app' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     unmount();
-    render(<OnboardingHost />);
+    render(<OnboardingHost />, { wrapper: Q });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('skips the install steps when already installed', async () => {
     const restore = standalone(true);
-    render(<OnboardingHost />);
+    render(<OnboardingHost />, { wrapper: Q });
     await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     restore();
@@ -66,7 +73,7 @@ describe('OnboardingHost', () => {
 
   it('does not show for a user who has already seen it (seen is per user id)', () => {
     localStorage.setItem('mt-walkthrough-seen:u1', '1');
-    render(<OnboardingHost />);
+    render(<OnboardingHost />, { wrapper: Q });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
@@ -96,7 +103,7 @@ describe('InstallBanner', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('shows "Install Media Tracker", opens the steps, and ✕ dismisses it for good', async () => {
-    const { unmount } = render(<InstallBanner />);
+    const { unmount } = render(<InstallBanner />, { wrapper: Q });
     expect(screen.getByText('Install Media Tracker')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show me how' }));
     expect(screen.getByRole('dialog', { name: 'Install the app' })).toBeInTheDocument();
@@ -105,26 +112,46 @@ describe('InstallBanner', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText('Install Media Tracker')).not.toBeInTheDocument();
     unmount();
-    render(<InstallBanner />);
+    render(<InstallBanner />, { wrapper: Q });
     expect(screen.queryByText('Install Media Tracker')).not.toBeInTheDocument();
   });
 
   it('is hidden when already installed (display-mode: standalone)', () => {
     const restore = standalone(true);
-    render(<InstallBanner />);
+    render(<InstallBanner />, { wrapper: Q });
     expect(screen.queryByText('Install Media Tracker')).not.toBeInTheDocument();
     restore();
   });
 
   it('is hidden when iOS reports navigator.standalone', () => {
     vi.stubGlobal('navigator', { ...navigator, standalone: true });
-    render(<InstallBanner />);
+    render(<InstallBanner />, { wrapper: Q });
     expect(screen.queryByText('Install Media Tracker')).not.toBeInTheDocument();
   });
 
   it('still works when localStorage throws', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    render(<InstallBanner />);
+    render(<InstallBanner />, { wrapper: Q });
     expect(screen.getByText('Install Media Tracker')).toBeInTheDocument();
+  });
+});
+
+describe('switched off by the admin (AD2)', () => {
+  it('the install banner is gone when its switch is off', async () => {
+    mockFetch({ 'GET /api/app': { body: publicSettings({ features: { installBanner: false } }) } });
+    render(<InstallBanner />, { wrapper: Q });
+    await waitFor(() => expect(screen.queryByText('Install Media Tracker')).not.toBeInTheDocument());
+  });
+
+  it('the first-run walkthrough is skipped when its switch is off', async () => {
+    mockFetch({ 'GET /api/app': { body: publicSettings({ features: { walkthrough: false } }) } });
+    render(<OnboardingHost />, { wrapper: Q });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('the install banner shows the admin\'s app name', async () => {
+    mockFetch({ 'GET /api/app': { body: publicSettings({ brand: { name: 'Our Shelf' } }) } });
+    render(<InstallBanner />, { wrapper: Q });
+    expect(await screen.findByText('Install Our Shelf')).toBeInTheDocument();
   });
 });

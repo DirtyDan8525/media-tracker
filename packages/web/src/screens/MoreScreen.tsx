@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useAppName, useAppSettings } from '../data/appSettings';
 import { useUnread } from '../data/feed';
 import { Icon } from '../design/components/Icon';
 import { PageHeader } from '../shell/PageHeader';
@@ -15,6 +16,8 @@ export function MoreScreen() {
   // The same count as the Profile dot; for the admin it includes people waiting for approval.
   const requests = useUnread().data?.requests ?? 0;
   const [tour, setTour] = useState(false);
+  const appName = useAppName();
+  const { features } = useAppSettings();
   return (
     <div className="screen">
       <PageHeader title="More" profile />
@@ -22,10 +25,12 @@ export function MoreScreen() {
         <section aria-labelledby="more-ratings" className="group">
           <h2 id="more-ratings" className="group__title">Ratings</h2>
           <div className="group__card">
-            <Link to="/sharpen" className="group__row">
-              <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Sharpen my ratings</span>
-              <span className="group__chev"><Icon name="chevron" size={18} /></span>
-            </Link>
+            {features.closeCalls && (
+              <Link to="/sharpen" className="group__row">
+                <span className="group__row-start"><span className="tile-icon"><Icon name="compare" size={18} /></span>Sharpen my ratings</span>
+                <span className="group__chev"><Icon name="chevron" size={18} /></span>
+              </Link>
+            )}
             <Link to="/top5" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="top5" size={18} /></span>Top 5</span>
               <span className="group__chev"><Icon name="chevron" size={18} /></span>
@@ -59,10 +64,10 @@ export function MoreScreen() {
         <section aria-labelledby="more-app" className="group">
           <h2 id="more-app" className="group__title">App</h2>
           <div className="group__card">
-            <button type="button" className="group__row" onClick={() => setTour(true)}>How to use the app</button>
+            {features.walkthrough && <button type="button" className="group__row" onClick={() => setTour(true)}>How to use the app</button>}
             <Link to="/whats-new" className="group__row">What's new</Link>
             <Link to="/whats-new" className="group__row">Coming soon</Link>
-            <Link to="/about" className="group__row">About Media Tracker</Link>
+            <Link to="/about" className="group__row">About {appName}</Link>
           </div>
         </section>
       </div>

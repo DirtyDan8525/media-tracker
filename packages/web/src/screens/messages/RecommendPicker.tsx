@@ -7,14 +7,15 @@ import { Button } from '../../design/components/Button';
 import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { Sheet } from '../../design/components/Sheet';
-import { enabledLists, LIST_LABEL } from '../../nav';
+import { LIST_LABEL } from '../../nav';
+import { useEnabledLists } from '../../shell/useLists';
 import { useSessionMe } from '../../shell/SessionGate';
 import type { RecSnapshot } from '@media-tracker/shared';
 
 /** The Recommend picker (from + in a chat): a title from your own lists, filtered by list; tapping one sends it. */
 export function RecommendPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (rec: RecSnapshot) => void }) {
   const me = useSessionMe();
-  const lists = enabledLists(me.settings);
+  const lists = useEnabledLists();
   const [filter, setFilter] = useState<Category | 'all'>('all');
   const [q, setQ] = useState('');
   const { data } = useAllEntries(lists);

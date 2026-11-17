@@ -127,7 +127,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
     const first = !prev || prev.senderId !== m.senderId || dayLabel(prev.createdAt, now) !== day;
     rows.push(
       <Bubble key={m.id} m={m} mine={m.senderId === me.id} showWho={isGroup && m.senderId !== me.id && first} sender={users[m.senderId]}
-        name={nameFor(m.senderId)} onOptions={() => setDeleting(m)} onOpenImage={() => setViewing(m)} />,
+        name={nameFor(m.senderId)} canDelete={m.senderId === me.id || me.isAdmin} onOptions={() => setDeleting(m)} onOpenImage={() => setViewing(m)} />,
     );
   });
 
@@ -200,7 +200,9 @@ function Chat({ conversation }: { conversation: Conversation }) {
   );
 }
 
-function Bubble({ m, mine, showWho, sender, name, onOptions, onOpenImage }: {
+function Bubble({ m, mine, showWho, sender, name, canDelete, onOptions, onOpenImage }: {
+  /** Your own message, or any message for the admin (AD7). */
+  canDelete: boolean;
   m: Message; mine: boolean; showWho: boolean; sender: PublicUser | undefined; name: string; onOptions: () => void; onOpenImage: () => void;
 }) {
   const body = m.deleted ? (
@@ -224,7 +226,7 @@ function Bubble({ m, mine, showWho, sender, name, onOptions, onOpenImage }: {
             {body}
             <time className="bubble__time" dateTime={m.createdAt}>{clock(m.createdAt)}</time>
           </div>
-          {mine && !m.deleted && <IconButton label="Message options" icon="more" look="plain" className="bubble__opts" onClick={onOptions} />}
+          {canDelete && !m.deleted && <IconButton label={mine ? 'Message options' : `Message options for ${name}'s message`} icon="more" look="plain" className="bubble__opts" onClick={onOptions} />}
         </div>
       </div>
     </li>

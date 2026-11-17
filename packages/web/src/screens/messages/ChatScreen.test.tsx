@@ -132,6 +132,17 @@ describe('Chat', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it("the admin can delete anyone's message (AD7); the confirm sheet is the same", async () => {
+    const b = messagesBackend({ messages: { c1: [makeMessage({ senderId: REN_U.id, text: 'rude thing' })] } });
+    fakeBackend({ me: makeMe({ isAdmin: true }), extra: { ...b.handlers, 'GET /api/friends': { body: friendsOf(REN) } } as never });
+    renderApp('/messages/c1');
+    await screen.findByText('rude thing');
+    await userEvent.click(screen.getByRole('button', { name: "Message options for Ren's message" }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete this message?' })).getByRole('button', { name: 'Delete message' }));
+    await waitFor(() => expect(screen.queryByText('rude thing')).not.toBeInTheDocument());
+    expect(screen.getByText('Message deleted')).toBeInTheDocument();
+  });
+
   it('a former friend\'s direct chat is read-only: a notice, no composer', async () => {
     setup({ conversations: [makeConversation({ readOnly: true })], messages: { c1: [makeMessage({ text: 'bye' })] } });
     renderApp('/messages/c1');

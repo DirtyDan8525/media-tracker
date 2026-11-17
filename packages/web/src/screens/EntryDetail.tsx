@@ -13,6 +13,7 @@ import { Button } from '../design/components/Button';
 import { CountUp } from '../design/components/CountUp';
 import { CoverBackdrop } from '../design/components/CoverBackdrop';
 import { CoverImage } from '../design/components/CoverImage';
+import { Icon } from '../design/components/Icon';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { EmptyState } from '../design/components/EmptyState';
 import { Sheet } from '../design/components/Sheet';
@@ -213,8 +214,9 @@ function DetailBody({ entry }: { entry: Entry }) {
             checked={entry.notesPrivate} onChange={(notesPrivate) => save({ notesPrivate })} />
         </section>
 
-        <section className="detail__section" aria-label="Edit details">
-          <h2 className="detail__h">Edit details</h2>
+        {/* Dan, 2026-11-17: the edit fields live in one full-width "Edit info" drop-down, closed by default. */}
+        <details className="detail__section detail__more" aria-label="Edit details">
+          <summary className="detail__more-summary"><span>Edit info</span><Icon name="chevron-down" size={18} /></summary>
           <div className="detail__edit">
             <DetailField label={cfg.titleLabel} value={entry.title} maxLength={300}
               check={(v) => (v.trim() === '' ? 'A title is required.' : null)} onSave={(title) => save({ title })} />
@@ -241,10 +243,12 @@ function DetailBody({ entry }: { entry: Entry }) {
             <DetailField label={ORIGIN_LABEL[entry.category]} value={entry.origin} maxLength={300} onSave={(origin) => save({ origin })} />
             <DetailField label="Synopsis" multiline value={entry.synopsis} maxLength={5000} onSave={(synopsis) => save({ synopsis })} />
           </div>
-        </section>
+          <div className="detail__actions">
+            <Button onClick={() => setSheet('refetch')}>Re-fetch</Button>
+          </div>
+        </details>
 
         <div className="detail__actions">
-          <Button onClick={() => setSheet('refetch')}>Re-fetch</Button>
           <Button className="btn--danger" onClick={() => setSheet('delete')}>Delete</Button>
         </div>
       </div>

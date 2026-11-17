@@ -231,3 +231,15 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 
 /* "Watch on YouTube" on a video's page. */
 .detail__watch { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-height: var(--tap); margin-top: var(--space-4); padding: 0 var(--space-8); text-decoration: none; }
+
+/* "Edit info" drop-down on a title's page: one full-width row, closed by default. */
+.detail__more { border: 1px solid var(--grid-line); border-radius: var(--radius-lg); padding: 0; }
+.detail__more-summary {
+  display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 var(--space-6);
+  cursor: pointer; list-style: none; font-weight: 600; color: var(--bright-text);
+}
+.detail__more-summary::-webkit-details-marker { display: none; }
+.detail__more-summary:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; border-radius: var(--radius-lg); }
+.detail__more[open] .detail__more-summary svg { transform: rotate(180deg); }
+.detail__more > .detail__edit, .detail__more > .detail__actions { padding: 0 var(--space-6) var(--space-6); }
+@media (prefers-reduced-motion: no-preference) { .detail__more-summary svg { transition: transform 150ms; } }

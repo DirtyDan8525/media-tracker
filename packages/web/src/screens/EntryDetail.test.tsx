@@ -493,4 +493,17 @@ describe('YouTube', () => {
     expect(link).toHaveAttribute('target', '_blank');
   });
 });
+
+describe('Edit info drop-down', () => {
+  it('the edit fields sit in a closed "Edit info" drop-down that opens on tap', async () => {
+    fakeBackend({ entries: [makeEntry({ id: 'e1', title: 'Cyberpunk: Edgerunners' })] });
+    renderApp('/entry/e1');
+    const summary = await screen.findByText('Edit info');
+    const details = summary.closest('details')!;
+    expect(details).not.toHaveAttribute('open');
+    await userEvent.click(summary);
+    expect(details).toHaveAttribute('open');
+    expect(screen.getByRole('button', { name: 'Re-fetch' })).toBeInTheDocument();
+  });
+});
 });

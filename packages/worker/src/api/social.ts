@@ -8,7 +8,7 @@ import {
   type Target,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
-import { canView, publicUser, relationOf } from '../social/visibility';
+import { canView, canViewPost, publicUser, relationOf } from '../social/visibility';
 
 export const social = new Hono<AppEnv>();
 
@@ -41,26 +41,32 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 /**
  * The entry behind a reaction/comment target, or null when it is missing or the viewer may not see
- * it (stranger, pending, ex-friend, friend on a private entry). A post id must be an anchor
- * (`post_id IS NULL`). 1 query, plus 1 for the friendship unless the viewer owns the entry.
+ * it. A post id must be an anchor (`post_id IS NULL`). Amends S7 (Dan 2026-11-16: Everyone = all
+ * active users): a post is open to you when it is yours or its entry is not private and its author
+ * is active, friend or not (1 query); an entry target stays friends-only (1 query, plus 1 for the
+ * friendship unless the viewer owns the entry).
  */
 export async function resolveTarget(
   db: D1Database,
   viewerId: string,
   target: Target,
 ): Promise<{ ownerId: string; entryId: string } | null> {
-  const row =
-    'activityId' in target
-      ? await db
-          .prepare(
-            'SELECT e.user_id, e.id, e.is_private FROM activity a JOIN entries e ON e.id = a.entry_id WHERE a.id = ? AND a.post_id IS NULL',
-          )
-          .bind(target.activityId)
-          .first<{ user_id: string; id: string; is_private: number }>()
-      : await db
-          .prepare('SELECT user_id, id, is_private FROM entries WHERE id = ?')
-          .bind(target.entryId)
-          .first<{ user_id: string; id: string; is_private: number }>();
+  if ('activityId' in target) {
+    const row = await db
+      .prepare(
+        `SELECT e.user_id, e.id, e.is_private, u.status FROM activity a
+           JOIN entries e ON e.id = a.entry_id JOIN users u ON u.id = e.user_id
+          WHERE a.id = ? AND a.post_id IS NULL`,
+      )
+      .bind(target.activityId)
+      .first<{ user_id: string; id: string; is_private: number; status: string }>();
+    if (!row || !canViewPost(viewerId, { ownerId: row.user_id, isPrivate: row.is_private === 1, ownerStatus: row.status })) return null;
+    return { ownerId: row.user_id, entryId: row.id };
+  }
+  const row = await db
+    .prepare('SELECT user_id, id, is_private FROM entries WHERE id = ?')
+    .bind(target.entryId)
+    .first<{ user_id: string; id: string; is_private: number }>();
   if (!row) return null;
   const rel = await relationOf(db, viewerId, row.user_id);
   if (!canView(rel, { isPrivate: row.is_private === 1 })) return null;
@@ -193,16 +199,19 @@ social.post('/comments', async (c) => {
 social.delete('/comments/:id', async (c) => {
   const user = c.var.user;
   const row = await c.env.DB.prepare(
-    `SELECT c.user_id AS author, c.deleted_at, e.user_id AS owner, e.is_private
+    `SELECT c.user_id AS author, c.deleted_at, c.activity_id, e.user_id AS owner, e.is_private, u.status AS owner_status
      FROM comments c LEFT JOIN activity a ON a.id = c.activity_id
-     JOIN entries e ON e.id = COALESCE(c.entry_id, a.entry_id)
+     JOIN entries e ON e.id = COALESCE(c.entry_id, a.entry_id) JOIN users u ON u.id = e.user_id
      WHERE c.id = ?`,
   )
     .bind(c.req.param('id'))
-    .first<{ author: string; deleted_at: string | null; owner: string; is_private: number }>();
+    .first<{ author: string; deleted_at: string | null; activity_id: string | null; owner: string; is_private: number; owner_status: string }>();
   if (!row || row.deleted_at !== null) return c.json(notFound, 404);
-  const rel = await relationOf(c.env.DB, user.id, row.owner);
-  if (!canView(rel, { isPrivate: row.is_private === 1 })) return c.json(notFound, 404);
+  // A post's thread is open to any active user's non-private post (Dan 2026-11-16); an entry's stays friends-only.
+  const visible = row.activity_id !== null
+    ? canViewPost(user.id, { ownerId: row.owner, isPrivate: row.is_private === 1, ownerStatus: row.owner_status })
+    : canView(await relationOf(c.env.DB, user.id, row.owner), { isPrivate: row.is_private === 1 });
+  if (!visible) return c.json(notFound, 404);
   if (row.author !== user.id && row.owner !== user.id) return c.json({ error: 'forbidden' }, 403);
   await c.env.DB.prepare('UPDATE comments SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL')
     .bind(new Date().toISOString(), c.req.param('id'))

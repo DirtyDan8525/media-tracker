@@ -28,10 +28,12 @@ export interface ActivityItem {
   createdAt: string;
 }
 
-/** Every row of up to 30 posts, plus their authors and their reactions / comment counts by post id. */
+/** Every row of up to 30 posts, plus their authors (and which are friends) and their reactions / comment counts by post id. */
 export interface ActivityPage {
   items: ActivityItem[];
   users: Record<string, PublicUser>;
+  /** Which of `users` are your accepted friends (a non-friend's entry page is closed to you). */
+  friends: string[];
   social: Record<string, PostSocial>;
   next: { before: string; beforeId: string } | null;
 }

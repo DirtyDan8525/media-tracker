@@ -15,7 +15,7 @@ function item(over: Partial<ActivityItem> & Pick<ActivityItem, 'type' | 'title'>
   // Each row is its own post unless the test names one.
   return { id: `a${n}`, postId: `a${n}`, userId: 'u1', entryId: `e-${over.title}`, category: 'anime', coverUrl: '', payload: {}, createdAt: ago(1), ...over };
 }
-const page = (items: ActivityItem[], next: ActivityPage['next'] = null): ActivityPage => ({ items, users: {}, social: {}, next });
+const page = (items: ActivityItem[], next: ActivityPage['next'] = null): ActivityPage => ({ items, users: {}, friends: [], social: {}, next });
 
 beforeEach(() => {
   localStorage.clear();
@@ -245,7 +245,7 @@ describe('ActivityScreen: friends, reactions, comments', () => {
   const ren = { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarAt: '2026-11-01T00:00:00.000Z' };
   const frieren = (over: Partial<ActivityItem> = {}) =>
     item({ type: 'rated', title: 'Frieren', userId: 'u-ren', entryId: 'e-fr', id: 'p-fr', postId: 'p-fr', payload: { from: null, to: 9 }, ...over });
-  const renPage = (social: ActivityPage['social'] = {}): ActivityPage => ({ items: [frieren()], users: { 'u-ren': ren }, social, next: null });
+  const renPage = (social: ActivityPage['social'] = {}): ActivityPage => ({ items: [frieren()], users: { 'u-ren': ren }, friends: ['u-ren'], social, next: null });
 
   it('Everyone shows "Ren rated Frieren 9.0" with Ren\'s avatar, the name linking to /u/ren and the title to /u/ren/entry/<id>', async () => {
     fakeBackend({ extra: { 'GET /api/activity': { body: renPage() } } });
@@ -343,5 +343,107 @@ describe('ActivityScreen: friends, reactions, comments', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/reactions').map((c) => c.body))
       .toEqual([{ activityId: 'p-fr', emoji: '😮' }, { activityId: 'p-fr', emoji: '🎉' }]));
+  });
+});
+
+describe('ActivityScreen: everyone and deleting posts', () => {
+  const sam = { id: 'u-sam', username: 'sam', displayName: 'Sam', avatarAt: null };
+  const own = (title: string, over: Partial<ActivityItem> = {}) => item({ type: 'added', title, payload: { rating: 8 }, ...over });
+  const strangerPage = (): ActivityPage => ({
+    items: [item({ type: 'rated', title: 'Mushishi', userId: 'u-sam', entryId: 'e-mu', payload: { from: null, to: 8 } })],
+    users: { 'u-sam': sam }, friends: [], social: {}, next: null,
+  });
+
+  it("a non-friend's name links to /u/<username>, their title is plain text; reacting and commenting stay available", async () => {
+    fakeBackend({ extra: { 'GET /api/activity': { body: strangerPage() } } });
+    renderApp('/activity');
+    const row = (await screen.findByText('Mushishi')).closest('li')!;
+    expect(row).toHaveTextContent('Sam rated Mushishi 8.0');
+    expect(within(row).getByRole('link', { name: 'Sam' })).toHaveAttribute('href', '/u/sam');
+    expect(within(row).queryByRole('link', { name: 'Mushishi' })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'React' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Comment' })).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: /Options for/ })).not.toBeInTheDocument();
+  });
+
+  it('only your own posts have a ⋯ menu; "Delete post" asks first, then DELETEs the anchor and drops the post', async () => {
+    const { calls } = fakeBackend({ extra: {
+      'GET /api/activity': { body: { ...strangerPage(), items: [...strangerPage().items, own('Bleach', { id: 'p-bl', postId: 'p-bl' }), own('Naruto', { id: 'p-na', postId: 'p-na' })] } },
+      'DELETE /api/activity/:id': { status: 204 },
+    } });
+    renderApp('/activity');
+    const row = (await screen.findByRole('link', { name: 'Bleach' })).closest('li')!;
+    expect(screen.getAllByRole('button', { name: /^Options for/ })).toHaveLength(2);
+    await userEvent.click(within(row).getByRole('button', { name: 'Options for Bleach' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Delete this post?' });
+    expect(sheet).toHaveTextContent('The title stays on your list.');
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Delete post' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Bleach' })).not.toBeInTheDocument());
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/api/activity/p-bl']);
+    expect(screen.getByRole('link', { name: 'Naruto' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText('Post deleted')).toBeInTheDocument();
+  });
+
+  it('Cancel leaves the post and sends nothing; a failed delete keeps the sheet and says so', async () => {
+    let fail = true;
+    const { calls } = fakeBackend({ extra: {
+      'GET /api/activity': { body: page([own('Bleach', { id: 'p-bl', postId: 'p-bl' })]) },
+      'DELETE /api/activity/:id': () => (fail ? { status: 500, body: { error: 'boom' } } : { status: 204 }),
+    } });
+    renderApp('/activity');
+    await userEvent.click(await screen.findByRole('button', { name: 'Options for Bleach' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Bleach' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete post' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete post' }));
+    expect(await screen.findByText("Couldn't delete that. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Bleach' })).toBeInTheDocument();
+  });
+
+  it('Select appears on You only; checkboxes sit on your posts, "Delete N posts" confirms and POSTs one batch', async () => {
+    const { calls } = fakeBackend({ extra: {
+      'GET /api/activity': { body: page([own('Bleach', { id: 'p-bl', postId: 'p-bl' }), own('Naruto', { id: 'p-na', postId: 'p-na' }), own('Frieren', { id: 'p-fr', postId: 'p-fr' })]) },
+      'POST /api/activity/delete': { body: { deleted: 2 } },
+    } });
+    renderApp('/activity');
+    await screen.findByRole('link', { name: 'Bleach' });
+    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'You' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Select' }));
+    expect(screen.getByRole('button', { name: 'Delete 0 posts' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Options for/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Bleach' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Frieren' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete 2 posts' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Delete 2 posts?' });
+    expect(sheet).toHaveTextContent('The titles stay on your list.');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Delete 2 posts' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Bleach' })).not.toBeInTheDocument());
+    const posted = calls.filter((c) => c.method === 'POST' && c.path === '/api/activity/delete');
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.body).toEqual({ postIds: ['p-bl', 'p-fr'] });
+    expect(screen.getByRole('link', { name: 'Naruto' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument(); // select mode ended
+    expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
+  });
+
+  it('Done leaves Select mode without deleting; switching scope ends it too', async () => {
+    const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([own('Bleach')]) } } });
+    renderApp('/activity?show=you');
+    await userEvent.click(await screen.findByRole('button', { name: 'Select' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Bleach' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Select' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Everyone' }));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'DELETE' || c.path === '/api/activity/delete')).toBe(false);
   });
 });

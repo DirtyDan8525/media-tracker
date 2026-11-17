@@ -93,3 +93,11 @@
 .switch[aria-checked='true'] i::after { left: 21px; background: var(--on-highlight); }
 .switch:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: 12px; }
 .nav-dot--inline { position: static; display: inline-block; margin-right: var(--space-4); border-color: transparent; vertical-align: middle; }
+
+/* Own posts: the ⋯ menu, Select mode (checkbox row, toolbar) and the delete confirm. */
+.feed-post__actions > .feed-post__menu { flex: none; position: relative; }
+.feed-post__panel { top: auto; bottom: calc(100% + var(--space-2)); left: auto; right: 0; min-width: 180px; }
+.feed-post__select { display: flex; align-items: center; gap: var(--space-4); min-height: var(--tap); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.feed-post__select input { width: 24px; height: 24px; margin: 0; accent-color: var(--highlight); }
+.activity__tools { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: flex-end; }
+.activity__confirm { display: flex; gap: var(--space-4); justify-content: flex-end; }

@@ -24,7 +24,8 @@ async function signInAndSetUsername(page: Page, username: string) {
   }
   // Phase 5: the first-run walkthrough and install banner (seen/dismissed flags live in localStorage per browser).
   const skip = page.getByRole('dialog', { name: 'Your lists' }).getByRole('button', { name: 'Skip' });
-  if (await skip.isVisible().catch(() => false)) await skip.click();
+  // The walkthrough can open a beat after the nav shows (slow under two projects at once): wait briefly for it.
+  if (await skip.waitFor({ state: 'visible', timeout: 2_000 }).then(() => true, () => false)) await skip.click();
   const notNow = page.getByRole('button', { name: 'Not now' });
   if (await notNow.isVisible().catch(() => false)) await notNow.click();
   await page.evaluate(() => { try { localStorage.setItem('mt-install-dismissed', '1'); } catch { /* ignore */ } });

@@ -1,5 +1,5 @@
 /**
- * The one visibility rule (spec §4, plan S9): a viewer sees an entry if they own it, or are an
+ * The entry visibility rule (spec §4, plan S9): a viewer sees an entry if they own it, or are an
  * accepted friend of the owner and the entry isn't private. Notes are left out when notes_private.
  * Picks-derived fields (strength, priorMean, scoreLocked) and comparisons never leave for anyone but
  * the owner. Every friend-visible route filters with `visibleEntrySql` and maps rows through
@@ -53,6 +53,21 @@ export function FRIEND_IDS_SQL(param: string): string {
 /** SQL twin of `canView` for the entries row aliased `alias`, viewer bound at `viewerParam`. */
 export function visibleEntrySql(alias: string, viewerParam: string): string {
   return `(${alias}.user_id = ${viewerParam} OR (${alias}.is_private = 0 AND ${alias}.user_id IN (${FRIEND_IDS_SQL(viewerParam)})))`;
+}
+
+/**
+ * Feed visibility of an activity post (S9, amended by Dan 2026-11-16: Everyone = all active users):
+ * your own posts, or any non-private entry's post by an active user, friend or not. Entry pages,
+ * entry-level threads and friend lists stay friends-only (`canView`, `visibleEntrySql`).
+ */
+export function canViewPost(viewerId: string, post: { ownerId: string; isPrivate: boolean; ownerStatus: string }): boolean {
+  if (post.ownerId === viewerId) return true;
+  return !post.isPrivate && post.ownerStatus === 'active';
+}
+
+/** SQL twin of `canViewPost` for the entries row aliased `alias`, viewer bound at `viewerParam`. */
+export function feedVisibleSql(alias: string, viewerParam: string): string {
+  return `(${alias}.user_id = ${viewerParam} OR (${alias}.is_private = 0 AND ${alias}.user_id IN (SELECT au.id FROM users au WHERE au.status = 'active')))`;
 }
 
 export class NotVisible extends Error {

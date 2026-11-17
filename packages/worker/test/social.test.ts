@@ -116,14 +116,38 @@ describe('reactions', () => {
 });
 
 describe('visibility of the thread', () => {
-  it.each(['S', 'P'] as const)('%s (stranger / pending) gets 404 on react, list and comment', async (k) => {
-    for (const t of [post, entry]) {
-      expect((await react(k, t)).status).toBe(404);
-      expect((await comment(k, t, 'hi')).status).toBe(404);
-      const q = 'activityId' in t ? 'activityId=postPub' : 'entryId=pub';
-      expect((await as(k, `/api/comments?${q}`)).status).toBe(404);
-      expect((await as(k, `/api/reactions?${q}`)).status).toBe(404);
-    }
+  it.each(['S', 'P'] as const)('%s (stranger / pending) gets 404 on the entry thread but may react, list and comment on the post (Dan 2026-11-16)', async (k) => {
+    expect((await react(k, entry)).status).toBe(404);
+    expect((await comment(k, entry, 'hi')).status).toBe(404);
+    expect((await as(k, '/api/comments?entryId=pub')).status).toBe(404);
+    expect((await as(k, '/api/reactions?entryId=pub')).status).toBe(404);
+    expect((await react(k, post)).status).toBe(200);
+    expect((await comment(k, post, 'hi')).status).toBe(201);
+    expect((await as(k, '/api/comments?activityId=postPub')).status).toBe(200);
+    expect((await as(k, '/api/reactions?activityId=postPub')).status).toBe(200);
+  });
+
+  it("a stranger never reaches a private entry's post, nor a removed or pending user's post", async () => {
+    expect((await react('S', { activityId: 'postPriv' })).status).toBe(404);
+    expect((await comment('S', { activityId: 'postPriv' }, 'hi')).status).toBe(404);
+    await env.DB.exec("UPDATE users SET status = 'removed' WHERE id = 'uO'");
+    expect((await react('S', post)).status).toBe(404);
+    expect((await as('S', '/api/comments?activityId=postPub')).status).toBe(404);
+    await env.DB.exec("UPDATE users SET status = 'pending' WHERE id = 'uO'");
+    expect((await react('S', post)).status).toBe(404);
+  });
+
+  it("a stranger can delete their own comment on a post, not someone else's", async () => {
+    const mine = (await (await comment('S', post, 'a')).json()) as Comment;
+    const theirs = (await (await comment('F', post, 'b')).json()) as Comment;
+    expect((await as('S', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(403);
+    expect((await as('S', `/api/comments/${mine.id}`, 'DELETE')).status).toBe(204);
+  });
+
+  it('a post resolves in one query, even for a stranger', async () => {
+    const spy = spyD1(env.DB);
+    expect((await react('S', post, '❤️', spy.db)).status).toBe(200);
+    expect(spy.queries).toBeLessThanOrEqual(6);
   });
 
   it("a private entry's post and entry: 404 for the friend, 200 for the owner", async () => {
@@ -142,12 +166,12 @@ describe('visibility of the thread', () => {
     expect((await as('O', '/api/comments?entryId=pub')).status).toBe(200);
   });
 
-  it('unfriending hides the thread from the ex-friend', async () => {
-    await comment('F', post, 'hello');
-    expect((await as('F', '/api/comments?activityId=postPub')).status).toBe(200);
+  it('unfriending cuts the entry thread but the post stays open to the ex-friend (Everyone)', async () => {
+    await comment('F', entry, 'hello');
+    expect((await as('F', '/api/comments?entryId=pub')).status).toBe(200);
     await env.DB.exec("DELETE FROM friendships WHERE user_a = 'uF' OR user_b = 'uF'");
-    expect((await as('F', '/api/comments?activityId=postPub')).status).toBe(404);
-    expect((await react('F', post)).status).toBe(404);
+    expect((await as('F', '/api/comments?entryId=pub')).status).toBe(404);
+    expect((await as('F', '/api/comments?activityId=postPub')).status).toBe(200);
   });
 });
 
@@ -189,11 +213,11 @@ describe('comments', () => {
     expect(await list('F', 'entryId=pub')).toHaveLength(200);
   });
 
-  it('delete: author 204, entry owner 204, a third friend 403, stranger 404', async () => {
+  it('delete: author 204, entry owner 204, a third friend 403, a stranger 403 (the post is open)', async () => {
     const mine = (await (await comment('F', post, 'a')).json()) as Comment;
     const theirs = (await (await comment('F', post, 'b')).json()) as Comment;
     expect((await as('G', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(403);
-    expect((await as('S', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(404);
+    expect((await as('S', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(403); // a stranger sees the post, not their comment to delete
     expect((await as('F', `/api/comments/${mine.id}`, 'DELETE')).status).toBe(204);
     expect((await as('O', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(204);
     expect((await as('O', `/api/comments/${theirs.id}`, 'DELETE')).status).toBe(404);
@@ -208,6 +232,12 @@ describe('comments', () => {
     expect(await (await as('O', '/api/reactions?activityId=postPub')).json()).toMatchObject({ comments: 1 });
     const row = await env.DB.prepare('SELECT deleted_at FROM comments WHERE id = ?').bind(c.id).first<{ deleted_at: string | null }>();
     expect(row?.deleted_at).not.toBeNull();
+  });
+
+  it('delete: a stranger who commented on a private-again post cannot delete it (404)', async () => {
+    const c = (await (await comment('S', post, 'x')).json()) as Comment;
+    await env.DB.exec("UPDATE entries SET is_private = 1 WHERE id = 'pub'");
+    expect((await as('S', `/api/comments/${c.id}`, 'DELETE')).status).toBe(404);
   });
 
   it('a friend who can no longer see the entry cannot delete (404)', async () => {

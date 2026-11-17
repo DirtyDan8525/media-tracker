@@ -412,14 +412,16 @@ describe('GET /api/activity?show= (S6)', () => {
     expect(titles(await feed(A))).toEqual(['Open', 'Secret']); // the owner still sees both
   });
 
-  it('pending C and stranger see none; unfriending cuts the feed at once', async () => {
+  it('pending C sees A on Everyone (all active users) but not Friends; unfriending cuts Friends at once, not Everyone', async () => {
     await befriend(A, B);
     await befriend(C, A, 'pending');
     await mk(A, { title: 'Frieren', rating: 9 });
-    expect((await feed(C, '?show=everyone')).items).toEqual([]);
+    expect(titles(await feed(C, '?show=everyone'))).toEqual(['Frieren']);
     expect((await feed(C, '?show=friends')).items).toEqual([]);
+    expect((await feed(C, '?show=everyone')).friends).toEqual([]);
     await env.DB.exec('DELETE FROM friendships');
-    expect((await feed(B, '?show=everyone')).items).toEqual([]);
+    expect((await feed(B, '?show=friends')).items).toEqual([]);
+    expect(titles(await feed(B, '?show=everyone'))).toEqual(['Frieren']);
   });
 
   it('A\'s bare "added" post (no rating, no status) is hidden from B, shown to A on You', async () => {
@@ -439,6 +441,43 @@ describe('GET /api/activity?show= (S6)', () => {
     await patch(A, e.id, { rating: 8 });
     const page = await feed(B, '?show=friends');
     expect(page.items.map((i) => i.type).sort()).toEqual(['added', 'rated']);
+  });
+
+  it("Everyone shows non-friends' posts (not on Friends), the page marks who is a friend (Dan 2026-11-16)", async () => {
+    await befriend(A, B);
+    await mk(A, { title: 'FriendPost', rating: 9 });
+    await mk(C, { title: 'StrangerPost', rating: 8 });
+    await mk(B, { title: 'Mine', rating: 5 });
+    const page = await feed(B, '?show=everyone');
+    expect(titles(page)).toEqual(['FriendPost', 'Mine', 'StrangerPost']);
+    expect(page.friends).toEqual([await idOf(A)]);
+    expect(titles(await feed(B, '?show=friends'))).toEqual(['FriendPost']);
+    expect(titles(await feed(B, '?show=you'))).toEqual(['Mine']);
+  });
+
+  it("a stranger's private entry, bare added, pending and removed users never appear on Everyone", async () => {
+    await mk(C, { title: 'Secret', rating: 8, isPrivate: true });
+    await mk(C, { title: 'Bare' });
+    await mk(C, { title: 'Visible', rating: 7 });
+    const d = 'd@example.com';
+    await mk(d, { title: 'FromRemoved', rating: 7 });
+    const e = 'e@example.com';
+    await mk(e, { title: 'FromPending', rating: 7 });
+    await mk(B, { title: 'Own private', rating: 6, isPrivate: true });
+    await env.DB.prepare("UPDATE users SET status = 'removed' WHERE email = ?").bind(d).run();
+    await env.DB.prepare("UPDATE users SET status = 'pending' WHERE email = ?").bind(e).run();
+    expect(titles(await feed(B, '?show=everyone'))).toEqual(['Own private', 'Visible']);
+    // A stranger turning an entry private hides it from Everyone at once.
+    const vis = await env.DB.prepare("SELECT id FROM entries WHERE title = 'Visible'").first<{ id: string }>();
+    await patch(C, vis!.id, { isPrivate: true });
+    expect(titles(await feed(B, '?show=everyone'))).toEqual(['Own private']);
+  });
+
+  it('unread stays friends-only: a stranger\'s post does not count', async () => {
+    await mk(C, { title: 'StrangerPost', rating: 8 });
+    await idOf(B);
+    const res = await as(B, '/api/activity/unread');
+    expect(((await res.json()) as { feed: number }).feed).toBe(0);
   });
 
   it('an unknown show is a 400', async () => {
@@ -537,3 +576,93 @@ describe('unread (S8)', () => {
     expect(await unread(C)).toEqual({ feed: 0, requests: 0 }); // C's own request is outgoing
   });
 });
+
+
+describe('deleting your own posts', () => {
+  const count = async (sql: string, ...v: unknown[]) => (await env.DB.prepare(sql).bind(...v).first<{ n: number }>())!.n;
+  const post = async (title: string) => {
+    const e = await mk(A, { title, rating: 7 });
+    await patch(A, e.id, { status: 'Completed' });
+    const [anchor] = await rows(e.id);
+    return { e, anchor: anchor!.id };
+  };
+
+  it('DELETE /api/activity/:postId removes the anchor, its joined rows, reactions and comments; the entry stays', async () => {
+    await befriend(A, B);
+    const p = await post('Gone');
+    const keep = await post('Keep');
+    const a = await idOf(A);
+    const b = await idOf(B);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?4, ?2, '❤️', ?3)").bind(p.anchor, b, at(1), keep.anchor),
+      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c1', ?1, ?2, 'x', ?3), ('c2', ?4, ?2, 'y', ?3)").bind(p.anchor, b, at(1), keep.anchor),
+    ]);
+    expect((await rows(p.e.id)).length).toBeGreaterThan(1);
+    const res = await as(A, `/api/activity/${p.anchor}`, 'DELETE');
+    expect(res.status).toBe(204);
+    expect(await rows(p.e.id)).toEqual([]);
+    expect(await count('SELECT COUNT(*) AS n FROM reactions WHERE activity_id = ?', p.anchor)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM comments WHERE activity_id = ?', p.anchor)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM reactions')).toBe(1);
+    expect(await count('SELECT COUNT(*) AS n FROM comments')).toBe(1);
+    expect(await count('SELECT COUNT(*) AS n FROM entries WHERE id = ?', p.e.id)).toBe(1);
+    expect(titles2(await feed(A))).toEqual(['Keep']);
+    expect(titles2(await feed(B, '?show=friends'))).toEqual(['Keep']);
+    void a;
+  });
+
+  it("404 for someone else's post, a missing id, and a non-anchor row; nothing is deleted", async () => {
+    const p = await post('Mine');
+    expect((await as(B, `/api/activity/${p.anchor}`, 'DELETE')).status).toBe(404);
+    expect((await as(A, '/api/activity/nope', 'DELETE')).status).toBe(404);
+    const child = await env.DB.prepare('SELECT id FROM activity WHERE post_id = ?').bind(p.anchor).first<{ id: string }>();
+    expect((await as(A, `/api/activity/${child!.id}`, 'DELETE')).status).toBe(404);
+    expect((await rows(p.e.id)).length).toBe(2);
+  });
+
+  it('a friend cannot delete your post either, and the call costs one batch', async () => {
+    await befriend(A, B);
+    const p = await post('Mine');
+    expect((await as(B, `/api/activity/${p.anchor}`, 'DELETE')).status).toBe(404);
+    const spy = spyD1(env.DB);
+    const res = await app.fetch(new Request(`https://app.test/api/activity/${p.anchor}`, { method: 'DELETE' }),
+      { ...env, DB: spy.db, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env);
+    expect(res.status).toBe(204);
+    expect(spy.queries).toBeLessThanOrEqual(8);
+  });
+
+  it('POST /api/activity/delete removes many of your posts in one batch and ignores ids that are not yours', async () => {
+    const p1 = await post('One');
+    const p2 = await post('Two');
+    const p3 = await post('Three');
+    const other = await mk(B, { title: 'Theirs', rating: 5 });
+    const [theirs] = await rows(other.id);
+    const spy = spyD1(env.DB);
+    const res = await app.fetch(new Request('https://app.test/api/activity/delete', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ postIds: [p1.anchor, p2.anchor, theirs!.id, 'nope'] }),
+    }), { ...env, DB: spy.db, ENVIRONMENT: 'dev', DEV_EMAIL: A } as Env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deleted: 2 });
+    expect(spy.queries).toBeLessThanOrEqual(8);
+    expect(spy.maxParams).toBeLessThanOrEqual(100);
+    expect(titles2(await feed(A))).toEqual(['Three']);
+    expect(titles2(await feed(B))).toEqual(['Theirs']);
+    void p3;
+  });
+
+  it('POST /api/activity/delete validates: 1 to 100 string ids', async () => {
+    const send = (body: unknown) => as(A, '/api/activity/delete', 'POST', body);
+    expect((await send({ postIds: [] })).status).toBe(400);
+    expect((await send({})).status).toBe(400);
+    expect((await send({ postIds: [1] })).status).toBe(400);
+    expect((await send({ postIds: Array.from({ length: 101 }, (_, i) => `p${i}`) })).status).toBe(400);
+    expect((await send({ postIds: Array.from({ length: 100 }, (_, i) => `p${i}`) })).status).toBe(200);
+  });
+
+  it('requires sign-in', async () => {
+    const res = await app.fetch(new Request('https://app.test/api/activity/x', { method: 'DELETE' }), { ...env, ENVIRONMENT: 'prod' } as Env);
+    expect(res.status).toBe(401);
+  });
+});
+const titles2 = (p: ActivityPage) => [...new Set(p.items.map((i) => i.title))].sort();

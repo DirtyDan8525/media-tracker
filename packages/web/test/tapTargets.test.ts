@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 // Spec section 6: every tap target is at least 44 px. jsdom does no layout, so this reads the
 // stylesheets: a control's effective hit height is its height / min-height / line-height plus
 // whatever its ::after hit area adds (inset: -Npx 0 adds N above and N below).
-const css = ['components.css', 'lists.css', 'search.css', 'activity.css', 'nav.css', 'list-menu.css'].map((f) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8')).join('\n');
+const css = ['components.css', 'lists.css', 'search.css', 'activity.css', 'feed.css', 'nav.css', 'list-menu.css'].map((f) => readFileSync(new URL(`../src/design/${f}`, import.meta.url), 'utf8')).join('\n');
 const tokens = readFileSync(new URL('../src/design/tokens.css', import.meta.url), 'utf8');
 const TAP = Number(/--tap:\s*(\d+)px/.exec(tokens)![1]);
 /** A px size token from tokens.css (e.g. --tap, --btn-h), or null. */
@@ -77,6 +77,7 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     ['.list-menu__trigger', 'min-height'],
     ['.list-menu__item', 'min-height'],
     ['.profile-btn', 'height'],
+    ['.feed-post__select', 'min-height'],
   ] as const)('%s', (selector, prop) => {
     const props = prop === 'height' ? ['height', 'min-height'] : [prop];
     const size = hit(selector, props);

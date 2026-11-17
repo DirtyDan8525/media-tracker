@@ -2,7 +2,7 @@ import {
   type ActivityPage, type Comment, type FeedScope, type PostSocial, type Reaction, type Target,
 } from '@media-tracker/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { ApiError, api } from '../api/client';
 import { useToast } from '../design/components/Toast';
 
 export const ACTIVITY_KEY = ['activity'] as const;
@@ -141,5 +141,33 @@ export function useDeleteComment() {
       qc.setQueryData<Comment[]>(['comments', targetKey(target)], (old) => old?.filter((c) => c.id !== id));
       patchSocial(qc, target, (s) => ({ ...s, comments: Math.max(0, s.comments - 1) }));
     },
+  });
+}
+
+/** Drops the posts `ids` (anchor ids) from every cached feed scope. */
+function removePosts(qc: QueryClient, ids: string[]): void {
+  const gone = new Set(ids);
+  qc.setQueriesData<InfiniteData<ActivityPage>>({ queryKey: ACTIVITY_KEY }, (data) =>
+    data && { ...data, pages: data.pages.map((p) => ({ ...p, items: p.items.filter((i) => !gone.has(i.postId)) })) });
+}
+
+/**
+ * Deletes your own posts (the entries stay): one post with `DELETE /api/activity/:id`, a selection
+ * (`batch`) with `POST /api/activity/delete`. A post that is already gone (404) counts as deleted.
+ */
+export function useDeletePosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, batch }: { ids: string[]; batch: boolean }) => {
+      if (batch) await api.post<{ deleted: number }>('/api/activity/delete', { postIds: ids });
+      else {
+        try {
+          await api.del(`/api/activity/${encodeURIComponent(ids[0]!)}`);
+        } catch (e) {
+          if (!(e instanceof ApiError && e.status === 404)) throw e;
+        }
+      }
+    },
+    onSuccess: (_r, { ids }) => removePosts(qc, ids),
   });
 }

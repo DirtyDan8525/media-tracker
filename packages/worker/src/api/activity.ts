@@ -4,7 +4,7 @@ import {
   type ActivityItem, type ActivityPage, type ActivityType, type Category, type FeedScope, type PostSocial, type PublicUser, type Reaction,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
-import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, publicUser, visibleEntrySql, type PublicUserRow } from '../social/visibility';
+import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, feedVisibleSql, publicUser, visibleEntrySql, type PublicUserRow } from '../social/visibility';
 
 export const activity = new Hono<AppEnv>();
 
@@ -159,26 +159,34 @@ function parsePayload(json: string): ActivityItem['payload'] {
 }
 
 /**
- * S6: an anchor row `a` (joined to its entry `e`, viewer at ?1) whose post is more than a bare
- * "added": the anchor carries a rating or status, or a later row joined it (only an anchor can be
- * "added"). Others' posts must also pass the visibility rule.
+ * S6, amended by Dan 2026-11-16: Everyone = all active users. An anchor row `a` (joined to its
+ * entry `e`, viewer at ?1) whose post is more than a bare "added": the anchor carries a rating or
+ * status, or a later row joined it (only an anchor can be "added"). Never a bare "added" of
+ * others, never a private entry's post unless it is yours, never a pending or removed user's.
  */
 const NOT_BARE = `(a.type <> 'added' OR json_extract(a.payload_json, '$.rating') IS NOT NULL
       OR json_extract(a.payload_json, '$.status') IS NOT NULL
       OR EXISTS (SELECT 1 FROM activity p WHERE p.post_id = a.id))`;
-const OTHERS_POSTS = `(a.user_id IN (${FRIEND_IDS_SQL('?1')}) AND ${visibleEntrySql('e', '?1')} AND ${NOT_BARE})`;
+/** Friends' posts (the Friends scope and the unread count stay friends-only). */
+const FRIENDS_POSTS = `(a.user_id IN (${FRIEND_IDS_SQL('?1')}) AND ${visibleEntrySql('e', '?1')} AND ${NOT_BARE})`;
 const SCOPE: Record<FeedScope, string> = {
   you: 'a.user_id = ?1',
-  friends: OTHERS_POSTS,
+  friends: FRIENDS_POSTS,
   // A bare "added" shows only in You, your own included.
-  everyone: `((a.user_id = ?1 AND ${NOT_BARE}) OR ${OTHERS_POSTS})`,
+  everyone: `(${feedVisibleSql('e', '?1')} AND ${NOT_BARE})`,
+};
+/** The rows of the found posts are re-checked with their scope's own rule. */
+const ROW_VISIBLE: Record<FeedScope, string> = {
+  you: visibleEntrySql('e', '?1'),
+  friends: visibleEntrySql('e', '?1'),
+  everyone: feedVisibleSql('e', '?1'),
 };
 
 const isScope = (v: string): v is FeedScope => (FEED_SCOPES as readonly string[]).includes(v);
 
-// 1 query + 1 batch of 4 (rows, users, reactions, comment counts), plus sign-in (1-3): ≤ 8.
+// 1 query + 1 batch of 4 (rows, users + friend flag, reactions, comment counts), plus sign-in (1-3): ≤ 8.
 // Pages are 30 posts, by anchor (created_at, id); visibility is read-time, so an entry made
-// private disappears from friends' feeds at once (review focus 1).
+// private disappears from others' feeds at once (review focus 1).
 activity.get('/', async (c) => {
   const show = c.req.query('show') ?? 'everyone';
   const before = c.req.query('before');
@@ -200,7 +208,7 @@ activity.get('/', async (c) => {
   const anchors = found.slice(0, PAGE);
   const last = anchors[anchors.length - 1];
   const next = found.length > PAGE && last ? { before: last.created_at, beforeId: last.id } : null;
-  if (anchors.length === 0) return c.json({ items: [], users: {}, social: {}, next } satisfies ActivityPage);
+  if (anchors.length === 0) return c.json({ items: [], users: {}, friends: [], social: {}, next } satisfies ActivityPage);
 
   const postIds = JSON.stringify(anchors.map((a) => a.id));
   const userIds = JSON.stringify([...new Set(anchors.map((a) => a.user_id))]);
@@ -210,10 +218,13 @@ activity.get('/', async (c) => {
       `SELECT a.id, a.post_id, a.user_id, a.type, a.entry_id, a.payload_json, a.created_at, e.category, e.title, e.cover_url
          FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
         WHERE (a.id IN (SELECT value FROM json_each(?2)) OR a.post_id IN (SELECT value FROM json_each(?2)))
-          AND ${visibleEntrySql('e', '?1')}
+          AND ${ROW_VISIBLE[show]}
         ORDER BY a.created_at DESC, a.id DESC`,
     ).bind(viewer, postIds),
-    db.prepare(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE id IN (SELECT value FROM json_each(?1))`).bind(userIds),
+    // `friend`: 1 for an accepted active friend (the web links only friends' titles).
+    db.prepare(
+      `SELECT ${PUBLIC_USER_COLS}, id IN (${FRIEND_IDS_SQL('?2')}) AS friend FROM users WHERE id IN (SELECT value FROM json_each(?1))`,
+    ).bind(userIds, viewer),
     db.prepare(
       `SELECT activity_id, emoji, COUNT(*) AS n, SUM(user_id = ?1) AS mine FROM reactions
         WHERE activity_id IN (SELECT value FROM json_each(?2)) AND ${BY_ACTIVE('reactions')} GROUP BY activity_id, emoji`,
@@ -225,7 +236,11 @@ activity.get('/', async (c) => {
   ]);
 
   const users: Record<string, PublicUser> = {};
-  for (const u of (usersRes!.results as PublicUserRow[])) users[u.id] = publicUser(u);
+  const friends: string[] = [];
+  for (const u of (usersRes!.results as (PublicUserRow & { friend: number })[])) {
+    users[u.id] = publicUser(u);
+    if (u.friend === 1) friends.push(u.id);
+  }
   const social: Record<string, PostSocial> = {};
   for (const a of anchors) social[a.id] = { reactions: {}, mine: [], comments: 0 };
   for (const r of reactRes!.results as { activity_id: string; emoji: string; n: number; mine: number }[]) {
@@ -253,6 +268,7 @@ activity.get('/', async (c) => {
       createdAt: r.created_at,
     })),
     users,
+    friends,
     social,
     next,
   };
@@ -265,7 +281,7 @@ const BY_ACTIVE = (t: string) => `EXISTS (SELECT 1 FROM users bu WHERE bu.id = $
 /** Counts at most UNREAD_CAP rows of `sql`. */
 const capped = (sql: string) => `(SELECT COUNT(*) FROM (${sql} LIMIT ${UNREAD_CAP}))`;
 
-// 1 query, plus sign-in (1-3). S8: friends' visible posts, plus others' live comments and
+// 1 query, plus sign-in (1-3). S8 (stays friends-only, Dan 2026-11-16): friends' visible posts, plus others' live comments and
 // reactions on your posts and entries, newer than feed_seen_at (never seen = all), capped at 99;
 // requests = incoming pending friend requests, plus (A7) pending sign-ups for the admin.
 // A8: nothing from pending or removed users counts.
@@ -274,7 +290,7 @@ activity.get('/unread', async (c) => {
   const onMine = (t: string) => `(${t}.entry_id IN (SELECT id FROM entries WHERE user_id = ?1)
       OR ${t}.activity_id IN (SELECT id FROM activity WHERE user_id = ?1))`;
   const posts = `SELECT 1 FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
-      WHERE a.post_id IS NULL AND ${OTHERS_POSTS} AND a.created_at > ${seen}`;
+      WHERE a.post_id IS NULL AND ${FRIENDS_POSTS} AND a.created_at > ${seen}`;
   const comments = `SELECT 1 FROM comments k WHERE k.user_id <> ?1 AND k.deleted_at IS NULL
       AND k.created_at > ${seen} AND ${onMine('k')} AND ${BY_ACTIVE('k')}`;
   const reactions = `SELECT 1 FROM reactions r WHERE r.user_id <> ?1 AND r.created_at > ${seen} AND ${onMine('r')} AND ${BY_ACTIVE('r')}`;
@@ -291,4 +307,46 @@ activity.get('/unread', async (c) => {
 activity.post('/seen', async (c) => {
   await c.env.DB.prepare('UPDATE users SET feed_seen_at = ? WHERE id = ?').bind(new Date().toISOString(), c.var.user.id).run();
   return c.body(null, 204);
+});
+
+/** The ids of `ids` that are the viewer's own anchor posts (post_id IS NULL), as a JSON param. */
+const OWN_ANCHORS = `SELECT a.id FROM activity a WHERE a.user_id = ?1 AND a.post_id IS NULL AND a.id IN (SELECT value FROM json_each(?2))`;
+
+/**
+ * Deletes the viewer's own posts by anchor id: every row of the post (post_id = anchor) and the
+ * anchor, plus the posts' reactions and comments (explicit, not left to the cascade). Ids that are
+ * not the viewer's anchors are ignored; returns how many posts went. One batch of 4.
+ */
+async function deletePosts(db: D1Database, viewerId: string, ids: string[]): Promise<number> {
+  const json = JSON.stringify(ids);
+  const [found] = await db.batch([
+    db.prepare(`SELECT COUNT(*) AS n FROM (${OWN_ANCHORS})`).bind(viewerId, json),
+    db.prepare(`DELETE FROM reactions WHERE activity_id IN (${OWN_ANCHORS})`).bind(viewerId, json),
+    db.prepare(`DELETE FROM comments WHERE activity_id IN (${OWN_ANCHORS})`).bind(viewerId, json),
+    db.prepare(
+      `DELETE FROM activity WHERE user_id = ?1
+          AND (COALESCE(post_id, id) IN (SELECT value FROM json_each(?2)))`,
+    ).bind(viewerId, json),
+  ]);
+  return (found!.results[0] as { n: number }).n;
+}
+
+const MAX_BATCH_DELETE = 100;
+
+// POST /api/activity/delete { postIds }: owner only, 1-100 anchor ids, one batch (4 statements).
+// Ids that aren't your anchors are ignored (a stale selection must not fail the rest).
+activity.post('/delete', async (c) => {
+  const body = await c.req.json().catch(() => null) as { postIds?: unknown } | null;
+  const ids = body?.postIds;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > MAX_BATCH_DELETE || !ids.every((i) => typeof i === 'string' && i.length > 0 && i.length <= 64)) {
+    return c.json({ error: 'invalid' }, 400);
+  }
+  const deleted = await deletePosts(c.env.DB, c.var.user.id, [...new Set(ids as string[])]);
+  return c.json({ deleted });
+});
+
+// DELETE /api/activity/:postId: owner only, the anchor id; 404 when it isn't your post. The entry stays.
+activity.delete('/:postId', async (c) => {
+  const deleted = await deletePosts(c.env.DB, c.var.user.id, [c.req.param('postId')]);
+  return deleted === 0 ? c.json({ error: 'not_found' }, 404) : c.body(null, 204);
 });

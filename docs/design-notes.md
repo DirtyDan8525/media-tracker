@@ -51,3 +51,6 @@
 
 ## Messages wireframes — approved 2026-11-17
 - `MessagesList`, `Chat`, `NewChat`, `ShareRec`, `Recommended` (`*.wf.dc.html`) approved, with one change: on phones Messages replaces Top 5 in the bottom bar (not a top-bar button); Top 5 returns to More.
+
+## Admin powers wireframes — approved 2026-11-17
+- `AdminHome`, `AdminSwitches`, `AdminLook`, `AdminContent`, `AdminTools` (`*.wf.dc.html`) approved with no changes (docs/plans/2026-11-17-phase6c-admin.md).

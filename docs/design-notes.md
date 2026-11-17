@@ -48,3 +48,6 @@
 
 ## Header, Plan to watch, bio wireframes — approved 2026-11-16
 - `ListHeader`, `PlanToWatch`, `ProfileBio` (`*.wf.dc.html`) approved with no changes (items 15–18 of docs/plans/phase5-requests.md).
+
+## Messages wireframes — approved 2026-11-17
+- `MessagesList`, `Chat`, `NewChat`, `ShareRec`, `Recommended` (`*.wf.dc.html`) approved, with one change: on phones Messages replaces Top 5 in the bottom bar (not a top-bar button); Top 5 returns to More.

@@ -201,9 +201,13 @@ describe('entries create / list / get', () => {
 });
 
 describe('duplicateOf', () => {
-  it('a duplicate album (same title and creator) still saves, with duplicateOf set', async () => {
+  it('a duplicate is refused (409, nothing written) unless allowDuplicate: true', async () => {
     const first = await mk(A, { category: 'albums', title: 'Discovery', creator: 'Daft Punk' });
-    const { res, json } = await create(A, { category: 'albums', title: ' discovery ', creator: 'daft punk' });
+    const refused = await as(A, '/api/entries', 'POST', { category: 'albums', title: ' discovery ', creator: 'daft punk' });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: 'duplicate', duplicateOf: first.id });
+    expect(((await (await as(A, '/api/entries?category=albums')).json()) as Entry[]).length).toBe(1);
+    const { res, json } = await create(A, { category: 'albums', title: ' discovery ', creator: 'daft punk', allowDuplicate: true });
     expect(res.status).toBe(201);
     expect(json.duplicateOf).toBe(first.id);
     expect(json.entry.id).not.toBe(first.id);
@@ -215,7 +219,7 @@ describe('duplicateOf', () => {
     await mk(B, { category: 'albums', title: 'Discovery', creator: 'Daft Punk' });
     expect((await create(A, { category: 'albums', title: 'Discovery', creator: 'Someone Else' })).json.duplicateOf).toBeNull();
     expect((await create(A, { category: 'songs', title: 'Discovery', creator: 'Daft Punk' })).json.duplicateOf).toBeNull();
-    const c = await create(A, { category: 'albums', title: 'Discovery', creator: 'Daft Punk' });
+    const c = await create(A, { category: 'albums', title: 'Discovery', creator: 'Daft Punk', allowDuplicate: true });
     expect(c.json.duplicateOf).not.toBeNull();
   });
 });

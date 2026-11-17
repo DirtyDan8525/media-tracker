@@ -18,7 +18,7 @@ const as = (email: string, path: string, method = 'GET', body?: unknown) =>
   );
 
 const mk = async (email: string, body: Record<string, unknown> = {}) => {
-  const res = await as(email, '/api/entries', 'POST', { category: 'anime', title: 't', ...body });
+  const res = await as(email, '/api/entries', 'POST', { category: 'anime', title: 't', allowDuplicate: true, ...body });
   expect(res.status).toBe(201);
   return ((await res.json()) as { entry: Entry }).entry;
 };

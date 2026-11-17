@@ -268,6 +268,11 @@ entries.post('/entries', async (c) => {
     .bind(userId, cat)
     .all<{ id: string; title: string; creator: string }>();
   const duplicateOf = findDuplicate(existing, { id, title: values.title!, creator: values.creator ?? '' }, cat);
+  // Dan, 2026-11-16: never add a second copy silently. 409 (nothing written) unless the person said
+  // "Add again" (allowDuplicate: true).
+  if (duplicateOf && (body as { allowDuplicate?: unknown }).allowDuplicate !== true) {
+    return c.json({ error: 'duplicate', duplicateOf }, 409);
+  }
 
   // A new title can change its neighbours' shown scores (the two-decimal rule), so its set re-fits.
   let setStmts: D1PreparedStatement[] = [];

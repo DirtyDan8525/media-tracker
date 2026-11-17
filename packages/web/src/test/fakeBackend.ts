@@ -53,9 +53,11 @@ export function fakeBackend(opts: BackendOptions = {}) {
       return e ? { body: view(e) } : { status: 404, body: { error: 'not_found' } };
     },
     'POST /api/entries': (b) => {
-      const body = b as Partial<Entry> & { category: Entry['category']; title: string };
+      const { allowDuplicate, ...body } = b as Partial<Entry> & { category: Entry['category']; title: string; allowDuplicate?: boolean };
       const entry = makeEntry({ typedTitle: body.title, lookupState: 'pending', ...body });
       const duplicateOf = findDuplicate(entries, { id: entry.id, title: entry.title, creator: entry.creator }, entry.category);
+      // Like the Worker: a duplicate is refused unless allowDuplicate (nothing written).
+      if (duplicateOf && allowDuplicate !== true) return { status: 409, body: { error: 'duplicate', duplicateOf } };
       entries.push(entry);
       return { status: 201, body: { entry: view(entry), duplicateOf } };
     },

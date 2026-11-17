@@ -2,7 +2,7 @@ import {
   CATEGORY_CONFIG, findDuplicate, type Category, type Entry, type FriendEntry, type PublicUser, type Relation,
 } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { ApiError, api } from '../api/client';
 import type { Me } from '../api/types';
 import { useToast } from '../design/components/Toast';
 import { entriesKey, writeEntry } from './entryCache';
@@ -172,7 +172,15 @@ export function useAddToMine(): (e: FriendEntry) => Promise<AddToMineResult> {
     } catch {
       // can't read your list right now: the server's answer below still tells
     }
-    const res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', addBody(e));
+    let res: { entry: Entry; duplicateOf: string | null };
+    try {
+      res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', addBody(e));
+    } catch (err) {
+      // The server refuses a duplicate (409) and writes nothing.
+      const dupOf = err instanceof ApiError && err.status === 409 ? (err.body as { duplicateOf?: string } | undefined)?.duplicateOf : undefined;
+      if (dupOf) return { entryId: dupOf, duplicate: true };
+      throw err;
+    }
     if (res.duplicateOf) {
       await api.del(`/api/entries/${res.entry.id}`).catch(() => undefined);
       void qc.invalidateQueries({ queryKey: entriesKey(e.category) });

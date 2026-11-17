@@ -189,15 +189,23 @@ describe('adding an entry', () => {
     expect(titles()).toEqual(['jjba']);
   });
 
-  it('toasts when the title is already on the list, and still saves it', async () => {
+  it('asks before adding a title that is already on the list: Cancel adds nothing, Add again adds it', async () => {
     const { entries } = fakeBackend({ entries: [makeEntry({ category: 'albums', title: 'Abbey Road', creator: 'The Beatles' })] });
     renderApp('/list/albums');
-    const d = await openAdd(/^Add album$/i);
-    await userEvent.type(within(d).getByRole('textbox', { name: 'Album' }), 'abbey road');
-    await userEvent.type(within(d).getByRole('textbox', { name: /^Artist/ }), 'the beatles');
-    await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Already on your Albums list')).toBeInTheDocument();
-    expect(entries).toHaveLength(2);
+    const addIt = async () => {
+      const d = await openAdd(/^Add album$/i);
+      await userEvent.type(within(d).getByRole('textbox', { name: 'Album' }), 'abbey road');
+      await userEvent.type(within(d).getByRole('textbox', { name: /^Artist/ }), 'the beatles');
+      await userEvent.click(within(d).getByRole('button', { name: 'Add' }));
+      return screen.findByRole('dialog', { name: 'Already on your list' });
+    };
+    let ask = await addIt();
+    expect(within(ask).getByText(/already on your Albums list/)).toBeInTheDocument();
+    await userEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(entries).toHaveLength(1);
+    ask = await addIt();
+    await userEvent.click(within(ask).getByRole('button', { name: 'Add again' }));
+    await waitFor(() => expect(entries).toHaveLength(2));
   });
 
   it('leaves the entry saved as "Couldn\'t find it" with Retry and Paste image link when the lookup fails', async () => {

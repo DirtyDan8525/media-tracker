@@ -1,11 +1,10 @@
 import { CATEGORY_CONFIG, PLAN_STATUS, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { ApiError, api } from '../api/client';
 import { CLOSE_COUNTS_KEY } from '../data/ratings';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
-import { LIST_LABEL } from '../nav';
 import { applyLookupMatch } from '../lookup/apply';
 import { buildLookupQuery } from '../lookup/query';
 import { runLookup } from '../lookup/run';
@@ -47,7 +46,10 @@ let tempCounter = 0;
  * several open the picker (`state === 'choose'`), none leaves it "Couldn't find it". retry(),
  * choose(), keepTyped() and search() continue from there.
  */
-export function useAddEntry(defaultCategory: Category) {
+/** Asked before adding a second copy of a title (Dan, 2026-11-16): resolve true to add it again. */
+export type ConfirmDuplicate = (title: string, category: Category, existingId: string) => Promise<boolean>;
+
+export function useAddEntry(defaultCategory: Category, confirmDuplicate?: ConfirmDuplicate) {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(0);
@@ -117,25 +119,39 @@ export function useAddEntry(defaultCategory: Category) {
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });
 
-    const lookup = runLookup(buildLookupQuery(category, title, creator));
     let entry: Entry;
+    let lookup: ReturnType<typeof runLookup> | null = null;
     try {
-      const res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', body);
+      let res: { entry: Entry; duplicateOf: string | null };
+      try {
+        res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', body);
+      } catch (err) {
+        // Already on the list: nothing was written. Ask; "Add again" re-posts with allowDuplicate.
+        if (!(err instanceof ApiError && err.status === 409 && err.error === 'duplicate')) throw err;
+        const existingId = (err.body as { duplicateOf?: string } | undefined)?.duplicateOf ?? '';
+        removeTemp(qc, temp);
+        lookupRunning.delete(tempId);
+        const again = confirmDuplicate ? await confirmDuplicate(title, category, existingId) : false;
+        if (!again) return null;
+        lookupRunning.add(tempId);
+        writeEntry(qc, temp, { persist: false });
+        res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', { ...body, allowDuplicate: true });
+      }
+      lookup = runLookup(buildLookupQuery(category, title, creator));
       entry = res.entry;
       lookupRunning.add(entry.id);
       lookupRunning.delete(tempId);
       writeEntry(qc, entry, { replaceId: tempId });
       if (entry.rating !== null) void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
-      if (res.duplicateOf) toast.show(`Already on your ${LIST_LABEL[category]} list`);
     } catch {
       lookupRunning.delete(tempId);
       removeTemp(qc, temp);
       toast.show("Couldn't save that. Check your connection and try again.");
       return null;
     }
-    await resolve(entry, title, lookup);
+    await resolve(entry, title, lookup!);
     return entry;
-  }, [defaultCategory, qc, toast, resolve]);
+  }, [defaultCategory, qc, toast, resolve, confirmDuplicate]);
 
   /** Look an entry up again (Retry), with its own title or `term`. */
   const retry = useCallback(async (entry: Entry, term?: string): Promise<void> => {

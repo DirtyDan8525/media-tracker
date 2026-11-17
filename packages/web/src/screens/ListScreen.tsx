@@ -29,6 +29,7 @@ import { EntryCards } from './list/EntryCards';
 import { EntryTable } from './list/EntryTable';
 import { PlanList } from './list/PlanList';
 import { ActiveChips, activeFilters, FilterBar, FilterChips, FilterSheet, PlanSwitch, planLabel, SearchBox } from './list/ListFilters';
+import { useDuplicateConfirm } from './list/DuplicateConfirm';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));
@@ -61,7 +62,8 @@ function ListBody({ category }: { category: Category }) {
   const wide = useIsWide();
   const { data, isPending, isError } = useEntries(category);
   const counts = useListCounts().data ?? {};
-  const add = useAddEntry(category);
+  const dup = useDuplicateConfirm();
+  const add = useAddEntry(category, dup.confirm);
   useEffect(() => rememberList(category), [category]);
   const [sort, setSort] = useState<SortKey>('rating');
   const [addOpen, setAddOpen] = useState(false);
@@ -258,6 +260,7 @@ function ListBody({ category }: { category: Category }) {
           <AddEntry category={category} onSubmit={(input) => void submitAdd(input)} onClose={() => setAddOpen(false)} />
         </Suspense>
       )}
+      {dup.element}
       {add.state === 'choose' && add.pickTarget && (
         <Suspense fallback={<SheetFallback title="Which one did you mean?" onClose={() => void add.keepTyped()} />}>
           <PickerSheet

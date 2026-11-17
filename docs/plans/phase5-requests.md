@@ -55,3 +55,6 @@ Changes the 2026-11-15 nav decision (docs/specs/decisions-2026-11-15.md) and S7 
 ## Header (Dan, 2026-11-16)
 18. Top-left: the small Media Tracker **star logo**; tapping it opens **About**. The list dropdown moves to the **centre** of the top bar (or just below on narrow phones), between logo and profile.
 19. **About text editable by Dan** in Admin (goes with Phase 6 item 5, app text).
+
+## Later (Dan, 2026-11-16)
+20. **Previews:** play a song preview (~30 s clip, e.g. from the iTunes Search API's preview URLs) and movie/TV/game trailers (e.g. TMDB videos → YouTube embed) on a title's page.

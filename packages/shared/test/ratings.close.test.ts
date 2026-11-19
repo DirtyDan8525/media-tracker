@@ -38,6 +38,17 @@ describe('numberFirst', () => {
     for (const v of r.values()) expect(v.moved).toBe(false);
   });
 
+  test('two 10s never go above 10: the winner stays 10, the other drops (Dan, 2026-11-19)', () => {
+    const r = shown([it('a', 10), it('b', 10)], [pick('a', 'b')]);
+    expect(r.a).toBe(10);
+    expect(r.b).toBeLessThan(10);
+    const three = shown([it('a', 10), it('b', 10), it('c', 9.9)], [pick('b', 'a'), pick('a', 'c')]);
+    for (const v of Object.values(three)) expect(v).toBeLessThanOrEqual(10);
+    expect(three.b).toBe(10);
+    const low = shown([it('x', 0), it('y', 0)], [pick('x', 'y')]);
+    for (const v of Object.values(low)) expect(v).toBeGreaterThanOrEqual(0);
+  });
+
   test('one pick between two 9.6s gives 9.62 and 9.58 (wireframe)', () => {
     expect(shown([it('inv', 9.6), it('arc', 9.6)], [pick('inv', 'arc')])).toEqual({ inv: 9.62, arc: 9.58 });
     expect(shown([it('inv', 9.6), it('arc', 9.6)], [pick('arc', 'inv')])).toEqual({ inv: 9.58, arc: 9.62 });

@@ -13,6 +13,8 @@ import type { Comparison } from './types';
 export const CLOSE_HUNDREDTHS = 30;
 /** The largest nudge, in hundredths (N4). */
 export const MAX_NUDGE_HUNDREDTHS = 20;
+/** 10.00 in hundredths: the top of the scale. */
+const SCALE_MAX = 1000;
 /** Moving titles closer than this (hundredths) share a cluster; further apart they can never cross. */
 const CLUSTER_HUNDREDTHS = 2 * MAX_NUDGE_HUNDREDTHS;
 /** The gap a pick opens between two equal numbers (9.6 vs 9.6 → 9.62 / 9.58), then the fallbacks. */
@@ -138,8 +140,10 @@ function solveCluster(nodes: Node[], picks: readonly PickRow[], s: Map<string, n
     }
     const z = order.map((n, j) => n.T + D[j]!);
     const U = new Array<number>(k), L = new Array<number>(k);
-    for (let j = 0; j < k; j++) U[j] = Math.min(j > 0 ? U[j - 1]! : Infinity, order[j]!.T + MAX_NUDGE_HUNDREDTHS + D[j]!);
-    for (let j = k - 1; j >= 0; j--) L[j] = Math.max(j < k - 1 ? L[j + 1]! : -Infinity, order[j]!.T - MAX_NUDGE_HUNDREDTHS + D[j]!);
+    // Shown scores stay within 0–10 (Dan, 2026-11-19: two 10s compared went above 10): the top of a
+    // tie at 10 stays 10.00 and the other drops below it, never the reverse.
+    for (let j = 0; j < k; j++) U[j] = Math.min(j > 0 ? U[j - 1]! : Infinity, Math.min(order[j]!.T + MAX_NUDGE_HUNDREDTHS, SCALE_MAX) + D[j]!);
+    for (let j = k - 1; j >= 0; j--) L[j] = Math.max(j < k - 1 ? L[j + 1]! : -Infinity, Math.max(order[j]!.T - MAX_NUDGE_HUNDREDTHS, 0) + D[j]!);
     if (G > 0 && order.some((_, j) => L[j]! > U[j]!)) continue;
     const w = poolNonIncreasing(z);
     order.forEach((n, j) => {

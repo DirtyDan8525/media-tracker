@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0014_public_links.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0015_clamp_ratings.sql`) with a green check.
 
 ## Pictures in messages (create the picture storage once, before step 7)
 
@@ -236,6 +236,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0005_tier_ratings.sql`: new columns for each title's tier and score, and the table that keeps your Compare picks.
    - `0008_plan_order.sql`: the order of your Plan to watch lists (a new `plan_order` column on titles; titles already planned are numbered in the order you added them) and the profile bio (a new `bio` column on users). Apply it **before** deploying: the new app reads and writes these columns.
    - `0014_public_links.sql`: public profile links (two new columns on users, `public_token_hash` and `public_link_at`; everyone starts with the link off). Apply it **before** deploying: the new app reads these columns.
+   - `0015_clamp_ratings.sql`: pulls any score above 10 (from comparing two 10s) back to 10. Safe to run any time.
    - `0013_app_settings.sql`: the admin's app settings (a new table, `app_settings`: announcement, switches, app text and look, defaults for new people). Apply it **before** deploying.
    - `0012_push.sql`: notifications (new tables `push_subscriptions` and `push_throttle`). Apply it **before** deploying. Turning notifications on is optional: see "Notifications (optional)" after step 8.
    - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.

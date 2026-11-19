@@ -12,6 +12,7 @@ import { FillDetailsRow } from './settings/FillDetailsRow';
 import { CompareOptions } from './settings/CompareOptions';
 import { NOTIFICATIONS_ENABLED, NotificationsSection } from './settings/NotificationsSection';
 import { SettingsLinks } from './settings/SettingsLinks';
+import { PublicLinkRow } from './settings/PublicLinkRow';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 import { SegRadio } from '../design/components/SegRadio';
@@ -91,6 +92,7 @@ export function SettingsScreen() {
             )}
             <DisplayNameRow />
             <InviteLinkRow />
+            <PublicLinkRow />
           </div>
         </section>
 

@@ -7,11 +7,12 @@ import { APP_KEY, useAppSettings } from './data/appSettings';
 import { ToastProvider, useToast } from './design/components/Toast';
 import { applyTheme } from './design/theme';
 import { routes } from './routes';
+import { setBrandTitle } from './pageTitle';
 
 /** The app's name in the tab title, and the accent for people who are not signed in (the signed-in theme applies it itself). */
 function BrandEffects() {
   const { brand } = useAppSettings();
-  useEffect(() => { document.title = brand.name; }, [brand.name]);
+  useEffect(() => { setBrandTitle(brand.name); }, [brand.name]);
   useEffect(() => {
     const root = document.documentElement;
     if (brand.accent && !root.style.getPropertyValue('--bg')) applyTheme({ theme: 'Midnight', colors: {} }, root, brand.accent);

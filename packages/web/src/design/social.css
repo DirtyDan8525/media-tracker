@@ -137,3 +137,15 @@ a.person:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2p
 .friend-card__titles { font-size: var(--fs-meta); color: var(--text); }
 .friend-card__actions { display: flex; gap: var(--space-4); }
 .friend-card__btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* Public profile link page (/p/:token, item 34): the Join / Add friend bar sticks to the bottom. */
+.public-page { min-height: 100dvh; display: flex; flex-direction: column; }
+.public-page > .screen__body { flex: 1; padding-top: var(--space-9); }
+.public-cta {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center; gap: var(--space-6); flex-wrap: wrap;
+  padding: var(--space-6) var(--space-7) calc(var(--space-6) + env(safe-area-inset-bottom));
+  background: var(--bg); border-top: 1px solid var(--grid-line);
+}
+.public-cta > .btn--block { max-width: 420px; }
+.public-cta__text { margin: 0; color: var(--muted-text); text-align: center; }

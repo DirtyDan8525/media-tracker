@@ -240,6 +240,9 @@
   transition: background var(--dur) var(--ease);
 }
 .group__row + .group__row { border-top: 1px solid var(--grid-line); }
+/* Public profile link (item 34): a block row in a group card, and its own card in Edit profile. */
+.group__row + .public-link { border-top: 1px solid var(--grid-line); }
+.edit-profile__public { margin-top: var(--space-7); background: var(--alt-row); }
 a.group__row:hover { background: var(--alt-row); }
 .group__row-start { display: flex; align-items: center; gap: var(--space-6); }
 /* a small icon square at the start of a row (More's list rows, the import file) */

@@ -16,10 +16,12 @@ export function initialOf(me: Pick<Me, 'username' | 'email'>): string {
  * requested as `/api/me/avatar?v=<avatarAt>`: the answer is immutable and the server ignores `v`,
  * so a new photo (a new `avatarAt`) is a new URL. Decorative (`alt=""`): the control around it carries the name.
  */
-export function Avatar(props: ({ me: AvatarMe; user?: undefined } | { user: AvatarUser; me?: undefined }) & { size: number; className?: string }) {
+export function Avatar(props: ({ me: AvatarMe; user?: undefined } | { user: AvatarUser; me?: undefined }) & { size: number; className?: string; src?: string }) {
   const { size, className } = props;
   const who = props.user ? { avatarAt: props.user.avatarAt, initial: initialOf({ username: props.user.username, email: '' }), src: `/api/users/${encodeURIComponent(props.user.id)}/avatar` }
     : { avatarAt: props.me.avatarAt, initial: initialOf(props.me), src: '/api/me/avatar' };
+  // `src`: another route for the same photo (the public profile link's token-scoped one, item 34).
+  if (props.src) who.src = props.src;
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [who.avatarAt]);
   const style = { width: size, height: size, fontSize: Math.round(size * 0.42) };

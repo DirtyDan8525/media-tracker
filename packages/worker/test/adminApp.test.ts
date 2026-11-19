@@ -402,7 +402,7 @@ describe('GET /api/admin/numbers', () => {
 // ---- backup (AD10) ----
 describe('GET /api/admin/backup', () => {
   const seedSecrets = () => env.DB.batch([
-    env.DB.prepare("UPDATE users SET password_hash = 'PWHASH-SECRET' WHERE id = 'uRen'"),
+    env.DB.prepare("UPDATE users SET password_hash = 'PWHASH-SECRET', public_token_hash = 'PUBLIC-HASH-SECRET' WHERE id = 'uRen'"),
     env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_used_at) VALUES ('SESSION-HASH-SECRET', 'uRen', ?1, ?1, ?1)").bind(iso(0)),
     env.DB.prepare("INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) VALUES ('RESET-HASH-SECRET', 'uRen', ?1, ?1)").bind(iso(0)),
     env.DB.prepare("INSERT INTO signup_links (token_hash, id, created_by, created_at, expires_at) VALUES ('LINK-HASH-SECRET', 'link-1', 'uRen', ?1, ?1)").bind(iso(0)),
@@ -419,7 +419,7 @@ describe('GET /api/admin/backup', () => {
     expect(res.headers.get('content-type')).toContain('application/json');
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="media-tracker-backup-\d{4}-\d{2}-\d{2}\.json"$/);
     const text = await res.text();
-    for (const secret of ['PWHASH-SECRET', 'SESSION-HASH-SECRET', 'RESET-HASH-SECRET', 'LINK-HASH-SECRET', 'ENDPOINT-SECRET', 'P256DH-SECRET', 'AUTH-SECRET']) {
+    for (const secret of ['PWHASH-SECRET', 'PUBLIC-HASH-SECRET', 'SESSION-HASH-SECRET', 'RESET-HASH-SECRET', 'LINK-HASH-SECRET', 'ENDPOINT-SECRET', 'P256DH-SECRET', 'AUTH-SECRET']) {
       expect(text, secret).not.toContain(secret);
     }
     const body = JSON.parse(text);
@@ -439,7 +439,7 @@ describe('GET /api/admin/backup', () => {
     expect(body.tables.app_settings[0].key).toBe('brand');
     expect(body.excluded.tables).toEqual([...BACKUP_SKIPPED_TABLES]);
     expect(body.excluded.columns).toEqual({
-      users: ['password_hash'], avatars: ['data'], signup_links: ['token_hash'], push_subscriptions: ['endpoint', 'p256dh', 'auth'],
+      users: ['password_hash', 'public_token_hash'], avatars: ['data'], signup_links: ['token_hash'], push_subscriptions: ['endpoint', 'p256dh', 'auth'],
     });
   });
 

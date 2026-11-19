@@ -17,6 +17,7 @@ import { lookup } from './lookup/routes';
 import { admin } from './api/admin';
 import { push } from './api/push';
 import { appInfo } from './api/app';
+import { publicApi } from './api/public';
 
 export type { AppUser, AppEnv } from './auth/user';
 export type { Env } from './env';
@@ -64,6 +65,9 @@ app.route('/api/auth', auth);
 
 // The public subset of the admin's app settings, readable signed out (the sign-in page uses it). Read-only.
 app.route('/api/app', appInfo);
+
+// Public profile links (item 34): read-only, GET only, anyone with the link. See api/public.ts.
+app.route('/api/public', publicApi);
 
 // Everything else under /api requires a signed-in user. Later tasks mount
 // their routers here: api.route('/entries', entries), etc.

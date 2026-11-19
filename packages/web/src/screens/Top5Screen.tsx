@@ -143,13 +143,13 @@ function TopBlock({ category, rows, onShare }: {
 
 type TopEntry = Pick<Entry, 'id' | 'category' | 'title' | 'creator' | 'coverUrl' | 'rating'>;
 
-/** One ranked row; it links to your entry, or to `to` (a friend's entry). */
-export function TopRow({ entry, rank, to }: { entry: TopEntry; rank: number; to?: string }) {
+/** One ranked row; it links to your entry, or to `to` (a friend's entry); `to` null is a plain row (the public profile page has no entry page). */
+export function TopRow({ entry, rank, to }: { entry: TopEntry; rank: number; to?: string | null }) {
   const square = CATEGORY_CONFIG[entry.category].square;
   const hero = rank === 1;
   return (
     <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'} data-square={square || undefined}>
-      <Link to={to ?? `/entry/${entry.id}`} className={hero ? 'top5__hero' : 'top5__row'}>
+      <RowShell to={to === null ? null : to ?? `/entry/${entry.id}`} className={hero ? 'top5__hero' : 'top5__row'}>
         {hero && <CoverBackdrop src={entry.coverUrl} />}
         <span className="top5__rank">{rank}</span>{' '}
         {/* Decorative: the row's name is its text, so the cover stays out of the link's name. */}
@@ -162,7 +162,11 @@ export function TopRow({ entry, rank, to }: { entry: TopEntry; rank: number; to?
           {entry.creator && <span className="top5__creator">{entry.creator}</span>}
         </span>{' '}
         <RatingBadge rating={entry.rating} size={hero ? 'md' : 'sm'} />
-      </Link>
+      </RowShell>
     </li>
   );
+}
+
+function RowShell({ to, className, children }: { to: string | null; className: string; children: ReactNode }) {
+  return to === null ? <div className={className}>{children}</div> : <Link to={to} className={className}>{children}</Link>;
 }

@@ -6,6 +6,7 @@ import { useSaveBio } from '../../data/bio';
 import { useSaveDisplayName } from '../../data/social';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
+import { PublicLinkRow } from '../settings/PublicLinkRow';
 import { useToast } from '../../design/components/Toast';
 import '../../design/plan.css';
 
@@ -83,6 +84,9 @@ export function EditProfileSheet({ me, onClose }: { me: Me; onClose: () => void 
           {error && <p id={errId} role="alert" className="field-error">{error}</p>}
         </div>
       </form>
+      <section aria-label="Public profile link" className="group__card edit-profile__public">
+        <PublicLinkRow />
+      </section>
     </Sheet>
   );
 }

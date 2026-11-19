@@ -29,8 +29,8 @@ export function PersonText({ user, sub }: { user: Pick<PublicUser, 'username' | 
   );
 }
 
-export function PersonAvatar({ user, size = 40 }: { user: Pick<PublicUser, 'id' | 'username' | 'avatarAt'>; size?: number }) {
-  return <Avatar user={user} size={size} />;
+export function PersonAvatar({ user, size = 40, src }: { user: Pick<PublicUser, 'id' | 'username' | 'avatarAt'>; size?: number; src?: string }) {
+  return <Avatar user={user} size={size} src={src} />;
 }
 
 /** One chip per category (single choice), the pattern of the list filters. */

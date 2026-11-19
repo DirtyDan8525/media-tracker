@@ -38,7 +38,7 @@ type TabId = (typeof TABS)[number]['id'];
 const DASH = '—';
 
 /** "Nov 2026" from an ISO timestamp (SQLite's "YYYY-MM-DD HH:MM:SS" counts as UTC). */
-function monthYear(at: string): string | null {
+export function monthYear(at: string): string | null {
   const iso = /(?:[zZ]|[+-]\d\d:?\d\d)$/.test(at) ? at : `${at.replace(' ', 'T')}Z`;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -192,27 +192,37 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
 
 const entryLink = (username: string, id: string) => `/u/${username}/entry/${id}`;
 
-function ListsPanel({ username, rows }: { username: string; rows: FriendEntry[] }) {
+/** Where a row opens: a function of the entry id, or null for no link (the public page, item 34, has no entry page). */
+export type EntryHref = ((id: string) => string) | null;
+const hrefFor = (username: string, linkTo: EntryHref | undefined): EntryHref => (linkTo === undefined ? (id) => entryLink(username, id) : linkTo);
+
+export function ListsPanel({ username, rows, linkTo }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref }) {
   const sorted = useMemo(() => sortEntries(rows, 'rating'), [rows]);
   const wide = useIsWide();
+  const href = hrefFor(username, linkTo);
   // PC: the same rows as your own list table (Dan, 2026-11-17), read-only.
-  if (wide && sorted[0]) return <FriendTable username={username} rows={sorted} />;
+  if (wide && sorted[0]) return <FriendTable username={username} rows={sorted} linkTo={href} />;
   return (
     <ul className="people plain-list">
       {sorted.map((e) => {
         const cfg = CATEGORY_CONFIG[e.category];
         const status = e.status && cfg.hasStatus ? statusLabel(e.status, e.category) : null;
         const label = [e.title, status, e.rating !== null ? `rated ${formatRating(e.rating)}` : 'not rated'].filter(Boolean).join(', ');
+        const inner = (
+          <>
+            <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={cfg.square} width={40} /></span>
+            <span className="person__meta">
+              <span className="person__name">{e.title}</span>
+              {e.status && cfg.hasStatus && <StatusPill status={e.status} category={e.category} />}
+            </span>
+            <RatingBadge rating={e.rating} size="sm" />
+          </>
+        );
         return (
           <li key={e.id}>
-            <Link to={entryLink(username, e.id)} className="person" aria-label={label}>
-              <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={cfg.square} width={40} /></span>
-              <span className="person__meta">
-                <span className="person__name">{e.title}</span>
-                {e.status && cfg.hasStatus && <StatusPill status={e.status} category={e.category} />}
-              </span>
-              <RatingBadge rating={e.rating} size="sm" />
-            </Link>
+            {href
+              ? <Link to={href(e.id)} className="person" aria-label={label}>{inner}</Link>
+              : <div className="person" aria-label={label} role="group">{inner}</div>}
           </li>
         );
       })}
@@ -220,7 +230,8 @@ function ListsPanel({ username, rows }: { username: string; rows: FriendEntry[] 
   );
 }
 
-function FriendTable({ username, rows }: { username: string; rows: FriendEntry[] }) {
+export function FriendTable({ username, rows, linkTo }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref }) {
+  const href = hrefFor(username, linkTo);
   const cfg = CATEGORY_CONFIG[rows[0]!.category];
   const cols: (keyof typeof COL_WIDTHS)[] = ['cover', 'rating', 'title', 'genres'];
   if (cfg.hasStatus) cols.push('status');
@@ -246,7 +257,7 @@ function FriendTable({ username, rows }: { username: string; rows: FriendEntry[]
             <tr key={e.id}>
               <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
               <td><RatingBadge rating={e.rating} size="sm" /></td>
-              <td><div className="cell-title"><Link to={entryLink(username, e.id)} data-role="title">{e.title}</Link></div></td>
+              <td><div className="cell-title">{href ? <Link to={href(e.id)} data-role="title">{e.title}</Link> : <span data-role="title">{e.title}</span>}</div></td>
               {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
               <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
               {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
@@ -260,7 +271,8 @@ function FriendTable({ username, rows }: { username: string; rows: FriendEntry[]
   );
 }
 
-function Top5Panel({ username, rows, categories }: { username: string; rows: FriendEntry[]; categories: Category[] }) {
+export function Top5Panel({ username, rows, categories, linkTo }: { username: string; rows: FriendEntry[]; categories: Category[]; linkTo?: EntryHref }) {
+  const href = hrefFor(username, linkTo);
   const blocks = categories.map((c) => ({ c, top: topFive(rows.filter((e) => e.category === c)) })).filter((b) => b.top.length > 0);
   if (blocks.length === 0) return <p className="friend-note">Nothing rated yet.</p>;
   return (
@@ -269,7 +281,7 @@ function Top5Panel({ username, rows, categories }: { username: string; rows: Fri
         <section key={c} aria-labelledby={`ft5-${c}`} className="top5__block">
           <h2 id={`ft5-${c}`} className="top5__heading">{LIST_LABEL[c]}</h2>
           <ol className="top5__list">
-            {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} to={entryLink(username, e.id)} />)}
+            {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} to={href ? href(e.id) : null} />)}
           </ol>
         </section>
       ))}
@@ -277,7 +289,7 @@ function Top5Panel({ username, rows, categories }: { username: string; rows: Fri
   );
 }
 
-function StatsPanel({ rows, categories }: { rows: FriendEntry[]; categories: Category[] }) {
+export function StatsPanel({ rows, categories }: { rows: FriendEntry[]; categories: Category[] }) {
   const stats = computeStats(Object.fromEntries(categories.map((c) => [c, rows.filter((e) => e.category === c)])), categories);
   const { all } = stats;
   return (

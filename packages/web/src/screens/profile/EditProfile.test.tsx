@@ -150,3 +150,20 @@ describe("a friend's profile: bio", () => {
     expect(document.querySelector('.friend-id__bio')).toBeNull();
   });
 });
+
+describe('Edit profile: public profile link (item 34)', () => {
+  it('has the Public profile link switch, which turns the link on', async () => {
+    let on = false;
+    const { calls } = bioBackend(undefined, {
+      'GET /api/me/public-link': () => ({ body: { on } }),
+      'POST /api/me/public-link': () => { on = true; return { body: { link: 'https://app.test/p/AbCdEfGhIjKlMnOpQrStUv' } }; },
+    });
+    renderApp('/profile');
+    const sheet = await openSheet();
+    const sw = await within(sheet).findByRole('switch', { name: 'Public profile link' });
+    await waitFor(() => expect(sw).not.toBeChecked());
+    await userEvent.click(sw);
+    expect(await within(sheet).findByDisplayValue('https://app.test/p/AbCdEfGhIjKlMnOpQrStUv')).toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/me/public-link')).toBe(true);
+  });
+});

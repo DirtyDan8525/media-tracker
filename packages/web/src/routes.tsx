@@ -7,6 +7,7 @@ import { AddByCodeScreen } from './screens/social/AddByCodeScreen';
 import { FriendEntryDetail } from './screens/social/FriendEntryDetail';
 import { FriendProfile } from './screens/social/FriendProfile';
 import { FriendsScreen } from './screens/social/FriendsScreen';
+import { PublicProfile } from './screens/social/PublicProfile';
 import { ChatScreen } from './screens/messages/ChatScreen';
 import { MessagesScreen } from './screens/messages/MessagesScreen';
 import { NewChatScreen } from './screens/messages/NewChatScreen';
@@ -105,6 +106,8 @@ export const routes: RouteObject[] = [
   { path: 'reset/:token', element: <ResetScreen /> },
   // So does a sign-up link from Dan.
   { path: 'join/:token', element: <JoinScreen /> },
+  // A public profile link (item 34): read-only, for anyone with the link, signed in or not.
+  { path: 'p/:token', element: <PublicProfile /> },
   {
     element: <SessionGate />,
     children: [

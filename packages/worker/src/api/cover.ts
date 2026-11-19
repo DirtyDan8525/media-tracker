@@ -176,18 +176,28 @@ cover.get('/', async (c) => {
     .bind(c.var.user.id, raw)
     .first<{ title: string; category: string }>();
   if (!own) return c.json({ error: 'not_found' }, 404);
-  if (isBlockedHost(first.hostname)) return c.json(upstream, 502);
+  return serveCover(raw, first, own, c.env.DB);
+});
+
+/**
+ * The proxy itself, once the caller has checked that `raw` is the cover_url of an entry the viewer may
+ * see (`own` is that entry's title and category). Shared by /api/cover and the public profile link's
+ * /api/public/:token/cover/:entryId (item 34). D1: 0, or 1-2 on the anime fallback; outbound as above.
+ */
+export async function serveCover(raw: string, first: URL, own: { title: string; category: string }, db: D1Database): Promise<Response> {
+  const json = (body: unknown, status: number) => Response.json(body, { status });
+  if (isBlockedHost(first.hostname)) return json(upstream, 502);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), COVER_TIMEOUT_MS); // covers every fetch and body below
   try {
     let img = await fetchImage(first, controller.signal);
     if (!img && own.category === 'anime' && own.title.trim() !== '' && !controller.signal.aborted) {
-      const poster = await kitsuPoster(c.env.DB, raw, own.title, controller.signal);
+      const poster = await kitsuPoster(db, raw, own.title, controller.signal);
       const url = poster ? parseHttpUrl(poster) : null;
       if (url) img = await fetchImage(url, controller.signal);
     }
-    if (!img) return c.json(upstream, 502);
+    if (!img) return json(upstream, 502);
     return new Response(img.bytes, {
       headers: {
         'Content-Type': img.type,
@@ -197,8 +207,14 @@ cover.get('/', async (c) => {
       },
     });
   } catch {
-    return c.json(upstream, 502);
+    return json(upstream, 502);
   } finally {
     clearTimeout(timer);
   }
-});
+}
+
+/** A stored cover_url as a fetchable URL, or null (not http(s), has credentials, too long). */
+export function coverUrlOf(raw: string | null): URL | null {
+  return raw && raw.length <= 2000 ? parseHttpUrl(raw) : null;
+}
+

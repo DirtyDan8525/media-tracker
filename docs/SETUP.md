@@ -319,10 +319,7 @@ A copy of the whole database is saved every night into a **private** GitHub repo
 
 **Success:** the run turns green and has a `media-tracker-YYYY-MM-DD` file under **Artifacts**. After that it runs by itself every night. While a backup runs (a few seconds for a small database) the app may pause for a moment.
 
-**To restore from a nightly copy:** download the artifact, unzip it to get `media-tracker-YYYY-MM-DD.sql`, then (this replaces data, so only when you mean it):
-```
-npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --file media-tracker-YYYY-MM-DD.sql
-```
+**To restore from a nightly copy:** the file is a full SQL copy (tables and rows). It goes into a new, empty database, which then replaces the old one in `wrangler.toml`. This is rare and easy to get wrong, so ask for step-by-step help when you need it.
 For small mistakes from the last 7 days, Cloudflare's Time Travel is easier: `npm exec -w packages/worker -- wrangler d1 time-travel restore media-tracker --env production --timestamp=<when>`.
 
 ## The three most likely problems

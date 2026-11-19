@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0015_clamp_ratings.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0016_movie_status.sql`) with a green check.
 
 ## Pictures in messages (create the picture storage once, before step 7)
 
@@ -118,6 +118,22 @@ npm exec -w packages/worker -- wrangler secret put YOUTUBE_API_KEY --env product
 ```
 
 The free quota is 10,000 units a day. One title search costs 100 units, so that is about 100 searches a day (pasting a link costs nothing). Until the key is set, the app says "Paste a YouTube link (search needs setup)".
+
+### Spotify direct links (optional)
+
+On a song or album page, "Open in Spotify" goes straight to the track or album when it can find it. Without any setup it opens a Spotify search instead. To get direct links:
+
+1. Go to <https://developer.spotify.com/dashboard> (a Spotify Premium account is needed to create an app) and create an app. Development mode is fine, because nobody signs in with Spotify.
+2. Give it any redirect URI, for example `https://example.com/callback`, and tick "Web API".
+3. Open the app's settings and copy the **Client ID** and **Client secret**.
+4. Store them as secrets in the Codespace (paste each value when asked):
+
+```
+npm exec -w packages/worker -- wrangler secret put SPOTIFY_ID --env production
+npm exec -w packages/worker -- wrangler secret put SPOTIFY_SECRET --env production
+```
+
+Never put these keys in `wrangler.toml`. Until they are set the button still opens a Spotify search.
 
 ### Notifications (optional)
 
@@ -237,6 +253,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0008_plan_order.sql`: the order of your Plan to watch lists (a new `plan_order` column on titles; titles already planned are numbered in the order you added them) and the profile bio (a new `bio` column on users). Apply it **before** deploying: the new app reads and writes these columns.
    - `0014_public_links.sql`: public profile links (two new columns on users, `public_token_hash` and `public_link_at`; everyone starts with the link off). Apply it **before** deploying: the new app reads these columns.
    - `0015_clamp_ratings.sql`: pulls any score above 10 (from comparing two 10s) back to 10. Safe to run any time.
+   - `0016_movie_status.sql`: Movies get a Status column (for Plan to watch); movies already on a list become Completed.
    - `0013_app_settings.sql`: the admin's app settings (a new table, `app_settings`: announcement, switches, app text and look, defaults for new people). Apply it **before** deploying.
    - `0012_push.sql`: notifications (new tables `push_subscriptions` and `push_throttle`). Apply it **before** deploying. Turning notifications on is optional: see "Notifications (optional)" after step 8.
    - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.

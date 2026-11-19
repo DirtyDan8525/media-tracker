@@ -81,7 +81,7 @@ describe('Stats screen', () => {
     const anime = within(table).getByRole('row', { name: /^Anime/ });
     expect(within(anime).getAllByRole('cell').map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['3', '2', '8.5', '1', '9.0']);
     const movies = within(table).getByRole('row', { name: /^Movies/ });
-    expect(within(movies).getAllByRole('cell').map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['1', '1', '7.0', '—', '7.0']);
+    expect(within(movies).getAllByRole('cell').map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['1', '1', '7.0', '0', '7.0']);
     expect(within(table).queryByRole('row', { name: /^TV Shows/ })).not.toBeInTheDocument();
     const total = within(table).getByRole('row', { name: /^All media/ });
     expect(within(total).getAllByRole('cell').map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['4', '3', '8.0', '1', '9.0']);
@@ -93,7 +93,7 @@ describe('Stats screen', () => {
     renderApp('/stats');
     const table = await screen.findByRole('table', { name: 'Stats by list' });
     const movies = within(table).getByRole('row', { name: /^Movies/ });
-    expect(within(movies).getAllByRole('cell').map((c) => c.textContent?.trim())).toEqual(['1', '0', '—', '—', '—']);
+    expect(within(movies).getAllByRole('cell').map((c) => c.textContent?.trim())).toEqual(['1', '0', '—', '0', '—']);
   });
 
   it('lists anime genres with counts and averages, and omits them when Anime is off', async () => {
@@ -133,7 +133,7 @@ describe('Stats screen', () => {
     expect(within(anime!).getByText('Completed', { selector: 'dt' }).nextSibling).toHaveTextContent('1');
     expect(within(anime!).getByText('Highest', { selector: 'dt' }).nextSibling).toHaveTextContent('9.0');
     expect(within(anime!).getByLabelText('Rating 8.5')).toBeInTheDocument();
-    expect(within(movies!).getByText('Completed', { selector: 'dt' }).nextSibling).toHaveTextContent('—');
+    expect(within(movies!).getByText('Completed', { selector: 'dt' }).nextSibling).toHaveTextContent('0');
   });
 
   it('shows a skeleton while loading', async () => {

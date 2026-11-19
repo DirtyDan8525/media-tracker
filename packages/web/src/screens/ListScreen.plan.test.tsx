@@ -62,8 +62,8 @@ describe('compact filters (phone)', () => {
   });
 
   it('a list without a Status column has no Plan to watch switch and no Status in the sheet', async () => {
-    fakeBackend({ entries: [makeEntry({ category: 'movies', title: 'Heat', rating: 8, genres: 'Crime' })] });
-    renderApp('/list/movies');
+    fakeBackend({ entries: [makeEntry({ category: 'albums', title: 'Heat', rating: 8, genres: 'Crime', status: null })] });
+    renderApp('/list/albums');
     await screen.findByText('Heat');
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filters' }));

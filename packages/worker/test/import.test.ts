@@ -150,12 +150,12 @@ describe('POST /api/import', () => {
     expect(await count('SELECT COUNT(*) n FROM imports')).toBe(0);
   });
 
-  it('rejects bad shapes: non-uuid id, empty/non-array rows, bad category, status on movies, seasons on movies', async () => {
+  it('rejects bad shapes: non-uuid id, empty/non-array rows, bad category, status on albums, seasons on movies', async () => {
     expect((await post(A, 'not-a-uuid', [row(1)])).status).toBe(400);
     expect((await post(A, crypto.randomUUID(), [])).status).toBe(400);
     expect((await post(A, crypto.randomUUID(), 'x')).status).toBe(400);
     expect((await post(A, crypto.randomUUID(), [{ ...row(1), category: 'nope' }])).status).toBe(400);
-    expect((await post(A, crypto.randomUUID(), [row(1, { status: 'Completed' })])).status).toBe(400);
+    expect((await post(A, crypto.randomUUID(), [row(1, { category: 'albums', status: 'Completed' })])).status).toBe(400);
     expect((await post(A, crypto.randomUUID(), [row(1, { seasons: [{ label: 'S', rating: null, notes: '' }] })])).status).toBe(400);
     expect((await post(A, crypto.randomUUID(), [row(1, { category: 'anime', seasons: [{ label: 'S', rating: 11, notes: '' }] })])).status).toBe(400);
     expect((await as(A, '/api/import', 'POST', { rows: [row(1)] })).status).toBe(400);

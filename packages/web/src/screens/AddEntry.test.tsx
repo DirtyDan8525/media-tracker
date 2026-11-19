@@ -236,7 +236,7 @@ describe('the Add sheet: "Add to" list dropdown', () => {
     renderApp('/list/anime');
     const d = await openAdd();
     await userEvent.click(addTo(d));
-    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Movies' }));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Albums' }));
     expect(within(d).queryByRole('button', { name: 'Completed' })).not.toBeInTheDocument();
     await userEvent.click(addTo(d));
     await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Anime' }));

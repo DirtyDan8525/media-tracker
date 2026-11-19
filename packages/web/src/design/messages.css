@@ -117,9 +117,10 @@
 /* The composer's Recommend button (replaces the + menu). */
 .composer__rec { flex: none; }
 
-/* PC (>= 1024 px): the open chat fills the main area up to 900 px wide, and the thread fills the height between header and composer. */
+/* PC (>= 1024 px): the open chat fills the whole main area and scales with the window (Dan, 2026-11-19); the thread fills the height between header and composer. */
 @media (min-width: 1024px) {
-  .frame--wide .chat { width: 100%; max-width: 900px; margin-inline: auto; height: 100dvh; }
+  .frame--wide .chat { width: 100%; max-width: none; height: 100dvh; }
+  .frame--wide .bubble-col { max-width: min(70%, 760px); }
   .frame--wide .chat__scroll { padding-inline: var(--space-12); }
   .frame--wide .chat__list, .frame--wide .composer__row, .frame--wide .composer__status, .frame--wide .composer__count { max-width: 100%; }
   .frame--wide .chat__top, .frame--wide .composer { padding-inline: var(--space-12); }

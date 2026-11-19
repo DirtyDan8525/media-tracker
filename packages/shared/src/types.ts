@@ -139,7 +139,7 @@ export interface CategoryConfig {
 
 export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
   anime:  { titleLabel: 'Title', creatorLabel: 'Studio',    hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: true },
-  movies: { titleLabel: 'Title', creatorLabel: 'Director',  hasStatus: false, creatorIsSearchHint: false, square: false, hasSeasons: false },
+  movies: { titleLabel: 'Title', creatorLabel: 'Director',  hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: false },
   tv:     { titleLabel: 'Title', creatorLabel: null,        hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: true },
   albums: { titleLabel: 'Album', creatorLabel: 'Artist',    hasStatus: false, creatorIsSearchHint: true,  square: true,  hasSeasons: false },
   songs:  { titleLabel: 'Song',  creatorLabel: 'Artist',    hasStatus: false, creatorIsSearchHint: true,  square: true,  hasSeasons: false },

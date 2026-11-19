@@ -61,7 +61,8 @@ describe('validateEntryInput', () => {
     expect(ok({ title: 't', status: 'Done' })).toBe(false);
     expect(ok({ title: 't', status: 'Completed' }, 'create', 'albums')).toBe(false);
     expect(ok({ title: 't', status: null }, 'create', 'albums')).toBe(true);
-    expect(ok({ status: 'Dropped' }, 'patch', 'movies')).toBe(false);
+    expect(ok({ status: 'Dropped' }, 'patch', 'songs')).toBe(false);
+    expect(ok({ status: 'Plan to watch' }, 'patch', 'movies')).toBe(true); // movies have a Status column since 2026-11-19
   });
 
   it('enums, booleans, releaseDate, cover url, and string bounds', () => {
@@ -204,7 +205,8 @@ describe('entries create / list / get', () => {
   it('400 on bad status; non-null status is rejected where hasStatus is false', async () => {
     expect((await create(A, { category: 'anime', title: 't', status: 'Finished' })).res.status).toBe(400);
     expect((await create(A, { category: 'albums', title: 't', status: 'Completed' })).res.status).toBe(400);
-    expect((await create(A, { category: 'movies', title: 't', status: 'Completed' })).res.status).toBe(400);
+    expect((await create(A, { category: 'albums', title: 't', status: 'Completed' })).res.status).toBe(400);
+    expect((await create(A, { category: 'movies', title: 'm', status: 'Plan to watch' })).res.status).toBe(201);
     expect((await create(A, { category: 'movies', title: 't', status: null })).res.status).toBe(201);
   });
 

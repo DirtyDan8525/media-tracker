@@ -30,7 +30,7 @@ describe('statusLabel', () => {
     for (const s of ['On Hold', 'Dropped', 'Rewatching'] as const) expect(statusLabel(s, 'youtube')).toBe(s);
     expect(statusLabel('Completed', 'movies')).toBe('Completed');
   });
-  it('keeps stored wording on lists without a Status column', () => {
+  it('keeps stored wording on movies (watch wording, like TV) and lists without a Status column', () => {
     for (const c of ['movies', 'albums', 'songs'] as Category[]) for (const s of STATUSES) expect(statusLabel(s, c)).toBe(s);
   });
 });

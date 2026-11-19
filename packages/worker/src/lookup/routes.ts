@@ -7,6 +7,7 @@ import { CATEGORIES } from '../api/entryValidation';
 import { getCached, putCached } from './cache';
 import { lookupChain } from './chain';
 import { envSecrets, redactSecrets } from './http';
+import { spotifyLink } from './spotifyLink';
 import { parseYouTubeLink } from './sources/youtube';
 import { SOURCE_IDS, SOURCES, keysPresent, type LookupDeps } from './sources/index';
 
@@ -118,4 +119,17 @@ lookup.post('/details', async (c) => {
   if (isEmptyDetails(details)) details = null;
   if (details) await putCached(c.env.DB, id, key, details);
   return c.json(failed ? { details: null, failed: true } : { details });
+});
+
+// GET /api/spotify/link?kind=track|album&title=&artist= -> { url: string | null } (mounted on the authed api router).
+export const spotify = new Hono<AppEnv>();
+
+spotify.get('/link', async (c) => {
+  const kind = c.req.query('kind');
+  const title = c.req.query('title');
+  const artist = c.req.query('artist') ?? '';
+  if (kind !== 'track' && kind !== 'album') return c.json(invalid, 400);
+  if (typeof title !== 'string' || title.trim() === '' || title.length > 300 || artist.length > 300) return c.json(invalid, 400);
+  const url = await spotifyLink(kind, title.trim(), artist.trim(), depsFor(c.env, []));
+  return c.json({ url });
 });

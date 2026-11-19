@@ -113,15 +113,16 @@ describe('adding an entry', () => {
     expect(calls.find((c) => c.path === '/api/entries')?.body).not.toHaveProperty('rating');
   });
 
-  it('shows status chips for anime but not for movies', async () => {
-    fakeBackend();
-    renderApp('/list/anime');
-    const d = await openAdd();
-    expect(within(d).getByRole('button', { name: 'Completed' })).toBeInTheDocument();
-    await userEvent.click(within(d).getByRole('button', { name: 'Close' }));
+  it('shows status chips for anime and movies (Plan to watch, Dan 2026-11-19) but not for albums', async () => {
     fakeBackend();
     renderApp('/list/movies');
-    const d2 = await openAdd(/^Add movie$/i);
+    const d = await openAdd(/^Add movie$/i);
+    expect(within(d).getByRole('button', { name: 'Completed' })).toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: 'Plan to watch' })).toBeInTheDocument();
+    await userEvent.click(within(d).getByRole('button', { name: 'Close' }));
+    fakeBackend();
+    renderApp('/list/albums');
+    const d2 = await openAdd(/^Add album$/i);
     expect(within(d2).queryByRole('button', { name: 'Completed' })).not.toBeInTheDocument();
     expect(within(d2).getByRole('spinbutton', { name: 'Rating' })).toBeInTheDocument();
   });
@@ -402,10 +403,10 @@ describe('PC table', () => {
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
   });
 
-  it('has no Status column for movies', async () => {
+  it('has no Status column for albums', async () => {
     setViewportWidth(1024);
-    fakeBackend({ entries: rows({ category: 'movies', status: null }) });
-    renderApp('/list/movies');
+    fakeBackend({ entries: rows({ category: 'albums', status: null }) });
+    renderApp('/list/albums');
     await screen.findByRole('table');
     expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Season Avg' })).not.toBeInTheDocument();
@@ -632,15 +633,15 @@ describe('search and filters', () => {
     expect(screen.getByRole('searchbox', { name: 'Filter Anime' })).toHaveValue('POKEMON');
   });
 
-  it('Status filter narrows, and is absent on Movies', async () => {
+  it('Status filter narrows, and is absent on Albums', async () => {
     three();
     const { unmount } = renderApp('/list/anime');
     await screen.findByText('Frieren');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'Status: On Hold');
     expect(titles()).toEqual(['Pokémon']);
     unmount();
-    fakeBackend({ entries: [makeEntry({ category: 'movies', title: 'Heat', genres: 'Crime' })] });
-    renderApp('/list/movies');
+    fakeBackend({ entries: [makeEntry({ category: 'albums', title: 'Heat', genres: 'Crime', status: null })] });
+    renderApp('/list/albums');
     await screen.findByText('Heat');
     expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Genre' })).toBeInTheDocument();
@@ -704,8 +705,8 @@ describe('search and filters', () => {
   });
 
   it('ignores a status on a list without a Status column', async () => {
-    fakeBackend({ entries: [makeEntry({ category: 'movies', title: 'Heat', genres: 'Crime' })] });
-    const { router } = renderApp('/list/movies?status=Dropped');
+    fakeBackend({ entries: [makeEntry({ category: 'albums', title: 'Heat', genres: 'Crime', status: null })] });
+    const { router } = renderApp('/list/albums?status=Dropped');
     await screen.findByText('Heat');
     await waitFor(() => expect(router.state.location.search).toBe(''));
     expect(titles()).toEqual(['Heat']);

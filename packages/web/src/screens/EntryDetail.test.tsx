@@ -129,8 +129,8 @@ describe('entry details', () => {
     expect(patches(calls)).toEqual([]);
   });
 
-  it('has no status control for movies', async () => {
-    fakeBackend({ entries: [frieren({ category: 'movies', status: null })] });
+  it('has no status control for albums', async () => {
+    fakeBackend({ entries: [frieren({ category: 'albums', status: null })] });
     renderApp('/entry/f1');
     await screen.findByRole('spinbutton', { name: 'Rating' });
     expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeInTheDocument();

@@ -247,6 +247,19 @@ describe('the Add sheet: "Add to" list dropdown', () => {
   });
 });
 
+describe('Add sheet for Songs and Albums', () => {
+  it.each([['Add album', 'Album'], ['Add song', 'Song']])('%s: the title field says "Didn\'t find it? Paste a Spotify link." and not the YouTube hint', async (addName, label) => {
+    fakeBackend({ me: meWith() });
+    renderApp(`/list/${label === 'Album' ? 'albums' : 'songs'}`);
+    await screen.findByRole('navigation', { name: 'Main' });
+    await userEvent.click(await screen.findByRole('link', { name: addName }));
+    const d = await screen.findByRole('dialog', { name: 'Add' });
+    const field = within(d).getByRole('textbox', { name: label });
+    expect(field).toHaveAccessibleDescription(/Didn't find it\? Paste a Spotify link\./);
+    expect(within(d).queryByText(/YouTube/)).not.toBeInTheDocument();
+  });
+});
+
 describe('Add sheet for YouTube', () => {
   it('labels the fields Video and Channel and says a link can be pasted', async () => {
     fakeBackend({ me: meWith() });

@@ -60,8 +60,8 @@ export function Composer({ conversationId, onSent }: { conversationId: string; o
   return (
     <div className="composer">
       <div className="composer__row">
-        <button type="button" className="btn btn--secondary btn--compact composer__rec" aria-haspopup="dialog" onClick={() => setPicker(true)}>
-          <Icon name="share" size={18} />Recommend
+        <button type="button" className="icon-btn icon-btn--outlined composer__rec" aria-label="Recommend" title="Recommend" aria-haspopup="dialog" onClick={() => setPicker(true)}>
+          <Icon name="share" size={22} />
         </button>
         <textarea ref={field} className="input composer__field" rows={1} aria-label="Message" placeholder="Message" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} aria-invalid={over || undefined} />

@@ -1,4 +1,4 @@
-import { DEFAULT_USER_SETTINGS, type UserSettings } from '@media-tracker/shared';
+import { DEFAULT_USER_SETTINGS, type NavSettings, type UserSettings } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
@@ -20,6 +20,7 @@ export function normalizeMe(me: Me): Me {
       colors: { ...s.colors },
       tabs: { ...DEFAULT_USER_SETTINGS.tabs, ...s.tabs },
       notify: { ...DEFAULT_USER_SETTINGS.notify, ...s.notify },
+      nav: { ...DEFAULT_USER_SETTINGS.nav, ...s.nav },
     },
   };
 }
@@ -62,6 +63,9 @@ export function useMe() {
 }
 
 /** Saves a partial settings change; the UI updates at once and rolls back if the save fails. */
+/** A settings update: any keys; `nav` may carry just the part that changed. */
+export type SettingsUpdate = Omit<Partial<UserSettings>, 'nav'> & { nav?: Partial<NavSettings> };
+
 export const SETTINGS_SAVE_ERROR = "Couldn't save your settings. Try again.";
 
 /**
@@ -74,7 +78,7 @@ export function useSaveSettings(opts: { errorToast?: string } = {}) {
   const toast = useToast();
   return useMutation({
     mutationKey: SETTINGS_MUTATION,
-    mutationFn: (partial: Partial<UserSettings>) =>
+    mutationFn: (partial: SettingsUpdate) =>
       api.put<{ settings: UserSettings }>('/api/me/settings', { settings: partial }),
     onMutate: async (partial) => {
       await qc.cancelQueries({ queryKey: ME_KEY });
@@ -88,6 +92,7 @@ export function useSaveSettings(opts: { errorToast?: string } = {}) {
             tabs: { ...prev.settings.tabs, ...partial.tabs },
             colors: { ...prev.settings.colors, ...partial.colors },
             notify: { ...prev.settings.notify, ...partial.notify },
+            nav: { ...prev.settings.nav, ...partial.nav },
           },
         });
       }

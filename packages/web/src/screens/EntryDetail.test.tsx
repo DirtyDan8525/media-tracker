@@ -494,6 +494,28 @@ describe('YouTube', () => {
   });
 });
 
+describe('Open in Spotify', () => {
+  it('a song matched from Spotify opens the track directly, in a new tab', async () => {
+    fakeBackend({ entries: [makeEntry({ id: 's1', category: 'songs', title: 'Time', creator: 'Pink Floyd', source: 'spotify', sourceId: 'track:1XyZ' })] });
+    renderApp('/entry/s1');
+    const link = await screen.findByRole('link', { name: 'Open in Spotify' });
+    expect(link).toHaveAttribute('href', 'https://open.spotify.com/track/1XyZ');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+  it('an album from another source opens a Spotify search for "title artist"', async () => {
+    fakeBackend({ entries: [makeEntry({ id: 'a1', category: 'albums', title: 'Kid A', creator: 'Radiohead', source: 'deezer', sourceId: 'album:12' })] });
+    renderApp('/entry/a1');
+    expect(await screen.findByRole('link', { name: 'Open in Spotify' })).toHaveAttribute('href', 'https://open.spotify.com/search/Kid%20A%20Radiohead');
+  });
+  it('other lists have no Open in Spotify link', async () => {
+    fakeBackend({ entries: [makeEntry({ id: 'e1', category: 'anime', title: 'Frieren' })] });
+    renderApp('/entry/e1');
+    await screen.findByRole('heading', { level: 1, name: 'Frieren' });
+    expect(screen.queryByRole('link', { name: 'Open in Spotify' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Edit info drop-down', () => {
   it('the edit fields sit in a closed "Edit info" drop-down that opens on tap', async () => {
     fakeBackend({ entries: [makeEntry({ id: 'e1', title: 'Cyberpunk: Edgerunners' })] });

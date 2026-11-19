@@ -1,0 +1,12 @@
+{
+  "https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8": {
+    "file": "1.html",
+    "status": 403,
+    "contentType": "text/html; charset=utf-8"
+  },
+  "https://open.spotify.com/oembed?url=https%3A%2F%2Fopen.spotify.com%2Ftrack%2F4PTG3Z6ehGkBFwjybzWkR8": {
+    "file": "2.json",
+    "status": 200,
+    "contentType": "application/json"
+  }
+}

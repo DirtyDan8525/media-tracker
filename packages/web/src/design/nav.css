@@ -153,3 +153,14 @@
   background: var(--card); color: var(--highlight); font-size: var(--fs-body); font-weight: 600; text-decoration: none;
 }
 .profile__requests:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+
+/* A tappable profile picture (opens it full screen): a plain button around the avatar; the hit area grows to 44 px when the picture is smaller. */
+.avatar-btn { position: relative; flex: none; display: inline-flex; padding: 0; border: 0; border-radius: 50%; background: none; cursor: zoom-in; }
+.avatar-btn::after { content: ''; position: absolute; inset: min(0px, calc((100% - 44px) / 2)); }
+.avatar-btn:focus-visible { outline: 2px solid var(--focus, var(--highlight)); outline-offset: 2px; }
+.avatar-viewer {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: var(--space-8); background: rgb(0 0 0 / 0.88);
+}
+.avatar-viewer__img { display: block; max-width: 100%; max-height: 100%; width: min(90vmin, 720px); aspect-ratio: 1; object-fit: contain; border-radius: var(--radius-lg, 12px); }
+.avatar-viewer__close { position: absolute; top: max(var(--space-4), env(safe-area-inset-top)); right: var(--space-4); color: #fff; }

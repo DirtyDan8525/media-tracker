@@ -136,7 +136,7 @@ export function ProfileScreen() {
         backTo={current ? `/list/${current}` : '/more'} backUsesHistory />
       <div className="screen__body profile__body">
         <div className="profile__id">
-          <div className="profile__photo"><Avatar me={me} size={96} /></div>
+          <div className="profile__photo"><Avatar me={me} size={96} viewable /></div>
           <div className="profile__photo-actions">
             <Button variant="ghost" compact disabled={reading} aria-busy={reading} onClick={() => fileInput.current?.click()}>
               {reading ? 'Reading photo…' : 'Change photo'}

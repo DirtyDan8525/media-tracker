@@ -19,9 +19,9 @@
   /* Banner (item 23): a tall cover backdrop; the photo straddles its bottom edge with the name, @username and bio beside it. */
   .frame--wide .profile__banner, .frame--wide .page-header.has-backdrop.profile__banner { min-height: 280px; padding-bottom: 0; }
   .frame--wide .profile__id {
-    display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; grid-template-rows: 56px auto auto auto auto;
+    display: grid; grid-template-columns: 128px minmax(0, 1fr) auto; grid-template-rows: 64px auto auto auto auto;
     column-gap: var(--space-10); row-gap: var(--space-1); align-items: start;
-    margin-top: -56px; text-align: left; padding: 0 var(--space-4); background: none; border: none;
+    margin-top: -64px; text-align: left; padding: 0 var(--space-4); background: none; border: none;
   }
   .frame--wide .profile__photo { grid-column: 1; grid-row: 1 / span 5; }
   .frame--wide .profile__display, .frame--wide .profile__name, .frame--wide .profile__bio, .frame--wide .profile__since { grid-column: 2; text-align: left; }
@@ -31,7 +31,7 @@
   .frame--wide .profile__since { grid-row: 5; }
   .frame--wide .profile__photo-actions { grid-column: 3; grid-row: 2; justify-content: flex-end; }
   .frame--wide .profile__edit { grid-column: 3; grid-row: 3; justify-self: end; }
-  .frame--wide .profile__photo .avatar { width: 112px !important; height: 112px !important; font-size: 48px !important; }
+  .frame--wide .profile__photo .avatar, .frame--wide .friend-id .avatar { width: 128px !important; height: 128px !important; font-size: 54px !important; }
   .frame--wide .profile__since { font-size: 16px; }
   .frame--wide .profile__tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-8); }
   .frame--wide .profile-tile { padding: var(--space-8) var(--space-10); }

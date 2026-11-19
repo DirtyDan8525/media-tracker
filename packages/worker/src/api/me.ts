@@ -3,6 +3,7 @@ import {
   AVATAR_MAX_BYTES,
   COMPARE_ASK,
   DEFAULT_USER_SETTINGS,
+  NAV_SIDES,
   NOTIFY_KEYS,
   decodeAvatar,
   validateBio,
@@ -32,11 +33,11 @@ export type SanitizeResult = { ok: true; settings: UserSettings } | { ok: false 
  * Unknown keys are dropped (that includes the removed compareStyle, compareRoom and
  * compareWindow); a known key with a bad value fails the whole update. `tiers` is
  * dropped too: only PUT /api/ratings/tiers/:list writes it, because a change re-fits scores (Q3).
- * `tabs`, `colors` and `notify` merge per key; scalars replace. Does not mutate `current`.
+ * `tabs`, `colors`, `notify` and `nav` merge per key; scalars replace. Does not mutate `current`.
  */
 export function sanitizeSettings(partial: unknown, current: UserSettings): SanitizeResult {
   if (!isPlainObject(partial)) return { ok: false };
-  const next: UserSettings = { ...current, tabs: { ...current.tabs }, colors: { ...current.colors }, notify: { ...current.notify } };
+  const next: UserSettings = { ...current, tabs: { ...current.tabs }, colors: { ...current.colors }, notify: { ...current.notify }, nav: { ...current.nav } };
 
   if ('theme' in partial) {
     const t = partial.theme;
@@ -69,6 +70,22 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
       if (typeof v !== 'boolean') return { ok: false };
       next.notify[k as (typeof NOTIFY_KEYS)[number]] = v;
     }
+  }
+  if ('nav' in partial) {
+    const n = partial.nav;
+    if (!isPlainObject(n)) return { ok: false };
+    if ('side' in n) {
+      if (typeof n.side !== 'string' || !(NAV_SIDES as readonly string[]).includes(n.side)) return { ok: false };
+      next.nav.side = n.side as (typeof NAV_SIDES)[number];
+    }
+    if ('collapsed' in n) {
+      if (typeof n.collapsed !== 'boolean') return { ok: false };
+      next.nav.collapsed = n.collapsed;
+    }
+  }
+  if ('coverViewer' in partial) {
+    if (typeof partial.coverViewer !== 'boolean') return { ok: false };
+    next.coverViewer = partial.coverViewer;
   }
   const enums = [
     ['compareAsk', COMPARE_ASK],

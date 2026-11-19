@@ -2,6 +2,8 @@ import type { FeatureKey } from '@media-tracker/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, type RouteObject } from 'react-router';
 import { AboutScreen } from './screens/AboutScreen';
+import { HelpScreen } from './screens/HelpScreen';
+import { InstallInstructionsScreen } from './screens/InstallInstructionsScreen';
 import { WhatsNewScreen } from './screens/WhatsNewScreen';
 import { AddByCodeScreen } from './screens/social/AddByCodeScreen';
 import { FriendEntryDetail } from './screens/social/FriendEntryDetail';
@@ -140,6 +142,8 @@ export const routes: RouteObject[] = [
           { path: 'settings/appearance', element: <AppearanceScreen /> },
           { path: 'settings/tiers', element: <Navigate to="/settings" replace /> },
           { path: 'about', element: <AboutScreen /> },
+          { path: 'help', element: <HelpScreen /> },
+          { path: 'install', element: <InstallInstructionsScreen /> },
           { path: 'whats-new', element: <WhatsNewScreen /> },
           { path: 'more', element: <MoreScreen /> },
           { path: 'admin', element: <AdminRoute><AdminScreen /></AdminRoute> },

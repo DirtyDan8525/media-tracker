@@ -1,3 +1,4 @@
+import { DEFAULT_USER_SETTINGS } from '@media-tracker/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -261,7 +262,7 @@ describe('app shell', () => {
       expect(row.querySelector('.count-pill')).toHaveTextContent('3');
     });
 
-    it('reads the PCNav board: brand, Home, Search, Activity, Friends, Messages, Top 5, Stats, Sharpen, the Lists group, Settings, More / About, profile (no Compare, N9)', async () => {
+    it('reads the PCNav board: brand, a collapse button, Home, Search, Activity, Friends (Messages is one with it), Top 5, Stats, Sharpen, the Lists group, Settings, More / About, profile (no Compare, N9)', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
@@ -269,7 +270,7 @@ describe('app shell', () => {
       // every row, in document order
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'About Media Tracker', 'Home', 'Search', 'Activity', 'Friends', 'Messages', 'Top 5', 'Stats', 'Sharpen my ratings',
+        'About Media Tracker', 'Collapse side bar', 'Home', 'Search', 'Activity', 'Friends', 'Top 5', 'Stats', 'Sharpen my ratings',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube',
         'Settings', 'More / About', 'Profile, @dan',
       ]);
@@ -280,19 +281,44 @@ describe('app shell', () => {
       expect(nav.querySelector('.count-pill')).toBeNull();
     });
 
-    it('PC: Friends and Messages rows carry their own badges (requests, unread), after Activity', async () => {
+    it('PC: Friends and Messages are one "Friends" row after Activity; its badge is unread messages + requests', async () => {
       setViewportWidth(1280);
       mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 1, messages: 3 } } });
       renderApp('/list/anime');
       const nav = await sideNav();
-      const friends = await within(nav).findByRole('link', { name: 'Friends, 1 new' });
+      const friends = await within(nav).findByRole('link', { name: 'Friends, 4 new' });
       expect(friends).toHaveAttribute('href', '/friends');
-      const row = await within(nav).findByRole('link', { name: 'Messages, 3 unread' });
-      expect(row).toHaveAttribute('href', '/messages');
+      expect(within(nav).queryByRole('link', { name: /^Messages/ })).not.toBeInTheDocument();
       const names = within(nav).getAllByRole('link').map((a) => a.textContent ?? '');
       const at = (label: string) => names.findIndex((n) => n.startsWith(label));
       expect(at('Friends')).toBe(at('Activity') + 1);
-      expect(at('Messages')).toBe(at('Friends') + 1);
+    });
+
+    it('PC: the collapse button folds the nav to an icon rail with named links and badges, and saves nav.collapsed', async () => {
+      setViewportWidth(1280);
+      mockApi(makeMe(), { 'GET /api/activity/unread': { body: { feed: 0, requests: 1, messages: 3 } } });
+      renderApp('/list/anime');
+      const nav = await sideNav();
+      const toggle = within(nav).getByRole('button', { name: 'Collapse side bar' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(toggle);
+      const expand = await within(nav).findByRole('button', { name: 'Expand side bar' });
+      expect(expand).toHaveAttribute('aria-expanded', 'false');
+      expect(nav).toHaveClass('side-nav--collapsed');
+      const friends = within(nav).getByRole('link', { name: 'Friends, 4 new' });
+      expect(friends).toHaveAttribute('title', 'Friends');
+      expect(friends.querySelector('.count-pill')).toHaveTextContent('4');
+      expect(within(nav).getByRole('link', { name: 'Anime' })).toHaveAttribute('title', 'Anime');
+      expect(within(nav).queryByText('Settings')).not.toBeInTheDocument();
+      expect(within(nav).getByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    });
+
+    it('PC: nav.side "right" puts the side bar after the content', async () => {
+      setViewportWidth(1280);
+      mockApi(makeMe({ settings: { ...DEFAULT_USER_SETTINGS, nav: { side: 'right', collapsed: false } } }));
+      renderApp('/list/anime');
+      await sideNav();
+      expect(document.querySelector('.frame--wide')).toHaveClass('frame--nav-right');
     });
 
     it('Top 5, Stats, Sharpen my ratings and Settings are side-nav links; there is no navigation called "Lists"', async () => {
@@ -368,7 +394,7 @@ describe('app shell', () => {
       renderApp('/list/anime');
       const nav = await sideNav();
       expect(linkNames(nav)).not.toContain('Anime Seasons');
-      expect(linkNames(nav)).toHaveLength(1 + 8 + 9 + 3); // brand, Home..Sharpen (8), 9 lists, Settings, More / About, Profile
+      expect(linkNames(nav)).toHaveLength(1 + 7 + 9 + 3); // brand, Home..Sharpen (7), 9 lists, Settings, More / About, Profile
     });
   });
 
@@ -391,7 +417,7 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(linkNames(main)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats', 'Import from Google Sheets', "What's new", 'Coming soon', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats', 'Import from Google Sheets', 'Help & how-tos', 'Install instructions', "What's new", 'Coming soon', 'About Media Tracker']);
     expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
     const tabs = screen.getByRole('navigation', { name: 'Main' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');

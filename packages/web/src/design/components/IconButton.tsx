@@ -1,9 +1,10 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, Ref } from 'react';
 import { Icon, type IconName } from './Icon';
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   /** The accessible name (also the tooltip). */
   label: string;
+  ref?: Ref<HTMLButtonElement>;
   icon: IconName;
   /** 'outlined' = the mockups' 44 px Cards square with a border; 'plain' = no fill. */
   look?: 'outlined' | 'plain';

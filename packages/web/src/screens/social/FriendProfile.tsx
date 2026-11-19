@@ -1,6 +1,6 @@
 import { CATEGORY_CONFIG, formatRating, statusLabel, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { COL_WIDTHS, tableMinWidth } from '../list/EntryTable';
+import { TableFrame, useRowViewer, type ColumnDef, type ViewerItem } from '../list/tableKit';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useAccept, useFriendEntries, useFriends, useProfile, useRemoveFriend, useSendRequest, type FriendsData,
@@ -19,7 +19,7 @@ import { LIST_LABEL, LIST_ORDER } from '../../nav';
 import { computeStats } from '../../ratings/stats';
 import { topFive } from '../../ratings/topFive';
 import { useIsWide } from '../../hooks';
-import { BackButton } from '../../shell/BackButton';
+import { BackButton, backState } from '../../shell/BackButton';
 import { useSessionMe } from '../../shell/SessionGate';
 import { ListCard } from '../StatsScreen';
 import { TopRow } from '../Top5Screen';
@@ -95,7 +95,7 @@ function StrangerView({ user, relation }: { user: PublicUser; relation: 'none' |
       <div className="friend-top"><BackButton to="/friends" /></div>
       <div className="screen__body social-page">
         <div className="friend-id">
-          <PersonAvatar user={user} size={80} />
+          <PersonAvatar user={user} size={96} viewable name={who(user)} />
           <h1>{who(user)}</h1>
           {user.displayName && <span className="friend-id__user">@{user.username}</span>}
         </div>
@@ -153,7 +153,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
       </div>
       <div className="screen__body social-page friend-page">
         <div className="friend-id">
-          <PersonAvatar user={user} size={80} />
+          <PersonAvatar user={user} size={96} viewable name={who(user)} />
           <h1>{who(user)}</h1>
           {user.displayName && <span className="friend-id__user">@{user.username}</span>}
           {bio && <p className="friend-id__bio">{bio}</p>}
@@ -178,8 +178,8 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
               {(tab === 'lists' || tab === 'compare') && (
                 <CategoryChips categories={categories} value={category} onChange={setCategory} />
               )}
-              {tab === 'lists' && category && <ListsPanel username={user.username} rows={rows.filter((e) => e.category === category)} />}
-              {tab === 'top5' && <Top5Panel username={user.username} rows={rows} categories={categories} />}
+              {tab === 'lists' && category && <ListsPanel username={user.username} rows={rows.filter((e) => e.category === category)} name={who(user)} />}
+              {tab === 'top5' && <Top5Panel username={user.username} rows={rows} categories={categories} name={who(user)} />}
               {tab === 'stats' && <StatsPanel rows={rows} categories={categories} />}
               {tab === 'compare' && category && <CompareWithFriend user={user} category={category} entries={rows} />}
             </>
@@ -196,12 +196,12 @@ const entryLink = (username: string, id: string) => `/u/${username}/entry/${id}`
 export type EntryHref = ((id: string) => string) | null;
 const hrefFor = (username: string, linkTo: EntryHref | undefined): EntryHref => (linkTo === undefined ? (id) => entryLink(username, id) : linkTo);
 
-export function ListsPanel({ username, rows, linkTo }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref }) {
+export function ListsPanel({ username, rows, linkTo, name }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref; name?: string }) {
   const sorted = useMemo(() => sortEntries(rows, 'rating'), [rows]);
   const wide = useIsWide();
   const href = hrefFor(username, linkTo);
   // PC: the same rows as your own list table (Dan, 2026-11-17), read-only.
-  if (wide && sorted[0]) return <FriendTable username={username} rows={sorted} linkTo={href} />;
+  if (wide && sorted[0]) return <FriendTable username={username} rows={sorted} linkTo={href} name={name} />;
   return (
     <ul className="people plain-list">
       {sorted.map((e) => {
@@ -221,7 +221,7 @@ export function ListsPanel({ username, rows, linkTo }: { username: string; rows:
         return (
           <li key={e.id}>
             {href
-              ? <Link to={href(e.id)} className="person" aria-label={label}>{inner}</Link>
+              ? <Link to={href(e.id)} state={backState(`${name ?? `@${username}`}'s lists`)} className="person" aria-label={label}>{inner}</Link>
               : <div className="person" aria-label={label} role="group">{inner}</div>}
           </li>
         );
@@ -230,48 +230,42 @@ export function ListsPanel({ username, rows, linkTo }: { username: string; rows:
   );
 }
 
-export function FriendTable({ username, rows, linkTo }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref }) {
+export function FriendTable({ username, rows, linkTo, name }: { username: string; rows: FriendEntry[]; linkTo?: EntryHref; name?: string }) {
   const href = hrefFor(username, linkTo);
+  const back = backState(`${name ?? `@${username}`}'s lists`);
+  const items = useMemo<ViewerItem[]>(() => rows.map((e) => ({
+    id: e.id, title: e.title, category: e.category, coverUrl: e.coverUrl, rating: e.rating, status: e.status, creator: e.creator,
+    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, to: href ? href(e.id) : null, state: back,
+  })), [rows, href, back.backLabel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const viewer = useRowViewer(items);
   const cfg = CATEGORY_CONFIG[rows[0]!.category];
-  const cols: (keyof typeof COL_WIDTHS)[] = ['cover', 'rating', 'title', 'genres'];
-  if (cfg.hasStatus) cols.push('status');
-  if (cfg.creatorLabel) cols.push('creator');
-  if (cfg.hasSeasons) cols.push('avg');
+  const columns: ColumnDef[] = [{ id: 'cover', label: 'Cover' }, { id: 'rating', label: 'Rating' }, { id: 'title', label: 'Title' }];
+  if (cfg.hasStatus) columns.push({ id: 'status', label: 'Status' });
+  columns.push({ id: 'genres', label: 'Genres' });
+  if (cfg.creatorLabel) columns.push({ id: 'creator', label: cfg.creatorLabel });
+  if (cfg.hasSeasons) columns.push({ id: 'avg', label: 'Season Avg' });
+  columns.push({ id: 'notes', label: 'Notes' });
   return (
-    <div className="table-wrap">
-      <table className="entry-table" aria-label={`${LIST_LABEL[rows[0]!.category]}, @${username}`} style={{ minWidth: tableMinWidth(cols) }}>
-        <thead>
-          <tr>
-            <th scope="col" className="col-cover">Cover</th>
-            <th scope="col" className="col-rating">Rating</th>
-            <th scope="col" className="col-title">Title</th>
-            {cfg.hasStatus && <th scope="col" className="col-status">Status</th>}
-            <th scope="col" className="col-genres">Genres</th>
-            {cfg.creatorLabel && <th scope="col" className="col-creator">{cfg.creatorLabel}</th>}
-            {cfg.hasSeasons && <th scope="col" className="col-avg">Season Avg</th>}
-            <th scope="col">Notes</th>
+    <TableFrame list={rows[0]!.category} label={`${LIST_LABEL[rows[0]!.category]}, @${username}`} columns={columns} viewer={viewer}>
+      <tbody>
+        {rows.map((e) => (
+          <tr key={e.id} {...viewer.rowProps(e.id)}>
+            <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
+            <td><RatingBadge rating={e.rating} size="sm" /></td>
+            <td><div className="cell-title">{href ? <Link to={href(e.id)} state={back} data-role="title">{e.title}</Link> : <span data-role="title">{e.title}</span>}</div></td>
+            {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
+            <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
+            {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
+            {cfg.hasSeasons && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
+            <td><span className="cell-notes" title={e.notes || undefined}>{e.notes ?? ''}</span></td>
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((e) => (
-            <tr key={e.id}>
-              <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
-              <td><RatingBadge rating={e.rating} size="sm" /></td>
-              <td><div className="cell-title">{href ? <Link to={href(e.id)} data-role="title">{e.title}</Link> : <span data-role="title">{e.title}</span>}</div></td>
-              {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
-              <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
-              {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
-              {cfg.hasSeasons && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
-              <td><span className="cell-notes" title={e.notes || undefined}>{e.notes ?? ''}</span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </TableFrame>
   );
 }
 
-export function Top5Panel({ username, rows, categories, linkTo }: { username: string; rows: FriendEntry[]; categories: Category[]; linkTo?: EntryHref }) {
+export function Top5Panel({ username, rows, categories, linkTo, name }: { username: string; rows: FriendEntry[]; categories: Category[]; linkTo?: EntryHref; name?: string }) {
   const href = hrefFor(username, linkTo);
   const blocks = categories.map((c) => ({ c, top: topFive(rows.filter((e) => e.category === c)) })).filter((b) => b.top.length > 0);
   if (blocks.length === 0) return <p className="friend-note">Nothing rated yet.</p>;
@@ -281,7 +275,7 @@ export function Top5Panel({ username, rows, categories, linkTo }: { username: st
         <section key={c} aria-labelledby={`ft5-${c}`} className="top5__block">
           <h2 id={`ft5-${c}`} className="top5__heading">{LIST_LABEL[c]}</h2>
           <ol className="top5__list">
-            {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} to={href ? href(e.id) : null} />)}
+            {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} to={href ? href(e.id) : null} backLabel={`${name ?? `@${username}`}'s Top 5`} />)}
           </ol>
         </section>
       ))}

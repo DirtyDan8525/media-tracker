@@ -254,3 +254,21 @@ describe.skipIf(!hasFixtures('spotify', 'live-at-electric-lady'))('spotify fixtu
     expect(f.unmatched).toEqual([]);
   });
 });
+
+describe('oEmbed answers (recorded shape): a link whose page gives no tags', () => {
+  it('an album link with /intl-de/ and ?si=: title and 640px cover from oEmbed, no artist', async () => {
+    const f = replayFetch('spotify', 'oembed-album');
+    const r = await lookupChain('albums', q('https://open.spotify.com/intl-de/album/2bxBgkzYqo9WBQgl0ZraY6?si=abc'), deps(f));
+    expect(f.unmatched).toEqual([]);
+    expect(r).toMatchObject({
+      title: 'Live at Electric Lady', creator: '', source: 'spotify', sourceId: 'album:2bxBgkzYqo9WBQgl0ZraY6',
+      cover: 'https://i.scdn.co/image/ab67616d0000b273aaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+  });
+  it('a track link: sourceId track:<id>', async () => {
+    const f = replayFetch('spotify', 'oembed-track');
+    const r = await lookupChain('songs', q('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8'), deps(f));
+    expect(f.unmatched).toEqual([]);
+    expect(r).toMatchObject({ title: 'Never Gonna Give You Up', creator: '', source: 'spotify', sourceId: 'track:4PTG3Z6ehGkBFwjybzWkR8' });
+  });
+});

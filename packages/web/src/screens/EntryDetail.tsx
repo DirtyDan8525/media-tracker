@@ -37,6 +37,7 @@ import { SeasonsEditor } from './entry/SeasonsEditor';
 import { useCloseCall } from './sharpen/CloseCallSheet';
 import { EntrySocial } from './social/EntrySocial';
 import '../design/feed.css';
+import { OpenInSpotify } from './entry/OpenInSpotify';
 
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;
 
@@ -112,7 +113,7 @@ function DetailBody({ entry }: { entry: Entry }) {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory /><ShareButton rec={recFromEntry(entry)} /></div>
+      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory pc /><ShareButton rec={recFromEntry(entry)} /></div>
       <div className="screen__body detail">
         <div className="detail__top">
           <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />
@@ -127,6 +128,7 @@ function DetailBody({ entry }: { entry: Entry }) {
                 Watch on YouTube
               </a>
             )}
+            <OpenInSpotify entry={entry} />
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>

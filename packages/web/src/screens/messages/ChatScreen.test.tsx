@@ -244,6 +244,7 @@ describe('Chat', () => {
       const { calls } = setup({}, {}, entries);
       renderApp('/messages/c1');
       await screen.findByRole('textbox', { name: 'Message' });
+      expect(screen.getByRole('button', { name: 'Recommend' })).toHaveAttribute('title', 'Recommend');
       await userEvent.click(screen.getByRole('button', { name: 'Recommend' }));
       const picker = await screen.findByRole('dialog', { name: 'Recommend a title' });
       // no list chips: titles of every list are in one list, and the search filters across them

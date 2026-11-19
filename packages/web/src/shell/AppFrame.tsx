@@ -6,8 +6,10 @@ import { useListCounts } from '../data/useEntries';
 import { BottomTabs } from '../design/components/BottomTabs';
 import { SideNav } from '../design/components/SideNav';
 import { useIsWide } from '../hooks';
+import { useSaveSettings } from '../data/useMe';
 import { useEnabledLists } from './useLists';
 import { useCurrentList } from './currentList';
+import { CoverViewerContext } from '../screens/list/tableKit';
 import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
 import { AddBubble } from './AddBubble';
@@ -38,16 +40,21 @@ function FrameLayout() {
   const unread = useUnread().data;
   const activityCount = unread?.feed ?? 0;
   const messagesCount = features.messages ? unread?.messages ?? 0 : 0;
-  // Incoming friend requests. The phone's Friends badge adds the unread messages (BottomTabs); PC has a Messages row of its own.
+  // Incoming friend requests. The Friends badge (phone tab and PC row) adds the unread messages.
   const requestsCount = features.friends ? unread?.requests ?? 0 : 0;
   const current = useCurrentList();
+  const save = useSaveSettings();
+  const { side, collapsed } = me.settings.nav;
   if (wide) {
     return (
-      <div className="frame frame--wide">
+      <div className={`frame frame--wide${side === 'right' ? ' frame--nav-right' : ''}`}>
         <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} friendsCount={requestsCount}
-          showActivity={features.feed} showMessages={features.messages} showFriends={features.friends} showSharpen={features.closeCalls} me={me} />
+          showActivity={features.feed} showMessages={features.messages} showFriends={features.friends} showSharpen={features.closeCalls} me={me}
+          collapsed={collapsed} onToggleCollapsed={() => save.mutate({ nav: { collapsed: !collapsed } })} />
         <main className="frame__main">
-          <Outlet />
+          <CoverViewerContext.Provider value={me.settings.coverViewer}>
+            <Outlet />
+          </CoverViewerContext.Provider>
         </main>
       </div>
     );

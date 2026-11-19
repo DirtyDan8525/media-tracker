@@ -65,6 +65,8 @@ export function MoreScreen() {
           <h2 id="more-app" className="group__title">App</h2>
           <div className="group__card">
             {features.walkthrough && <button type="button" className="group__row" onClick={() => setTour(true)}>How to use the app</button>}
+            <Link to="/help" className="group__row">Help &amp; how-tos</Link>
+            <Link to="/install" className="group__row">Install instructions</Link>
             <Link to="/whats-new" className="group__row">What's new</Link>
             <Link to="/whats-new" className="group__row">Coming soon</Link>
             <Link to="/about" className="group__row">About {appName}</Link>

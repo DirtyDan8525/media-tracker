@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { useFeature } from '../../data/appSettings';
+import { useUnread } from '../../data/feed';
+import { countText } from '../../design/components/BottomTabs';
 import { useAccept, useFriends, useFriendsEntries, useRemoveFriend, type Friend } from '../../data/social';
 import { Button } from '../../design/components/Button';
 import { EmptyState } from '../../design/components/EmptyState';
@@ -41,7 +44,12 @@ export function FriendsScreen() {
   }
 
   const header = (
-    <PageHeader title="Friends" profile actions={<Button variant="primary" compact onClick={addFriend}><Icon name="plus" size={18} />Add friend</Button>} />
+    <PageHeader title="Friends" profile actions={
+      <>
+        {wide && <MessagesLink />}
+        <Button variant="primary" compact onClick={addFriend}><Icon name="plus" size={18} />Add friend</Button>
+      </>
+    } />
   );
   if (isPending) {
     return (
@@ -87,7 +95,7 @@ export function FriendsScreen() {
             <ul className="people plain-list friends-requests">
               {incoming.map((u) => (
                 <li key={u.id} className="person">
-                  <PersonAvatar user={u} />
+                  <PersonAvatar user={u} viewable name={`@${u.username}`} />
                   <span className="person__meta">
                     <span className="person__name">@{u.username}</span>
                     <span className="person__sub">Wants to be friends</span>
@@ -102,7 +110,7 @@ export function FriendsScreen() {
               ))}
               {outgoing.map((u) => (
                 <li key={u.id} className="person">
-                  <PersonAvatar user={u} />
+                  <PersonAvatar user={u} viewable name={`@${u.username}`} />
                   <span className="person__meta">
                     <span className="person__name">@{u.username}</span>
                     <span className="person__sub">Requested</span>
@@ -136,6 +144,19 @@ export function FriendsScreen() {
       </div>
       {!wide && <MessagesBubble />}
     </div>
+  );
+}
+
+/** PC: Messages is not a side-nav row (Friends covers it), so it opens from here; gone while Messages is switched off. */
+function MessagesLink() {
+  const on = useFeature('messages');
+  const unread = useUnread().data?.messages ?? 0;
+  if (!on) return null;
+  return (
+    <Link to="/messages" className="btn btn--secondary btn--compact" aria-label={unread > 0 ? `Messages, ${countText(unread)} unread` : 'Messages'}>
+      <Icon name="messages" size={18} />Messages
+      {unread > 0 && <span className="count-pill" aria-hidden="true">{countText(unread)}</span>}
+    </Link>
   );
 }
 

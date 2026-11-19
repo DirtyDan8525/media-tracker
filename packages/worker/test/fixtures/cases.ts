@@ -68,6 +68,11 @@ export const CASES: FixtureCase[] = [
     termFromEnv: { name: 'SPOTIFY_ALBUM_URL', describe: 'a Spotify album link for Clairo \u2013 Live at Electric Lady',
       accept: (v) => parseSpotifyRef(v)?.kind === 'album' },
     query: { term: '', typedTitle: '', hint: '', category: 'albums' } },
+  // oEmbed only (no key): the page gives no tags, so the title and cover come from oEmbed and the artist stays empty. The recorded files are hand-written until this is run.
+  { source: 'spotify', case: 'oembed-album', chain: true,
+    query: { term: 'https://open.spotify.com/intl-de/album/2bxBgkzYqo9WBQgl0ZraY6?si=abc', typedTitle: '', hint: '', category: 'albums' } },
+  { source: 'spotify', case: 'oembed-track', chain: true,
+    query: { term: 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8', typedTitle: '', hint: '', category: 'songs' } },
   // IGDB needs IGDB_ID and IGDB_SECRET in .dev.vars; the token flow is recorded for real (secrets never reach the files).
   // Steam needs no key; the steam cases call the steam source directly, so they run with or without IGDB keys.
   { source: 'igdb', case: 'breath-of-the-wild',

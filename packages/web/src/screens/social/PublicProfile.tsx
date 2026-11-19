@@ -114,7 +114,7 @@ function PublicView({ token, user, bio, memberSince, meId, meLoading }: {
     <>
       <div className="screen__body social-page friend-page">
         <div className="friend-id">
-          <PersonAvatar user={user} size={80} src={publicAvatarSrc(token)} />
+          <PersonAvatar user={user} size={96} src={publicAvatarSrc(token)} viewable name={who(user)} />
           <h1>{who(user)}</h1>
           {user.displayName && <span className="friend-id__user">@{user.username}</span>}
           {bio && <p className="friend-id__bio">{bio}</p>}

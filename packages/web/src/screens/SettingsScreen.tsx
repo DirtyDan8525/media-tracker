@@ -5,6 +5,7 @@ import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
 import { useAppSettings } from '../data/appSettings';
+import { useIsWide } from '../hooks';
 import { tabSwitches } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
 import { ExportRow } from './settings/ExportRow';
@@ -30,6 +31,7 @@ export function SettingsScreen() {
   const toast = useToast();
   const [editingName, setEditingName] = useState(false);
   const app = useAppSettings();
+  const wide = useIsWide();
 
   function toggle(key: string, on: boolean) {
     save.mutate({ tabs: { [key]: on } });
@@ -51,6 +53,23 @@ export function SettingsScreen() {
             ))}
           </div>
         </section>
+
+        {wide && (
+          <section aria-labelledby="set-pc" className="group">
+            <h2 id="set-pc" className="group__title">On this computer</h2>
+            <div className="group__card group__pad stack-10">
+              <SegRadio label="Side bar" value={me.settings.nav.side}
+                options={[{ value: 'left', label: 'On the left' }, { value: 'right', label: 'On the right' }]}
+                onChange={(v) => { if (me.settings.nav.side !== v) save.mutate({ nav: { side: v as 'left' | 'right' } }); }} />
+              <label className="switch-row">
+                <input type="checkbox" role="switch" checked={me.settings.coverViewer}
+                  onChange={(e) => save.mutate({ coverViewer: e.target.checked })} />
+                <span>Cover viewer</span>
+              </label>
+              <p className="hint">Click a row in a list to see its cover large, with the details, beside the table.</p>
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="set-search" className="group">
           <h2 id="set-search" className="group__title">Search</h2>

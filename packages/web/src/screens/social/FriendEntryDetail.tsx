@@ -16,6 +16,7 @@ import { recFromEntry } from '../../data/messages';
 import { ShareButton } from '../messages/ShareButton';
 import { EntrySocial } from './EntrySocial';
 import '../../design/social.css';
+import { OpenInSpotify } from '../entry/OpenInSpotify';
 
 /** A friend's title (route /u/:username/entry/:id, S10): read-only, with their notes unless private, and Add to mine. */
 export function FriendEntryDetail() {
@@ -32,7 +33,7 @@ export function FriendEntryDetail() {
     const missing = error instanceof ApiError && error.status === 404;
     return (
       <div className="screen">
-        <div className="detail-top"><BackButton to={`/u/${username}`} useHistory /></div>
+        <div className="detail-top"><BackButton to={`/u/${username}`} useHistory pc /></div>
         <div className="screen__body">
           {missing ? (
             <EmptyState icon="info" title="We couldn't find that title" body="It may have been deleted, or it's no longer shared with you."
@@ -76,7 +77,7 @@ function Body({ username, entry, seasons }: {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/u/${username}`} useHistory /><ShareButton rec={recFromEntry({ ...entry, rating: null })} /></div>
+      <div className="detail-top"><BackButton to={`/u/${username}?tab=lists&c=${entry.category}`} useHistory pc /><ShareButton rec={recFromEntry({ ...entry, rating: null })} /></div>
       <div className="screen__body detail">
         <div className="detail__top">
           <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero" />
@@ -91,6 +92,7 @@ function Body({ username, entry, seasons }: {
                 Watch on YouTube
               </a>
             )}
+            <OpenInSpotify entry={entry} />
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>

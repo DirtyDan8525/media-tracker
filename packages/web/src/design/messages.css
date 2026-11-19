@@ -6,7 +6,7 @@
 .person--button { width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; }
 .person--button:hover { background: var(--panel); }
 .person--button:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
-.chat-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); color: var(--bright-text); }
+.chat-avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); color: var(--bright-text); }
 .check-row {
   display: flex; align-items: center; gap: var(--space-6); min-height: 56px; padding: var(--space-4) var(--space-6); border-radius: var(--radius-xl);
   cursor: pointer; position: relative;
@@ -53,7 +53,7 @@
 
 .bubble-row { display: flex; align-items: flex-end; gap: var(--space-4); }
 .bubble-row--mine { justify-content: flex-end; }
-.bubble-row__gap { width: 32px; flex: none; }
+.bubble-row__gap { width: 36px; flex: none; }
 .bubble-col { display: flex; flex-direction: column; gap: var(--space-2); max-width: min(82%, 520px); min-width: 0; }
 .bubble-row--mine .bubble-col { align-items: flex-end; }
 .bubble__who { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding-left: var(--space-4); }
@@ -115,7 +115,15 @@
 .messages-new .btn { flex: 1; min-height: var(--tap); gap: var(--space-3); text-decoration: none; }
 
 /* The composer's Recommend button (replaces the + menu). */
-.composer__rec { flex: none; gap: var(--space-3); white-space: nowrap; }
+.composer__rec { flex: none; }
+
+/* PC (>= 1024 px): the open chat fills the main area up to 900 px wide, and the thread fills the height between header and composer. */
+@media (min-width: 1024px) {
+  .frame--wide .chat { width: 100%; max-width: 900px; margin-inline: auto; height: 100dvh; }
+  .frame--wide .chat__scroll { padding-inline: var(--space-12); }
+  .frame--wide .chat__list, .frame--wide .composer__row, .frame--wide .composer__status, .frame--wide .composer__count { max-width: 100%; }
+  .frame--wide .chat__top, .frame--wide .composer { padding-inline: var(--space-12); }
+}
 
 /* Title pages: the Share button shows its word beside the icon (still a 44 px tap target). */
 .detail-top .detail-top__share { border-color: transparent; color: var(--text); gap: var(--space-3); min-height: var(--tap); min-width: var(--tap); padding: 0 var(--space-5); font-weight: 600; }

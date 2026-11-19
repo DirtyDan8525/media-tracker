@@ -23,10 +23,10 @@ describe('Profile on PC (item 23): CSS', () => {
     expect(Number(minHeight(block('min-width: 1440px')))).toBeGreaterThanOrEqual(280);
     expect(css).toMatch(/clamp\(320px, 24vw, 360px\)/);
   });
-  it('the photo overlaps the banner bottom edge by half its 112px height', () => {
+  it('the photo overlaps the banner bottom edge by half its 128px height', () => {
     const b = block('min-width: 1024px');
-    expect(b).toMatch(/\.profile__id \{[^}]*margin-top: -56px/);
-    expect(b).toMatch(/grid-template-columns: 112px/);
+    expect(b).toMatch(/\.profile__id \{[^}]*margin-top: -64px/);
+    expect(b).toMatch(/grid-template-columns: 128px/);
   });
   it('phone rules are untouched: the banner height is only set inside the wide media queries', () => {
     expect(css.slice(0, css.indexOf('@media'))).not.toMatch(/profile__banner/);

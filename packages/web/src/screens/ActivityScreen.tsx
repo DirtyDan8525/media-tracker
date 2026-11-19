@@ -17,6 +17,7 @@ import { useNow } from '../hooks';
 import { LIST_LABEL } from '../nav';
 import { useCurrentList } from '../shell/currentList';
 import { useAddFriend } from '../shell/AddFriendHost';
+import { backState } from '../shell/BackButton';
 import { PageHeader } from '../shell/PageHeader';
 import { CommentsSheet } from './social/CommentsSheet';
 import { ReactButton, ReactionChips } from './social/ReactionBar';
@@ -272,7 +273,7 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
   const own = who === null;
   // A non-friend's entry page is friends-only, so their title is plain text; the name still opens their profile.
   const title = own || friend ? (
-    <Link className="activity-line__title" to={own ? `/entry/${line.entryId}` : `/u/${who.username}/entry/${line.entryId}`}>
+    <Link className="activity-line__title" state={backState('Activity')} to={own ? `/entry/${line.entryId}` : `/u/${who.username}/entry/${line.entryId}`}>
       <strong>{line.title}</strong>
     </Link>
   ) : (

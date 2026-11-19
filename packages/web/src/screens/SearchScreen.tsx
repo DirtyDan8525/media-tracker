@@ -16,6 +16,7 @@ import { useUrlText } from '../lists/useUrlText';
 import { LIST_LABEL } from '../nav';
 import { useEnabledLists } from '../shell/useLists';
 import { useCurrentList } from '../shell/currentList';
+import { backState } from '../shell/BackButton';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import '../design/search.css';
@@ -157,7 +158,7 @@ function ResultRow({ entry: e }: { entry: Entry }) {
   const meta = [e.creator, e.genres].filter(Boolean).join(' · ');
   return (
     <li className="entry-card entry-card--ok">
-      <Link className="entry-card__link" to={`/entry/${e.id}`}>
+      <Link className="entry-card__link" state={backState('Search')} to={`/entry/${e.id}`}>
         {/* Decorative: the row's name is its text. */}
         <span aria-hidden="true"><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} /></span>
         <div className="entry-card__text">

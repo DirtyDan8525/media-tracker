@@ -43,7 +43,7 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
 
   // Add Frieren.
   await openAddAnime(page);
-  await page.getByLabel('Title').fill('frieren');
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill('frieren');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   // The card/row appears with the (fake) cover.
@@ -68,7 +68,7 @@ test('first visit: username, add Frieren, rate it 9.5', async ({ page }) => {
 async function addRatedAnime(page: Page, title: string, rating: string) {
   await page.goto('/list/anime');
   await openAddAnime(page);
-  await page.getByLabel('Title').fill(title);
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
   await page.getByRole('spinbutton', { name: 'Rating' }).fill(rating);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('link', { name: new RegExp(title, 'i') }).first()).toBeVisible();
@@ -218,6 +218,9 @@ test('number flow: a typed 9.7 counts as Loved in the Profile tier counts; Plann
   const before = await lovedCount();
 
   await addRatedAnime(page, 'Monster', '9.7');
+  // A close call with an earlier title may ask which you liked more (it depends on what earlier tests left); this test is about the number.
+  const closeCall = page.getByRole('dialog', { name: 'Close call' });
+  if (await closeCall.isVisible({ timeout: 1500 }).catch(() => false)) await closeCall.getByRole('button', { name: 'Skip' }).click();
   expect(await lovedCount()).toBe(before + 1);
 
   // The entry has the Rating field (holding 9.7) and no tier chips or Lock.
@@ -321,7 +324,7 @@ test('Top 5: Share Anime Top 5 previews a 1080 × 1350 PNG and Save image downlo
   await expect(page.getByText('Image saved')).toBeVisible();
 });
 
-test('Friends and Messages: Friends is tab 4 on the phone (Messages is its floating bubble) and a side-nav row on PC; Top 5 is in More on the phone', async ({ page }) => {
+test('Friends and Messages: Friends is tab 4 on the phone (Messages is its floating bubble) and one side-nav row on PC (Messages opens from the Friends page); Top 5 is in More on the phone', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   await page.goto('/list/anime');
   const nav = page.getByRole('navigation', { name: 'Main' });
@@ -339,11 +342,12 @@ test('Friends and Messages: Friends is tab 4 on the phone (Messages is its float
     // Option B: the floating speech bubble opens Messages.
     await page.getByRole('link', { name: /^Messages/ }).click();
   } else {
-    // PC: Friends, Messages, Top 5, Stats and Sharpen my ratings are side-nav rows.
+    // PC: Friends (with Messages folded in), Top 5, Stats and Sharpen my ratings are side-nav rows.
     for (const n of ['Top 5', 'Stats', 'Sharpen my ratings']) await expect(nav.getByRole('link', { name: n })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /^Messages/ })).toHaveCount(0);
     await nav.getByRole('link', { name: /^Friends/ }).click();
     await expect(page).toHaveURL(/\/friends$/);
-    await nav.getByRole('link', { name: /^Messages/ }).click();
+    await page.getByRole('link', { name: /^Messages/ }).click();
   }
   await expect(page).toHaveURL(/\/messages$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Messages' })).toBeVisible();

@@ -162,6 +162,16 @@ export interface UserSettings {
   tiers: Partial<Record<Category, TierSet>>;
   /** Which kinds of push notification this user wants (Phase 6b, P4). All on by default. */
   notify: Record<NotifyKey, boolean>;
+  /** PC side nav: which side it sits on and whether it is folded to an icon rail (Dan, 2026-11-18). */
+  nav: NavSettings;
+  /** PC: clicking a list row opens the cover viewer panel (Dan, 2026-11-19). On by default. */
+  coverViewer: boolean;
+}
+
+export const NAV_SIDES = ['left', 'right'] as const;
+export interface NavSettings {
+  side: (typeof NAV_SIDES)[number];
+  collapsed: boolean;
 }
 
 export const NOTIFY_KEYS = ['messages', 'friendRequests', 'comments', 'reactions', 'signups'] as const;
@@ -178,6 +188,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   searchScope: 'all',
   tiers: {},
   notify: { messages: true, friendRequests: true, comments: true, reactions: true, signups: true },
+  nav: { side: 'left', collapsed: false },
+  coverViewer: true,
 };
 
 // Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).

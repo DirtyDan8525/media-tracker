@@ -60,7 +60,7 @@ export function PeopleList({ users, label, linkProfiles = false }: { users: Publ
         const rel = relationOf(u.id);
         const who = (
           <>
-            <PersonAvatar user={u} />
+            <PersonAvatar user={u} viewable={!linkProfiles} name={`@${u.username}`} />
             <span className="person__meta">
               <span className="person__name">@{u.username}</span>
               {u.displayName && <span className="person__sub">{u.displayName}</span>}

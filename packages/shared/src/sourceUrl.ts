@@ -48,3 +48,15 @@ export function sourceUrl(source: SourceId | null | undefined, sourceId: string 
       return null; // igdb, itunes: no stable public page from the stored id
   }
 }
+
+/**
+ * Where "Open in Spotify" goes for a song or album: the item itself when it was matched from Spotify,
+ * otherwise a Spotify search for "title artist".
+ */
+export function spotifyUrl(e: { source: SourceId | null | undefined; sourceId: string | null | undefined; title: string; creator: string }): string {
+  if (e.source === 'spotify') {
+    const direct = sourceUrl('spotify', e.sourceId);
+    if (direct) return direct;
+  }
+  return `https://open.spotify.com/search/${encodeURIComponent([e.title, e.creator].map((s) => s.trim()).filter(Boolean).join(' '))}`;
+}

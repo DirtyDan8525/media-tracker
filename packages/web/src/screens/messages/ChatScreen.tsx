@@ -137,7 +137,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
         <BackButton to="/messages" />
         {isGroup
           ? <span className="chat-avatar chat-avatar--group" aria-hidden="true"><Icon name="group" size={20} /></span>
-          : other && <Avatar user={other} size={40} />}
+          : other && <Avatar user={other} size={44} viewable name={other.displayName || `@${other.username}`} />}
         <div className="chat__titles">
           <h1 className="chat__title">{title}</h1>
           {sub && <span className="chat__sub">{sub}</span>}
@@ -218,7 +218,7 @@ function Bubble({ m, mine, showWho, sender, name, canDelete, onOptions, onOpenIm
   );
   return (
     <li className={`bubble-row${mine ? ' bubble-row--mine' : ''}`}>
-      {!mine && (showWho && sender ? <Avatar user={sender} size={32} /> : <span className="bubble-row__gap" aria-hidden="true" />)}
+      {!mine && (showWho && sender ? <Avatar user={sender} size={36} viewable name={name} /> : <span className="bubble-row__gap" aria-hidden="true" />)}
       <div className="bubble-col">
         {showWho && <span className="bubble__who">{name}</span>}
         <div className="bubble-wrap">

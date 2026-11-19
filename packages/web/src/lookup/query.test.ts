@@ -67,4 +67,10 @@ describe('buildInfoPatch', () => {
     const link = 'https://open.spotify.com/album/abc123';
     expect(buildInfoPatch({ category: 'albums', title: link, creator: '' }, link, info({ title: 'Abbey Road', creator: 'The Beatles' }), 'add').title).toBe('Abbey Road');
   });
+  it('a Spotify link whose oEmbed has no artist keeps the artist the person typed', () => {
+    const link = 'https://open.spotify.com/intl-de/album/abc123?si=x';
+    const p = buildInfoPatch({ category: 'albums', title: link, creator: 'Clairo' }, link, info({ title: 'Live at Electric Lady', creator: '', source: 'spotify', sourceId: 'album:abc123' }), 'add');
+    expect(p).toMatchObject({ title: 'Live at Electric Lady', source: 'spotify', sourceId: 'album:abc123' });
+    expect(p).not.toHaveProperty('creator');
+  });
 });

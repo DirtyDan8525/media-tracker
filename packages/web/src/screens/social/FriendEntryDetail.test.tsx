@@ -96,6 +96,18 @@ describe('Friend entry detail', () => {
     renderApp('/u/ren/entry/gone');
     expect(await screen.findByRole('heading', { name: "We couldn't find that title" })).toBeInTheDocument();
   });
+
+  it('a friend\'s song or album has an Open in Spotify link (direct when matched from Spotify, else a search)', async () => {
+    fakeBackend({ me: makeMe(), extra: body(THEIRS({ category: 'songs', status: null, title: 'Time', creator: 'Pink Floyd', source: 'spotify', sourceId: 'track:1XyZ' })) as never });
+    const { unmount } = renderApp('/u/ren/entry/f1');
+    const link = await screen.findByRole('link', { name: 'Open in Spotify' });
+    expect(link).toHaveAttribute('href', 'https://open.spotify.com/track/1XyZ');
+    expect(link).toHaveAttribute('target', '_blank');
+    unmount();
+    fakeBackend({ me: makeMe(), extra: body(THEIRS({ category: 'albums', status: null, title: 'Kid A', creator: 'Radiohead', source: 'deezer', sourceId: 'album:12' })) as never });
+    renderApp('/u/ren/entry/f1');
+    expect(await screen.findByRole('link', { name: 'Open in Spotify' })).toHaveAttribute('href', 'https://open.spotify.com/search/Kid%20A%20Radiohead');
+  });
 });
 
 void REN;

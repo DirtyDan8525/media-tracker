@@ -68,8 +68,14 @@ export function loadSettings(json: string): UserSettings {
   }
   const notify = { ...DEFAULT_USER_SETTINGS.notify };
   if (isPlainObject(known.notify)) for (const k of NOTIFY_KEYS) if (typeof known.notify[k] === 'boolean') notify[k] = known.notify[k];
+  const nav = { ...DEFAULT_USER_SETTINGS.nav };
+  if (isPlainObject(known.nav)) {
+    if (known.nav.side === 'left' || known.nav.side === 'right') nav.side = known.nav.side;
+    if (typeof known.nav.collapsed === 'boolean') nav.collapsed = known.nav.collapsed;
+  }
+  const coverViewer = typeof known.coverViewer === 'boolean' ? known.coverViewer : DEFAULT_USER_SETTINGS.coverViewer;
   // merge over defaults so older rows missing a key still get one
-  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify };
+  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer };
 }
 
 /**

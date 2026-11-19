@@ -15,7 +15,7 @@ export function ProfileButton() {
   if (wide) return null;
   return (
     <Link to="/profile" className="profile-btn" aria-label={requests > 0 ? `Profile, ${requests} friend ${requests === 1 ? 'request' : 'requests'}` : 'Profile'}>
-      <Avatar me={me} size={40} />
+      <Avatar me={me} size={44} />
       {requests > 0 && <span className="nav-dot" aria-hidden="true" />}
     </Link>
   );

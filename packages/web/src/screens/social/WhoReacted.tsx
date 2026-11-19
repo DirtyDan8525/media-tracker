@@ -63,7 +63,7 @@ export function WhoReactedSheet({ target, onClose }: { target: Target; onClose: 
               return (
                 <li key={`${emoji ?? ''}${u.id}`}>
                   <Link to={`/u/${u.username}`} className="person who-row" onClick={onClose}>
-                    {mine ? <Avatar me={me} size={40} /> : <Avatar user={u} size={40} />}
+                    {mine ? <Avatar me={me} size={44} /> : <Avatar user={u} size={44} />}
                     <span className="person__meta">
                       <span className="person__name">{mine ? 'You' : nameOf(u)}</span>
                       <span className="person__sub">@{u.username}</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sourceUrl } from '../src/index';
+import { sourceUrl, spotifyUrl } from '../src/index';
 
 describe('sourceUrl', () => {
   it.each([
@@ -40,5 +40,20 @@ describe('sourceUrl', () => {
     expect(sourceUrl('spotify', 'album:a/b')).toBeNull();
     expect(sourceUrl('steam', '620?x=1')).toBeNull();
     expect(sourceUrl('wiki', 'Alpha Quest')).toBeNull();
+  });
+});
+
+describe('spotifyUrl', () => {
+  it('a Spotify source links straight to the track or album', () => {
+    expect(spotifyUrl({ source: 'spotify', sourceId: 'album:4aBcD3fG', title: 'X', creator: 'Y' })).toBe('https://open.spotify.com/album/4aBcD3fG');
+    expect(spotifyUrl({ source: 'spotify', sourceId: 'track:1XyZ', title: 'X', creator: 'Y' })).toBe('https://open.spotify.com/track/1XyZ');
+  });
+  it('any other source searches Spotify for "title artist"', () => {
+    expect(spotifyUrl({ source: 'deezer', sourceId: 'album:12', title: 'Live At Electric Lady', creator: 'Clairo' }))
+      .toBe('https://open.spotify.com/search/Live%20At%20Electric%20Lady%20Clairo');
+    expect(spotifyUrl({ source: null, sourceId: null, title: 'Time & Tide', creator: '' })).toBe('https://open.spotify.com/search/Time%20%26%20Tide');
+  });
+  it('a malformed Spotify id falls back to the search', () => {
+    expect(spotifyUrl({ source: 'spotify', sourceId: 'album:a/b', title: 'T', creator: 'A' })).toBe('https://open.spotify.com/search/T%20A');
   });
 });

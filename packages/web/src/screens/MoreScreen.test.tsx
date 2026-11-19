@@ -20,7 +20,7 @@ describe('More (SettingsMore.v2)', () => {
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
       .toEqual(['Ratings', 'Your data', 'App']);
     expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats']);
-    expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(["What's new", 'Coming soon', 'About Media Tracker']);
+    expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Help & how-tos', 'Install instructions', "What's new", 'Coming soon', 'About Media Tracker']);
   });
 
   it('How to use the app re-opens the walkthrough', async () => {

@@ -199,6 +199,34 @@
 .side-nav__link:hover { background: var(--card); }
 .side-nav__link.active { color: var(--highlight); font-weight: 600; }
 
+/* Collapse button beside the brand; collapsed = a 72 px icon rail (names are aria-labels + tooltips, badges stay on the icons). */
+.side-nav__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.side-nav__head .side-nav__brand { flex: 1; min-width: 0; }
+.side-nav__toggle {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap);
+  border: 0; border-radius: var(--radius-md); background: none; color: var(--muted-text); cursor: pointer;
+}
+.side-nav__toggle:hover { background: var(--card); color: var(--bright-text); }
+.side-nav__toggle-icon { display: flex; transform: rotate(180deg); }
+.side-nav--collapsed .side-nav__toggle-icon { transform: none; }
+.side-nav__toggle:focus-visible, .side-nav__link:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+@media (prefers-reduced-motion: no-preference) { .side-nav__toggle-icon { transition: transform var(--dur-fast) var(--ease); } }
+.side-nav--collapsed { width: 72px; padding-inline: var(--space-3); align-items: center; }
+.side-nav--collapsed .side-nav__head { flex-direction: column; }
+.side-nav--collapsed .side-nav__brand { padding: 0; justify-content: center; flex: none; width: var(--tap); }
+.side-nav--collapsed .side-nav__divider { align-self: stretch; }
+.side-nav--collapsed .side-nav__footer { align-items: center; align-self: stretch; }
+.side-nav--collapsed .side-nav__profile { padding: var(--space-3); justify-content: center; min-height: var(--tap); }
+.side-nav__rail-lists { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.side-nav__link--rail { justify-content: center; width: var(--tap); min-height: var(--tap); padding: 0; }
+.side-nav__link--rail .side-nav__rail-icon svg { color: var(--muted-text); }
+.side-nav__link--rail.active .side-nav__rail-icon svg { color: var(--highlight); }
+.side-nav__rail-icon { position: relative; display: flex; }
+.side-nav__rail-count { position: absolute; top: -8px; left: 12px; min-width: 18px; height: 18px; padding: 0 4px; font-size: var(--fs-tab); }
+/* Side bar on the right (Settings): the nav sits after the content. */
+.frame--nav-right { flex-direction: row-reverse; }
+.frame--nav-right .side-nav { border-right: 0; border-left: 1px solid var(--grid-line); }
+
 /* ---------- Frame ---------- */
 .frame--phone .frame__main { padding-bottom: calc(var(--bottom-tabs-h) + env(safe-area-inset-bottom)); }
 .frame--wide { display: flex; min-height: 100dvh; }

@@ -1,6 +1,6 @@
 import { CATEGORY_CONFIG, PROGRESS_CATEGORIES, STATUSES, formatRating, showsProgress, statusLabel, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { type KeyboardEvent } from 'react';
+import { useMemo, type HTMLAttributes, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
 import { effectiveLookupState } from '../../data/entryCache';
 import { SAVE_FAILED, saveEntryChange } from '../../data/entryMutations';
@@ -14,6 +14,9 @@ import { ProgressControl, progressText } from './ProgressControl';
 import { LookupNote } from './LookupNote';
 import { PrivateLock } from './PrivateLock';
 import { stagger, type RowActions } from './EntryCards';
+import { TableFrame, useRowViewer, type ColumnDef, type ViewerItem } from './tableKit';
+import { LIST_LABEL } from '../../nav';
+import { backState } from '../../shell/BackButton';
 
 /** Moves focus to the same column in the nearest row above/below that has it. */
 function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
@@ -29,57 +32,42 @@ function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
   }
 }
 
-/** Fixed column widths in px (mirrors lists.css); Notes takes the rest but never less than NOTES_MIN. */
-export const COL_WIDTHS = { cover: 56, rating: 72, title: 220, status: 132, progress: 196, genres: 140, creator: 140, avg: 80 } as const;
-const NOTES_MIN = 140;
-export function tableMinWidth(cols: (keyof typeof COL_WIDTHS)[]): number {
-  return cols.reduce((n, c) => n + COL_WIDTHS[c], NOTES_MIN);
-}
-
 export interface EntryTableProps extends RowActions {
   rows: Entry[];
   label: string;
   showSeasonAvg: boolean;
 }
 
-/** PC list: a table whose rating, status and notes edit in place. */
+/** PC list: a table whose rating, status and notes edit in place. Columns resize; a click on a row opens the cover viewer. */
 export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTableProps) {
   const first = rows[0];
+  const items = useMemo<ViewerItem[]>(() => rows.map((e) => ({
+    id: e.id, title: e.title, category: e.category, coverUrl: e.coverUrl, rating: e.rating, status: e.status, creator: e.creator,
+    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, to: `/entry/${e.id}`, state: backState(LIST_LABEL[e.category]),
+  })), [rows]);
+  const viewer = useRowViewer(items);
   if (!first) return null;
   const cfg = CATEGORY_CONFIG[first.category];
   // Columns with nothing to show on this list are left out, so Notes keeps its room (Dan, 2026-11-17).
   const hasProgress = PROGRESS_CATEGORIES.includes(first.category) && rows.some((r) => showsProgress(r) || (r.progress ?? 0) > 0);
-  const cols: (keyof typeof COL_WIDTHS)[] = ['cover', 'rating', 'title', 'genres'];
-  if (cfg.hasStatus) cols.push('status');
-  if (hasProgress) cols.push('progress');
-  if (cfg.creatorLabel) cols.push('creator');
   const withAvg = showSeasonAvg && rows.some((r) => r.seasonAvg != null);
-  if (withAvg) cols.push('avg');
+  const columns: ColumnDef[] = [{ id: 'cover', label: 'Cover' }, { id: 'rating', label: 'Rating' }, { id: 'title', label: 'Title' }];
+  if (cfg.hasStatus) columns.push({ id: 'status', label: 'Status' });
+  if (hasProgress) columns.push({ id: 'progress', label: 'Progress' });
+  columns.push({ id: 'genres', label: 'Genres' });
+  if (cfg.creatorLabel) columns.push({ id: 'creator', label: cfg.creatorLabel });
+  if (withAvg) columns.push({ id: 'avg', label: 'Season Avg' });
+  columns.push({ id: 'notes', label: 'Notes' });
   return (
-    <div className="table-wrap">
-      <table className="entry-table" aria-label={label} style={{ minWidth: tableMinWidth(cols) }}>
-        <thead>
-          <tr>
-            <th scope="col" className="col-cover">Cover</th>
-            <th scope="col" className="col-rating">Rating</th>
-            <th scope="col" className="col-title">Title</th>
-            {cfg.hasStatus && <th scope="col" className="col-status">Status</th>}
-            {hasProgress && <th scope="col" className="col-progress">Progress</th>}
-            <th scope="col" className="col-genres">Genres</th>
-            {cfg.creatorLabel && <th scope="col" className="col-creator">{cfg.creatorLabel}</th>}
-            {withAvg && <th scope="col" className="col-avg">Season Avg</th>}
-            <th scope="col">Notes</th>
-          </tr>
-        </thead>
-        <tbody onKeyDown={onGridKeyDown}>
-          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} {...actions} />)}
-        </tbody>
-      </table>
-    </div>
+    <TableFrame list={first.category} label={label} columns={columns} viewer={viewer}>
+      <tbody onKeyDown={onGridKeyDown}>
+        {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} rowProps={viewer.rowProps(e.id)} {...actions} />)}
+      </tbody>
+    </TableFrame>
   );
 }
 
-function TableRow({ entry: e, index, showSeasonAvg, hasProgress, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean } & RowActions) {
+function TableRow({ entry: e, index, showSeasonAvg, hasProgress, rowProps, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean; rowProps: HTMLAttributes<HTMLTableRowElement> } & RowActions) {
   const qc = useQueryClient();
   const toast = useToast();
   const cfg = CATEGORY_CONFIG[e.category];
@@ -88,7 +76,7 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, ...actions }: {
   const save = (patch: Partial<Entry>) => void saveEntryChange(qc, e, patch, () => toast.show(SAVE_FAILED));
 
   return (
-    <tr className={state === 'pending' ? 'is-pending rise-in' : 'rise-in'} style={stagger(index)}>
+    <tr className={state === 'pending' ? 'is-pending rise-in' : 'rise-in'} style={stagger(index)} {...rowProps}>
       <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
       <td>
         {editable ? (
@@ -103,7 +91,7 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, ...actions }: {
       </td>
       <td>
         <div className="cell-title">
-          {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} data-nav="title" data-role="title">{e.title}</Link>}
+          {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} state={backState(LIST_LABEL[e.category])} data-nav="title" data-role="title">{e.title}</Link>}
           {e.isPrivate && <PrivateLock />}
           <LookupNote entry={e} {...actions} />
         </div>

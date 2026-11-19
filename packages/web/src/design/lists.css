@@ -52,27 +52,62 @@ a.entry-card__title { line-height: var(--tap); }
 .entry-card__note { font-size: var(--fs-meta); color: var(--muted-text); }
 .entry-card__actions { display: flex; gap: var(--space-4); flex-wrap: wrap; }
 
-/* PC table (v2: 40 × 60 covers) */
+/* PC table (v2: 40 × 60 covers). Column widths come from <col> (COL_WIDTHS in tableKit.tsx, or what the user dragged to); the
+   table is never narrower than their sum and shares any extra room in proportion. Cells clip, so neighbours can never overlap. */
+.list-split { display: flex; align-items: flex-start; gap: var(--space-10); }
+.list-split__table { flex: 1; min-width: 0; }
+.frame--nav-right .list-split { flex-direction: row-reverse; }
+.table-tools { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
 .table-wrap { overflow-x: auto; border-radius: var(--radius-xl); border: 1px solid var(--grid-line); background: var(--bg); }
 .entry-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-sm); }
 .entry-table th, .entry-table td { box-sizing: border-box; }
-.entry-table th { padding: 13px var(--space-7); text-align: left; font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); background: var(--header-row); }
-.entry-table td { padding: 5px var(--space-7); vertical-align: middle; }
+.entry-table th { position: relative; padding: 13px var(--space-7); text-align: left; font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); background: var(--header-row); }
+.entry-table td { padding: 5px var(--space-7); vertical-align: middle; overflow: hidden; }
+.entry-table .col-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-table tbody tr { border-top: 1px solid var(--grid-line); background: var(--bg); transition: background 0.15s var(--ease); }
 .entry-table tbody tr:nth-child(even) { background: var(--alt-row); }
 .entry-table tbody tr:hover { background: var(--panel); }
-/* Fixed column widths (item 27); Notes, with no width, takes whatever is left. Keep in step with COL_WIDTHS in EntryTable.tsx. */
-.entry-table .col-cover { width: 56px; padding-inline: var(--space-4); }
-.entry-table .col-rating { width: 72px; padding-inline: var(--space-4); text-align: center; }
-.entry-table .col-year { width: 64px; }
-.entry-table .col-title { width: 220px; }
-.entry-table .col-status { width: 132px; }
-.entry-table .col-genres { width: 140px; }
-.entry-table .col-creator { width: 140px; }
-.entry-table .col-avg { width: 80px; }
-.entry-table td.col-genres, .entry-table td.col-creator, .entry-table td.col-year { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.entry-table td:last-child { overflow: hidden; }
+.entry-table tbody tr[aria-selected="true"] { background: var(--panel); box-shadow: inset 3px 0 0 var(--highlight); }
+.entry-table tbody tr[data-row] { cursor: pointer; }
+.entry-table tbody tr[data-row]:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.entry-table .col-cover, .entry-table .col-rating { padding-inline: var(--space-4); }
+.entry-table .col-rating { text-align: center; }
+.entry-table td.col-genres, .entry-table td.col-creator, .entry-table td.col-year { text-overflow: ellipsis; white-space: nowrap; }
 .entry-table td:last-child .cell-btn { max-width: 100%; }
+/* Drag handle on each header's right edge: a 44 px-wide hit area around a thin line. */
+.col-resize {
+  position: absolute; top: 0; bottom: 0; right: -22px; z-index: 1; width: var(--tap); padding: 0; border: 0; background: none; cursor: col-resize; touch-action: none;
+}
+.col-resize--last { right: 0; }
+.col-resize::before { content: ''; position: absolute; top: 25%; bottom: 25%; left: calc(50% - 1px); width: 2px; border-radius: 1px; background: var(--grid-line); }
+.col-resize--last::before { left: auto; right: 4px; }
+.col-resize:hover::before, .col-resize:focus-visible::before { background: var(--highlight); }
+.col-resize:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+
+/* Cover viewer: docked beside the table, on the side opposite the nav. */
+.cover-viewer {
+  position: sticky; top: var(--space-8); flex: none; width: 340px; max-height: calc(100dvh - 2 * var(--space-8)); overflow-y: auto;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); padding: var(--space-8);
+  border: 1px solid var(--grid-line); border-radius: var(--radius-xl); background: var(--card);
+}
+.cover-viewer__close { align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) calc(-1 * var(--space-6)) 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--text); cursor: pointer; }
+.cover-viewer__close:hover { background: var(--panel); }
+.cover-viewer__close:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.cover-viewer__cover { width: 100%; }
+.cover-viewer__title { margin: var(--space-3) 0 0; font-size: 20px; line-height: 1.25; color: var(--bright-text); overflow-wrap: anywhere; }
+.cover-viewer__list, .cover-viewer__meta { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); }
+.cover-viewer__facts { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.cover-viewer__genres { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cover-viewer__synopsis { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text); }
+.cover-viewer__open { align-self: stretch; min-height: var(--tap); }
+
+/* PC Back button on title pages reached from another page. */
+.back-link {
+  display: inline-flex; align-items: center; gap: var(--space-3); min-height: var(--tap); padding: 0 var(--space-6); border: 0; border-radius: var(--radius-md);
+  background: none; color: var(--text); font: 600 var(--fs-sm) var(--font); cursor: pointer;
+}
+.back-link:hover { background: var(--card); color: var(--bright-text); }
+.back-link:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
 .cell-title { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; font-weight: 600; }
 .cell-title a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--bright-text); font-size: var(--fs-body); text-decoration: none; }
 .cell-title a:hover { text-decoration: underline; }
@@ -220,7 +255,9 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 .search__input { -webkit-appearance: none; appearance: none; }
 
 /* Episode progress (item 22): "7 / 24" with − and + */
-.entry-table .col-progress { width: 196px; white-space: nowrap; }
+.entry-table .col-progress { white-space: nowrap; }
+/* Narrower number boxes in the table ("999" fits); phone and title page keep 6ch. */
+.entry-table .ep-progress__input { width: 4.5ch; }
 .ep-progress { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
 .ep-progress__row { display: inline-flex; align-items: center; gap: var(--space-2); }
 .ep-progress__btn {

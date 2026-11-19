@@ -28,7 +28,7 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
   const [category, setCategory] = useState<Category>(initial);
   const cfg = CATEGORY_CONFIG[category];
   const lists = useEnabledLists();
-  const ids = { title: useId(), creator: useId(), notes: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
+  const ids = { title: useId(), titleHint: useId(), pasteHint: useId(), creator: useId(), notes: useId(), rating: useId(), ratingErr: useId(), ratingHint: useId() };
   const [title, setTitle] = useState('');
   const [creator, setCreator] = useState('');
   const [notes, setNotes] = useState('');
@@ -49,7 +49,9 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
     onClose();
   }
 
-  const spotify = category === 'albums' || category === 'songs';
+  // A link works as the title for these lists (the lookup reads it): Songs/Albums take Spotify, YouTube takes YouTube.
+  const pasteHint = category === 'albums' || category === 'songs' ? "Didn't find it? Paste a Spotify link."
+    : category === 'youtube' ? 'You can also paste a YouTube link.' : null;
   return (
     <Sheet
       open
@@ -76,13 +78,13 @@ export function AddEntry({ category: initial, onSubmit, onClose }: AddEntryProps
           <label className="field-label" htmlFor={ids.title}>{cfg.titleLabel}</label>
           <input
             id={ids.title} data-autofocus className="input input--lg" value={title} maxLength={300} autoComplete="off"
+            aria-describedby={pasteHint ? `${ids.titleHint} ${ids.pasteHint}` : ids.titleHint}
             onChange={(e) => setTitle(e.target.value)}
           />
-          <span className="field-hint">
+          <span id={ids.titleHint} className="field-hint">
             Typos are fine. The official title and cover{cfg.creatorLabel ? ` and ${lower(cfg.creatorLabel)}` : ''} fill in for you.
-            {spotify && ' You can also paste a Spotify link.'}
-            {category === 'youtube' && ' You can also paste a YouTube link.'}
           </span>
+          {pasteHint && <span id={ids.pasteHint} className="field-hint">{pasteHint}</span>}
         </div>
 
         {cfg.creatorLabel && (

@@ -61,8 +61,8 @@ export function mockApi(me: Me, extra: Record<string, Handler | MockResponse> = 
     'GET /api/me': () => ({ body: current }),
     'GET /api/entries': { body: [] },
     'PUT /api/me/settings': (b) => {
-      const partial = (b as { settings: Partial<UserSettings> }).settings;
-      current = { ...current, settings: { ...current.settings, ...partial, tabs: { ...current.settings.tabs, ...partial.tabs }, colors: { ...current.settings.colors, ...partial.colors }, notify: { ...current.settings.notify, ...partial.notify } } };
+      const partial = (b as { settings: Partial<UserSettings> & { nav?: Partial<UserSettings['nav']> } }).settings;
+      current = { ...current, settings: { ...current.settings, ...partial, tabs: { ...current.settings.tabs, ...partial.tabs }, colors: { ...current.settings.colors, ...partial.colors }, notify: { ...current.settings.notify, ...partial.notify }, nav: { ...current.settings.nav, ...partial.nav } } };
       return { body: { settings: current.settings } };
     },
     ...extra,

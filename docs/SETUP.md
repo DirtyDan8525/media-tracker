@@ -305,6 +305,26 @@ npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env 
 ```
 **Success:** it reports the number of queries run and no error. The export already contains the table definitions and the migration record, so do **not** run `migrations apply` first on that database. Pictures sent in messages live in the separate storage bucket and are not in either backup.
 
+
+### Automatic nightly backups (separate from Cloudflare)
+
+A copy of the whole database is saved every night into a **private** GitHub repo and kept for 90 days. (Your app repo is public: never put backups there. The copy includes scrambled passwords, so keep the backup repo private.)
+
+1. On GitHub, click **+ → New repository**. Name it `media-tracker-backups`, choose **Private**, tick **Add a README file**, click **Create repository**.
+2. In that repo: **Settings → Secrets and variables → Actions → New repository secret**, twice:
+   - Name `CLOUDFLARE_API_TOKEN`, value: the same Cloudflare token you use in the Codespace.
+   - Name `CLOUDFLARE_ACCOUNT_ID`, value: your Cloudflare account ID (Cloudflare dashboard → Workers & Pages → the "Account ID" on the right).
+3. In that repo: **Add file → Create new file**, name it `.github/workflows/backup.yml`, paste the contents of `docs/backup/backup.yml` from the app repo, and click **Commit changes**.
+4. **Actions** tab → **Backup database** → **Run workflow** to make the first backup now.
+
+**Success:** the run turns green and has a `media-tracker-YYYY-MM-DD` file under **Artifacts**. After that it runs by itself every night. While a backup runs (a few seconds for a small database) the app may pause for a moment.
+
+**To restore from a nightly copy:** download the artifact, unzip it to get `media-tracker-YYYY-MM-DD.sql`, then (this replaces data, so only when you mean it):
+```
+npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --file media-tracker-YYYY-MM-DD.sql
+```
+For small mistakes from the last 7 days, Cloudflare's Time Travel is easier: `npm exec -w packages/worker -- wrangler d1 time-travel restore media-tracker --env production --timestamp=<when>`.
+
 ## The three most likely problems
 
 1. **`npm ci` fails or crashes, or says the engine is not supported.** You have an old Node. Run `node -v`; if it is not 24, reinstall Node.js 24 LTS (step 2), reopen PowerShell, and run `npm ci` again.

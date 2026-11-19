@@ -1,0 +1,39 @@
+# Nightly backup of the Media Tracker database.
+# Put this file at .github/workflows/backup.yml in a PRIVATE repo (e.g. media-tracker-backups),
+# never in the public app repo. Needs two repo secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+name: Backup database
+
+on:
+  schedule:
+    - cron: "17 7 * * *" # every day at 07:17 UTC (2:17 or 3:17 am Eastern)
+  workflow_dispatch: {} # "Run workflow" button for a backup right now
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Export the database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          day=$(date -u +%Y-%m-%d)
+          npx -y wrangler@4 d1 export media-tracker --remote --output "media-tracker-$day.sql"
+          test -s "media-tracker-$day.sql"
+          gzip -9 "media-tracker-$day.sql"
+          echo "DAY=$day" >> "$GITHUB_ENV"
+      - name: Keep the copy for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-tracker-${{ env.DAY }}
+          path: media-tracker-*.sql.gz
+          retention-days: 90
+          if-no-files-found: error

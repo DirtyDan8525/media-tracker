@@ -127,10 +127,12 @@ function DetailBody({ entry }: { entry: Entry }) {
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
             {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
-            <WatchOnYouTube entry={entry} />
-            <OpenInSpotify entry={entry} />
-            <PlayPreview entry={entry} />
-            <PlayTrailer entry={entry} />
+            <div className="detail__actions">
+              <WatchOnYouTube entry={entry} />
+              <OpenInSpotify entry={entry} />
+              <PlayPreview entry={entry} />
+              <PlayTrailer entry={entry} />
+            </div>
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>

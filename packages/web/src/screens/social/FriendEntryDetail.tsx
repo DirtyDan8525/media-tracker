@@ -95,9 +95,11 @@ function Body({ username, entry, seasons }: {
                 Watch on YouTube
               </a>
             )}
-            <OpenInSpotify entry={entry} />
-            <PlayPreview entry={entry} />
-            <PlayTrailer entry={entry} />
+            <div className="detail__actions">
+              <OpenInSpotify entry={entry} />
+              <PlayPreview entry={entry} />
+              <PlayTrailer entry={entry} />
+            </div>
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>

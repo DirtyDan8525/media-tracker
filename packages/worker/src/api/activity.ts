@@ -193,7 +193,11 @@ activity.get('/', async (c) => {
     db.prepare(
       `SELECT a.id, a.post_id, a.user_id, a.type, a.entry_id, a.payload_json, a.created_at, e.category, e.title, e.cover_url, e.creator,
               -- The note rides along only for its owner or an accepted friend, and never when the owner made notes private.
-              CASE WHEN e.user_id = ?1 OR (e.notes_private = 0 AND e.user_id IN (${FRIEND_IDS_SQL('?1')})) THEN NULLIF(e.notes, '') END AS note
+              -- A non-private note goes to friends, and to everyone while the admin switch
+              -- "Everyone feed shows notes to non-friends" (features.everyoneNotes, default on) is on.
+              CASE WHEN e.user_id = ?1 OR (e.notes_private = 0 AND (e.user_id IN (${FRIEND_IDS_SQL('?1')})
+                OR COALESCE((SELECT CASE WHEN json_valid(value_json) THEN json_extract(value_json, '$.everyoneNotes') END
+                             FROM app_settings WHERE key = 'features'), 1) != 0)) THEN NULLIF(e.notes, '') END AS note
          FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
         WHERE (a.id IN (SELECT value FROM json_each(?2)) OR a.post_id IN (SELECT value FROM json_each(?2)))
           AND ${ROW_VISIBLE[show]}

@@ -552,11 +552,20 @@ describe('GET /api/activity?show= (S6)', () => {
     expect(by(friend, 'Closed')).toMatchObject({ creator: 'Studio Y', note: null });
     expect(by(friend, 'Bare').note).toBeNull();
     expect(JSON.stringify(friend)).not.toContain('secret review');
-    // Not a friend (Everyone feed): the title shows, the note never does.
-    const stranger = await feed(C, '?show=everyone');
+    // Not a friend (Everyone feed), admin switch "Everyone feed shows notes" on (the default): the
+    // non-private note shows; a private note never does.
+    let stranger = await feed(C, '?show=everyone');
+    expect(by(stranger, 'Open')).toMatchObject({ creator: 'Studio X', note: 'Loved it' });
+    expect(JSON.stringify(stranger)).not.toContain('secret review');
+    // Switch off: notes are friends-only again.
+    await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES ('features', ?, ?)")
+      .bind(JSON.stringify({ everyoneNotes: false }), new Date().toISOString()).run();
+    stranger = await feed(C, '?show=everyone');
     expect(by(stranger, 'Open')).toMatchObject({ creator: 'Studio X', note: null });
     expect(JSON.stringify(stranger)).not.toContain('Loved it');
     expect(JSON.stringify(stranger)).not.toContain('secret review');
+    expect(by(await feed(B, '?show=friends'), 'Open').note).toBe('Loved it'); // friends still see it
+    await env.DB.prepare("DELETE FROM app_settings WHERE key = 'features'").run();
   });
 
   it('a page with posts from 2 users, reactions and comments costs ≤ 10 queries', async () => {

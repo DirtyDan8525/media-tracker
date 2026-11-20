@@ -21,6 +21,16 @@ function setup(over: Parameters<typeof messagesBackend>[0] = {}, extra: Record<s
 afterEach(() => vi.useRealTimers());
 
 describe('Chat', () => {
+  it("tapping their picture or name opens their profile, and Back returns to the chat (Dan, 2026-11-20)", async () => {
+    setup({ messages: { c1: [makeMessage({ senderId: REN_U.id, text: 'hey' })] } });
+    const { router } = renderApp('/messages');
+    router.navigate('/messages/c1');
+    await userEvent.click(await screen.findByRole('link', { name: "Open Ren's profile" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/u/ren'));
+    await userEvent.click((await screen.findAllByRole('button', { name: /Back/ }))[0]!);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/messages/c1'));
+  });
+
   it('shows day separators, mine on the right and theirs on the left, and no time on the bubbles', async () => {
     setup({
       messages: {

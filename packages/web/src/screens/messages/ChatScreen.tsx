@@ -1,6 +1,7 @@
 import { nameOf, type Conversation, type Message, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
+import { backState } from '../../shell/BackButton';
 import { ApiError } from '../../api/client';
 import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage, useReactToMessage } from '../../data/messages';
 import { CoverBackdrop } from '../../design/components/CoverBackdrop';
@@ -207,13 +208,26 @@ function Chat({ conversation }: { conversation: Conversation }) {
       style={{ '--chat-scale': textSize.scale, '--bubble-mine-bg': mineColors.bg, '--bubble-mine-text': mineColors.text } as CSSProperties}>
       <header className="chat__top">
         <ChatBack />
-        {isGroup
-          ? <span className="chat-avatar chat-avatar--group" aria-hidden="true"><Icon name="group" size={20} /></span>
-          : other && <Avatar user={other} size={44} viewable name={other.displayName || `@${other.username}`} />}
-        <div className="chat__titles">
-          <h1 className="chat__title">{title}</h1>
-          {sub && <span className="chat__sub">{sub}</span>}
-        </div>
+        {isGroup ? (
+          <>
+            <span className="chat-avatar chat-avatar--group" aria-hidden="true"><Icon name="group" size={20} /></span>
+            <div className="chat__titles">
+              <h1 className="chat__title">{title}</h1>
+              {sub && <span className="chat__sub">{sub}</span>}
+            </div>
+          </>
+        ) : other ? (
+          // Tapping their picture or name opens their profile; its Back returns here (Dan, 2026-11-20).
+          <Link to={`/u/${other.username}`} state={backState('chat')} className="chat__who" aria-label={`Open ${other.displayName || `@${other.username}`}'s profile`}>
+            <Avatar user={other} size={44} />
+            <div className="chat__titles">
+              <h1 className="chat__title">{title}</h1>
+              {sub && <span className="chat__sub">{sub}</span>}
+            </div>
+          </Link>
+        ) : (
+          <div className="chat__titles"><h1 className="chat__title">{title}</h1></div>
+        )}
         <TextSizeControl step={textSize.step} onChange={textSize.set} />
         {isGroup && (
           <div className="chat__menu" ref={menuWrap}

@@ -54,7 +54,7 @@ export function FriendProfile() {
   if (profile.isPending) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
-        <div className="friend-top"><BackButton to="/friends" pc /></div>
+        <div className="friend-top"><BackButton to="/friends" pc useHistory /></div>
         <div className="screen__body stack-10"><Skeleton height={96} /><Skeleton height={64} /><Skeleton height={64} /></div>
       </div>
     );
@@ -63,7 +63,7 @@ export function FriendProfile() {
     const missing = (profile.error as { status?: number } | null)?.status === 404;
     return (
       <div className="screen">
-        <div className="friend-top"><BackButton to="/friends" pc /></div>
+        <div className="friend-top"><BackButton to="/friends" pc useHistory /></div>
         <div className="screen__body">
           {missing ? (
             <EmptyState icon="info" title="We couldn't find that person" body="Check the username, or ask them for their invite link."
@@ -93,7 +93,7 @@ function StrangerView({ user, relation }: { user: PublicUser; relation: 'none' |
   };
   return (
     <div className="screen">
-      <div className="friend-top"><BackButton to="/friends" pc /></div>
+      <div className="friend-top"><BackButton to="/friends" pc useHistory /></div>
       <div className="screen__body social-page">
         <div className="friend-id">
           <PersonAvatar user={user} size={96} viewable name={who(user)} />
@@ -153,7 +153,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
   return (
     <div className="screen">
       <div className="friend-top">
-        <BackButton to="/friends" pc />
+        <BackButton to="/friends" pc useHistory />
         <MoreMenu user={user} friends={friends.data} />
       </div>
       <div className="screen__body social-page friend-page">

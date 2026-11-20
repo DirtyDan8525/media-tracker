@@ -571,5 +571,21 @@ describe('ActivityScreen: everyone and deleting posts', () => {
       expect(within(sheet).getByRole('heading', { name: 'Frieren' })).toBeInTheDocument();
       expect(sheet).toHaveTextContent('Gorgeous soundtrack, full text here');
     });
+
+    it('phone: a song post plays its preview right from the sheet, using the exact Deezer id (Dan, 2026-11-20)', async () => {
+      const { calls } = fakeBackend({ extra: {
+        'GET /api/activity': { body: page([item({ type: 'rated', category: 'songs', title: 'Mr. Blue Sky', creator: 'Electric Light Orchestra', source: 'deezer', sourceId: 'track:123', payload: { from: null, to: 9 } } as never)]) },
+        'GET /api/preview': { body: { url: 'https://cdnt-preview.dzcdn.net/x.mp3' } },
+        'GET /api/spotify/link': { body: { url: null } },
+      } });
+      renderApp('/activity');
+      const li = (await screen.findByRole('link', { name: /Mr\. Blue Sky/ })).closest('li')!;
+      await userEvent.click(li.querySelector('.activity-line__text')!);
+      const sheet = await screen.findByRole('dialog', { name: 'Post details' });
+      expect(await within(sheet).findByRole('button', { name: /Play preview/ })).toBeInTheDocument();
+      expect(within(sheet).getByRole('link', { name: /Open in Spotify/ })).toBeInTheDocument();
+      const preview = calls.find((c) => c.path.startsWith('/api/preview'))!;
+      expect(preview.path).toContain('id=track%3A123');
+    });
   });
 });

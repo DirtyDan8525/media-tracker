@@ -1,4 +1,4 @@
-import type { Category } from './types';
+import type { Category, Entry } from './types';
 import type { PostSocial, PublicUser } from './social';
 
 export const ACTIVITY_TYPES = ['added', 'rated', 're-rated', 'status'] as const;
@@ -20,6 +20,10 @@ export interface ActivityItem {
   coverUrl: string;
   /** The entry's creator (artist, studio, director, author); '' when it has none. */
   creator?: string;
+  /** Where the title came from (e.g. Deezer track id), so Play preview / trailer find the exact one; and its release date. */
+  source?: Entry['source'];
+  sourceId?: string | null;
+  releaseDate?: string;
   /** The owner's note on the title when this viewer may read it (yours, or a friend's that isn't private); else null. */
   note?: string | null;
   payload: {
@@ -58,6 +62,9 @@ export interface ActivityLine {
   entryTitle: string;
   coverUrl: string;
   creator: string;
+  source: Entry['source'];
+  sourceId: string | null;
+  releaseDate: string;
   note: string | null;
   at: string;
   added: boolean;
@@ -132,6 +139,9 @@ export function foldPosts(items: ActivityItem[]): ActivityLine[] {
         entryTitle: n.title,
         coverUrl: n.coverUrl,
         creator: n.creator ?? '',
+        source: n.source ?? null,
+        sourceId: n.sourceId ?? null,
+        releaseDate: n.releaseDate ?? '',
         note: n.note && n.note.trim() !== '' ? n.note : null,
         at: n.createdAt,
         added,

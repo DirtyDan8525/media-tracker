@@ -70,7 +70,8 @@ export function PostDetails({ line, who, friend, social, features, now, onCommen
     }
   }
   // The shared entry buttons take what the feed knows; the rest (source ids, release year) is looked up by title.
-  const media = { category: line.category, title: line.entryTitle, creator: line.creator, releaseDate: '', source: null, sourceId: null };
+  // Source ids let Play preview / trailer fetch the exact title, as on the title page (Dan, 2026-11-20).
+  const media = { category: line.category, title: line.entryTitle, creator: line.creator, releaseDate: line.releaseDate, source: line.source, sourceId: line.sourceId };
   return (
     <div className="activity-details">
       <div className="activity-panel__top">

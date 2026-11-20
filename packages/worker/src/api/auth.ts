@@ -3,9 +3,8 @@
  * requireUser, so these answer signed-out callers. The Origin check in index.ts still applies.
  */
 import { Hono } from 'hono';
-import { DEFAULT_USER_SETTINGS, tabsFor, type UserSettings } from '@media-tracker/shared';
 import { loadAppSettings } from '../settings/appSettings';
-import { USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
+import { APP_DEFAULTS_SQL, USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
 import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
 import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
 import { cleanDisplayName, meBody } from './me';
@@ -70,11 +69,8 @@ auth.post('/signup', async (c) => {
   const closed = !app.features.signups;
   // Closed: only a sign-up link gets in (a plain sign-up is refused before anything is written).
   if (closed && !joinHash) return c.json({ error: 'feature_off' }, 403);
-  const startSettings: UserSettings = {
-    ...DEFAULT_USER_SETTINGS,
-    theme: app.defaults.theme,
-    tabs: tabsFor(app.defaults.lists, DEFAULT_USER_SETTINGS.tabs),
-  };
+  // Nothing is copied: a new person follows the admin defaults until they change a setting themselves (customized stays empty).
+  const startSettings = { customized: {} };
   const id = crypto.randomUUID();
   const passwordHash = await hashPassword(body.password);
   const s = await freshSession();
@@ -113,7 +109,7 @@ auth.post('/signup', async (c) => {
     return c.json({ error: 'feature_off' }, 403);
   }
   if (!created) throw new Error('signup: user not created');
-  const me = meBody(toAppUser(created, c.env.ADMIN_EMAIL));
+  const me = meBody(toAppUser(created, c.env.ADMIN_EMAIL, app.defaults));
   // A link was offered but did not work (used, expired, revoked, unknown): the UI says so.
   if (created.status === 'pending') pushSignup(c.env, ctxOf(c), { id, username, displayName });
   const offered = body.joinToken !== undefined && body.joinToken !== '';
@@ -154,7 +150,7 @@ auth.post('/login', async (c) => {
   const db = c.env.DB;
   const now = Date.now();
   const [userRes, failRes] = await db.batch([
-    db.prepare(`SELECT ${USER_COLS}, password_hash FROM users WHERE username = ?`).bind(username),
+    db.prepare(`SELECT ${USER_COLS}, password_hash, ${APP_DEFAULTS_SQL} FROM users WHERE username = ?`).bind(username),
     db.prepare(`SELECT at FROM login_failures WHERE username = ? ORDER BY at DESC LIMIT ${LOGIN_MAX_FAILURES}`).bind(username),
   ]);
   if (locked((failRes!.results as { at: string }[]).map((r) => r.at), now)) return c.json({ error: 'too_many_attempts' }, 429);

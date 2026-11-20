@@ -47,7 +47,8 @@ export function ExportRow() {
   const { busy, run } = useExportData();
 
   return (
-    <button type="button" className="group__row export-row" disabled={busy} aria-describedby={hintId} onClick={run}>
+    // aria-disabled, not disabled: a disabled button drops keyboard focus mid-export.
+    <button type="button" className="group__row export-row" aria-disabled={busy} aria-describedby={hintId} onClick={busy ? undefined : run}>
       <span className="group__row-start">
         <span className="tile-icon"><Icon name="download" size={18} /></span>
         {busy ? 'Exporting…' : 'Export my data'}

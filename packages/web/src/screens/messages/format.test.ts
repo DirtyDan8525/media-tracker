@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageText, listTime, previewOf } from './format';
+import { ageText, listTime, previewOf, quoteText, snippetOfMessage } from './format';
 import { fitWithin } from './resizeImage';
 import { makeSummary, ME, REN_U } from '../../test/messagesBackend';
 
@@ -34,11 +34,27 @@ describe('listTime and ageText', () => {
 
 describe('previewOf', () => {
   const at = '2026-11-17T10:00:00Z';
-  it('a note on a rec is kept', () => {
+  it('a note on a rec is kept (older rows without a title still read "a title")', () => {
     const c = makeSummary({ last: { kind: 'rec', text: 'watch it', senderId: REN_U.id, deleted: false, createdAt: at } });
     expect(previewOf(c, ME.id)).toBe('Recommended a title: watch it');
   });
+  it('a rec preview names the title', () => {
+    const c = makeSummary({ last: { kind: 'rec', text: '', recTitle: 'Frieren', senderId: ME.id, deleted: false, createdAt: at } });
+    expect(previewOf(c, ME.id)).toBe('You: Recommended Frieren');
+    const withNote = makeSummary({ last: { kind: 'rec', text: 'watch it', recTitle: 'Frieren', senderId: ME.id, deleted: false, createdAt: at } });
+    expect(previewOf(withNote, ME.id)).toBe('You: Recommended Frieren: watch it');
+  });
   it('no messages', () => {
     expect(previewOf(makeSummary(), ME.id)).toBe('No messages yet');
+  });
+});
+
+describe('reply snippets', () => {
+  it('one line, shortened, with a word for recs and pictures', () => {
+    expect(snippetOfMessage({ kind: 'text', text: 'a\n  b', rec: null })).toBe('a b');
+    expect(Array.from(snippetOfMessage({ kind: 'text', text: 'x'.repeat(200), rec: null }))).toHaveLength(80);
+    expect(snippetOfMessage({ kind: 'image', text: '', rec: null })).toBe('📷 Photo');
+    expect(quoteText({ id: 'a', senderId: 'u', senderName: 'Ren', kind: 'rec', snippet: 'Frieren', deleted: false })).toBe('Recommended Frieren');
+    expect(quoteText({ id: 'a', senderId: '', senderName: '', kind: 'text', snippet: '', deleted: true })).toBe('Original message deleted');
   });
 });

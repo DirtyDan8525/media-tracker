@@ -13,6 +13,7 @@ const SWITCHES: Record<FeatureKey, { label: string; desc: string; off?: string }
   closeCalls: { label: 'Close-call questions', desc: 'Compare asks about near-equal picks' },
   walkthrough: { label: 'Walkthrough', desc: 'First-run tour for new people' },
   installBanner: { label: 'Install banner', desc: '"Add to Home screen" prompt' },
+  everyoneNotes: { label: 'Everyone feed shows notes to non-friends', desc: 'Off: only friends see the note on a post. Private notes stay hidden either way.' },
 };
 
 /** /admin/switches (AD2): one switch per feature, saved the moment it is flipped. */

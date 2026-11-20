@@ -1,4 +1,4 @@
-import { DEFAULT_USER_SETTINGS, type NavSettings, type UserSettings } from '@media-tracker/shared';
+import { DEFAULT_USER_SETTINGS, markCustomized, type Customized, type NavSettings, type UserSettings } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Me } from '../api/types';
@@ -14,6 +14,7 @@ export function normalizeMe(me: Me): Me {
   const s: Partial<UserSettings> = me.settings ?? {};
   return {
     ...me,
+    customized: me.customized ?? {},
     settings: {
       ...DEFAULT_USER_SETTINGS,
       ...s,
@@ -21,6 +22,7 @@ export function normalizeMe(me: Me): Me {
       tabs: { ...DEFAULT_USER_SETTINGS.tabs, ...s.tabs },
       notify: { ...DEFAULT_USER_SETTINGS.notify, ...s.notify },
       nav: { ...DEFAULT_USER_SETTINGS.nav, ...s.nav },
+      listOrder: Array.isArray(s.listOrder) ? s.listOrder : [],
     },
   };
 }
@@ -79,13 +81,14 @@ export function useSaveSettings(opts: { errorToast?: string } = {}) {
   return useMutation({
     mutationKey: SETTINGS_MUTATION,
     mutationFn: (partial: SettingsUpdate) =>
-      api.put<{ settings: UserSettings }>('/api/me/settings', { settings: partial }),
+      api.put<{ settings: UserSettings; customized?: Customized }>('/api/me/settings', { settings: partial }),
     onMutate: async (partial) => {
       await qc.cancelQueries({ queryKey: ME_KEY });
       const prev = qc.getQueryData<Me>(ME_KEY);
       if (prev) {
         qc.setQueryData<Me>(ME_KEY, {
           ...prev,
+          customized: markCustomized(prev.customized ?? {}, partial as Record<string, unknown>),
           settings: {
             ...prev.settings,
             ...partial,
@@ -102,11 +105,11 @@ export function useSaveSettings(opts: { errorToast?: string } = {}) {
       if (ctx?.prev) qc.setQueryData(ME_KEY, ctx.prev);
       if (opts.errorToast) toast.show(opts.errorToast);
     },
-    onSuccess: async ({ settings }) => {
+    onSuccess: async ({ settings, customized }) => {
       const cur = qc.getQueryData<Me>(ME_KEY);
       // Another toggle is still in flight: keep its optimistic state; the last save to land wins.
       if (!cur || qc.isMutating({ mutationKey: SETTINGS_MUTATION }) > 1) return;
-      const next = normalizeMe({ ...cur, settings });
+      const next = normalizeMe({ ...cur, settings, customized: customized ?? cur.customized });
       qc.setQueryData(ME_KEY, next);
       await storeMe(next);
     },

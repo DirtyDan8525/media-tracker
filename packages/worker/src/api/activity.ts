@@ -22,6 +22,12 @@ const INSERT = `INSERT INTO activity (id, user_id, entry_id, type, payload_json,
  */
 const anchorOf = (cutoffParam: string) =>
   `(SELECT a.id FROM activity a WHERE a.user_id = e.user_id AND a.entry_id = e.id AND a.post_id IS NULL
+      AND json_extract(a.payload_json, '$.seasonId') IS NULL
+      AND a.created_at >= ${cutoffParam} ORDER BY a.created_at DESC, a.id DESC LIMIT 1)`;
+/** Season ratings join only a post of the same season (never the title's own post), same 10-minute rule. */
+const seasonAnchorOf = (cutoffParam: string) =>
+  `(SELECT a.id FROM activity a WHERE a.user_id = e.user_id AND a.entry_id = e.id AND a.post_id IS NULL
+      AND json_extract(a.payload_json, '$.seasonId') = s.id
       AND a.created_at >= ${cutoffParam} ORDER BY a.created_at DESC, a.id DESC LIMIT 1)`;
 const cutoffOf = (now: string) => new Date(Date.parse(now) - ACTIVITY_MERGE_MS).toISOString();
 
@@ -89,64 +95,34 @@ export function activityForPatch(
   return out;
 }
 
-/** Shown-score change (spec §5.2 feed rule) at or above which a ratings save logs "re-rated". */
-export const RE_RATED_MIN_CHANGE = 0.5;
-
-type RatingState = { id: string; rating: number | null; tier: number | null };
-
 /**
- * The titles a ratings save (POST /api/ratings/:set/save) logs, per the spec §5.2 feed rule: only
- * titles the user's session named (a counted pick or a move), and of those only the ones whose
- * shown score moved by at least 0.5, that changed tier, or that got their first rating. Titles that
- * changed only because their tier re-fit never log. `before` is the set as loaded (tiers derived on
- * the fly for rows not yet backfilled), `changed` the rows the save writes.
+ * A season's rating save (POST or PATCH /api/.../seasons): 'rated' (from null) or 're-rated' on the
+ * parent entry, tagged with `seasonId` and the season's `label` so the feed names "Title · Season".
+ * Rows of one season within 10 minutes fold into one post (S5), like a title's re-rates; a season's
+ * rows never join the title's own post. Nothing when `to` is null or equals `from` (the shown
+ * ratings). Batch it AFTER the season's INSERT / label UPDATE (it reads the label).
  */
-export function ratingsSaveActivityRows(
-  before: Map<string, RatingState>,
-  changed: RatingState[],
-  sessionIds: Set<string>,
-): { id: string; rating: number }[] {
-  const out: { id: string; rating: number }[] = [];
-  for (const after of changed) {
-    if (!sessionIds.has(after.id) || after.rating === null) continue;
-    const old = before.get(after.id);
-    if (!old) continue;
-    const moved = old.rating === null
-      || old.tier !== after.tier
-      || Math.abs(after.rating - old.rating) >= RE_RATED_MIN_CHANGE - 1e-9;
-    if (moved) out.push({ id: after.id, rating: after.rating });
-  }
-  return out;
-}
-
-/**
- * One statement for a whole ratings save (3 bound parameters however many titles; the rows travel
- * as one JSON parameter). Each row compares against the STORED rating, so batch it BEFORE the set
- * UPDATE. Rated / re-rated with `via: 'compare'`, the shape foldPosts folds; each row joins its
- * entry's post per S5.
- */
-export function activityForRatingsSave(
+export function activityForSeason(
   db: D1Database,
   userId: string,
-  rowsJson: string,
+  seasonId: string,
+  from: number | null,
+  to: number | null,
   now: string,
-): D1PreparedStatement {
-  return db
+): D1PreparedStatement[] {
+  if (to === null || from === to) return [];
+  return [db
     .prepare(
       `${INSERT}
-       SELECT ${NEW_ID}, e.user_id, e.id, CASE WHEN e.rating IS NULL THEN 'rated' ELSE 're-rated' END,
-              json_object('from', e.rating, 'to', j.rating, 'via', 'compare'), ?3, ?3, ${anchorOf('?4')}
-         FROM entries e
-         JOIN (SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.rating') AS rating FROM json_each(?1)) j
-           ON j.id = e.id
-        WHERE e.user_id = ?2 AND (e.rating IS NULL OR e.rating <> j.rating)`,
+       SELECT ${NEW_ID}, e.user_id, e.id, ?3, json_object('from', ?4, 'to', ?5, 'seasonId', s.id, 'season', s.label), ?6, ?6, ${seasonAnchorOf('?7')}
+         FROM seasons s JOIN entries e ON e.id = s.entry_id WHERE s.id = ?1 AND e.user_id = ?2`,
     )
-    .bind(rowsJson, userId, now, cutoffOf(now));
+    .bind(seasonId, userId, from === null ? 'rated' : 're-rated', from, to, now, cutoffOf(now))];
 }
 
 interface Row {
   id: string; post_id: string | null; user_id: string; type: ActivityType; entry_id: string; payload_json: string;
-  created_at: string; category: Category; title: string; cover_url: string;
+  created_at: string; category: Category; title: string; cover_url: string; creator: string; note: string | null;
 }
 
 function parsePayload(json: string): ActivityItem['payload'] {
@@ -215,7 +191,9 @@ activity.get('/', async (c) => {
   const [rowsRes, usersRes, reactRes, commentRes] = await db.batch([
     // Every row of these posts; the visibility rule again, so nothing slips through between reads.
     db.prepare(
-      `SELECT a.id, a.post_id, a.user_id, a.type, a.entry_id, a.payload_json, a.created_at, e.category, e.title, e.cover_url
+      `SELECT a.id, a.post_id, a.user_id, a.type, a.entry_id, a.payload_json, a.created_at, e.category, e.title, e.cover_url, e.creator,
+              -- The note rides along only for its owner or an accepted friend, and never when the owner made notes private.
+              CASE WHEN e.user_id = ?1 OR (e.notes_private = 0 AND e.user_id IN (${FRIEND_IDS_SQL('?1')})) THEN NULLIF(e.notes, '') END AS note
          FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
         WHERE (a.id IN (SELECT value FROM json_each(?2)) OR a.post_id IN (SELECT value FROM json_each(?2)))
           AND ${ROW_VISIBLE[show]}
@@ -264,6 +242,8 @@ activity.get('/', async (c) => {
       category: r.category,
       title: r.title,
       coverUrl: r.cover_url,
+      creator: r.creator,
+      note: r.note,
       payload: parsePayload(r.payload_json),
       createdAt: r.created_at,
     })),

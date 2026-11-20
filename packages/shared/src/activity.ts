@@ -18,12 +18,19 @@ export interface ActivityItem {
   category: Category;
   title: string;
   coverUrl: string;
+  /** The entry's creator (artist, studio, director, author); '' when it has none. */
+  creator?: string;
+  /** The owner's note on the title when this viewer may read it (yours, or a friend's that isn't private); else null. */
+  note?: string | null;
   payload: {
     rating?: number | null;
     status?: string | null;
     from?: number | string | null;
     to?: number | string;
     via?: 'compare';
+    /** A season rating: the season's id and label (the row's entry is its parent). */
+    seasonId?: string;
+    season?: string;
   };
   createdAt: string;
 }
@@ -45,8 +52,13 @@ export interface ActivityLine {
   userId: string;
   entryId: string;
   category: Category;
+  /** The title as shown: a season post reads "Title · Season". */
   title: string;
+  /** The entry's own title (what Add to mine copies). */
+  entryTitle: string;
   coverUrl: string;
+  creator: string;
+  note: string | null;
   at: string;
   added: boolean;
   rating: { from: number | null; to: number } | null;
@@ -116,8 +128,11 @@ export function foldPosts(items: ActivityItem[]): ActivityLine[] {
         userId: n.userId,
         entryId: n.entryId,
         category: n.category,
-        title: n.title,
+        title: str(n.payload.season) !== null ? `${n.title} · ${str(n.payload.season)}` : n.title,
+        entryTitle: n.title,
         coverUrl: n.coverUrl,
+        creator: n.creator ?? '',
+        note: n.note && n.note.trim() !== '' ? n.note : null,
         at: n.createdAt,
         added,
         rating,

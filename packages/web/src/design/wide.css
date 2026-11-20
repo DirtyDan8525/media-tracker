@@ -47,6 +47,11 @@
   .frame--wide .stats > .load-notice, .frame--wide .stats > .stats__lists, .frame--wide .stats > .stats__genres { grid-column: 1 / -1; }
   /* Columns only as many as fit (a friend's profile is narrower than the Top 5 page; Dan, 2026-11-17). */
   .frame--wide .top5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: var(--space-12) var(--space-12); align-items: start; }
+  /* The Top 5 page fills the width (no 1200/1400 cap): columns of at least 300 px, never more than 4 (Dan, 2026-11-19). */
+  .frame--wide .screen__body.top5 { max-width: none; grid-template-columns: repeat(auto-fill, minmax(max(300px, calc((100% - 3 * var(--space-12)) / 4)), 1fr)); }
+  .frame--wide .top5__row .top5__title { font-size: 16px; }
+  .frame--wide .top5__row .top5__creator { font-size: 14px; }
+  .frame--wide .top5__row { padding: var(--space-3) var(--space-5); gap: var(--space-8); }
   .frame--wide .top5 > :not(.top5__block) { grid-column: 1 / -1; }
   .frame--wide .social-page .people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); }
 }
@@ -71,7 +76,13 @@
 /* PC layout pass (item 26, Dan 2026-11-17): no thin columns; reading text keeps a comfortable line. */
 @media (min-width: 1024px) {
   /* Activity: posts in two columns per day. */
-  .frame--wide .activity__day > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); align-items: start; }
+  /* Activity on PC: one left-aligned column (~2/3), a sticky details panel on the right (Dan, 2026-11-19). */
+  .frame--wide .activity-layout { display: flex; align-items: flex-start; gap: var(--space-12); }
+  .frame--wide .activity-layout__feed { flex: 0 0 64%; min-width: 560px; max-width: 64%; }
+  .frame--wide .activity { gap: var(--space-8); }
+  .frame--wide .activity__day > ul { display: flex; flex-direction: column; gap: var(--space-5); }
+  .frame--wide .activity-screen { --fs-sm: 15px; --fs-meta: 14px; }
+  .frame--wide .activity-line__avatar { width: 44px !important; height: 44px !important; font-size: 18px !important; }
   .frame--wide .activity-filter, .frame--wide .search-screen__controls { max-width: 720px; }
   /* Search: each list's results in two columns. */
   .frame--wide .search-group > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); }

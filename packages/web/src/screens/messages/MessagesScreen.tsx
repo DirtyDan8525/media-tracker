@@ -17,7 +17,8 @@ export function MessagesScreen() {
   const list = useConversations();
   const recs = useRecommended();
   const now = useNow();
-  const recCount = recs.data?.length ?? 0;
+  // Only recommendations you haven't seen yet (their chat not opened since they arrived) count.
+  const recCount = recs.data?.filter((i) => i.unread).length ?? 0;
   // Phone: Messages sits under the Friends tab, so its back arrow goes to Friends (without Friends it keeps the profile button).
   const friendsOn = useFeature('friends');
   const header = <PageHeader title="Messages" {...(friendsOn ? { backTo: '/friends' } : { profile: true })} />;

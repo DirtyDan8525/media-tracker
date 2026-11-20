@@ -8,6 +8,7 @@ import { SignInScreen } from '../screens/auth/SignInScreen';
 import { RemovedScreen, WaitingScreen } from '../screens/auth/WaitingScreen';
 import { CfSetContext, ThemeColorsContext } from '../design/ThemeContext';
 import { cfFor, applyTheme, themeColors } from '../design/theme';
+import { RateOnCompleteHost } from '../screens/entry/RateOnCompleteHost';
 import { Button } from '../design/components/Button';
 import { Skeleton } from '../design/components/Skeleton';
 import { homePath } from '../nav';
@@ -88,6 +89,7 @@ export function SessionGate() {
     <ThemeColorsContext.Provider value={themeColors(me.settings)}>
       <CfSetContext.Provider value={cfFor(me.settings)}>
         <Outlet />
+        <RateOnCompleteHost />
       </CfSetContext.Provider>
     </ThemeColorsContext.Provider>
   );

@@ -46,14 +46,15 @@ export function contrast(a: string, b: string): number {
 
 export type TextRole = 'Text' | 'Bright text' | 'Muted text';
 export type TextSurface = 'Background' | 'Cards';
-export interface ContrastWarning { role: TextRole; surface: TextSurface; ratio: number }
+/** `Button text` is the label on a Highlight fill (`--on-highlight`), checked against Highlight itself. */
+export interface ContrastWarning { role: TextRole | 'Button text'; surface: TextSurface | 'Highlight'; ratio: number }
 
 const TEXT_ROLES: readonly TextRole[] = ['Text', 'Bright text', 'Muted text'];
 const TEXT_SURFACES: readonly TextSurface[] = ['Background', 'Cards'];
 
 /**
  * Text roles that read below 4.5:1 on the surfaces body text sits on (Background, Cards), in role
- * order then surface order. A Custom theme still saves with these (Ruling P11); the editor warns.
+ * order then surface order, then the button label on Highlight (when even its best colour is below 4.5:1). A Custom theme still saves with these (Ruling P11); the editor warns.
  */
 export function contrastWarnings(colors: ThemeColors): ContrastWarning[] {
   const out: ContrastWarning[] = [];
@@ -63,7 +64,17 @@ export function contrastWarnings(colors: ThemeColors): ContrastWarning[] {
       if (ratio < 4.5) out.push({ role, surface, ratio });
     }
   }
+  const highlight = colors.Highlight ?? MIDNIGHT.Highlight!;
+  const ratio = contrast(onHighlightColor(colors), highlight);
+  if (ratio < 4.5) out.push({ role: 'Button text', surface: 'Highlight', ratio });
   return out;
+}
+
+/** The label colour on Highlight-filled buttons (`--on-highlight`): whichever of Header row / Background / Bright text reads best. */
+export function onHighlightColor(colors: ThemeColors): string {
+  const hl = colors.Highlight ?? MIDNIGHT.Highlight!;
+  const candidates = [colors['Header row'] ?? MIDNIGHT['Header row']!, colors.Background ?? MIDNIGHT.Background!, colors['Bright text'] ?? MIDNIGHT['Bright text']!];
+  return candidates.reduce((best, c) => (contrast(c, hl) > contrast(best, hl) ? c : best));
 }
 
 /** Does an admin-chosen accent reach 4.5:1 as text on the theme's Background and Cards? */
@@ -114,8 +125,7 @@ export function applyTheme(s: Pick<UserSettings, 'theme' | 'colors'>, root: HTML
   for (const [k, v] of Object.entries(CF_VARS)) root.style.setProperty(v, cf[k as keyof CfSet]);
 
   const hl = colors.Highlight!;
-  const candidates = [colors['Header row']!, colors.Background!, colors['Bright text']!];
-  const onHl = candidates.reduce((best, c) => (contrast(c, hl) > contrast(best, hl) ? c : best));
+  const onHl = onHighlightColor(colors);
   root.style.setProperty('--on-highlight', onHl);
   // Small text on a Highlight fill (the waiting-count pill) must reach 4.5:1. Every built-in theme's roles do since
   // P15 (so this equals --on-highlight there); a Custom Highlight may not, so fall back to black or white.

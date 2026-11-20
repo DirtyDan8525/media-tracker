@@ -14,7 +14,7 @@ import { entryFromRec } from './format';
  * A recommendation (M7): cover, title, list, the sender's rating and note, and Add to mine (as Plan to watch / Plan to
  * read). A title already on your list shows "On your list" as a link to it instead.
  */
-export function RecCard({ rec, senderName, note, own = false }: { rec: RecSnapshot; senderName: string; note: string; own?: boolean }) {
+export function RecCard({ rec, senderName, senderUsername, note, own = false }: { rec: RecSnapshot; senderName: string; senderUsername?: string; note: string; own?: boolean }) {
   const cfg = CATEGORY_CONFIG[rec.category];
   const toast = useToast();
   const addToMine = useAddToMine();
@@ -36,9 +36,14 @@ export function RecCard({ rec, senderName, note, own = false }: { rec: RecSnapsh
     }
   }
 
-  return (
-    <article className="rec-card" aria-label={`Recommendation: ${rec.title}`}>
-      <div className="rec-card__main">
+  // Tapping the card opens the title: yours for a card you sent (its own entry, else the one with that title), the sender's for a received one
+  // (their entry page, when the card knows it), else your own copy if you have it.
+  const mineId = own ? (rec.entryId && (!mine || mine.some((e) => e.id === rec.entryId)) ? rec.entryId : onList) : null;
+  const href = own ? (mineId ? `/entry/${mineId}` : null)
+    : rec.entryId && senderUsername ? `/u/${encodeURIComponent(senderUsername)}/entry/${encodeURIComponent(rec.entryId)}`
+    : onList ? `/entry/${onList}` : null;
+  const main = (
+    <>
         <CoverImage src={rec.coverUrl} alt="" square={cfg.square} width={48} />
         <div className="rec-card__meta">
           <b className="rec-card__title">{rec.title}</b>
@@ -50,7 +55,14 @@ export function RecCard({ rec, senderName, note, own = false }: { rec: RecSnapsh
             </span>
           )}
         </div>
-      </div>
+    </>
+  );
+
+  return (
+    <article className="rec-card" aria-label={`Recommendation: ${rec.title}`}>
+      {href
+        ? <Link className="rec-card__main rec-card__open" to={href}>{main}</Link>
+        : <div className="rec-card__main">{main}</div>}
       {note && <p className="rec-card__note">“{note}”</p>}
       {!own && (onList
         ? <Link className="btn btn--secondary rec-card__action" to={`/entry/${onList}`}>On your list</Link>

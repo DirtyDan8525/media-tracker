@@ -42,7 +42,7 @@ export type FriendEntry = Pick<
   | 'id' | 'userId' | 'category' | 'title' | 'status' | 'rating' | 'tier' | 'genres' | 'creator' | 'album'
   | 'coverUrl' | 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'detailsState' | 'source'
   | 'sourceId' | 'seasonAvg' | 'createdAt'
-> & { notes: string | null };
+> & { notes: string | null; /** The owner's tags on a title the viewer may see (never on private titles). */ tags?: string[] };
 
 export type Target = { activityId: string } | { entryId: string };
 

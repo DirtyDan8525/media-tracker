@@ -515,6 +515,99 @@ describe('recommended (M7)', () => {
   });
 });
 
+describe('replies, rec entry links, rec previews and unread recs', () => {
+  const postMsg = (email: string, conv: string, body: unknown, db?: D1Database) => as(email, `/api/conversations/${conv}/messages`, 'POST', body, db);
+
+  it('a reply carries the quoted sender and snippet in the send response and in the page (one join, no extra queries)', async () => {
+    const dm = await direct(A, b);
+    const first = await say(B, dm, 'we should watch   this\nweekend ' + 'x'.repeat(200));
+    const res = await postMsg(A, dm, { text: 'yes!', replyTo: first.id });
+    expect(res.status).toBe(201);
+    const sent = await json<Message>(res);
+    expect(sent.replyTo).toMatchObject({ id: first.id, senderId: b, senderName: '@ren', kind: 'text', deleted: false });
+    expect(sent.replyTo!.snippet.startsWith('we should watch this weekend ')).toBe(true);
+    expect(Array.from(sent.replyTo!.snippet).length).toBeLessThanOrEqual(100);
+    const p = await page(B, dm);
+    expect(p.messages[0]!.replyTo).toEqual(sent.replyTo);
+    expect(p.messages[1]!.replyTo).toBeNull();
+    // replying to a rec quotes its title; a reply to a reply works
+    const rec = await json<Message>(await postMsg(B, dm, { rec: REC }));
+    const r2 = await json<Message>(await postMsg(A, dm, { text: 'nice', replyTo: rec.id }));
+    expect(r2.replyTo).toMatchObject({ kind: 'rec', snippet: 'Frieren' });
+    expect((await json<Message>(await postMsg(B, dm, { text: 'ok', replyTo: r2.id }))).replyTo).toMatchObject({ senderId: a, snippet: 'nice' });
+  });
+
+  it('the original must be in the same chat and not deleted; bad shapes are 400; the page query count does not grow', async () => {
+    const dm = await direct(A, b);
+    const g = await group(A, [b, c]);
+    const inG = await say(A, g, 'in the group');
+    const inDm = await say(B, dm, 'in the dm');
+    expect(await json(await postMsg(A, dm, { text: 'x', replyTo: inG.id }))).toEqual({ error: 'invalid_reply' });
+    expect((await postMsg(A, dm, { text: 'x', replyTo: 'nope' })).status).toBe(400);
+    expect((await postMsg(A, dm, { text: 'x', replyTo: 5 })).status).toBe(400);
+    expect((await postMsg(A, dm, { text: 'x', replyTo: '' })).status).toBe(400);
+    await as(B, `/api/messages/${inDm.id}`, 'DELETE');
+    expect((await postMsg(A, dm, { text: 'x', replyTo: inDm.id })).status).toBe(400);
+    expect((await postMsg(C, g, { text: 'x', replyTo: inG.id })).status).toBe(201);
+    // a null replyTo is just not a reply
+    expect((await json<Message>(await postMsg(A, dm, { text: 'plain', replyTo: null }))).replyTo).toBeNull();
+    const live = await say(B, dm, 'live');
+    await postMsg(A, dm, { text: 'r', replyTo: live.id });
+    const spy = spyD1(env.DB);
+    expect((await as(A, `/api/conversations/${dm}/messages`, 'GET', undefined, spy.db)).status).toBe(200);
+    expect(spy.queries).toBe(1 + 2 + 1); // sign-in + access + page + read mark: the join adds none
+  });
+
+  it('when the original is deleted later the quote reads deleted; a deleted reply shows no quote; a hard-deleted original is the same', async () => {
+    const dm = await direct(A, b);
+    const orig = await say(B, dm, 'oops');
+    const reply = await json<Message>(await postMsg(A, dm, { text: 'ha', replyTo: orig.id }));
+    const keep = await say(B, dm, 'keep');
+    const reply2 = await json<Message>(await postMsg(A, dm, { text: 'ha2', replyTo: keep.id }));
+    await as(B, `/api/messages/${orig.id}`, 'DELETE');
+    let p = await page(A, dm);
+    expect(p.messages.find((m) => m.id === reply.id)!.replyTo).toEqual({ id: orig.id, senderId: '', senderName: '', kind: 'text', snippet: '', deleted: true });
+    await env.DB.prepare('DELETE FROM messages WHERE id = ?').bind(keep.id).run(); // FK sets reply_to NULL; the reply stays
+    p = await page(A, dm);
+    expect(p.messages.find((m) => m.id === reply2.id)).toBeDefined();
+    await as(A, `/api/messages/${reply.id}`, 'DELETE');
+    expect((await page(B, dm)).messages.find((m) => m.id === reply.id)).toMatchObject({ deleted: true, replyTo: null });
+  });
+
+  it('a rec keeps entryId only when it is the sender\'s own entry', async () => {
+    const dm = await direct(A, b);
+    const mine = await json<{ id: string }>(await as(A, '/api/entries', 'POST', { category: 'anime', title: 'Frieren' }));
+    const theirs = await json<{ id: string }>(await as(B, '/api/entries', 'POST', { category: 'anime', title: 'Frieren' }));
+    const own = await json<Message>(await postMsg(A, dm, { rec: { ...REC, entryId: mine.id } }));
+    expect(own.rec!.entryId).toBe(mine.id);
+    expect((await page(B, dm)).messages[0]!.rec!.entryId).toBe(mine.id);
+    const foreign = await json<Message>(await postMsg(A, dm, { rec: { ...REC, entryId: theirs.id } }));
+    expect(foreign.rec).not.toHaveProperty('entryId');
+    expect((await postMsg(A, dm, { rec: { ...REC, entryId: 7 } })).status).toBe(400);
+  });
+
+  it('the list preview of a rec carries its title', async () => {
+    const dm = await direct(A, b);
+    await postMsg(A, dm, { rec: REC, text: 'trust me' });
+    expect((await json<ConversationList>(await as(B, '/api/conversations'))).conversations[0]!.last).toMatchObject({ kind: 'rec', text: 'trust me', recTitle: 'Frieren' });
+    await say(A, dm, 'plain');
+    expect((await json<ConversationList>(await as(B, '/api/conversations'))).conversations[0]!.last).not.toHaveProperty('recTitle');
+  });
+
+  it('Recommended marks recs unread until their chat is opened', async () => {
+    const dm = await direct(A, b);
+    const g = await group(C, [a, b]);
+    await postMsg(A, dm, { rec: { ...REC, title: 'One' } });
+    await postMsg(C, g, { rec: { ...REC, title: 'Two' } });
+    const get = async () => (await json<{ items: { message: Message; unread: boolean }[] }>(await as(B, '/api/messages/recommended'))).items.map((i) => [i.message.rec!.title, i.unread]);
+    expect(await get()).toEqual([['Two', true], ['One', true]]);
+    await page(B, dm);
+    expect(await get()).toEqual([['Two', true], ['One', false]]);
+    await page(B, g);
+    expect(await get()).toEqual([['Two', false], ['One', false]]);
+  });
+});
+
 describe('unread (M3)', () => {
   it('counts chats, not messages; own messages and deleted ones do not count; opening clears it', async () => {
     expect(await unread(B)).toBe(0);

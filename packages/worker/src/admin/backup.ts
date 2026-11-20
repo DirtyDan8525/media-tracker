@@ -35,6 +35,8 @@ export const BACKUP_TABLES: Readonly<Record<string, readonly string[]>> = {
   push_subscriptions: ['endpoint', 'p256dh', 'auth'],
   push_throttle: [],
   app_settings: [],
+  tags: [],
+  entry_tags: [],
 };
 
 /** The same for the response's `excluded` note, so the file says what it leaves out. */

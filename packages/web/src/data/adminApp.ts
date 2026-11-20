@@ -1,8 +1,9 @@
-import type { AppSettingKey, AppSettings } from '@media-tracker/shared';
+import type { ApplyKey, AppSettingKey, AppSettings } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { AdminComment, AdminNumbers, Explanation, SourceCheck } from '../api/adminTypes';
 import { APP_KEY } from './appSettings';
+import { ME_KEY } from './useMe';
 
 export const ADMIN_APP_KEY = ['admin-app'] as const;
 
@@ -10,6 +11,8 @@ export interface AdminApp {
   settings: AppSettings;
   /** The keys that have been saved (the rest are on their built-in default). */
   set: AppSettingKey[];
+  /** Active people "Apply to everyone" reaches. */
+  people?: number;
 }
 
 export function useAdminApp() {
@@ -26,6 +29,15 @@ export function useSaveSetting() {
   return useMutation({
     mutationFn: ({ key, value }: { key: AppSettingKey; value: unknown }) => api.put<{ key: string; value: unknown }>(`/api/admin/app/${key}`, { value }),
     onSuccess: () => refreshApp(qc),
+  });
+}
+
+/** POST /api/admin/defaults/apply { key }: writes the default into every active person's settings. Resolves with how many people it reached. */
+export function useApplyDefault() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: ApplyKey) => api.post<{ key: string; people: number }>('/api/admin/defaults/apply', { key }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ME_KEY }),
   });
 }
 

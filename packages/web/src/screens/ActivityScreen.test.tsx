@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBackend } from '../test/fakeBackend';
 import { renderApp } from '../test/renderApp';
+import { setViewportWidth } from '../test/viewport';
 
 const NOW = new Date(2026, 10, 15, 12, 0, 0);
 const ago = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
@@ -442,5 +443,133 @@ describe('ActivityScreen: everyone and deleting posts', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Everyone' }));
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(calls.some((c) => c.method === 'DELETE' || c.path === '/api/activity/delete')).toBe(false);
+  });
+
+  describe('creator, notes, search and text size', () => {
+    it('a song shows its artist after the title; other lists show the creator in muted text', async () => {
+      fakeBackend({ extra: { 'GET /api/activity': { body: page([
+        item({ type: 'rated', title: 'Blinding Lights', category: 'songs', creator: 'The Weeknd', payload: { from: null, to: 9 } }),
+        item({ type: 'rated', title: 'Frieren', creator: 'Madhouse', payload: { from: null, to: 9 } }),
+      ]) } } });
+      const { container } = renderApp('/activity');
+      const song = (await screen.findByRole('link', { name: 'Blinding Lights' })).closest('li')!;
+      expect(song.querySelector('.activity-line__sentence')).toHaveTextContent('You rated Blinding Lights · The Weeknd 9.0');
+      const anime = screen.getByRole('link', { name: 'Frieren' }).closest('li')!;
+      expect(anime.querySelector('.activity-line__creator')).toHaveTextContent('Madhouse');
+      expect(container.querySelectorAll('.activity-line__creator')).toHaveLength(1);
+    });
+
+    it('shows the note as a quote; a long one is clamped with More / Less, nothing without a note', async () => {
+      const long = 'A very long review. '.repeat(20);
+      fakeBackend({ extra: { 'GET /api/activity': { body: page([
+        item({ type: 'rated', title: 'Frieren', note: long, payload: { from: null, to: 9 } }),
+        item({ type: 'rated', title: 'Bleach', note: 'Short one.', payload: { from: null, to: 7 } }),
+        item({ type: 'rated', title: 'Naruto', note: null, payload: { from: null, to: 6 } }),
+      ]) } } });
+      renderApp('/activity');
+      const frieren = (await screen.findByRole('link', { name: 'Frieren' })).closest('li')!;
+      const text = frieren.querySelector('.feed-post__note-text')!;
+      expect(text).toHaveClass('feed-post__note-text--clamped');
+      await userEvent.click(within(frieren).getByRole('button', { name: 'More' }));
+      expect(text).not.toHaveClass('feed-post__note-text--clamped');
+      await userEvent.click(within(frieren).getByRole('button', { name: 'Less' }));
+      expect(text).toHaveClass('feed-post__note-text--clamped');
+      const bleach = screen.getByRole('link', { name: 'Bleach' }).closest('li')!;
+      expect(bleach).toHaveTextContent('Short one.');
+      expect(within(bleach).queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Naruto' }).closest('li')!.querySelector('.feed-post__note')).toBeNull();
+    });
+
+    const feedFor = () => page([
+      item({ type: 'rated', title: 'Amélie', category: 'movies', creator: 'Jean-Pierre Jeunet', payload: { from: null, to: 9 } }),
+      item({ type: 'rated', title: 'Frieren', creator: 'Madhouse', note: 'Gorgeous soundtrack', payload: { from: null, to: 9 } }),
+      item({ type: 'rated', title: 'Bleach', userId: 'u2', payload: { from: null, to: 7 } }),
+    ]);
+    const withRen = () => ({ ...feedFor(), users: { u2: { id: 'u2', username: 'ren', displayName: 'Renée', avatarAt: null } } });
+
+    it('search filters loaded posts by title, creator, note and person, ignoring case and accents', async () => {
+      fakeBackend({ extra: { 'GET /api/activity': { body: withRen() } } });
+      renderApp('/activity');
+      await screen.findByRole('link', { name: 'Frieren' });
+      const box = screen.getByRole('searchbox', { name: 'Search posts' });
+      const shown = () => screen.queryAllByRole('listitem').filter((li) => li.classList.contains('feed-post')).map((li) => li.querySelector('strong:not(:first-child), .activity-line__title')?.textContent);
+      await userEvent.type(box, 'amelie');
+      expect(screen.getByRole('link', { name: 'Amélie' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Frieren' })).not.toBeInTheDocument();
+      await userEvent.clear(box);
+      await userEvent.type(box, 'MADHOUSE');
+      expect(screen.getByRole('link', { name: 'Frieren' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Amélie' })).not.toBeInTheDocument();
+      await userEvent.clear(box);
+      await userEvent.type(box, 'soundtrack');
+      expect(screen.getByRole('link', { name: 'Frieren' })).toBeInTheDocument();
+      await userEvent.clear(box);
+      await userEvent.type(box, 'renee');
+      expect(screen.getByText('Bleach')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Frieren' })).not.toBeInTheDocument();
+      await userEvent.clear(box);
+      await userEvent.type(box, 'zzz');
+      expect(screen.getByText('No matching posts')).toBeInTheDocument();
+      void shown;
+    });
+
+    it('with more pages, says "Searching loaded posts" and Show more keeps working', async () => {
+      const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([item({ type: 'rated', title: 'Frieren', payload: { from: null, to: 9 } })], { before: 'x', beforeId: 'y' }) } } });
+      renderApp('/activity');
+      await userEvent.type(await screen.findByRole('searchbox', { name: 'Search posts' }), 'frie');
+      expect(screen.getByText('Searching loaded posts')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+      await waitFor(() => expect(activityCalls(calls).length).toBeGreaterThan(1));
+    });
+
+    it('the Aa control scales the feed, saves under activity-text-size and leaves the chat key alone', async () => {
+      fakeBackend({ extra: { 'GET /api/activity': { body: feedFor() } } });
+      renderApp('/activity');
+      await screen.findByRole('link', { name: 'Frieren' });
+      const screenEl = () => document.querySelector<HTMLElement>('.activity-screen')!;
+      expect(screenEl().style.getPropertyValue('--activity-scale')).toBe('1');
+      await userEvent.click(screen.getByRole('button', { name: 'Text size' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Bigger text' }));
+      expect(screenEl().style.getPropertyValue('--activity-scale')).toBe('1.15');
+      expect(localStorage.getItem('activity-text-size')).toBe('115');
+      expect(localStorage.getItem('chat-text-size')).toBeNull();
+    });
+  });
+
+  describe('details (PC panel, phone sheet)', () => {
+    const feed = () => page([
+      item({ type: 'rated', title: 'Frieren', creator: 'Madhouse', note: 'Gorgeous soundtrack, full text here', payload: { from: null, to: 9 }, status: undefined } as never),
+      item({ type: 'rated', title: 'Bleach', payload: { from: null, to: 7 } }),
+    ]);
+
+    it('PC: starts with a hint; hover (after the settle delay) and keyboard focus fill the panel', async () => {
+      setViewportWidth(1280);
+      fakeBackend({ extra: { 'GET /api/activity': { body: feed() } } });
+      renderApp('/activity');
+      await screen.findByRole('link', { name: 'Frieren' });
+      const panel = screen.getByRole('complementary', { name: 'Post details' });
+      expect(panel).toHaveTextContent('Hover a post to see the details');
+      vi.useRealTimers();
+      const li = screen.getByRole('link', { name: 'Frieren' }).closest('li')!;
+      await userEvent.hover(li);
+      await waitFor(() => expect(within(panel).getByRole('heading', { name: 'Frieren' })).toBeInTheDocument());
+      expect(panel).toHaveTextContent('Madhouse');
+      expect(panel).toHaveTextContent('Gorgeous soundtrack, full text here');
+      expect(within(panel).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/entry/e-Frieren');
+      // Keyboard focus on another post switches at once.
+      await userEvent.click(within(screen.getByRole('link', { name: 'Bleach' }).closest('li')!).getByRole('button', { name: /React/ }));
+      expect(within(panel).getByRole('heading', { name: 'Bleach' })).toBeInTheDocument();
+    });
+
+    it('phone: tapping a post opens the same details in a sheet; no panel', async () => {
+      fakeBackend({ extra: { 'GET /api/activity': { body: feed() } } });
+      renderApp('/activity');
+      const li = (await screen.findByRole('link', { name: 'Frieren' })).closest('li')!;
+      expect(screen.queryByRole('complementary', { name: 'Post details' })).not.toBeInTheDocument();
+      await userEvent.click(li.querySelector('.activity-line__text')!);
+      const sheet = await screen.findByRole('dialog', { name: 'Post details' });
+      expect(within(sheet).getByRole('heading', { name: 'Frieren' })).toBeInTheDocument();
+      expect(sheet).toHaveTextContent('Gorgeous soundtrack, full text here');
+    });
   });
 });

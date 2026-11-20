@@ -12,7 +12,7 @@ import type { AppEnv } from '../auth/user';
 import { publicTokenHash } from '../social/publicLink';
 import { PUBLIC_USER_COLS, publicUser, toFriendEntry, type PublicUserRow } from '../social/visibility';
 import { coverUrlOf, serveCover } from './cover';
-import type { EntryRow } from './entries';
+import { TAGS_SUBSELECT, type EntryRow } from './entries';
 
 export const publicApi = new Hono<AppEnv>();
 
@@ -47,7 +47,7 @@ publicApi.get('/:token/entries', async (c) => {
   const hash = await publicTokenHash(c.req.param('token'));
   if (!hash) return c.json(notFound, 404, NO_STORE);
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id AS owner_id, e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg
+    `SELECT u.id AS owner_id, e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg, ${TAGS_SUBSELECT}
      FROM users u LEFT JOIN entries e ON e.user_id = u.id AND e.is_private = 0
      WHERE u.public_token_hash = ? AND u.status = 'active' ORDER BY e.created_at, e.rowid`,
   )

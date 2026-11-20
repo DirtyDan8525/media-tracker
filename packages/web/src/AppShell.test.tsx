@@ -1,5 +1,5 @@
 import { DEFAULT_USER_SETTINGS } from '@media-tracker/shared';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { publicSettings } from './test/appSettings';
@@ -251,6 +251,35 @@ describe('app shell', () => {
     });
   });
 
+  describe('crossing the phone / PC boundary (768 px) while the app is open', () => {
+    const only = (which: 'phone' | 'pc') => {
+      expect(document.querySelectorAll('nav[aria-label="Main"]')).toHaveLength(1);
+      expect(!!document.querySelector('.bottom-tabs')).toBe(which === 'phone');
+      expect(!!document.querySelector('.add-fab')).toBe(which === 'phone');
+      expect(!!document.querySelector('.side-nav')).toBe(which === 'pc');
+      expect(!!document.querySelector('.frame--phone')).toBe(which === 'phone');
+      expect(!!document.querySelector('.frame--wide')).toBe(which === 'pc');
+    };
+
+    it('swaps the bottom bar and Add bubble for the side nav (and back) in place: same page, same route, one Main nav', async () => {
+      try {
+        fakeBackend({ entries: [makeEntry({ title: 'Frieren', rating: 9 })] });
+        const { router } = renderApp('/list/anime');
+        await screen.findByRole('heading', { level: 1, name: 'Anime' });
+        only('phone');
+        for (const [width, which] of [[767, 'phone'], [768, 'pc'], [1280, 'pc'], [767, 'phone'], [1200, 'pc']] as const) {
+          act(() => setViewportWidth(width));
+          await waitFor(() => only(which));
+          expect(router.state.location.pathname).toBe('/list/anime');
+          expect(screen.getByRole('heading', { level: 1, name: 'Anime' })).toBeInTheDocument();
+        }
+        expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Stats' })).toBeInTheDocument();
+      } finally {
+        act(() => setViewportWidth(390));
+      }
+    });
+  });
+
   describe('PC side nav (Main, SideNavPC board)', () => {
     const sideNav = () => screen.findByRole('navigation', { name: 'Main' });
 
@@ -262,7 +291,7 @@ describe('app shell', () => {
       expect(row.querySelector('.count-pill')).toHaveTextContent('3');
     });
 
-    it('reads the PCNav board: brand, a collapse button, Home, Search, Activity, Friends (Messages is one with it), Top 5, Stats, Sharpen, the Lists group, Settings, More / About, profile (no Compare, N9)', async () => {
+    it('reads the PCNav board: brand (alone in the header), Home, Search, Activity, Friends (Messages is one with it), Top 5, Stats, Sharpen, the Lists group, Settings, More / About, profile (no Compare, N9)', async () => {
       setViewportWidth(1280);
       mockApi(makeMe({}, { songs: false }));
       renderApp('/list/anime');
@@ -270,9 +299,9 @@ describe('app shell', () => {
       // every row, in document order
       const rows = Array.from(nav.querySelectorAll('a, button')).map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/(?<=[^\s\d])\d+$/, '').trim());
       expect(rows).toEqual([
-        'About Media Tracker', 'Collapse side bar', 'Home', 'Search', 'Activity', 'Friends', 'Top 5', 'Stats', 'Sharpen my ratings',
+        'About Media Tracker', 'Home', 'Search', 'Activity', 'Friends', 'Top 5', 'Stats', 'Sharpen my ratings',
         'Anime', 'Movies', 'TV Shows', 'Albums', 'Games', 'Books', 'Manga', 'YouTube',
-        'Settings', 'More / About', 'Profile, @dan',
+        'Reorder lists', 'Settings', 'More / About', 'Collapse side bar', 'Profile, @dan',
       ]);
       expect(nav.querySelector('.side-nav__label')).toHaveTextContent('Lists');
       expect(nav.querySelectorAll('.side-nav__divider')).toHaveLength(1);

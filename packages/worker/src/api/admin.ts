@@ -5,10 +5,10 @@
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import {
-  isAppSettingKey, validateAppSetting,
+  clearPatch, defaultPatch, isAppSettingKey, isApplyKey, legacyCustomized, mergePatch, validateAppSetting,
   type Category, type PublicUser,
 } from '@media-tracker/shared';
-import type { AppEnv } from '../auth/user';
+import { loadSettings, type AppEnv } from '../auth/user';
 import { BACKUP_EXCLUDED_NOTE, BACKUP_TABLES } from '../admin/backup';
 import { CATEGORIES } from './entryValidation';
 import { checkSources, explainLookup } from '../lookup/adminTools';
@@ -141,11 +141,41 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-// GET /api/admin/app -> { settings, set }: every key with defaults filled in (what the editors start from), and the keys
-// that have been saved. 1 query (+ sign-in).
+// GET /api/admin/app -> { settings, set, people }: every key with defaults filled in (what the editors start from), the keys
+// that have been saved, and how many active people "Apply to everyone" reaches. 2 queries (+ sign-in).
 admin.get('/app', async (c) => {
-  const { results } = await c.env.DB.prepare('SELECT key FROM app_settings').all<{ key: string }>();
-  return c.json({ settings: await loadAppSettings(c.env.DB), set: results.map((r) => r.key).filter(isAppSettingKey) });
+  const [{ results }, people] = await Promise.all([
+    c.env.DB.prepare('SELECT key FROM app_settings').all<{ key: string }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE status = 'active'").first<{ n: number }>(),
+  ]);
+  return c.json({ settings: await loadAppSettings(c.env.DB), set: results.map((r) => r.key).filter(isAppSettingKey), people: people?.n ?? 0 });
+});
+
+// POST /api/admin/defaults/apply { key } -> { key, people }: writes the admin default for one setting into every active person's
+// settings, over what they chose themselves, and forgets that they changed it (they follow the default again). 400 unknown key.
+// Accounts that predate change tracking have no `customized` list yet; each is given one (what differs from the built-in defaults)
+// in the same batch, so applying one key does not turn their other changes into "follows the default". 3 queries, plus one per
+// such account, which stops being any once they have been touched (+ sign-in). The main write is one UPDATE with json_patch.
+admin.post('/defaults/apply', async (c) => {
+  const body = await readJson(c.req.raw);
+  const key = body?.key;
+  if (!isApplyKey(key)) return c.json({ error: 'invalid' }, 400);
+  const db = c.env.DB;
+  const { defaults } = await loadAppSettings(db);
+  const patch = { ...defaultPatch(key, defaults), customized: clearPatch(key) };
+  const NO_TRACKING = "CASE WHEN json_valid(settings_json) THEN json_type(settings_json, '$.customized') IS NULL ELSE 1 END";
+  const { results: legacy } = await db.prepare(`SELECT id, settings_json FROM users WHERE status = 'active' AND ${NO_TRACKING}`)
+    .all<{ id: string; settings_json: string }>();
+  const results = await db.batch([
+    db.prepare(`UPDATE users SET settings_json = json_patch(settings_json, ?) WHERE status = 'active' AND NOT (${NO_TRACKING})`).bind(JSON.stringify(patch)),
+    ...legacy.map((u) => {
+      const stored = loadSettings(u.settings_json);
+      const next = mergePatch({ ...stored, customized: legacyCustomized(stored) }, patch);
+      return db.prepare('UPDATE users SET settings_json = ? WHERE id = ?').bind(JSON.stringify(next), u.id);
+    }),
+  ]);
+  const people = results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
+  return c.json({ key, people });
 });
 
 // PUT /api/admin/app/:key { value } -> { key, value }: the validated, normalized value, saved. 400 invalid, 404 unknown key.

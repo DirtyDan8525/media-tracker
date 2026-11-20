@@ -1,5 +1,5 @@
 import { nameOf, type Conversation, type Message, type PublicUser } from '@media-tracker/shared';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { ApiError } from '../../api/client';
 import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage } from '../../data/messages';
@@ -12,13 +12,23 @@ import { Sheet } from '../../design/components/Sheet';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
 import { BackButton } from '../../shell/BackButton';
+import { useIsWide } from '../../hooks';
 import { useSessionMe } from '../../shell/SessionGate';
 import { dayLabel } from '../activity/format';
-import { Composer } from './Composer';
+import { Composer, type ReplyDraft } from './Composer';
+import { TextSizeControl } from '../../design/components/TextSizeControl';
+import { useBubbleMineColors } from './bubbleColors';
+import { useChatTextSize } from '../../design/components/useTextSize';
 import { AddPeopleSheet, LeaveSheet, RenameSheet } from './GroupSheets';
 import { RecCard } from './RecCard';
-import { clock } from './format';
+import { clock, quoteText, snippetOfMessage } from './format';
 import '../../design/messages.css';
+
+/** Back in a chat. Phone: the round arrow to the Messages list. PC (no arrow of its own): a "Back" button that returns to where you opened the chat from, else the Messages list. */
+function ChatBack() {
+  const wide = useIsWide();
+  return <BackButton to="/messages" pc useHistory={wide} />;
+}
 
 /** One chat (route /messages/:id): bubbles, day separators, the composer. Polls every 5 s while visible (see useChat). */
 export function ChatScreen() {
@@ -27,7 +37,7 @@ export function ChatScreen() {
   if (conv.isPending) {
     return (
       <div className="screen chat" aria-busy="true" aria-label="Loading">
-        <div className="chat__top"><BackButton to="/messages" /></div>
+        <div className="chat__top"><ChatBack /></div>
         <div className="screen__body stack-10"><Skeleton height={48} /><Skeleton height={48} /></div>
       </div>
     );
@@ -36,7 +46,7 @@ export function ChatScreen() {
     const missing = conv.error instanceof ApiError && conv.error.status === 404;
     return (
       <div className="screen chat">
-        <div className="chat__top"><BackButton to="/messages" /></div>
+        <div className="chat__top"><ChatBack /></div>
         <div className="screen__body">
           {missing ? (
             <EmptyState icon="info" title="We couldn't find that chat" body="It may be gone, or you're not in it any more." actionLabel="Go to Messages" actionHref="/messages" />
@@ -50,6 +60,9 @@ export function ChatScreen() {
   return <Chat conversation={conv.data} />;
 }
 
+/** A pause this long starts a new run of bubbles (more space above it, the name again in a group). */
+const RUN_GAP_MS = 10 * 60_000;
+
 type Sheets = null | 'rename' | 'add' | 'leave';
 
 function Chat({ conversation }: { conversation: Conversation }) {
@@ -62,6 +75,10 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const [deleting, setDeleting] = useState<Message | null>(null);
   const [viewing, setViewing] = useState<Message | null>(null);
   const [live, setLive] = useState('');
+  const [reply, setReply] = useState<ReplyDraft | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const textSize = useChatTextSize();
+  const mineColors = useBubbleMineColors();
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const menuWrap = useRef<HTMLDivElement>(null);
@@ -112,6 +129,22 @@ function Chat({ conversation }: { conversation: Conversation }) {
     }
   }
 
+  const loaded = new Set((chat?.messages ?? []).map((m) => m.id));
+  const startReply = (m: Message) => setReply({ id: m.id, name: m.senderId === me.id ? 'yourself' : nameFor(m.senderId), snippet: snippetOfMessage(m) });
+  // A quote scrolls to its original and marks it for a moment (a ring, no motion needed); focus follows so keyboard and screen reader users arrive there too.
+  const flashTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+  const jumpTo = (id: string) => {
+    const el = scroller.current?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(id)}"]`);
+    if (!el) return;
+    stick.current = false;
+    el.scrollIntoView?.({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el.focus({ preventScroll: true });
+    setFlash(id);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(null), 1600);
+  };
+
   const sub = isGroup
     ? `${['You', ...conversation.members.filter((m) => m.id !== me.id).map((m) => nameOf(m))].join(', ')} · ${conversation.members.length} members`
     : (() => { const o = conversation.members.find((m) => m.id !== me.id); return o?.displayName ? `@${o.username}` : null; })();
@@ -120,21 +153,29 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const rows: ReactNode[] = [];
   const msgs = chat?.messages ?? [];
   const now = new Date();
+  // A run is one sender's consecutive messages on one day with no long pause: the name sits above its first bubble, the picture beside its last.
+  const breaks = (a: Message, b: Message) =>
+    a.senderId !== b.senderId || dayLabel(a.createdAt, now) !== dayLabel(b.createdAt, now) || Date.parse(b.createdAt) - Date.parse(a.createdAt) > RUN_GAP_MS;
   msgs.forEach((m, i) => {
     const prev = msgs[i - 1];
+    const next = msgs[i + 1];
     const day = dayLabel(m.createdAt, now);
-    if (!prev || dayLabel(prev.createdAt, now) !== day) rows.push(<li key={`day-${m.id}`} className="chat__day"><span>{day}</span></li>);
-    const first = !prev || prev.senderId !== m.senderId || dayLabel(prev.createdAt, now) !== day;
+    const newDay = !prev || dayLabel(prev.createdAt, now) !== day;
+    if (newDay) rows.push(<li key={`day-${m.id}`} className="chat__day"><span>{day}</span></li>);
+    const first = !prev || breaks(prev, m);
+    const mine = m.senderId === me.id;
     rows.push(
-      <Bubble key={m.id} m={m} mine={m.senderId === me.id} showWho={isGroup && m.senderId !== me.id && first} sender={users[m.senderId]}
-        name={nameFor(m.senderId)} canDelete={m.senderId === me.id || me.isAdmin} onOptions={() => setDeleting(m)} onOpenImage={() => setViewing(m)} />,
+      <Bubble key={m.id} m={m} mine={mine} first={first && !newDay} showWho={isGroup && !mine && first} lastOfRun={!next || breaks(m, next)} sender={users[m.senderId]}
+        name={nameFor(m.senderId)} meId={me.id} canDelete={mine || me.isAdmin} canReply={!readOnly && !m.deleted} flash={flash === m.id}
+        isLoaded={(id) => loaded.has(id)} onReply={() => startReply(m)} onJump={jumpTo} onOptions={() => setDeleting(m)} onOpenImage={() => setViewing(m)} />,
     );
   });
 
   return (
-    <div className="screen chat">
+    <div className="screen chat"
+      style={{ '--chat-scale': textSize.scale, '--bubble-mine-bg': mineColors.bg, '--bubble-mine-text': mineColors.text } as CSSProperties}>
       <header className="chat__top">
-        <BackButton to="/messages" />
+        <ChatBack />
         {isGroup
           ? <span className="chat-avatar chat-avatar--group" aria-hidden="true"><Icon name="group" size={20} /></span>
           : other && <Avatar user={other} size={44} viewable name={other.displayName || `@${other.username}`} />}
@@ -142,6 +183,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
           <h1 className="chat__title">{title}</h1>
           {sub && <span className="chat__sub">{sub}</span>}
         </div>
+        <TextSizeControl step={textSize.step} onChange={textSize.set} />
         {isGroup && (
           <div className="chat__menu" ref={menuWrap}
             onKeyDown={(e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); setMenu(false); menuWrap.current?.querySelector<HTMLElement>('button[aria-haspopup]')?.focus(); } }}>
@@ -178,7 +220,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
           {other ? `You and ${nameOf(other)} are no longer friends, so this chat is read-only.` : 'This chat is read-only.'}
         </p>
       ) : (
-        <Composer conversationId={conversation.id} onSent={() => { stick.current = true; }} />
+        <Composer conversationId={conversation.id} onSent={() => { stick.current = true; setReply(null); }} reply={reply} onCancelReply={() => setReply(null)} />
       )}
 
       {sheet === 'rename' && <RenameSheet conversation={conversation} onClose={() => setSheet(null)} />}
@@ -200,11 +242,53 @@ function Chat({ conversation }: { conversation: Conversation }) {
   );
 }
 
-function Bubble({ m, mine, showWho, sender, name, canDelete, onOptions, onOpenImage }: {
+/** Touch: holding a bubble this long starts a reply (a mouse has the Reply button; the keyboard reaches the same button). */
+const LONG_PRESS_MS = 450;
+
+function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, canDelete, canReply, flash, isLoaded, onReply, onJump, onOptions, onOpenImage }: {
   /** Your own message, or any message for the admin (AD7). */
   canDelete: boolean;
-  m: Message; mine: boolean; showWho: boolean; sender: PublicUser | undefined; name: string; onOptions: () => void; onOpenImage: () => void;
+  canReply: boolean;
+  flash: boolean;
+  /** Starts a new run (more space above). */
+  first: boolean;
+  lastOfRun: boolean;
+  meId: string;
+  isLoaded: (id: string) => boolean;
+  m: Message; mine: boolean; showWho: boolean; sender: PublicUser | undefined; name: string;
+  onReply: () => void; onJump: (id: string) => void; onOptions: () => void; onOpenImage: () => void;
 }) {
+  const press = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  const stop = () => { if (press.current) window.clearTimeout(press.current.timer); };
+  useEffect(() => stop, []);
+  const touch = canReply ? {
+    onPointerDown: (e: ReactPointerEvent) => {
+      if (e.pointerType !== 'touch' || (e.target as HTMLElement).closest('button, a')) return;
+      stop();
+      const p = { timer: 0, x: e.clientX, y: e.clientY, fired: false };
+      p.timer = window.setTimeout(() => { p.fired = true; navigator.vibrate?.(10); onReply(); }, LONG_PRESS_MS);
+      press.current = p;
+    },
+    onPointerMove: (e: ReactPointerEvent) => { const p = press.current; if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) stop(); },
+    onPointerUp: stop,
+    onPointerCancel: stop,
+    // The long press must not also pop the phone's text-selection menu.
+    onContextMenu: (e: { preventDefault: () => void }) => { if (press.current?.fired) { e.preventDefault(); press.current = null; } },
+  } : {};
+  const q = m.replyTo;
+  const quote = q && (q.deleted ? (
+    <div className="bubble__quote bubble__quote--deleted"><span className="bubble__quote-text">Original message deleted</span></div>
+  ) : isLoaded(q.id) ? (
+    <button type="button" className="bubble__quote" aria-label={`In reply to ${q.senderId === meId ? 'you' : q.senderName || 'someone'}: ${quoteText(q)}. Go to that message`} onClick={() => onJump(q.id)}>
+      <b className="bubble__quote-who">{q.senderId === meId ? 'You' : q.senderName || 'Someone'}</b>
+      <span className="bubble__quote-text">{quoteText(q)}</span>
+    </button>
+  ) : (
+    <div className="bubble__quote">
+      <b className="bubble__quote-who">{q.senderId === meId ? 'You' : q.senderName || 'Someone'}</b>
+      <span className="bubble__quote-text">{quoteText(q)}</span>
+    </div>
+  ));
   const body = m.deleted ? (
     <span className="bubble__deleted">Message deleted</span>
   ) : m.kind === 'image' ? (
@@ -212,21 +296,33 @@ function Bubble({ m, mine, showWho, sender, name, canDelete, onOptions, onOpenIm
       <img src={messageImageUrl(m.id)} alt={`Picture from ${name}`} loading="lazy" />
     </button>
   ) : m.kind === 'rec' && m.rec ? (
-    <RecCard rec={m.rec} senderName={name} note={m.text} own={mine} />
+    <>
+      <span className="bubble__label" aria-hidden="true">Recommendation</span>
+      <RecCard rec={m.rec} senderName={name} senderUsername={sender?.username} note={m.text} own={mine} />
+    </>
   ) : (
     <span className="bubble__text">{m.text}</span>
   );
+  const cls = `bubble-row${mine ? ' bubble-row--mine' : ''}${first ? ' bubble-row--first' : ''}${flash ? ' is-flash' : ''}`;
   return (
-    <li className={`bubble-row${mine ? ' bubble-row--mine' : ''}`}>
-      {!mine && (showWho && sender ? <Avatar user={sender} size={36} viewable name={name} /> : <span className="bubble-row__gap" aria-hidden="true" />)}
+    <li className={cls} data-mid={m.id} tabIndex={-1}>
+      {!mine && (
+        <span className="bubble-row__avatar">
+          {lastOfRun && sender ? <Avatar user={sender} size={28} viewable name={name} /> : null}
+        </span>
+      )}
       <div className="bubble-col">
         {showWho && <span className="bubble__who">{name}</span>}
         <div className="bubble-wrap">
-          <div className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}`}>
+          <div className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}`} {...touch}>
+            {quote}
             {body}
             <time className="bubble__time" dateTime={m.createdAt}>{clock(m.createdAt)}</time>
           </div>
-          {canDelete && !m.deleted && <IconButton label={mine ? 'Message options' : `Message options for ${name}'s message`} icon="more" look="plain" className="bubble__opts" onClick={onOptions} />}
+          <span className="bubble__actions">
+            {canReply && <button type="button" className="bubble__reply" aria-label={`Reply to ${mine ? 'your own' : `${name}'s`} message`} onClick={onReply}>Reply</button>}
+            {canDelete && !m.deleted && <IconButton label={mine ? 'Message options' : `Message options for ${name}'s message`} icon="more" look="plain" className="bubble__opts" onClick={onOptions} />}
+          </span>
         </div>
       </div>
     </li>

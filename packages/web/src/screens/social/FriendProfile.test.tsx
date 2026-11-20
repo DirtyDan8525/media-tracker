@@ -35,6 +35,24 @@ describe('Friend profile', () => {
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/conversations')?.body).toEqual({ userIds: ['id-ren'] });
   });
 
+  it('PC has a text Back button (the phone its round arrow); both return to /friends', async () => {
+    backend();
+    setViewportWidth(1280);
+    try {
+      const { router } = renderApp('/u/ren');
+      await screen.findByRole('heading', { level: 1, name: 'Ren' });
+      const back = screen.getByRole('button', { name: 'Back' });
+      expect(back).toHaveClass('back-link');
+      await userEvent.click(back);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/friends'));
+    } finally {
+      setViewportWidth(390);
+    }
+    renderApp('/u/ren');
+    await screen.findByRole('heading', { level: 1, name: 'Ren' });
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveClass('back-btn');
+  });
+
   it('shows tabs Lists / Top 5 / Stats / Compare and read-only rows without edit controls', async () => {
     backend();
     renderApp('/u/ren');

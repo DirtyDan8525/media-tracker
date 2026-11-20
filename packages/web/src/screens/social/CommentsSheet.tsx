@@ -11,7 +11,6 @@ import '../../design/feed.css';
 
 /** The comment thread of one post or entry: oldest first, a composer pinned under it. */
 export function CommentsSheet({ target, open, onClose }: { target: Target; open: boolean; onClose: () => void }) {
-  const comments = useComments(open ? target : null);
   const post = usePostComment();
   const toast = useToast();
   const [text, setText] = useState('');
@@ -44,20 +43,27 @@ export function CommentsSheet({ target, open, onClose }: { target: Target; open:
 
   return (
     <Sheet open={open} title="Comments" onClose={onClose} footer={footer}>
-      {comments.isPending ? (
-        <p className="comment-empty" aria-busy="true">Loading comments…</p>
-      ) : comments.isError ? (
-        <p className="comment-empty">
-          Couldn't load comments. <button type="button" className="link-btn" onClick={() => void comments.refetch()}>Try again</button>
-        </p>
-      ) : comments.data.length === 0 ? (
-        <p className="comment-empty">No comments yet. Say something kind.</p>
-      ) : (
-        <ul className="plain-list comment-list">
-          {comments.data.map((c) => <CommentRow key={c.id} comment={c} target={target} />)}
-        </ul>
-      )}
+      <CommentList target={target} />
     </Sheet>
+  );
+}
+
+/** The thread itself (loading, error, empty and the comments): the sheet shows it, and so does the Activity details panel. */
+export function CommentList({ target }: { target: Target }) {
+  const comments = useComments(target);
+  if (comments.isPending) return <p className="comment-empty" aria-busy="true">Loading comments…</p>;
+  if (comments.isError) {
+    return (
+      <p className="comment-empty">
+        Couldn't load comments. <button type="button" className="link-btn" onClick={() => void comments.refetch()}>Try again</button>
+      </p>
+    );
+  }
+  if (comments.data.length === 0) return <p className="comment-empty">No comments yet. Say something kind.</p>;
+  return (
+    <ul className="plain-list comment-list">
+      {comments.data.map((c) => <CommentRow key={c.id} comment={c} target={target} />)}
+    </ul>
   );
 }
 

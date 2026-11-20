@@ -27,6 +27,23 @@ export interface RecSnapshot {
   rating: number | null;
   source: SourceId | null;
   sourceId: string | null;
+  /** The sender's own entry for this title, when it was shared from one of their lists (checked by the server); lets the card open it. */
+  entryId?: string;
+}
+
+/** The message a reply answers, as the quote above the reply shows it (one batched join, no extra query per message). */
+export interface ReplyInfo {
+  /** The original message's id (the quote scrolls to it when it is loaded). */
+  id: string;
+  /** '' when the original was deleted. */
+  senderId: string;
+  /** Display name or @username of the original's sender; '' when deleted. */
+  senderName: string;
+  kind: MessageKind;
+  /** One line (100 characters at most): the text, a recommendation's title, '' for a picture or a deleted message. */
+  snippet: string;
+  /** The original was deleted (or is gone): the quote reads "Original message deleted". */
+  deleted: boolean;
 }
 
 export interface Message {
@@ -41,6 +58,8 @@ export interface Message {
   image: boolean;
   /** Soft-deleted by its sender: text, rec and picture are gone. */
   deleted: boolean;
+  /** The message this one replies to; null when it is not a reply (or it was deleted itself). */
+  replyTo: ReplyInfo | null;
   createdAt: string;
 }
 
@@ -61,6 +80,8 @@ export interface LastMessage {
   kind: MessageKind;
   /** A snippet (80 characters at most); '' for a picture or a deleted message. */
   text: string;
+  /** A recommendation's title (the preview reads "Recommended <title>"). */
+  recTitle?: string | null;
   senderId: string;
   deleted: boolean;
   createdAt: string;
@@ -88,4 +109,6 @@ export interface MessagePage {
 export interface RecommendedItem {
   message: Message;
   sender: PublicUser;
+  /** Not read yet: its chat has not been opened since it arrived. "Recommended to you · N" counts these. */
+  unread: boolean;
 }

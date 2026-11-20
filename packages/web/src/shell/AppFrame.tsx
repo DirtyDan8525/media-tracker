@@ -10,10 +10,13 @@ import { useSaveSettings } from '../data/useMe';
 import { useEnabledLists } from './useLists';
 import { useCurrentList } from './currentList';
 import { CoverViewerContext } from '../screens/list/tableKit';
+import { CoverViewerNoteContext } from '../screens/list/CoverViewer';
+import { setNavWidth, useNavWidth } from './navWidth';
 import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
 import { AddBubble } from './AddBubble';
 import { useSessionMe } from './SessionGate';
+import { useDeviceDefaults } from '../data/deviceDefaults';
 import '../design/nav.css';
 
 /**
@@ -45,15 +48,19 @@ function FrameLayout() {
   const current = useCurrentList();
   const save = useSaveSettings();
   const { side, collapsed } = me.settings.nav;
+  const savedWidth = useNavWidth();
+  const startWidth = useDeviceDefaults().navWidth;
+  const navWidth = savedWidth ?? startWidth;
   if (wide) {
     return (
       <div className={`frame frame--wide${side === 'right' ? ' frame--nav-right' : ''}`}>
         <SideNav lists={lists} counts={counts} activityCount={activityCount} messagesCount={messagesCount} friendsCount={requestsCount}
           showActivity={features.feed} showMessages={features.messages} showFriends={features.friends} showSharpen={features.closeCalls} me={me}
-          collapsed={collapsed} onToggleCollapsed={() => save.mutate({ nav: { collapsed: !collapsed } })} />
+          collapsed={collapsed} onToggleCollapsed={() => save.mutate({ nav: { collapsed: !collapsed } })}
+          side={side} width={navWidth} onWidthChange={setNavWidth} onWidthReset={() => setNavWidth(null)} />
         <main className="frame__main">
           <CoverViewerContext.Provider value={me.settings.coverViewer}>
-            <Outlet />
+            <CoverViewerNoteContext.Provider value><Outlet /></CoverViewerNoteContext.Provider>
           </CoverViewerContext.Provider>
         </main>
       </div>

@@ -21,7 +21,8 @@ import { BackupScreen } from './screens/admin/Backup';
 import { ContentScreen } from './screens/admin/Content';
 import { ListsScreen } from './screens/admin/Lists';
 import { LookupToolsScreen } from './screens/admin/LookupTools';
-import { DefaultsScreen, LookScreen } from './screens/admin/Look';
+import { LookScreen } from './screens/admin/Look';
+import { DefaultsScreen } from './screens/admin/Defaults';
 import { ModerationScreen } from './screens/admin/Moderation';
 import { NumbersScreen } from './screens/admin/Numbers';
 import { SwitchesScreen } from './screens/admin/Switches';
@@ -31,6 +32,7 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AppearanceScreen } from './screens/AppearanceScreen';
+import { TagsScreen } from './screens/settings/TagsScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
 import { JoinScreen } from './screens/auth/JoinScreen';
@@ -140,6 +142,7 @@ export const routes: RouteObject[] = [
           { path: 'stats', element: <StatsScreen /> },
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'settings/appearance', element: <AppearanceScreen /> },
+          { path: 'settings/tags', element: <TagsScreen /> },
           { path: 'settings/tiers', element: <Navigate to="/settings" replace /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'help', element: <HelpScreen /> },

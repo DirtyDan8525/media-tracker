@@ -33,7 +33,7 @@ describe('Messages list', () => {
     expect(rows[0]).toHaveTextContent('You: see you friday!');
     expect(rows[1]).toHaveAttribute('href', '/messages/c2');
     expect(rows[1]).toHaveTextContent('Anime night');
-    expect(rows[1]).toHaveTextContent('Ren: Recommended a title');
+    expect(rows[1]).toHaveTextContent('Ren: Recommended Frieren');
   });
 
   it('shows a picture as "Photo" and a deleted message as "Message deleted"', async () => {
@@ -68,10 +68,19 @@ describe('Messages list', () => {
     expect(screen.getByRole('link', { name: /^Recommended to you/ })).toHaveAttribute('href', '/messages/recommended');
   });
 
-  it('Recommended to you shows how many recs came', async () => {
-    setup({ recommended: [{ message: makeMessage({ kind: 'rec', rec: FRIEREN_REC }), sender: REN_U }] });
+  it('Recommended to you counts only the recs you have not seen', async () => {
+    setup({ recommended: [
+      { message: makeMessage({ kind: 'rec', rec: FRIEREN_REC }), sender: REN_U },
+      { message: makeMessage({ kind: 'rec', rec: FRIEREN_REC }), sender: REN_U, unread: false },
+    ] });
     renderApp('/messages');
     expect(await screen.findByRole('link', { name: 'Recommended to you · 1' })).toBeInTheDocument();
+  });
+
+  it('with every rec seen there is no count', async () => {
+    setup({ recommended: [{ message: makeMessage({ kind: 'rec', rec: FRIEREN_REC }), sender: REN_U, unread: false }] });
+    renderApp('/messages');
+    expect(await screen.findByRole('link', { name: 'Recommended to you' })).toBeInTheDocument();
   });
 
   it('says so, with Retry, when the list cannot load', async () => {

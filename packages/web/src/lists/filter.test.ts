@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { makeEntry } from '../test/fakeBackend';
-import { foldText, genreOptions, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from './filter';
+import { foldText, genreOptions, tagOptions, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from './filter';
 
-const none: ListFilter = { q: '', status: '', genre: '' };
+const none: ListFilter = { q: '', status: '', genre: '', tag: '' };
 const f = (over: Partial<ListFilter>): ListFilter => ({ ...none, ...over });
 
 describe('foldText', () => {
@@ -78,5 +78,25 @@ describe('writeFilter keeps unrelated params; normalizeFilter drops the impossib
   it('drops status without a column and unknown genres', () => {
     expect(normalizeFilter(f({ status: 'Dropped', genre: 'nope' }), false, [{ genre: 'Drama' }])).toEqual(none);
     expect(normalizeFilter(f({ status: 'Dropped', genre: 'drama' }), true, [{ genre: 'Drama' }])).toEqual(f({ status: 'Dropped', genre: 'Drama' }));
+  });
+});
+
+describe('tags', () => {
+  it('matches a tag exactly, case-insensitively, and only the owner-visible tags field', () => {
+    const e = makeEntry({ tags: ['With Ren', 'Comfy'] });
+    expect(matchesFilter(e, f({ tag: 'with ren' }))).toBe(true);
+    expect(matchesFilter(e, f({ tag: 'with' }))).toBe(false);
+    expect(matchesFilter(makeEntry(), f({ tag: 'Comfy' }))).toBe(false);
+    expect(matchesFilter(e, f({ tag: 'Comfy', genre: 'x' }))).toBe(false);
+  });
+  it('counts each tag once per entry, sorted', () => {
+    const rows = [makeEntry({ tags: ['rewatch', 'Comfy'] }), makeEntry({ tags: ['Rewatch'] }), makeEntry()];
+    expect(tagOptions(rows)).toEqual([{ tag: 'Comfy', count: 1 }, { tag: 'rewatch', count: 2 }]);
+  });
+  it('reads and writes ?tag=, and drops a tag no entry has', () => {
+    expect(readFilter(new URLSearchParams('tag=With+Ren')).tag).toBe('With Ren');
+    expect(writeFilter(f({ tag: 'With Ren' }), new URLSearchParams('keep=1')).toString()).toBe('keep=1&tag=With+Ren');
+    expect(normalizeFilter(f({ tag: 'comfy' }), true, [], [{ tag: 'Comfy' }]).tag).toBe('Comfy');
+    expect(normalizeFilter(f({ tag: 'nope' }), true, [], [{ tag: 'Comfy' }]).tag).toBe('');
   });
 });

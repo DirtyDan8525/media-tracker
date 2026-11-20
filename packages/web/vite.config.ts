@@ -1,12 +1,26 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const MIDNIGHT_BG = '#1b1b25';
 
+/** Preloads the Inter 500 file (list titles, buttons) so the first paint does not swap fonts. Its hashed name only exists after the build. */
+const preloadInter500 = (): Plugin => ({
+  name: 'preload-inter-500',
+  transformIndexHtml: {
+    order: 'post',
+    handler(_html, ctx) {
+      const file = Object.keys(ctx.bundle ?? {}).find((n) => /inter-latin-500-normal[^/]*\.woff2$/.test(n));
+      if (!file) return undefined;
+      return [{ tag: 'link', attrs: { rel: 'preload', href: `/${file}`, as: 'font', type: 'font/woff2', crossorigin: '' }, injectTo: 'head' }];
+    },
+  },
+});
+
 export default defineConfig({
   plugins: [
     react(),
+    preloadInter500(),
     VitePWA({
       registerType: 'autoUpdate',
       includeManifestIcons: false, // the glob below already precaches them (no duplicates)

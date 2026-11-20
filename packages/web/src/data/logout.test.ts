@@ -4,7 +4,7 @@ import { localDb } from '../db/local';
 import { CURRENT_LIST_KEY } from '../shell/currentList';
 import { mockFetch } from '../test/mockApi';
 import { AFTER_SETUP_KEY } from './social';
-import { LOGOUT_REDIRECT, logOut, STEP_TIMEOUT_MS } from './logout';
+import { LOGOUT_DEADLINE_MS, LOGOUT_REDIRECT, logOut, STEP_TIMEOUT_MS } from './logout';
 
 function stubLocation() {
   const assign = vi.fn();
@@ -83,6 +83,27 @@ describe('logOut', () => {
       const done = logOut(new QueryClient());
       await vi.advanceTimersByTimeAsync(STEP_TIMEOUT_MS + 10);
       await done;
+      expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
+      expect(assign).toHaveBeenCalledExactlyOnceWith('/');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('several hanging steps are cut by one overall deadline, not 2 s each; later sync clean-up still runs', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const assign = stubLocation();
+      vi.spyOn(localDb.entries, 'clear').mockReturnValue(new Promise(() => {}) as never);
+      vi.spyOn(localDb.me, 'clear').mockReturnValue(new Promise(() => {}) as never);
+      mockFetch({ 'POST /api/auth/logout': { status: 204 } });
+      vi.stubGlobal('fetch', () => new Promise(() => {}));
+      localStorage.setItem(CURRENT_LIST_KEY, 'movies');
+      const qc = new QueryClient();
+      qc.cancelQueries = () => new Promise(() => {}) as never;
+      const done = logOut(qc);
+      await vi.advanceTimersByTimeAsync(LOGOUT_DEADLINE_MS + 50);
+      await done; // four steps would take 8 s at 2 s each
       expect(localStorage.getItem(CURRENT_LIST_KEY)).toBeNull();
       expect(assign).toHaveBeenCalledExactlyOnceWith('/');
     } finally {

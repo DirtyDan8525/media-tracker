@@ -4,7 +4,7 @@
  * drops devices the push service says are gone (404/410) and ignores every other failure. No-op without VAPID keys.
  */
 import { buildPushHTTPRequest } from '@pushforge/builder';
-import { loadSettings } from '../auth/user';
+import { readSettings } from '../auth/user';
 import type { Env } from '../env';
 
 export type NotifyType = 'messages' | 'friendRequests' | 'comments' | 'reactions' | 'signups';
@@ -30,8 +30,9 @@ export const clip = (text: string, max = MESSAGE_PREVIEW_MAX) => {
 interface SubRow { endpoint: string; p256dh: string; auth: string }
 
 async function deliver(env: Env, userId: string, type: NotifyType, payload: PushPayload): Promise<void> {
-  const user = await env.DB.prepare('SELECT settings_json FROM users WHERE id = ? AND status = \'active\'').bind(userId).first<{ settings_json: string }>();
-  if (!user || loadSettings(user.settings_json).notify[type] === false) return;
+  const user = await env.DB.prepare('SELECT settings_json, (SELECT value_json FROM app_settings WHERE key = \'defaults\') AS app_defaults FROM users WHERE id = ? AND status = \'active\'')
+    .bind(userId).first<{ settings_json: string; app_defaults: string | null }>();
+  if (!user || readSettings(user.settings_json, user.app_defaults).settings.notify[type] === false) return;
   const { results } = await env.DB.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?').bind(userId).all<SubRow>();
   if (results.length === 0) return;
   const privateJWK = JSON.parse(env.VAPID_PRIVATE_KEY!) as JsonWebKey;

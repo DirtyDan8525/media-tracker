@@ -26,3 +26,13 @@ export function timeAgo(iso: string, now: Date): string {
 
 /** Whose activity the screen shows. Until Phase 4 only 'you' has data. */
 export type ActivityFilter = 'everyone' | 'friends' | 'you';
+
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/** Search for the Activity feed: every word of `query` must appear in one of the `fields` (case and accents ignored). */
+export function matchesSearch(query: string, fields: readonly (string | null | undefined)[]): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const hay = fold(fields.filter((f): f is string => !!f).join('\n'));
+  return words.every((w) => hay.includes(w));
+}

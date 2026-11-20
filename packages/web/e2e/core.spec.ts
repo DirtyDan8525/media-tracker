@@ -7,6 +7,26 @@ async function openAddAnime(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Add' })).toBeVisible();
 }
 
+/**
+ * Phase 5: the first-run walkthrough, then the install steps (seen/dismissed flags live in localStorage
+ * per browser). Both are modal and cover the page, including the Add button, so they are dismissed
+ * and waited out: each dialog is awaited briefly (slow under two projects at once), and the helper
+ * returns only once no dialog is left.
+ */
+async function dismissFirstRunDialogs(page: Page) {
+  const appears = (button: ReturnType<Page['getByRole']>) => button.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false);
+  const walkthrough = page.getByRole('dialog', { name: 'Your lists' });
+  const skip = walkthrough.getByRole('button', { name: 'Skip' });
+  if (await appears(skip)) {
+    await skip.click();
+    await expect(walkthrough).toBeHidden();
+    // The install steps follow the walkthrough on a device that has not installed the app.
+    const notNow = page.getByRole('button', { name: 'Not now' });
+    if (await appears(notNow)) await notNow.click();
+  }
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+
 const SAMPLE = fileURLToPath(new URL('../test/fixtures/sample-tracker.xlsx', import.meta.url));
 
 // Each project's server has one fixed dev user, so the first test to run does the username setup
@@ -22,12 +42,7 @@ async function signInAndSetUsername(page: Page, username: string) {
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(field).toBeHidden();
   }
-  // Phase 5: the first-run walkthrough and install banner (seen/dismissed flags live in localStorage per browser).
-  const skip = page.getByRole('dialog', { name: 'Your lists' }).getByRole('button', { name: 'Skip' });
-  // The walkthrough can open a beat after the nav shows (slow under two projects at once): wait briefly for it.
-  if (await skip.waitFor({ state: 'visible', timeout: 2_000 }).then(() => true, () => false)) await skip.click();
-  const notNow = page.getByRole('button', { name: 'Not now' });
-  if (await notNow.isVisible().catch(() => false)) await notNow.click();
+  await dismissFirstRunDialogs(page);
   await page.evaluate(() => { try { localStorage.setItem('mt-install-dismissed', '1'); } catch { /* ignore */ } });
 }
 
@@ -111,17 +126,17 @@ test('close call: a second 3.0 asks "Which did you like more?" right after Add; 
 
 test('Sharpen my ratings (More): asks only the close pairs, then the list is all clear', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
-  // Trigun 3.1 is close to Bleach and Naruto (both typed 3.0); added through the API, so nothing is asked yet.
+  // Trigun 3.1 is close to Bleach and Naruto (both typed 3.0, Naruto already picked over Bleach);
+  // added through the API, so nothing is asked yet. Only neighbours are asked: Trigun vs Naruto, and
+  // "About the same" with Naruto then settles Trigun vs Bleach too.
   const made = await page.request.post('/api/entries', { data: { category: 'anime', title: 'Trigun', rating: 3.1 } });
   expect(made.ok()).toBeTruthy();
 
   await page.goto('/more');
   await page.getByRole('main').getByRole('link', { name: 'Sharpen my ratings' }).click();
   await expect(page.getByText('Pick a list. Only close ratings come up.')).toBeVisible();
-  await page.getByRole('link', { name: 'Anime, 2 close calls' }).click();
-  await expect(page.getByText('Close call 1 of 2')).toBeVisible();
-  await page.getByRole('button', { name: 'About the same' }).click();
-  await expect(page.getByText('Close call 2 of 2')).toBeVisible();
+  await page.getByRole('link', { name: 'Anime, 1 close call' }).click();
+  await expect(page.getByText('Close call 1 of 1')).toBeVisible();
   await page.getByRole('button', { name: 'About the same' }).click();
   await expect(page.getByText('That was the last one')).toBeVisible();
   await page.getByRole('main').getByRole('button', { name: 'Done' }).last().click();

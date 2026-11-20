@@ -14,8 +14,9 @@
   .activity-filter__opt:focus-within { outline: 2px solid var(--highlight); outline-offset: 2px; }
 }
 
-.activity { display: flex; flex-direction: column; gap: var(--space-6); }
-.activity__day { display: flex; flex-direction: column; gap: var(--space-4); }
+.activity { display: flex; flex-direction: column; gap: var(--space-5); }
+.activity__day { display: flex; flex-direction: column; gap: var(--space-3); }
+.activity__day > ul { gap: var(--space-3); }
 .activity__day-title {
   margin: var(--space-4) var(--space-2) 0; font-size: var(--fs-meta); font-weight: 600; line-height: 1.3;
   color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.06em;
@@ -23,23 +24,56 @@
 .activity__more { align-self: flex-start; }
 
 .activity-line {
-  position: relative; display: flex; align-items: center; gap: var(--space-6); min-height: 64px; padding: var(--space-5) var(--space-6);
+  position: relative; display: flex; align-items: center; gap: var(--space-6); min-height: 56px; padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-xl); background: var(--card); color: var(--text);
 }
 .activity-line__avatar {
-  flex: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  flex: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: var(--panel); border: 1px solid var(--grid-line); color: var(--bright-text); font-size: var(--fs-body); font-weight: 700;
 }
 .activity-line__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.activity-line__sentence { font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; }
+.activity-line__sentence { font-size: calc(var(--fs-sm) * var(--activity-scale, 1)); line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
 .activity-line__sentence strong { color: var(--bright-text); }
-.activity-line__title { color: var(--text); text-decoration: none; }
+.activity-line__title { color: var(--text); text-decoration: none; padding: 12px 0; margin: -12px 0; }
 .activity-line__title:hover { text-decoration: underline; }
-/* The title link is stretched over the whole row (a 64 px tap target, not a 20 px line of text);
-   its focus ring is drawn around the row. */
-a.activity-line__title::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
-a.activity-line__title:focus-visible { outline: none; }
-a.activity-line__title:focus-visible::after { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: var(--radius-xl); }
-.activity-line__time { font-size: var(--fs-pill); color: var(--muted-text); }
+
+.activity-line__time { font-size: calc(var(--fs-meta) * var(--activity-scale, 1)); color: var(--muted-text); }
 .activity-line__cover { flex: none; display: block; line-height: 0; }
 @media (min-width: 768px) { .activity-filter { max-width: 560px; } }
+
+/* Artist after a song's or album's title; the creator line of the other lists (studio, director, author). */
+.activity-line__by { color: var(--muted-text); font-weight: 400; }
+.activity-line__creator { font-size: calc(var(--fs-meta) * var(--activity-scale, 1)); color: var(--muted-text); overflow-wrap: anywhere; }
+
+/* Search box and the "Aa" text-size control under the filter chips. */
+.activity-bar { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-4); }
+.activity-bar__search { flex: 1; min-width: 0; margin-top: 0; }
+.activity-bar__hint { margin: var(--space-2) var(--space-2) 0; font-size: var(--fs-meta); color: var(--muted-text); }
+@media (min-width: 768px) { .activity-bar { max-width: 560px; } }
+
+/* PC details panel (sticky, right of the feed). */
+.feed-post--active { box-shadow: inset 0 0 0 1px var(--highlight); }
+.activity-panel {
+  position: sticky; top: var(--space-8); flex: 1 1 0; min-width: 0; max-height: calc(100vh - 2 * var(--space-8)); overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-8); padding: var(--space-8); border-radius: var(--radius-xl); background: var(--card);
+}
+.activity-panel__hint { margin: 0; padding: var(--space-12) 0; text-align: center; color: var(--muted-text); font-size: var(--fs-body); }
+.activity-panel__top { display: flex; gap: var(--space-8); align-items: flex-start; }
+.activity-panel__titles { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.activity-panel__title { margin: 0; font-size: var(--fs-brand); line-height: 1.25; color: var(--bright-text); overflow-wrap: anywhere; }
+.activity-panel__creator { margin: 0; font-size: var(--fs-body); color: var(--text); }
+.activity-panel__meta { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); }
+.activity-panel__open { align-self: flex-start; display: inline-flex; align-items: center; min-height: var(--tap); color: var(--highlight); font-weight: 600; }
+.activity-panel__who { display: flex; align-items: center; gap: var(--space-5); }
+.activity-panel__who > div { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.activity-panel__time { font-size: var(--fs-meta); color: var(--muted-text); }
+.activity-panel__facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-6); font-size: var(--fs-sm); }
+.activity-panel__facts dt { color: var(--muted-text); } .activity-panel__facts dd { margin: 0; color: var(--bright-text); }
+.activity-panel__h { margin: 0 0 var(--space-3); font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.06em; }
+.activity-panel__reacted { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text); }
+.activity-panel section > .btn { margin-top: var(--space-4); }
+
+.activity-details { display: flex; flex-direction: column; gap: var(--space-8); }
+.activity-panel__actions { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+.activity-panel__actions .detail__watch { margin: 0; }
+.feed-post { cursor: pointer; }

@@ -16,7 +16,10 @@ import { recFromEntry } from '../../data/messages';
 import { ShareButton } from '../messages/ShareButton';
 import { EntrySocial } from './EntrySocial';
 import '../../design/social.css';
+import '../../design/tags.css';
 import { OpenInSpotify } from '../entry/OpenInSpotify';
+import { PlayPreview } from '../entry/PlayPreview';
+import { PlayTrailer } from '../entry/PlayTrailer';
 
 /** A friend's title (route /u/:username/entry/:id, S10): read-only, with their notes unless private, and Add to mine. */
 export function FriendEntryDetail() {
@@ -93,6 +96,8 @@ function Body({ username, entry, seasons }: {
               </a>
             )}
             <OpenInSpotify entry={entry} />
+            <PlayPreview entry={entry} />
+            <PlayTrailer entry={entry} />
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>
@@ -110,6 +115,13 @@ function Body({ username, entry, seasons }: {
             </span>
             <RatingBadge rating={entry.rating} size="lg" />
           </div>
+
+          {(entry.tags?.length ?? 0) > 0 && (
+            <section className="detail__section" aria-label="Tags">
+              <h2 className="detail__h">Tags</h2>
+              <ul className="tag-list">{entry.tags!.map((t) => <li key={t} className="tag-chip tag-chip--read">{t}</li>)}</ul>
+            </section>
+          )}
 
           {entry.synopsis && (
             <section className="detail__section" aria-label="Synopsis"><p className="synopsis">{entry.synopsis}</p></section>

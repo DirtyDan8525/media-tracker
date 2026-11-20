@@ -1,6 +1,7 @@
 import { APP_SETTING_DEFAULTS, publicAppSettings, type FeatureKey, type PublicAppSettings } from '@media-tracker/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { setDeviceDefaults } from './deviceDefaults';
 import { api } from '../api/client';
 
 export const APP_KEY = ['app'] as const;
@@ -20,6 +21,7 @@ export function normalizeApp(raw: Partial<PublicAppSettings> | undefined): Publi
     about: raw.about ?? null,
     brand: { ...d.brand, ...raw.brand },
     lists: { ...d.lists, ...raw.lists },
+    device: { ...d.device, ...raw.device },
   };
 }
 
@@ -29,7 +31,10 @@ export function normalizeApp(raw: Partial<PublicAppSettings> | undefined): Publi
  */
 export function useAppSettings(): PublicAppSettings {
   const q = useQuery({ queryKey: APP_KEY, queryFn: () => api.get<PublicAppSettings>('/api/app'), staleTime: 60_000, retry: false });
-  return useMemo(() => normalizeApp(q.data), [q.data]);
+  const app = useMemo(() => normalizeApp(q.data), [q.data]);
+  const device = q.data ? app.device : null;
+  useEffect(() => { if (device) setDeviceDefaults(device); }, [device]);
+  return app;
 }
 
 /** Is this feature switched on? (true while the settings are unknown.) */

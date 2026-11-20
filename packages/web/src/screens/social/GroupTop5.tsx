@@ -1,9 +1,8 @@
-import { CATEGORY_CONFIG, formatRating, groupTop5, type Category, type GroupRow } from '@media-tracker/shared';
+import { groupTop5, type Category, type GroupRow } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, type ReactNode } from 'react';
 import { useFriendsEntries, useFriends } from '../../data/social';
 import { useAllEntries } from '../../data/useEntries';
-import { CoverImage } from '../../design/components/CoverImage';
 import { EmptyState } from '../../design/components/EmptyState';
 import { Skeleton } from '../../design/components/Skeleton';
 import { LIST_LABEL } from '../../nav';
@@ -11,6 +10,7 @@ import { useEnabledLists } from '../../shell/useLists';
 import { PageHeader } from '../../shell/PageHeader';
 import { useAddFriend } from '../../shell/AddFriendHost';
 import { useSessionMe } from '../../shell/SessionGate';
+import { TopRow } from '../Top5Screen';
 import '../../design/ratings.css';
 
 /** Top 5's "Friends" view: you and every friend together, per list. A title counts once at least 2 people rated it. */
@@ -74,7 +74,6 @@ export function GroupTop5({ toggle }: { toggle: ReactNode }) {
 function GroupBlock({ category, rows }: { category: Category; rows: GroupRow[] }) {
   const name = LIST_LABEL[category];
   const id = `group5-${category}`;
-  const square = CATEGORY_CONFIG[category].square;
   return (
     <section aria-labelledby={id} className="top5__block">
       <h2 id={id} className="top5__heading">{name}</h2>
@@ -83,18 +82,8 @@ function GroupBlock({ category, rows }: { category: Category; rows: GroupRow[] }
       ) : (
         <ol className="top5__list">
           {rows.map((r, i) => (
-            <li key={r.title} className="top5__item" data-square={square || undefined}>
-              <div className="top5__row">
-                <span className="top5__rank">{i + 1}</span>{' '}
-                <span className="top5__cover-wrap" aria-hidden="true">
-                  <CoverImage src={r.coverUrl} alt={`${r.title} cover`} square={square} width={32} className="top5__cover" />
-                </span>
-                <span className="top5__text">
-                  <span className="top5__title">{r.title}</span>{' '}
-                  <span className="top5__creator">{formatRating(Math.round(r.average * 10) / 10)} · {r.raters} ratings</span>
-                </span>
-              </div>
-            </li>
+            <TopRow key={r.title} rank={i + 1} to={null} sub={`${r.raters} ratings`}
+              entry={{ id: r.title, category, title: r.title, creator: '', coverUrl: r.coverUrl, rating: Math.round(r.average * 10) / 10 }} />
           ))}
         </ol>
       )}

@@ -10,9 +10,12 @@ export const LOGOUT_REDIRECT = '/';
 /** A step that hasn't settled by now (a blocked IndexedDB never rejects) is abandoned so the logout still happens. */
 export const STEP_TIMEOUT_MS = 2000;
 
-function withTimeout(work: unknown): Promise<unknown> {
+/** The whole logout waits at most this long in total, however many steps hang (each still starts). */
+export const LOGOUT_DEADLINE_MS = 4000;
+
+function withTimeout(work: unknown, ms: number): Promise<unknown> {
   let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, STEP_TIMEOUT_MS); });
+  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); });
   return Promise.race([Promise.resolve(work), timeout]).finally(() => clearTimeout(timer));
 }
 
@@ -30,9 +33,11 @@ export async function logOut(qc: QueryClient): Promise<void> {
     () => sessionStorage.removeItem(AFTER_SETUP_KEY),
     () => forgetCurrentList(),
   ];
+  const deadline = Date.now() + LOGOUT_DEADLINE_MS;
   for (const step of steps) {
     try {
-      await withTimeout(step());
+      // Past the deadline a step still starts (its synchronous clean-up runs) but is not waited for.
+      await withTimeout(step(), Math.max(0, Math.min(STEP_TIMEOUT_MS, deadline - Date.now())));
     } catch {
       // keep going: clear what we can
     }

@@ -37,6 +37,15 @@ describe('foldPosts', () => {
     expect(lines[0]).toMatchObject({ key: 'p1', entryId: 'a', userId: 'u1', rating: { from: 7, to: 9 }, at: items[0]!.createdAt });
   });
 
+  it('a season post reads "Title · Season" and folds its own re-rates', () => {
+    const season = { seasonId: 's1', season: 'Season 2' };
+    const [line] = foldPosts([
+      row('p1', 'a', 're-rated', { from: 8, to: 9, ...season }, 0),
+      row('p1', 'a', 'rated', { from: null, to: 8, ...season }, 5, { id: 'p1' }),
+    ]);
+    expect(line).toMatchObject({ title: 'Title a · Season 2', entryId: 'a', rating: { from: null, to: 9 } });
+  });
+
   it('drops a post whose rating ends where it began (7 to 8 to 7)', () => {
     const items = [row('p1', 'a', 're-rated', { from: 8, to: 7 }, 0), row('p1', 'a', 're-rated', { from: 7, to: 8 }, 1, { id: 'p1' })];
     expect(foldPosts(items)).toEqual([]);

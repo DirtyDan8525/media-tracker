@@ -1,6 +1,6 @@
 import { DEFAULT_USER_SETTINGS, THEMES } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
-import { applyTheme, barTextColor, CF_VARS, contrast, contrastWarnings, ROLE_VARS } from './theme';
+import { applyTheme, barTextColor, CF_VARS, contrast, contrastWarnings, onHighlightColor, ROLE_VARS } from './theme';
 
 const css = (name: string) => document.documentElement.style.getPropertyValue(name);
 
@@ -86,6 +86,22 @@ describe('contrastWarnings', () => {
     const w = contrastWarnings({ ...THEMES.Midnight!, Text: '#333333' });
     expect(w.map((x) => [x.role, x.surface])).toEqual([['Text', 'Background'], ['Text', 'Cards']]);
     expect(w[0]!.ratio).toBeCloseTo(contrast('#333333', '#1b1b25'), 5);
+  });
+});
+
+describe('contrastWarnings: button text on Highlight', () => {
+  const grey = { ...THEMES.Midnight!, Highlight: '#808080', 'Header row': '#8a8a8a', Background: '#777777', 'Bright text': '#858585' };
+
+  it('flags a Custom Highlight that no label colour reads on, with the ratio of the best one', () => {
+    const w = contrastWarnings(grey).filter((x) => x.surface === 'Highlight');
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ role: 'Button text', surface: 'Highlight' });
+    expect(w[0]!.ratio).toBeCloseTo(Math.max(...['#8a8a8a', '#777777', '#858585'].map((c) => contrast(c, '#808080'))), 5);
+    expect(contrast(onHighlightColor(grey), '#808080')).toBeLessThan(4.5);
+  });
+
+  it('says nothing when one of the label colours reads at 4.5:1', () => {
+    expect(contrastWarnings({ ...THEMES.Midnight!, Highlight: '#ff9f43' }).filter((x) => x.surface === 'Highlight')).toEqual([]);
   });
 });
 

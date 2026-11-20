@@ -2,8 +2,8 @@ import { env } from 'cloudflare:workers';
 import { afterEach, describe, expect, it } from 'vitest';
 import { app } from '../src/index';
 import type { Env } from '../src/env';
-import type { ActivityPage, Entry, SavePayload } from '@media-tracker/shared';
-import { activityForPatch, ratingsSaveActivityRows } from '../src/api/activity';
+import { foldPosts, type ActivityPage, type Entry, type SavePayload } from '@media-tracker/shared';
+import { activityForPatch } from '../src/api/activity';
 import { pair } from '../src/social/visibility';
 import { spyD1 } from './d1spy';
 
@@ -78,12 +78,71 @@ describe('activity writes', () => {
     expect(items.slice(0, 2).map((i) => i.type).sort()).toEqual(['rated', 'status']);
   });
 
-  it('notes, coverUrl, lookup fills and seasons log nothing', async () => {
+  it('notes, coverUrl, lookup fills and an unrated season log nothing', async () => {
     const e = await mk(A, { title: 'X' });
     await patch(A, e.id, { notes: 'n', coverUrl: 'https://img.test/c.jpg', synopsis: 's', lookupState: 'ok' });
-    const res = await as(A, `/api/entries/${e.id}/seasons`, 'POST', { label: 'S1', rating: 8 });
+    const res = await as(A, `/api/entries/${e.id}/seasons`, 'POST', { label: 'S1', notes: 'n' });
     expect(res.status).toBe(201);
     expect((await feed(A)).items.map((i) => i.type)).toEqual(['added']);
+  });
+
+  describe('season ratings', () => {
+    const season = async (entryId: string, body: Record<string, unknown>) => {
+      const res = await as(A, `/api/entries/${entryId}/seasons`, 'POST', body);
+      expect(res.status).toBe(201);
+      return (await res.json()) as { id: string };
+    };
+    const patchSeason = async (id: string, body: unknown) => expect((await as(A, `/api/seasons/${id}`, 'PATCH', body)).status).toBe(200);
+
+    it('a rated season posts rated; re-rates within 10 minutes fold into that one post; same rating or a clear logs nothing', async () => {
+      const e = await mk(A, { title: 'Frieren' });
+      const s = await season(e.id, { label: 'Season 2', rating: 8 });
+      await patchSeason(s.id, { rating: 9 });
+      await patchSeason(s.id, { rating: 9 });
+      await patchSeason(s.id, { rating: 9.5 });
+      await patchSeason(s.id, { rating: null });
+      const { items } = await feed(A);
+      const rows = items.filter((i) => i.payload.seasonId === s.id);
+      expect(rows.map((i) => i.type)).toEqual(['re-rated', 're-rated', 'rated']);
+      expect(rows[2]!.payload).toMatchObject({ from: null, to: 8, season: 'Season 2' });
+      expect(rows.every((i) => i.entryId === e.id)).toBe(true);
+      // One season post (anchor + 2 joined rows), apart from the title's own 'added' post.
+      expect(new Set(rows.map((i) => i.postId)).size).toBe(1);
+      expect(rows.filter((i) => i.postId === i.id)).toHaveLength(1);
+      const lines = foldPosts(items);
+      expect(lines).toHaveLength(2);
+      expect(lines.find((l) => l.rating)).toMatchObject({ title: 'Frieren · Season 2', entryId: e.id, rating: { from: null, to: 9.5 } });
+    });
+
+    it('seasons of one title and the title itself each keep their own post', async () => {
+      const e = await mk(A, { title: 'Frieren', rating: 7 });
+      const s1 = await season(e.id, { label: 'S1', rating: 8 });
+      const s2 = await season(e.id, { label: 'S2', rating: 9 });
+      await patch(A, e.id, { rating: 8 });
+      const { items } = await feed(A);
+      const posts = new Set(items.map((i) => i.postId));
+      expect(posts.size).toBe(3);
+      const lines = foldPosts(items);
+      expect(lines.map((l) => l.title).sort()).toEqual(['Frieren', 'Frieren · S1', 'Frieren · S2']);
+      expect(s1.id).not.toBe(s2.id);
+    });
+
+    it('a later rating of an unrated season is a first rating (rated), and it shows to friends', async () => {
+      await befriend(A, B);
+      const e = await mk(A, { title: 'Show', category: 'tv', status: 'Completed' });
+      const s = await season(e.id, { label: 'S1' });
+      await patchSeason(s.id, { rating: 7.5 });
+      const { items } = await feed(B, '?show=friends');
+      expect(items.map((i) => i.type)).toContain('rated');
+      expect(foldPosts(items).map((l) => l.title)).toContain('Show · S1');
+    });
+
+    it('an unrelated user cannot post for your season', async () => {
+      const e = await mk(A, { title: 'X' });
+      const s = await season(e.id, {});
+      expect((await as(B, `/api/seasons/${s.id}`, 'PATCH', { rating: 5 })).status).toBe(404);
+      expect((await feed(A)).items.map((i) => i.type)).toEqual(['added']);
+    });
   });
 
   it('import logs nothing', async () => {
@@ -282,30 +341,6 @@ describe('activity on POST /api/ratings/:set/save', () => {
   });
 });
 
-describe('ratingsSaveActivityRows', () => {
-  const st = (id: string, rating: number | null, tier: number | null) => ({ id, rating, tier });
-  const before = new Map([
-    ['same', st('same', 8, 2)], ['small', st('small', 8, 2)], ['half', st('half', 8, 2)], ['tier', st('tier', 8.9, 2)],
-    ['first', st('first', null, null)], ['refit', st('refit', 8, 2)], ['cleared', st('cleared', 8, 2)],
-  ]);
-  const changed = [
-    st('same', 8, 2), st('small', 8.49, 2), st('half', 8.5, 2), st('tier', 9.03, 3),
-    st('first', 8.25, 2), st('refit', 6.1, 1), st('cleared', null, null),
-  ];
-
-  it('logs session titles that moved ≥ 0.5, changed tier or got a first rating; never re-fit-only rows', () => {
-    const session = new Set(['same', 'small', 'half', 'tier', 'first', 'cleared']);
-    expect(ratingsSaveActivityRows(before, changed, session)).toEqual([
-      { id: 'half', rating: 8.5 }, { id: 'tier', rating: 9.03 }, { id: 'first', rating: 8.25 },
-    ]);
-  });
-
-  it('a 0.5 drop counts like a 0.5 rise, despite float error', () => {
-    const b = new Map([['x', st('x', 8.3, 2)]]);
-    expect(ratingsSaveActivityRows(b, [st('x', 7.8, 2)], new Set(['x']))).toEqual([{ id: 'x', rating: 7.8 }]);
-  });
-});
-
 // ---- Phase 4: posts (S5), scoped feed (S6), social counts, unread (S8) ----
 
 const idOf = async (email: string) => {
@@ -500,6 +535,28 @@ describe('GET /api/activity?show= (S6)', () => {
     expect(forB.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️', '🔥'], comments: 1 });
     const forA = await feed(A);
     expect(forA.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️'], comments: 1 });
+  });
+
+  it('carries the creator, and the note only to its owner or a friend when notes are not private', async () => {
+    await befriend(A, B);
+    await befriend(A, C, 'pending');
+    await mk(A, { title: 'Open', rating: 8, creator: 'Studio X', notes: 'Loved it' });
+    await mk(A, { title: 'Closed', rating: 8, creator: 'Studio Y', notes: 'secret review', notesPrivate: true });
+    await mk(A, { title: 'Bare', rating: 8, notes: '' });
+    const by = (page: ActivityPage, title: string) => page.items.find((i) => i.title === title)!;
+    const mine = await feed(A);
+    expect(by(mine, 'Open')).toMatchObject({ creator: 'Studio X', note: 'Loved it' });
+    expect(by(mine, 'Closed').note).toBe('secret review'); // yours: always
+    const friend = await feed(B, '?show=friends');
+    expect(by(friend, 'Open')).toMatchObject({ creator: 'Studio X', note: 'Loved it' });
+    expect(by(friend, 'Closed')).toMatchObject({ creator: 'Studio Y', note: null });
+    expect(by(friend, 'Bare').note).toBeNull();
+    expect(JSON.stringify(friend)).not.toContain('secret review');
+    // Not a friend (Everyone feed): the title shows, the note never does.
+    const stranger = await feed(C, '?show=everyone');
+    expect(by(stranger, 'Open')).toMatchObject({ creator: 'Studio X', note: null });
+    expect(JSON.stringify(stranger)).not.toContain('Loved it');
+    expect(JSON.stringify(stranger)).not.toContain('secret review');
   });
 
   it('a page with posts from 2 users, reactions and comments costs ≤ 10 queries', async () => {

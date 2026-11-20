@@ -40,7 +40,7 @@ describe('Share on a title page', () => {
     const sends = calls.filter((c) => c.method === 'POST' && /\/api\/conversations\/[^/]+\/messages$/.test(c.path));
     expect(sends.map((c) => c.path).sort()).toEqual(['/api/conversations/c1/messages', '/api/conversations/g1/messages']);
     expect(sends[0]!.body).toEqual({
-      rec: { category: 'anime', title: 'Frieren', creator: 'Madhouse', coverUrl: 'https://img.example/f.jpg', rating: 9, source: 'kitsu', sourceId: '154587' },
+      rec: { category: 'anime', title: 'Frieren', creator: 'Madhouse', coverUrl: 'https://img.example/f.jpg', rating: 9, source: 'kitsu', sourceId: '154587', entryId: 'f1' },
       text: 'you HAVE to watch this',
     });
     // Ren's direct chat was opened (found) first.

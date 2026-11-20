@@ -16,6 +16,7 @@ export interface ShareRequest {
   shareTitle: string;
 }
 
+export const SHARE_FAILED = "Couldn't share the image. Try Save image.";
 export const RENDER_FAILED = "Couldn't make the image. Try again.";
 
 /**
@@ -58,6 +59,9 @@ export function ShareSheet({ request, onClose }: { request: ShareRequest; onClos
       const result = await shareOrSave(image.blob, request.filename, request.shareTitle);
       if (result === 'saved') toast.show('Image saved');
       if (result === 'shared') onClose();
+    } catch {
+      // Anything unexpected (shareOrSave handles cancel and share failures itself): tell the person, keep the sheet open.
+      toast.show(SHARE_FAILED);
     } finally {
       setBusy(false);
     }

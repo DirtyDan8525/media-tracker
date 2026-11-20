@@ -44,7 +44,7 @@
 }
 
 /* A feed post: avatar, text, cover on top; React + Comment under it, all on one card. */
-.feed-post { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-5) var(--space-4); border-radius: var(--radius-xl); background: var(--card); }
+.feed-post { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5) var(--space-3); border-radius: var(--radius-xl); background: var(--card); }
 .feed-post .activity-line { background: none; padding: 0; align-items: flex-start; min-height: 0; }
 .feed-post__chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-height: 28px; }
 .activity-line__avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
@@ -122,3 +122,13 @@
 .who-row { min-height: var(--tap); }
 .who-row__emoji { font-size: var(--fs-body); }
 .entry-social .who-btn { align-self: flex-start; }
+
+/* The person's note under a post: a short quote, 3 lines, More / Less. */
+.feed-post__note { margin: var(--space-2) 0 var(--space-1); padding: var(--space-1) 0 var(--space-1) var(--space-5); border-left: 3px solid var(--grid-line); }
+.feed-post__note-text { margin: 0; font-size: calc(var(--fs-sm) * var(--activity-scale, 1)); line-height: 1.45; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.feed-post__note-text--clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.feed-post__note-more {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--space-2);
+  font: 600 calc(var(--fs-meta) * var(--activity-scale, 1)) var(--font); color: var(--highlight); cursor: pointer;
+}
+.feed-post__note-more:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: 4px; }

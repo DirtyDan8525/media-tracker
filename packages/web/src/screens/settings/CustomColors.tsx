@@ -102,7 +102,8 @@ export function CustomColors() {
   }
 
   const warnings = contrastWarnings(draft);
-  const warned = new Set(warnings.map((w) => w.role as string));
+  // The button label is a result of several roles; flag the Highlight row (the fill it sits on).
+  const warned = new Set<string>(warnings.map((w) => (w.surface === 'Highlight' ? 'Highlight' : w.role)));
 
   return (
     <>

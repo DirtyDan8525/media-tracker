@@ -1,4 +1,4 @@
-import type { ConversationSummary, FriendEntry, LastMessage, RecSnapshot } from '@media-tracker/shared';
+import type { ConversationSummary, FriendEntry, LastMessage, Message, RecSnapshot, ReplyInfo } from '@media-tracker/shared';
 import { nameOf } from '@media-tracker/shared';
 
 const CLOCK = () => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -34,10 +34,26 @@ export function ageText(iso: string, now: Date): string {
 export function previewOf(c: ConversationSummary, meId: string): string {
   const last: LastMessage | null = c.last;
   if (!last) return 'No messages yet';
-  const body = last.deleted ? 'Message deleted' : last.kind === 'image' ? '📷 Photo' : last.kind === 'rec' ? (last.text ? `Recommended a title: ${last.text}` : 'Recommended a title') : last.text;
+  const recWhat = last.recTitle ? `Recommended ${last.recTitle}` : 'Recommended a title';
+  const body = last.deleted ? 'Message deleted' : last.kind === 'image' ? '📷 Photo' : last.kind === 'rec' ? (last.text ? `${recWhat}: ${last.text}` : recWhat) : last.text;
   if (last.senderId === meId) return `You: ${body}`;
   const sender = c.members.find((m) => m.id === last.senderId);
   return c.kind === 'group' && sender ? `${sender.displayName || sender.username}: ${body}` : body;
+}
+
+/** One line about a message for the composer's "Replying to" bar: its text, "Recommended <title>", or "📷 Photo". */
+export function snippetOfMessage(m: Pick<Message, 'kind' | 'text' | 'rec'>): string {
+  const one = (m.kind === 'rec' ? `Recommended ${m.rec?.title ?? 'a title'}` : m.kind === 'image' ? '📷 Photo' : m.text).replace(/\s+/g, ' ').trim();
+  const chars = Array.from(one);
+  return chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : one;
+}
+
+/** What a quote shows for the replied-to message: its snippet, with a rec / picture given a word. */
+export function quoteText(r: ReplyInfo): string {
+  if (r.deleted) return 'Original message deleted';
+  if (r.kind === 'rec') return `Recommended ${r.snippet || 'a title'}`;
+  if (r.kind === 'image') return '📷 Photo';
+  return r.snippet;
 }
 
 /** A recommendation as the shared server action's FriendEntry, so "Add to mine" can reuse the friend-title copy (S11). */

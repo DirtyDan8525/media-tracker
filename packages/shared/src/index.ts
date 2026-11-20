@@ -16,3 +16,5 @@ export * from './compareFriends';
 export * from './bio';
 export * from './messages';
 export * from './appSettings';
+export * from './userDefaults';
+export { AniListError, lookupAniList, mapAniListEntry, aniListStatus, type AniListEntry, type AniListErrorCode } from './import/anilist';

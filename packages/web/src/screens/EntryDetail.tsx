@@ -34,10 +34,15 @@ import { useSessionMe } from '../shell/SessionGate';
 import { ProgressControl } from './list/ProgressControl';
 import { DetailField } from './entry/DetailField';
 import { SeasonsEditor } from './entry/SeasonsEditor';
+import { TagsRow } from './entry/TagsRow';
+import { MoreStats } from './entry/MoreStats';
 import { useCloseCall } from './sharpen/CloseCallSheet';
 import { EntrySocial } from './social/EntrySocial';
 import '../design/feed.css';
 import { OpenInSpotify } from './entry/OpenInSpotify';
+import { WatchOnYouTube } from './entry/WatchOnYouTube';
+import { PlayPreview } from './entry/PlayPreview';
+import { PlayTrailer } from './entry/PlayTrailer';
 
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;
 
@@ -122,13 +127,10 @@ function DetailBody({ entry }: { entry: Entry }) {
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
             {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
-            {entry.category === 'youtube' && sourceUrl(entry.source, entry.sourceId) && (
-              // Dan, 2026-11-17: a video links straight to YouTube.
-              <a className="btn btn--primary detail__watch" href={sourceUrl(entry.source, entry.sourceId)!} target="_blank" rel="noopener noreferrer">
-                Watch on YouTube
-              </a>
-            )}
+            <WatchOnYouTube entry={entry} />
             <OpenInSpotify entry={entry} />
+            <PlayPreview entry={entry} />
+            <PlayTrailer entry={entry} />
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>
@@ -181,6 +183,8 @@ function DetailBody({ entry }: { entry: Entry }) {
             <ProgressControl entry={entry} />
           </div>
         )}
+
+        <TagsRow entry={entry} />
 
         {entry.detailsState === 'needs_review' && <PickMatch entry={entry} />}
 
@@ -249,6 +253,8 @@ function DetailBody({ entry }: { entry: Entry }) {
             <Button onClick={() => setSheet('refetch')}>Re-fetch</Button>
           </div>
         </details>
+
+        <MoreStats entry={entry} />
 
         <div className="detail__actions">
           <Button className="btn--danger" onClick={() => setSheet('delete')}>Delete</Button>

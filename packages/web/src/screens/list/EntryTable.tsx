@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, PROGRESS_CATEGORIES, STATUSES, formatRating, showsProgress, statusLabel, type Entry, type Status } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, PROGRESS_CATEGORIES, STATUSES, airingOf, formatRating, showsProgress, statusLabel, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, type HTMLAttributes, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
@@ -14,7 +14,8 @@ import { ProgressControl, progressText } from './ProgressControl';
 import { LookupNote } from './LookupNote';
 import { PrivateLock } from './PrivateLock';
 import { stagger, type RowActions } from './EntryCards';
-import { TableFrame, useRowViewer, type ColumnDef, type ViewerItem } from './tableKit';
+import { ColumnsMenu, OPTIONAL_COLUMNS, TableFrame, useOptionalColumns, useRowViewer, type ColId, type ColumnDef, type ViewerItem } from './tableKit';
+import '../../design/tags.css';
 import { LIST_LABEL } from '../../nav';
 import { backState } from '../../shell/BackButton';
 
@@ -32,6 +33,13 @@ function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
   }
 }
 
+/** 'Sep 29, 2025' from 'YYYY-MM-DD' (blank when not set). */
+function dayText(d: string | null | undefined): string {
+  if (!d) return '';
+  const t = new Date(`${d}T00:00:00Z`);
+  return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
 export interface EntryTableProps extends RowActions {
   rows: Entry[];
   label: string;
@@ -43,9 +51,10 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
   const first = rows[0];
   const items = useMemo<ViewerItem[]>(() => rows.map((e) => ({
     id: e.id, title: e.title, category: e.category, coverUrl: e.coverUrl, rating: e.rating, status: e.status, creator: e.creator,
-    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, to: `/entry/${e.id}`, state: backState(LIST_LABEL[e.category]),
+    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, source: e.source, sourceId: e.sourceId, to: `/entry/${e.id}`, state: backState(LIST_LABEL[e.category]),
   })), [rows]);
   const viewer = useRowViewer(items);
+  const optional = useOptionalColumns(first?.category ?? '');
   if (!first) return null;
   const cfg = CATEGORY_CONFIG[first.category];
   // Columns with nothing to show on this list are left out, so Notes keeps its room (Dan, 2026-11-17).
@@ -57,17 +66,25 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
   columns.push({ id: 'genres', label: 'Genres' });
   if (cfg.creatorLabel) columns.push({ id: 'creator', label: cfg.creatorLabel });
   if (withAvg) columns.push({ id: 'avg', label: 'Season Avg' });
+  // Optional columns (Columns menu), after the standard ones and before Notes. Airing is for anime and TV only.
+  const choices = OPTIONAL_COLUMNS.filter((c) => c.id !== 'airing' || first.category === 'anime' || first.category === 'tv');
+  const extra = choices.filter((c) => optional.on.includes(c.id));
+  const shown = new Set<ColId>(extra.map((c) => c.id));
+  columns.push(...extra);
   columns.push({ id: 'notes', label: 'Notes' });
   return (
-    <TableFrame list={first.category} label={label} columns={columns} viewer={viewer}>
-      <tbody onKeyDown={onGridKeyDown}>
-        {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} rowProps={viewer.rowProps(e.id)} {...actions} />)}
-      </tbody>
-    </TableFrame>
+    <>
+      <div className="table-tools table-tools--columns"><ColumnsMenu choices={choices} on={optional.on} onToggle={optional.toggle} /></div>
+      <TableFrame list={first.category} label={label} columns={columns} viewer={viewer}>
+        <tbody onKeyDown={onGridKeyDown}>
+          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} extra={shown} rowProps={viewer.rowProps(e.id)} {...actions} />)}
+        </tbody>
+      </TableFrame>
+    </>
   );
 }
 
-function TableRow({ entry: e, index, showSeasonAvg, hasProgress, rowProps, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean; rowProps: HTMLAttributes<HTMLTableRowElement> } & RowActions) {
+function TableRow({ entry: e, index, showSeasonAvg, hasProgress, extra, rowProps, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean; extra: Set<ColId>; rowProps: HTMLAttributes<HTMLTableRowElement> } & RowActions) {
   const qc = useQueryClient();
   const toast = useToast();
   const cfg = CATEGORY_CONFIG[e.category];
@@ -121,6 +138,15 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, rowProps, ...ac
       <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
       {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
       {showSeasonAvg && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
+      {extra.has('tags') && (
+        <td className="col-tags" title={(e.tags ?? []).join(', ') || undefined}>
+          {(e.tags?.length ?? 0) > 0 && <ul className="tags-cell tag-list" aria-label={`Tags for ${e.title}`}>{e.tags!.map((t) => <li key={t} className="tag-chip tag-chip--read">{t}</li>)}</ul>}
+        </td>
+      )}
+      {extra.has('started') && <td className="muted col-started">{dayText(e.startedAt)}</td>}
+      {extra.has('finished') && <td className="muted col-finished">{dayText(e.finishedAt)}</td>}
+      {extra.has('rewatches') && <td className="muted col-rewatches">{(e.rewatches ?? 0) > 0 ? e.rewatches : ''}</td>}
+      {extra.has('airing') && <td className="muted col-airing">{airingOf(e) ?? ''}</td>}
       <td>
         {editable ? (
           <EditableCell

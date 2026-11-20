@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { patchLocal, restoreLocal, writeEntry } from './entryCache';
 import { CLOSE_COUNTS_KEY, ratingSetKey } from './ratings';
 import { refreshCategories } from './useEntries';
+import { COMPLETED, announceCompleted } from './rateOnComplete';
 
 export const SAVE_FAILED = "Couldn't save that change";
 
@@ -29,6 +30,8 @@ export async function saveEntryChange(
       void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
       void refreshCategories(qc, [entry.category]);
     }
+    // Newly Completed and still unrated: the rating sheet offers to rate it (once, here, for every screen).
+    if (patch.status === COMPLETED && prev?.status !== COMPLETED) announceCompleted(saved);
     return saved;
   } catch (err) {
     if (prev) restoreLocal(qc, prev);

@@ -10,6 +10,7 @@ import { useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
 import { ProgressBar } from '../design/components/ProgressBar';
+import { AniListImport } from './AniListImport';
 import { chunkRows } from '../import/chunk';
 import { parseWorkbook } from '../import/parseWorkbook';
 import { LIST_LABEL, LIST_ORDER } from '../nav';
@@ -162,7 +163,7 @@ export function ImportScreen() {
 
   return (
     <div className="screen">
-      <PageHeader title="Import your Sheet" backTo="/more" />
+      <PageHeader title="Import" backTo="/more" />
       <div className="screen__body import">
         {stage.k === 'choose' && (
           <div className="import__panel">
@@ -175,6 +176,8 @@ export function ImportScreen() {
             </label>
           </div>
         )}
+
+        {stage.k === 'choose' && <AniListImport onImport={begin} />}
 
         {stage.k === 'reading' && <p role="status" className="muted">Reading your Sheet…</p>}
 

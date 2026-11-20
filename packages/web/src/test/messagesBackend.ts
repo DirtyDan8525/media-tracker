@@ -10,7 +10,7 @@ let n = 0;
 export function makeMessage(over: Partial<Message> = {}): Message {
   n++;
   return {
-    id: `m${n}`, conversationId: 'c1', senderId: REN_U.id, kind: 'text', text: `hello ${n}`, rec: null, image: false, deleted: false,
+    id: `m${n}`, conversationId: 'c1', senderId: REN_U.id, kind: 'text', text: `hello ${n}`, rec: null, image: false, deleted: false, replyTo: null,
     createdAt: new Date(Date.now() - (1000 - n) * 60_000).toISOString(), ...over,
   };
 }
@@ -29,10 +29,10 @@ export function makeSummary(over: Partial<ConversationSummary> = {}): Conversati
  * An in-memory stand-in for the Worker's conversations and messages routes (docs/plans/2026-11-17-phase6-messages.md).
  * `messages` are oldest first here; the page answer is newest first like the real one.
  */
-export function messagesBackend(opts: { conversations?: Conversation[]; messages?: Record<string, Message[]>; recommended?: { message: Message; sender: PublicUser }[]; sendFail?: MockResponse } = {}) {
+export function messagesBackend(opts: { conversations?: Conversation[]; messages?: Record<string, Message[]>; recommended?: { message: Message; sender: PublicUser; unread?: boolean }[]; sendFail?: MockResponse } = {}) {
   const conversations = [...(opts.conversations ?? [makeConversation()])];
   const messages: Record<string, Message[]> = { ...(opts.messages ?? {}) };
-  const state = { recommended: opts.recommended ?? [], sendFail: opts.sendFail, readOnly: false, unread: 0, pageSize: 50 };
+  const state = { recommended: (opts.recommended ?? []).map((r) => ({ unread: true, ...r })), sendFail: opts.sendFail, readOnly: false, unread: 0, pageSize: 50 };
   const find = (id: string) => conversations.find((c) => c.id === id);
   const notFound = { status: 404, body: { error: 'not_found' } } as const;
   const handlers: Record<string, Handler | MockResponse> = {
@@ -44,7 +44,7 @@ export function messagesBackend(opts: { conversations?: Conversation[]; messages
           const last = list[list.length - 1];
           return {
             ...c, lastMessageAt: last?.createdAt ?? c.createdAt, unread: false,
-            last: last ? { kind: last.kind, text: last.text.slice(0, 80), senderId: last.senderId, deleted: last.deleted, createdAt: last.createdAt } : null,
+            last: last ? { kind: last.kind, text: last.text.slice(0, 80), ...(last.kind === 'rec' ? { recTitle: last.rec?.title ?? null } : {}), senderId: last.senderId, deleted: last.deleted, createdAt: last.createdAt } : null,
           };
         }),
       },
@@ -64,8 +64,12 @@ export function messagesBackend(opts: { conversations?: Conversation[]; messages
     },
     'POST /api/conversations/:id/messages': (b, _u, p) => {
       if (state.sendFail) return state.sendFail;
-      const body = b as { text?: string; rec?: RecSnapshot };
-      const m = makeMessage({ conversationId: p.id!, senderId: ME.id, kind: body.rec ? 'rec' : 'text', text: body.text ?? '', rec: body.rec ?? null, createdAt: new Date().toISOString() });
+      const body = b as { text?: string; rec?: RecSnapshot; replyTo?: string };
+      const orig = body.replyTo ? (messages[p.id!] ?? []).find((x) => x.id === body.replyTo) : undefined;
+      if (body.replyTo && (!orig || orig.deleted)) return { status: 400, body: { error: 'invalid_reply' } };
+      const sender = orig && [ME, REN_U, ALBERTO, VANCE].find((u) => u.id === orig.senderId);
+      const replyTo = orig ? { id: orig.id, senderId: orig.senderId, senderName: sender?.displayName || `@${sender?.username}`, kind: orig.kind, snippet: orig.kind === 'rec' ? orig.rec?.title ?? '' : orig.text.slice(0, 100), deleted: false } : null;
+      const m = makeMessage({ conversationId: p.id!, senderId: ME.id, kind: body.rec ? 'rec' : 'text', text: body.text ?? '', rec: body.rec ?? null, replyTo, createdAt: new Date().toISOString() });
       (messages[p.id!] ??= []).push(m);
       return { status: 201, body: m };
     },

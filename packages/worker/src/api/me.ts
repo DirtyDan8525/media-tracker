@@ -1,14 +1,18 @@
 import { Hono } from 'hono';
 import {
   AVATAR_MAX_BYTES,
+  CATEGORY_CONFIG,
   COMPARE_ASK,
   DEFAULT_USER_SETTINGS,
   NAV_SIDES,
   NOTIFY_KEYS,
   decodeAvatar,
+  markCustomized,
+  mergePatch,
   validateBio,
   SEARCH_SCOPE,
   THEMES,
+  type Category,
   type UserSettings,
 } from '@media-tracker/shared';
 import { USERNAME_RE, type AppEnv, type AppUser } from '../auth/user';
@@ -83,6 +87,16 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
       next.nav.collapsed = n.collapsed;
     }
   }
+  if ('listOrder' in partial) {
+    const o = partial.listOrder;
+    if (!Array.isArray(o) || o.length > Object.keys(CATEGORY_CONFIG).length) return { ok: false };
+    const seen = new Set<string>();
+    for (const c of o) {
+      if (typeof c !== 'string' || !Object.hasOwn(CATEGORY_CONFIG, c) || seen.has(c)) return { ok: false };
+      seen.add(c);
+    }
+    next.listOrder = o as Category[];
+  }
   if ('coverViewer' in partial) {
     if (typeof partial.coverViewer !== 'boolean') return { ok: false };
     next.coverViewer = partial.coverViewer;
@@ -121,8 +135,8 @@ export function cleanDisplayName(raw: unknown): string | null | undefined {
 
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, bio, status } = user;
-  return { id, email, username, isAdmin, settings, avatarAt, createdAt, displayName, bio, status };
+  const { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status } = user;
+  return { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status };
 }
 
 // 2 queries (≤ 21 when the lazy typed-number backfill finds sets to re-fit; Ruling N2). The
@@ -169,15 +183,40 @@ me.put('/bio', async (c) => {
   return c.json(meBody({ ...c.var.user, bio: v.bio }));
 });
 
+/**
+ * What a settings update actually sets: only the keys it carried (and that were valid), with their new values. Written as a
+ * merge patch, so everything else stays as stored and keeps following the admin defaults.
+ */
+function settingsDelta(partial: Record<string, unknown>, next: UserSettings): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of ['theme', 'compareAsk', 'searchScope', 'coverViewer', 'listOrder'] as const) if (k in partial) out[k] = next[k];
+  for (const g of ['tabs', 'colors', 'notify', 'nav'] as const) {
+    const p = partial[g];
+    if (!isPlainObject(p)) continue;
+    const leaves: Record<string, unknown> = {};
+    for (const leaf of Object.keys(p)) if (Object.hasOwn(next[g], leaf)) leaves[leaf] = (next[g] as Record<string, unknown>)[leaf];
+    if (Object.keys(leaves).length) out[g] = leaves;
+  }
+  return out;
+}
+
+// 1 query (+ sign-in). Saves what this update sets and marks it as the person's own (`customized`), so every
+// setting they never touch keeps following the admin defaults. The answer is the effective settings.
 me.put('/settings', async (c) => {
   const body = await readJson(c.req.raw);
   if (!body) return c.json(invalid, 400);
-  const result = sanitizeSettings(body.settings, c.var.user.settings);
+  const user = c.var.user;
+  const result = sanitizeSettings(body.settings, user.settings);
   if (!result.ok) return c.json(invalid, 400);
-  await c.env.DB.prepare('UPDATE users SET settings_json = ? WHERE id = ?')
-    .bind(JSON.stringify(result.settings), c.var.user.id)
-    .run();
-  return c.json({ settings: result.settings });
+  const delta = settingsDelta(body.settings as Record<string, unknown>, result.settings);
+  // Colours are personal (no admin default), so they are not tracked.
+  const { colors, ...tracked } = delta;
+  const customized = markCustomized(user.customized, tracked);
+  void colors;
+  // Written whole (as before), so stale keys still drop out; unchanged settings keep their stored value and keep following the defaults.
+  const stored = mergePatch(user.storedSettings, delta);
+  await c.env.DB.prepare('UPDATE users SET settings_json = ? WHERE id = ?').bind(JSON.stringify({ ...(stored as object), customized }), user.id).run();
+  return c.json({ settings: result.settings, customized });
 });
 
 // Base64 of a maximum-size photo is about 87.4 KB; allow a little for the JSON around it.

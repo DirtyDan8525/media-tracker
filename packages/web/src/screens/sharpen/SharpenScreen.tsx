@@ -86,7 +86,11 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
   const toast = useToast();
   const wide = useIsWide();
   const { data, isPending, isError, refetch } = useClosePairs(set);
-  const [k, setK] = useState(0);
+  // Pairs are reloaded after every answer: picks change the shown order, which changes which
+  // neighbours are still open, and can settle later pairs (Dan, 2026-11-19: far too many questions).
+  const [k, setK] = useState(0); // answered or skipped this session
+  const [seen, setSeen] = useState<ReadonlySet<string>>(new Set()); // pairs answered or skipped
+  const keyOf = (a: string, b: string) => (a < b ? `${a}~${b}` : `${b}~${a}`);
   const [busy, setBusy] = useState(false);
   const [nudged, setNudged] = useState<Nudged>(new Map());
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -95,19 +99,22 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
   const finish = () => { void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY }); onDone(); };
   const byId = new Map<string, SetItem>((data?.items ?? []).map((i) => [i.id, i]));
   const now = (x: SetItem): SetItem => ({ ...x, rating: nudged.get(x.id)?.rating ?? x.rating });
-  const pairs = data?.pairs ?? [];
-  const pair = pairs[k];
+  const pairs = (data?.pairs ?? []).filter(([a, b]) => !seen.has(keyOf(a, b)));
+  const pair = pairs[0];
 
   async function answer(x: CloseAnswer) {
     if (pair === undefined || busy) return;
-    if (x === 'skip') { setK(k + 1); return; }
+    const done = new Set(seen).add(keyOf(pair[0], pair[1]));
+    if (x === 'skip') { setSeen(done); setK(k + 1); return; }
     const [a, b] = pair;
     const [w, l] = x === 'b' ? [b, a] : [a, b];
     setBusy(true);
     const changed = await saveClosePick(qc, set, { winnerId: w, loserId: l, isTie: x === 'same' });
-    setBusy(false);
-    if (changed === null) { toast.show(PICK_FAILED); return; }
+    if (changed === null) { setBusy(false); toast.show(PICK_FAILED); return; }
     setNudged(addNudged(nudged, changed));
+    setSeen(done);
+    await refetch();
+    setBusy(false);
     setK(k + 1);
   }
 
@@ -121,8 +128,8 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
   } else if (pair === undefined) {
     body = (
       <div className="stack-18">
-        <EmptyState icon="check" title={pairs.length === 0 ? 'All clear' : 'That was the last one'}
-          body={pairs.length === 0 ? `No close ratings to compare on ${setLabel(set)}.` : 'Nothing close is left to ask about here.'} />
+        <EmptyState icon="check" title={k === 0 ? 'All clear' : 'That was the last one'}
+          body={k === 0 ? `No close ratings to compare on ${setLabel(set)}.` : 'Nothing close is left to ask about here.'} />
         {nudged.size > 0 && <NudgedList nudged={nudged} />}
         <Button variant="primary" className="btn--block" onClick={finish}>Done</Button>
       </div>
@@ -132,7 +139,7 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
     body = (
       <div className="close-call">
         <div className="close-call__bar">
-          <span className="close-call__count" aria-live="polite">Close call {k + 1} of {pairs.length}</span>
+          <span className="close-call__count" aria-live="polite">Close call {k + 1} of {k + pairs.length}</span>
           <Button variant="ghost" compact disabled={busy} onClick={() => void answer('skip')}>Skip</Button>
         </div>
         <ClosePair key={`${a}|${b}`} a={now(byId.get(a)!)} b={now(byId.get(b)!)} busy={busy} wide={wide} onAnswer={(x) => void answer(x)} />

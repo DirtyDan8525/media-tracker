@@ -5,10 +5,10 @@ import {
 } from '../src/importLimits';
 
 describe('import chunk limits', () => {
-  it('import limits: 19 entry params → 5 rows per statement, chunk 150; 9 season params → 11, chunk 165', () => {
+  it('import limits: 19 entry params → 5 rows per statement, chunk 145; 9 season params → 11, chunk 165', () => {
     expect(IMPORT_ENTRY_PARAMS).toBe(19);
     expect(ENTRIES_PER_STATEMENT).toBe(5);
-    expect(IMPORT_CHUNK_ROWS).toBe(150);
+    expect(IMPORT_CHUNK_ROWS).toBe(145);
     expect(IMPORT_SEASON_PARAMS).toBe(9);
     expect(SEASONS_PER_STATEMENT).toBe(11);
     expect(IMPORT_CHUNK_SEASONS).toBe(165);

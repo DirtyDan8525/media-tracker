@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, PROGRESS_MAX, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
+import { CATEGORY_CONFIG, PROGRESS_MAX, REWATCHES_MAX, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
 
 const SOURCES = ['anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb', 'youtube'];
 const LOOKUP_STATES = ['ok', 'not_found', 'pending'];
@@ -12,7 +12,7 @@ export type EntryFields = Partial<
     Entry,
     | 'title' | 'typedTitle' | 'status' | 'rating' | 'genres' | 'creator' | 'album' | 'coverUrl' | 'notes'
     | 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'detailsState' | 'isPrivate' | 'notesPrivate'
-    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked' | 'progressTotal'
+    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked' | 'progressTotal' | 'startedAt' | 'finishedAt' | 'rewatches'
   >
 > & { tier?: Tier; progress?: number };
 
@@ -46,6 +46,15 @@ function isCoverUrl(v: unknown): boolean {
   }
 }
 
+/** null, or a real calendar day 'YYYY-MM-DD' from 1900 to a year from now (a plan may sit a little ahead; nothing far). */
+export function isValidDay(v: unknown, now = Date.now()): v is string | null {
+  if (v === null) return true;
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== v) return false;
+  return v >= '1900-01-01' && t <= now + 366 * 86_400_000;
+}
+
 const isProgressInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= PROGRESS_MAX;
 
 // key -> validator for the simple, category-independent fields.
@@ -71,6 +80,9 @@ const FIELD_CHECKS: Record<string, (v: unknown) => boolean> = {
   scoreLocked: (v) => typeof v === 'boolean',
   progress: isProgressInt,
   progressTotal: (v) => v === null || isProgressInt(v),
+  startedAt: (v) => isValidDay(v),
+  finishedAt: (v) => isValidDay(v),
+  rewatches: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= REWATCHES_MAX,
 };
 
 /**

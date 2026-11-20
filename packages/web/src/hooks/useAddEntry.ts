@@ -3,6 +3,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
 import { CLOSE_COUNTS_KEY } from '../data/ratings';
+import { COMPLETED, announceCompleted } from '../data/rateOnComplete';
 import { lookupRunning, patchLocal, writeEntry } from '../data/entryCache';
 import { useToast } from '../design/components/Toast';
 import { applyLookupMatch } from '../lookup/apply';
@@ -146,6 +147,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
       lookupRunning.delete(tempId);
       writeEntry(qc, entry, { replaceId: tempId });
       if (entry.rating !== null) void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
+      else if (entry.status === COMPLETED) announceCompleted(entry);
     } catch {
       lookupRunning.delete(tempId);
       removeTemp(qc, temp);

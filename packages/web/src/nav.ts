@@ -16,23 +16,33 @@ export const TAB_SWITCHES: { key: string; label: string }[] = [
 
 export const isCategory = (s: string | undefined): s is Category => LIST_ORDER.includes(s as Category);
 
+type OrderSettings = { listOrder?: Category[] };
+
 /**
- * The lists a person sees, in order. With the admin's `lists` setting (AD11): its order, minus the lists hidden
- * for everyone; a person's own Settings can still turn lists off, but not back on.
+ * Every list the admin has not hidden for everyone, in the order this person sees them: their own `listOrder` first (the
+ * Reorder lists sheet), then any list it does not name in the admin's order. Includes lists the person turned off.
  */
-export function enabledLists(settings: Pick<UserSettings, 'tabs'>, lists?: ListsSetting): Category[] {
-  const order = lists ? lists.order.filter((c) => LIST_ORDER.includes(c)) : LIST_ORDER;
-  return order.filter((c) => settings.tabs[c] !== false && !lists?.hidden.includes(c));
+export function orderedLists(settings: OrderSettings, lists?: ListsSetting): Category[] {
+  const base = (lists ? lists.order.filter((c) => LIST_ORDER.includes(c)) : [...LIST_ORDER]).filter((c) => !lists?.hidden.includes(c));
+  const own = (settings.listOrder ?? []).filter((c) => base.includes(c));
+  return [...own, ...base.filter((c) => !own.includes(c))];
 }
 
-/** Settings → Tabs: the admin's order, without the lists hidden for everyone; the season switches follow. */
-export function tabSwitches(lists?: ListsSetting): { key: string; label: string }[] {
-  const shown = (lists ? lists.order : LIST_ORDER).filter((c) => !lists?.hidden.includes(c));
-  return [...shown.map((c) => ({ key: c as string, label: LIST_LABEL[c] })), ...TAB_SWITCHES.slice(LIST_ORDER.length)];
+/**
+ * The lists a person sees, in order. The admin's `lists` setting (AD11) sets the order and hides lists for everyone, a person's
+ * own `listOrder` reorders what is left, and their Settings can turn lists off (but not back on if the admin hid them).
+ */
+export function enabledLists(settings: Pick<UserSettings, 'tabs'> & OrderSettings, lists?: ListsSetting): Category[] {
+  return orderedLists(settings, lists).filter((c) => settings.tabs[c] !== false);
+}
+
+/** Settings → Tabs: the lists in the order the person sees them, without the lists hidden for everyone; the season switches follow. */
+export function tabSwitches(lists?: ListsSetting, listOrder?: Category[]): { key: string; label: string }[] {
+  return [...orderedLists({ listOrder }, lists).map((c) => ({ key: c as string, label: LIST_LABEL[c] })), ...TAB_SWITCHES.slice(LIST_ORDER.length)];
 }
 
 /** Where `/` lands: the first enabled list, or Settings if every list is off. */
-export function homePath(settings: Pick<UserSettings, 'tabs'>, lists?: ListsSetting): string {
+export function homePath(settings: Pick<UserSettings, 'tabs'> & OrderSettings, lists?: ListsSetting): string {
   const first = enabledLists(settings, lists)[0];
   return first ? `/list/${first}` : '/settings';
 }

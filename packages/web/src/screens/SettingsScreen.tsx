@@ -13,6 +13,8 @@ import { FillDetailsRow } from './settings/FillDetailsRow';
 import { CompareOptions } from './settings/CompareOptions';
 import { NOTIFICATIONS_ENABLED, NotificationsSection } from './settings/NotificationsSection';
 import { SettingsLinks } from './settings/SettingsLinks';
+import { SideBarRows } from './settings/SideBarRows';
+import { TagsLink } from './settings/TagsLink';
 import { PublicLinkRow } from './settings/PublicLinkRow';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
@@ -44,7 +46,7 @@ export function SettingsScreen() {
         <section aria-labelledby="set-tabs" className="group">
           <h2 id="set-tabs" className="group__title">Tabs</h2>
           <div className="group__card switch-grid">
-            {tabSwitches(app.lists).map(({ key, label }) => (
+            {tabSwitches(app.lists, me.settings.listOrder).map(({ key, label }) => (
               <label key={key} className="switch-row">
                 <input type="checkbox" role="switch" checked={me.settings.tabs[key] !== false}
                   onChange={(e) => toggle(key, e.target.checked)} />
@@ -61,12 +63,13 @@ export function SettingsScreen() {
               <SegRadio label="Side bar" value={me.settings.nav.side}
                 options={[{ value: 'left', label: 'On the left' }, { value: 'right', label: 'On the right' }]}
                 onChange={(v) => { if (me.settings.nav.side !== v) save.mutate({ nav: { side: v as 'left' | 'right' } }); }} />
-              <label className="switch-row">
+              <SideBarRows />
+              <label className="switch-row" id="cover-viewer">
                 <input type="checkbox" role="switch" checked={me.settings.coverViewer}
                   onChange={(e) => save.mutate({ coverViewer: e.target.checked })} />
                 <span>Cover viewer</span>
               </label>
-              <p className="hint">Click a row in a list to see its cover large, with the details, beside the table.</p>
+              <p className="hint">Point at a row in a list (or click it) to see its cover large, with the details and its Spotify, trailer or YouTube buttons, beside the table.</p>
             </div>
           </section>
         )}
@@ -83,6 +86,7 @@ export function SettingsScreen() {
         <section aria-labelledby="set-data" className="group">
           <h2 id="set-data" className="group__title">Your data</h2>
           <div className="group__card">
+            <TagsLink />
             <FillDetailsRow />
             <ExportRow />
           </div>

@@ -1,4 +1,4 @@
-import type { UserSettings } from '@media-tracker/shared';
+import type { Customized, UserSettings } from '@media-tracker/shared';
 
 /** GET /api/me */
 export interface Me {
@@ -7,6 +7,8 @@ export interface Me {
   username: string | null;
   isAdmin: boolean;
   settings: UserSettings;
+  /** Which settings the person set themselves; the rest follow the admin's defaults (already in `settings`). Absent on copies cached before this. */
+  customized?: Customized;
   avatarAt: string | null;
   displayName: string | null;
   /** Phase 5 (item 17): up to 150 characters; null or absent when none (rows cached before Phase 5 lack it). */

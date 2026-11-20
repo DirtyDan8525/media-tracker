@@ -6,7 +6,7 @@
  * `toFriendEntry`, which re-checks `canView`.
  */
 import type { FriendEntry, PublicUser, Relation } from '@media-tracker/shared';
-import type { EntryRow } from '../api/entries';
+import { parseTags, type EntryRow } from '../api/entries';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -101,6 +101,8 @@ export function toFriendEntry(row: EntryRow, rel: Relation): FriendEntry {
     seasonAvg: row.season_avg === null || row.season_avg === undefined ? null : round2(row.season_avg),
     createdAt: row.created_at,
     notes: row.notes_private === 1 ? null : row.notes,
+    // The owner's tags go where the title goes (canView above refused a private one): friends and public links.
+    tags: parseTags(row.tags_json),
   };
 }
 

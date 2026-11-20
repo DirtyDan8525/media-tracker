@@ -202,12 +202,25 @@ describe('questions', () => {
     expect(closeQuestionsFor('f', items, [])).toEqual([]);
   });
 
-  test('closePairs: nearest first, unanswered only, limited; countClosePairs counts them all', () => {
+  test('closePairs: only neighbours in the shown order, nearest first, unanswered only, limited', () => {
     const items = [ci('a', 8.0), ci('b', 8.0), ci('c', 8.2), ci('d', 8.6), ci('e', 8.9), ci('p', 8.0, true)];
-    expect(closePairs(items, [])).toEqual([['a', 'b'], ['a', 'c'], ['b', 'c'], ['d', 'e']]);
-    expect(countClosePairs(items, [])).toBe(4);
-    expect(closePairs(items, [pick('b', 'a')])).toEqual([['a', 'c'], ['b', 'c'], ['d', 'e']]);
-    expect(countClosePairs(items, [pick('b', 'a', true)])).toBe(3);
+    // Shown order e 8.9, d 8.6, c 8.2, a 8.0, b 8.0: d–c is 0.4 apart, so it isn't close.
+    expect(closePairs(items, [])).toEqual([['a', 'b'], ['a', 'c'], ['d', 'e']]);
+    expect(countClosePairs(items, [])).toBe(3);
+    // b beat a: b now shows above a, so the neighbours are c–b and b–a (answered).
+    expect(closePairs(items, [pick('b', 'a')])).toEqual([['b', 'c'], ['d', 'e']]);
+    expect(countClosePairs(items, [pick('b', 'a', true)])).toBe(2);
     expect(closePairs(items, [], 2)).toEqual([['a', 'b'], ['a', 'c']]);
+  });
+
+  test('20 titles on the same number ask 19 questions, not 190, and picks settle pairs through each other (Dan, 2026-11-19)', () => {
+    const items = Array.from({ length: 20 }, (_, i) => ci(`t${String(i).padStart(2, '0')}`, 9.2));
+    expect(countClosePairs(items, [])).toBe(19);
+    // a beat b and b beat c: a vs c is settled, never asked.
+    const three = [ci('a', 9), ci('b', 9), ci('c', 9)];
+    expect(closePairs(three, [pick('a', 'b'), pick('b', 'c')])).toEqual([]);
+    expect(closeQuestionsFor('a', three, [pick('a', 'b'), pick('b', 'c')])).toEqual([]);
+    // "About the same" joins a and b, and b beat c: a vs c is settled too.
+    expect(closePairs(three, [pick('a', 'b', true), pick('b', 'c')])).toEqual([]);
   });
 });

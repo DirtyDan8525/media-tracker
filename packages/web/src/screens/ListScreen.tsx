@@ -14,7 +14,7 @@ import { Skeleton, SkeletonRow } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
 import { useAddEntry, type AddInput } from '../hooks/useAddEntry';
 import { useIsWide } from '../hooks';
-import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, writeFilter, type ListFilter } from '../lists/filter';
+import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, tagOptions, writeFilter, type ListFilter } from '../lists/filter';
 import { planRows, readPlanView, writePlanView } from '../lists/plan';
 import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
@@ -106,17 +106,18 @@ function ListBody({ category }: { category: Category }) {
   }, [addRequested, setParams]);
   const urlFilter = useMemo(() => readFilter(params), [params]);
   const genres = useMemo(() => genreOptions(data ?? []), [data]);
+  const tags = useMemo(() => tagOptions(data ?? []), [data]);
   // Until the rows load nothing can be judged invalid, so the URL's values stand.
   const clean = useMemo(
-    () => (data ? normalizeFilter(urlFilter, CATEGORY_CONFIG[category].hasStatus, genres) : urlFilter),
-    [data, urlFilter, category, genres],
+    () => (data ? normalizeFilter(urlFilter, CATEGORY_CONFIG[category].hasStatus, genres, tags) : urlFilter),
+    [data, urlFilter, category, genres, tags],
   );
   // The box keeps its own text; the URL follows ~150 ms later, by `replace` (useUrlText).
   const { text: qText, setText: setQ, clear: clearQ } = useUrlText('q');
   useEffect(() => {
-    if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre)) return;
-    setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre }, prev), { replace: true });
-  }, [data, clean, urlFilter.status, urlFilter.genre, setParams]);
+    if (!data || (clean.status === urlFilter.status && clean.genre === urlFilter.genre && clean.tag === urlFilter.tag)) return;
+    setParams((prev) => writeFilter({ ...readFilter(prev), status: clean.status, genre: clean.genre, tag: clean.tag }, prev), { replace: true });
+  }, [data, clean, urlFilter.status, urlFilter.genre, urlFilter.tag, setParams]);
   // The Plan to watch view is all one status, so a Status filter does not apply there (it comes back when the switch is off).
   const filter: ListFilter = { ...clean, status: planned ? '' : clean.status, q: qText };
   const changeFilter = (next: Partial<ListFilter>) => {
@@ -126,7 +127,7 @@ function ListBody({ category }: { category: Category }) {
   };
   const clearAll = () => {
     clearQ();
-    setParams((prev) => writeFilter({ q: '', status: '', genre: '' }, prev), { replace: true });
+    setParams((prev) => writeFilter({ q: '', status: '', genre: '', tag: '' }, prev), { replace: true });
   };
   const filtering = isFiltering(filter);
   const total = data?.length ?? 0;
@@ -141,7 +142,7 @@ function ListBody({ category }: { category: Category }) {
   const rated = rows.filter((e) => e.rating !== null);
   const average = rated.length ? rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length : null;
   const chips = activeFilters(category, filter, planned);
-  const removeChip = (key: 'status' | 'genre') => changeFilter(key === 'status' ? { status: '' } : { genre: '' });
+  const removeChip = (key: 'status' | 'genre' | 'tag') => changeFilter(key === 'status' ? { status: '' } : key === 'tag' ? { tag: '' } : { genre: '' });
   const sub = !data
     ? undefined
     : planned
@@ -237,7 +238,7 @@ function ListBody({ category }: { category: Category }) {
         )}
         {total > 0 && wide && (
           <FilterChips
-            category={category} filter={filter} onChange={changeFilter} genres={genres} planned={planned}
+            category={category} filter={filter} onChange={changeFilter} genres={genres} tags={tags} planned={planned}
             sort={total > 1 && !planned ? (
               <div className="sort">
                 <label className="sort__label" htmlFor="list-sort">Sort</label>
@@ -253,7 +254,7 @@ function ListBody({ category }: { category: Category }) {
 
       {filtersOpen && (
         <FilterSheet
-          category={category} filter={filter} onChange={changeFilter} genres={genres} sort={sort} onSort={setSort}
+          category={category} filter={filter} onChange={changeFilter} genres={genres} tags={tags} sort={sort} onSort={setSort}
           planned={planned} shown={rows.length} onClose={() => setFiltersOpen(false)}
           onClear={() => { clearAll(); setSort('rating'); }}
         />

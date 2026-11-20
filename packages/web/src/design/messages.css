@@ -44,33 +44,65 @@
 .chat__menu { position: relative; flex: none; }
 .chat__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; overscroll-behavior: contain; }
 .frame--wide .chat__scroll { padding: var(--space-6) var(--space-16); }
-.chat__list { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: var(--space-2); margin-top: auto; }
+.chat__list { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: var(--space-3); margin-top: auto; }
 .chat__older { align-self: center; margin-bottom: var(--space-6); }
 .chat__empty { text-align: center; margin: auto; }
 .chat__day { text-align: center; margin: var(--space-6) 0 var(--space-3); font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: .06em; }
 .chat__readonly { flex: none; margin: 0; padding: var(--space-8); border-top: 1px solid var(--grid-line); background: var(--header-row); text-align: center; font-size: var(--fs-sm); color: var(--muted-text); }
 .chat__full { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; border-radius: var(--radius-lg); }
 
-.bubble-row { display: flex; align-items: flex-end; gap: var(--space-4); }
+.bubble-row { display: flex; align-items: flex-end; gap: var(--space-4); border-radius: var(--radius-xl); outline-offset: 2px; }
 .bubble-row--mine { justify-content: flex-end; }
-.bubble-row__gap { width: 36px; flex: none; }
+/* More air between runs (another sender, another day, a long pause) than between one person's consecutive messages. */
+.bubble-row--first { margin-top: var(--space-7); }
+/* Their picture sits at the same edge distance as my bubbles do on the right; one 28 px column on their side, empty except on the last bubble of a run. */
+.bubble-row__avatar { flex: none; width: 28px; align-self: flex-end; display: flex; }
+.bubble-row__avatar .avatar { flex: none; }
+.bubble-row:focus { outline: none; }
+.bubble-row:focus-visible { outline: 2px solid var(--highlight); }
+.bubble-row.is-flash .bubble { box-shadow: 0 0 0 3px var(--highlight); }
 .bubble-col { display: flex; flex-direction: column; gap: var(--space-2); max-width: min(82%, 520px); min-width: 0; }
 .bubble-row--mine .bubble-col { align-items: flex-end; }
 .bubble__who { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding-left: var(--space-4); }
 .bubble-wrap { display: flex; align-items: center; gap: var(--space-2); }
 .bubble-row--mine .bubble-wrap { flex-direction: row-reverse; }
 .bubble { position: relative; padding: var(--space-5) var(--space-7); border-radius: 18px; background: var(--card); color: var(--text); min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.bubble--mine { background: var(--panel); border-bottom-right-radius: 6px; }
+.bubble--mine { background: var(--bubble-mine-bg, var(--highlight)); color: var(--bubble-mine-text, var(--on-highlight-small, var(--on-highlight))); border-bottom-right-radius: 6px; }
+/* My text bubbles: the text and time use the on-accent colour (>= 4.5:1, bubbleColors.ts); a card or a deleted note keeps its neutral look. */
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__text,
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__time { color: var(--bubble-mine-text, var(--on-highlight-small, var(--on-highlight))); }
 .bubble-row:not(.bubble-row--mine) .bubble { border-bottom-left-radius: 6px; }
 .bubble--deleted { background: transparent; border: 1px dashed var(--grid-line); }
-.bubble--rec { padding: var(--space-4); background: var(--card); }
-.bubble__text { font-size: var(--fs-body); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--bright-text); }
+.bubble--rec { padding: var(--space-4); background: var(--card); color: var(--text); }
+.bubble__text { font-size: calc(var(--fs-body) * var(--chat-scale, 1)); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--bright-text); }
 .bubble__deleted { font-size: var(--fs-sm); font-style: italic; color: var(--muted-text); }
+.bubble__label { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding: 0 var(--space-2); }
 .bubble__time { align-self: flex-end; font-size: 11px; color: var(--muted-text); font-variant-numeric: tabular-nums; }
 .bubble__photo { all: unset; display: block; cursor: pointer; border-radius: var(--radius-lg); overflow: hidden; min-width: 44px; min-height: 44px; }
 .bubble__photo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .bubble__photo img { display: block; max-width: 100%; max-height: 280px; width: auto; height: auto; background: var(--panel); }
 .bubble__opts { flex: none; }
+.bubble__actions { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.bubble-row--mine .bubble__actions { flex-direction: row-reverse; }
+.bubble__reply { border: 0; background: transparent; color: var(--muted-text); font: inherit; font-size: var(--fs-meta); font-weight: 600; min-height: var(--tap); padding: 0 var(--space-4); border-radius: var(--radius-pill); cursor: pointer; }
+.bubble__reply:hover { background: var(--panel); color: var(--bright-text); }
+.bubble__reply:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+/* Mouse: the Reply button shows on hover or focus. Touch: hidden (long-press replies) but still reachable by a screen reader and on focus. */
+@media (hover: hover) { .bubble__reply { opacity: 0; } .bubble-row:hover .bubble__reply, .bubble-row:focus-within .bubble__reply { opacity: 1; } }
+@media (hover: none) { .bubble__reply { opacity: 0; pointer-events: none; position: absolute; width: 1px; min-width: 0; padding: 0; overflow: hidden; } .bubble__reply:focus-visible { opacity: 1; pointer-events: auto; position: static; width: auto; padding: 0 var(--space-4); } .bubble { -webkit-touch-callout: none; } }
+
+/* The quote above a reply: who and one line of what; tapping it goes to the original when it is loaded. */
+.bubble__quote { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-2) var(--space-4); border-left: 3px solid var(--highlight); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); text-align: left; }
+button.bubble__quote { cursor: pointer; }
+button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.bubble__quote-who { font-size: var(--fs-meta); font-weight: 700; color: var(--bright-text); }
+.bubble__quote-text { font-size: var(--fs-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bubble__quote--deleted .bubble__quote-text { font-style: italic; color: var(--muted-text); }
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote { background: color-mix(in srgb, var(--bubble-mine-text) 12%, transparent); border-left-color: var(--bubble-mine-text); color: var(--bubble-mine-text); }
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote-who,
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote-text { color: var(--bubble-mine-text); }
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote--deleted .bubble__quote-text { color: var(--bubble-mine-text); }
+
 
 /* A recommendation card (in a chat and in Recommended to you) */
 .rec-card { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5); border-radius: var(--radius-xl); background: var(--card); min-width: 220px; }
@@ -81,9 +113,19 @@
 .rec-card__sub { font-size: var(--fs-meta); color: var(--muted-text); }
 .rec-card__rated { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--muted-text); }
 .rec-card__note { margin: 0; font-size: var(--fs-sm); color: var(--bright-text); overflow-wrap: anywhere; }
+.rec-card__open { color: inherit; text-decoration: none; border-radius: var(--radius-lg); }
+.rec-card__open:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.rec-card__open:hover .rec-card__title { text-decoration: underline; }
 .rec-card__action { width: 100%; min-height: var(--tap); text-decoration: none; }
 .rec-item { display: flex; flex-direction: column; gap: var(--space-3); }
 .rec-item__from { font-size: var(--fs-meta); color: var(--muted-text); padding: 0 var(--space-2); }
+
+/* Composer: the "Replying to" bar */
+.composer__reply { display: flex; align-items: center; gap: var(--space-4); max-width: 760px; margin: 0 auto var(--space-4); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-6); border-left: 3px solid var(--highlight); border-radius: var(--radius-sm); background: var(--panel); }
+.frame--wide .composer__reply { max-width: 100%; }
+.composer__reply-text { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-sm); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer__reply-text b { color: var(--bright-text); }
+.composer__reply-snippet { color: var(--muted-text); }
 
 /* Composer */
 .composer { flex: none; padding: var(--space-4) var(--space-4) var(--space-5); border-top: 1px solid var(--grid-line); background: var(--header-row); }

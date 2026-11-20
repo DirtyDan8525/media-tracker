@@ -221,6 +221,20 @@ describe('Top 5 sharing (B17)', () => {
     expect(revoked).toEqual(['blob:card-1']);
   });
 
+  it('a share that throws toasts, keeps the sheet open and re-enables the buttons (no unhandled rejection)', async () => {
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { canShare: () => true, share: vi.fn() }));
+    vi.mocked(shareOrSave).mockRejectedValue(new Error('boom'));
+    fakeBackend({ entries: rows() });
+    renderApp('/top5');
+    await userEvent.click(await screen.findByRole('button', { name: 'Share my #1s' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Share your #1s' });
+    await within(sheet).findByRole('img');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Share' }));
+    expect(await screen.findByText("Couldn't share the image. Try Save image.")).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Share your #1s' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Share' })).toBeEnabled();
+  });
+
   it('closing the sheet revokes the preview URL', async () => {
     fakeBackend({ entries: rows() });
     renderApp('/top5');
@@ -270,7 +284,7 @@ describe('Top 5 sharing (B17)', () => {
       'GET /api/friends': { body: friends },
     }) as never;
 
-    it('the toggle switches to group rows "8.9 · 3 ratings" and back', async () => {
+    it('the toggle switches to group rows (rating badge, "3 ratings") and back, in the same row style as Mine', async () => {
       fakeBackend({ entries: [...rows(), makeEntry({ id: 'p1', title: 'Secret', rating: 9, isPrivate: true })], extra: extra() });
       renderApp('/top5');
       await screen.findByRole('region', { name: 'Anime' });
@@ -279,8 +293,11 @@ describe('Top 5 sharing (B17)', () => {
       const anime = await screen.findByRole('region', { name: 'Anime' });
       // you 9.5, Ren 8.5, Mika 9 -> 9.0 over 3; Mushishi: you 9 + Ren 3 -> 6.0 over 2
       await waitFor(() => expect(within(anime).getAllByRole('listitem')).toHaveLength(2));
-      expect(within(anime).getAllByRole('listitem')[0]).toHaveTextContent(/Frieren\s*9\.0 · 3 ratings/);
-      expect(within(anime).getAllByRole('listitem')[1]).toHaveTextContent(/Mushishi\s*6\.0 · 2 ratings/);
+      expect(within(anime).getAllByRole('listitem')[0]).toHaveTextContent(/Frieren\s*3 ratings\s*9\.0/);
+      expect(within(anime).getAllByRole('listitem')[1]).toHaveTextContent(/Mushishi\s*2 ratings\s*6\.0/);
+      expect(anime.querySelector('.top5__hero')).not.toBeNull(); // the #1 gets Mine's big card
+      expect(anime.querySelectorAll('.top5__row')).toHaveLength(1);
+      expect(screen.getByRole('radiogroup', { name: 'Whose Top 5' })).toHaveClass('seg--auto');
       expect(screen.queryByText('Only Ren')).not.toBeInTheDocument(); // one rater
       expect(screen.queryByText('Secret')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Share/ })).not.toBeInTheDocument();

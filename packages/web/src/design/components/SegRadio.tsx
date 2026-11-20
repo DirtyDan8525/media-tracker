@@ -8,6 +8,8 @@ export interface SegRadioProps<T extends string> {
   onChange: (value: T) => void;
   /** CSS block: 'seg' (a joined bar) or 'activity-filter' (separate chips). */
   block?: 'seg' | 'activity-filter';
+  /** Extra class on the group (e.g. 'seg--auto': a normal-width control on PC instead of full width). */
+  className?: string;
 }
 
 /**
@@ -15,10 +17,10 @@ export interface SegRadioProps<T extends string> {
  * behaviour and roving focus a radiogroup needs. The input covers its label (the whole option is
  * the tap target) and is invisible; the label draws the state.
  */
-export function SegRadio<T extends string>({ label, value, options, onChange, block = 'seg' }: SegRadioProps<T>) {
+export function SegRadio<T extends string>({ label, value, options, onChange, block = 'seg', className }: SegRadioProps<T>) {
   const name = useId();
   return (
-    <div role="radiogroup" aria-label={label} className={block}>
+    <div role="radiogroup" aria-label={label} className={className ? `${block} ${className}` : block}>
       {options.map((o) => {
         const on = o.value === value;
         return (

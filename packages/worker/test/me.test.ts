@@ -163,6 +163,15 @@ describe('sanitizeSettings', () => {
     expect(r).toMatchObject({ ok: true, settings: { theme: 'Custom', compareAsk: 'Off' } });
   });
 
+  it('listOrder: a list of known, distinct lists replaces the order; anything else fails the update', () => {
+    expect(sanitizeSettings({ listOrder: ['songs', 'anime'] }, cur)).toMatchObject({ ok: true, settings: { listOrder: ['songs', 'anime'] } });
+    expect(sanitizeSettings({ listOrder: [] }, { ...cur, listOrder: ['songs'] })).toMatchObject({ ok: true, settings: { listOrder: [] } });
+    bad({ listOrder: 'anime' });
+    bad({ listOrder: ['anime', 'anime'] });
+    bad({ listOrder: ['nope'] });
+    bad({ listOrder: [1] });
+  });
+
   it('drops the removed Sheet compare keys (an older client may still send them) instead of refusing the update', () => {
     const r = sanitizeSettings({ theme: 'Ocean', compareStyle: 'Swap the numbers', compareRoom: 'x', compareWindow: 99 }, cur);
     expect(r).toEqual({ ok: true, settings: { ...cur, theme: 'Ocean' } });
@@ -255,6 +264,6 @@ describe('settings and rating tiers', () => {
     // …and a later settings write doesn't carry the stale keys along.
     await putSettings(A, { theme: 'Ocean' });
     const raw = await env.DB.prepare('SELECT settings_json FROM users WHERE email = ?').bind(A).first<{ settings_json: string }>();
-    expect(Object.keys(JSON.parse(raw!.settings_json)).sort()).toEqual(Object.keys(DEFAULT_USER_SETTINGS).sort());
+    expect(Object.keys(JSON.parse(raw!.settings_json)).sort()).toEqual([...Object.keys(DEFAULT_USER_SETTINGS), 'customized'].sort());
   });
 });

@@ -139,3 +139,6 @@
 /* each list's tier counts ("Loved 14 · Liked 22 …"), under the list name on phone cards and in the PC table */
 .stats__tiers { display: block; margin: 0; font-size: var(--fs-pill); font-weight: 400; color: var(--muted-text); font-variant-numeric: tabular-nums; }
 .stats__table tbody th .stats__tiers { margin-top: var(--space-1); }
+
+/* The Mine / Friends toggle is a normal-width control on PC, not a full-width bar. */
+@media (min-width: 768px) { .seg--auto { display: inline-flex; align-self: flex-start; width: auto; } .seg--auto .seg__opt { flex: none; min-width: 120px; padding: 0 var(--space-12); } }

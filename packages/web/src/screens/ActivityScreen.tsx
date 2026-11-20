@@ -1,7 +1,7 @@
 import {
   CATEGORY_CONFIG, formatRating, nameOf, statusLabel, foldPosts, type ActivityLine, type Features, type PostSocial, type PublicUser, type Reaction, type Status,
 } from '@media-tracker/shared';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAppSettings } from '../data/appSettings';
 import { useDeletePosts, useFeed, useMarkSeen, useReact } from '../data/feed';
@@ -13,7 +13,10 @@ import { CoverImage } from '../design/components/CoverImage';
 import { EmptyState } from '../design/components/EmptyState';
 import { SegRadio } from '../design/components/SegRadio';
 import { SkeletonRow } from '../design/components/Skeleton';
-import { useNow } from '../hooks';
+import { Icon } from '../design/components/Icon';
+import { TextSizeControl } from '../design/components/TextSizeControl';
+import { useActivityTextSize } from '../design/components/useTextSize';
+import { useIsWide, useNow } from '../hooks';
 import { LIST_LABEL } from '../nav';
 import { useCurrentList } from '../shell/currentList';
 import { useAddFriend } from '../shell/AddFriendHost';
@@ -24,7 +27,8 @@ import { ReactButton, ReactionChips } from './social/ReactionBar';
 import { Avatar } from '../design/components/Avatar';
 import { RatingBadge } from '../design/components/RatingBadge';
 import { useSessionMe } from '../shell/SessionGate';
-import { dayLabel, timeAgo, type ActivityFilter } from './activity/format';
+import { ActivityPanel, PostDetails } from './activity/ActivityDetails';
+import { dayLabel, matchesSearch, timeAgo, type ActivityFilter } from './activity/format';
 import '../design/activity.css';
 import '../design/feed.css';
 import '../design/list-menu.css';
@@ -77,6 +81,19 @@ export function ActivityScreen() {
   const { data, isPending, isError, isSuccess, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
     useFeed(filter);
   const [commenting, setCommenting] = useState<string | null>(null);
+  const textSize = useActivityTextSize();
+  const wide = useIsWide();
+  // Phone: the post whose details sheet is open.
+  const [opened, setOpened] = useState<string | null>(null);
+  // PC details panel: the post hovered (after a short settle), focused or clicked last.
+  const [active, setActive] = useState<string | null>(null);
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(settle.current), []);
+  const hoverPost = (key: string, on: boolean) => {
+    clearTimeout(settle.current);
+    if (on) settle.current = setTimeout(() => setActive(key), 120);
+  };
+  const [query, setQuery] = useState('');
 
   // S8: Everyone and Friends count as seen once they have loaded.
   const markSeen = useMarkSeen();
@@ -92,6 +109,14 @@ export function ActivityScreen() {
   const users = useMemo(() => Object.assign({}, ...(data?.pages.map((p) => p.users) ?? [])) as Record<string, PublicUser>, [data]);
   const friends = useMemo(() => new Set(data?.pages.flatMap((p) => p.friends ?? []) ?? []), [data]);
   const social = useMemo(() => Object.assign({}, ...(data?.pages.map((p) => p.social) ?? [])) as Record<string, PostSocial>, [data]);
+  const needle = query.trim();
+  const shownLines = useMemo(
+    () => (needle === '' ? lines : lines.filter((l) => matchesSearch(needle, [
+      l.title, l.creator, l.note,
+      ...(l.userId === me.id ? ['You', me.username] : [users[l.userId]?.displayName, users[l.userId]?.username]),
+    ]))),
+    [lines, needle, users, me.id, me.username],
+  );
   const toggleSelected = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -114,6 +139,16 @@ export function ActivityScreen() {
   // Ticks once a minute while the screen is visible, so "5 min ago" keeps up.
   const now = useNow();
 
+  const detailProps = (key: string | null) => {
+    const line = key ? shownLines.find((l) => l.key === key) : undefined;
+    if (!line) return null;
+    return {
+      line, now, features, social: social[line.key] ?? NO_SOCIAL, friend: friends.has(line.userId),
+      who: line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null },
+      onComment: () => { setOpened(null); setCommenting(line.key); },
+    };
+  };
+
   let body: ReactNode;
   if (isError && !data) {
     body = (
@@ -135,7 +170,7 @@ export function ActivityScreen() {
     );
   } else {
     const days: { label: string; lines: ActivityLine[] }[] = [];
-    for (const line of lines) {
+    for (const line of shownLines) {
       const label = dayLabel(line.at, now);
       const last = days[days.length - 1];
       if (last?.label === label) last.lines.push(line);
@@ -158,6 +193,9 @@ export function ActivityScreen() {
             )}
           </div>
         )}
+        {needle !== '' && shownLines.length === 0 && (
+          <EmptyState icon="search" title="No matching posts" body={hasNextPage ? 'Nothing in the posts loaded so far. Show more to search further back.' : 'Try a different title, name or word from a note.'} />
+        )}
         {days.map((d, i) => (
           // The id is an index: a day label ("Sat, 13 Nov") has spaces, which an IDREF can't hold.
           <section key={d.label} aria-labelledby={`activity-day-${i}`} className="activity__day">
@@ -167,6 +205,8 @@ export function ActivityScreen() {
                 <FeedPost key={line.key} line={line} now={now} social={social[line.key] ?? NO_SOCIAL}
                   who={line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null }}
                   friend={friends.has(line.userId)} features={features} admin={me.isAdmin} onComments={() => setCommenting(line.key)}
+                  onOpen={!wide && !selecting ? () => setOpened(line.key) : null}
+                  panel={wide ? { active: active === line.key, show: () => { clearTimeout(settle.current); setActive(line.key); }, hover: (on) => hoverPost(line.key, on) } : null}
                   select={selecting && line.userId === me.id ? { on: selected.has(line.key), toggle: () => toggleSelected(line.key), full: selected.size >= MAX_SELECT } : null}
                   onDelete={() => setConfirm({ ids: [line.key], batch: false, others: line.userId !== me.id })} />
               ))}
@@ -187,11 +227,28 @@ export function ActivityScreen() {
   }
 
   return (
-    <div className="screen">
+    <div className="screen activity-screen" style={{ '--activity-scale': textSize.scale } as CSSProperties}>
       <PageHeader title="Activity" profile>
         <SegRadio block="activity-filter" label="Show" value={filter} options={FILTERS} onChange={setFilter} />
+        <div className="activity-bar">
+          <div className="search search--compact activity-bar__search">
+            <label htmlFor="activity-q" className="sr-only">Search posts</label>
+            <span className="search__icon" aria-hidden="true"><Icon name="search" size={20} /></span>
+            <input id="activity-q" type="search" className="search__input" autoComplete="off" spellCheck={false}
+              placeholder="Search posts" value={query} onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.preventDefault(); setQuery(''); } }} />
+            {query && (
+              <button type="button" className="search__clear" aria-label="Clear search" onClick={() => setQuery('')}><Icon name="close" size={18} /></button>
+            )}
+          </div>
+          <TextSizeControl step={textSize.step} onChange={textSize.set} />
+        </div>
+        {needle !== '' && hasNextPage && <p className="activity-bar__hint" role="status">Searching loaded posts</p>}
       </PageHeader>
-      <div className="screen__body">{body}</div>
+      <div className={wide ? 'screen__body activity-layout' : 'screen__body'}>
+        <div className="activity-layout__feed">{body}</div>
+        {wide && <ActivityPanel props={detailProps(active)} />}
+      </div>
       {confirm && (
         <Sheet open title={confirm.batch ? (confirm.ids.length === 1 ? 'Delete 1 post?' : `Delete ${confirm.ids.length} posts?`) : 'Delete this post?'}
           onClose={() => { if (!deletePosts.isPending) setConfirm(null); }}
@@ -206,19 +263,31 @@ export function ActivityScreen() {
           <p>{confirm.others ? 'You are deleting someone else\'s post. The title stays on their list.' : confirm.ids.length === 1 ? 'The title stays on your list.' : 'The titles stay on your list.'}</p>
         </Sheet>
       )}
+      {!wide && opened && (() => {
+        const p = detailProps(opened);
+        return p && (
+          <Sheet open title="Post details" onClose={() => setOpened(null)}>
+            <PostDetails {...p} />
+          </Sheet>
+        );
+      })()}
       {commenting && <CommentsSheet target={{ activityId: commenting }} open onClose={() => setCommenting(null)} />}
     </div>
   );
 }
 
 /** One post (FeedV2.wf): avatar, the line with name and time, rating badge + reaction chips, the cover; React and Comment under it. `who` is null for your own. */
-function FeedPost({ line, now, social, who, friend, features, admin, select, onComments, onDelete }: {
+function FeedPost({ line, now, social, who, friend, features, admin, select, panel, onOpen, onComments, onDelete }: {
   line: ActivityLine; now: Date; social: PostSocial; who: PublicUser | null; friend: boolean;
   features: Features;
   /** The admin may delete anyone's post (AD7). */
   admin: boolean;
   /** Select mode on your own post: the checkbox state; null otherwise. */
   select: { on: boolean; toggle: () => void; full: boolean } | null;
+  /** PC: the details panel hooks (hover with a settle delay, focus and click show it here); null on phones. */
+  panel: { active: boolean; show: () => void; hover: (on: boolean) => void } | null;
+  /** Phone: a tap on the post (not on one of its buttons or links) opens its details sheet; null while selecting and on PC. */
+  onOpen: (() => void) | null;
   onComments: () => void; onDelete: () => void;
 }) {
   const react = useReact();
@@ -226,7 +295,15 @@ function FeedPost({ line, now, social, who, friend, features, admin, select, onC
   const n = social.comments;
   const toggle = (emoji: Reaction) => react.mutate({ target, emoji });
   return (
-    <li className="feed-post">
+    <li className={panel?.active ? 'feed-post feed-post--active' : 'feed-post'}
+      {...(panel ? {
+        onPointerEnter: (e: PointerEvent<HTMLLIElement>) => { if (e.pointerType === 'mouse') panel.hover(true); },
+        onPointerLeave: () => panel.hover(false),
+        onFocus: panel.show,
+        onClick: panel.show,
+      } : onOpen ? {
+        onClick: (e: MouseEvent<HTMLLIElement>) => { if (!(e.target as Element).closest('a, button, input, label')) onOpen(); },
+      } : {})}>
       <ActivityRow line={line} now={now} who={who} friend={friend}>
         {(line.rating || (features.reactions && Object.keys(social.reactions).length > 0)) && (
           <div className="feed-post__chips">
@@ -235,6 +312,7 @@ function FeedPost({ line, now, social, who, friend, features, admin, select, onC
           </div>
         )}
       </ActivityRow>
+      {line.note && <PostNote text={line.note} who={who === null ? 'You' : nameOf(who)} />}
       {select ? (
         <label className="feed-post__select">
           <input type="checkbox" aria-label={`Select ${line.title}`} checked={select.on} disabled={select.full && !select.on} onChange={select.toggle} />
@@ -280,12 +358,15 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
     <strong className="activity-line__title">{line.title}</strong>
   );
   const name = own ? <strong>You</strong> : <Link className="activity-line__name" to={`/u/${who.username}`}>{nameOf(who)}</Link>;
+  // Songs and albums: the artist follows the title ("Blinding Lights · The Weeknd"); other lists get a muted line of their own.
+  const music = line.category === 'songs' || line.category === 'albums';
+  const by = music && line.creator ? <span className="activity-line__by"> · {line.creator}</span> : null;
   const status = line.status ? statusLabel(line.status.to as Status, line.category) : null;
   let sentence: ReactNode;
   if (line.added) {
     sentence = (
       <>
-        {name} added {title} to {LIST_LABEL[line.category]}
+        {name} added {title}{by} to {LIST_LABEL[line.category]}
         {line.rating && ` · rated ${formatRating(line.rating.to)}`}
         {status && ` · marked ${status}`}
       </>
@@ -294,27 +375,56 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
     const { from, to } = line.rating;
     sentence = (
       <>
-        {name} {from === null ? 'rated' : 're-rated'} {title}{' '}
+        {name} {from === null ? 'rated' : 're-rated'} {title}{by}{' '}
         {from === null ? formatRating(to) : `${formatRating(from)} → ${formatRating(to)}`}
         {status && ` · marked ${status}`}
       </>
     );
   } else {
-    sentence = <>{name} marked {title} {status}</>;
+    sentence = <>{name} marked {title}{by} {status}</>;
   }
   return (
     <div className="activity-line">
       {own
-        ? <Avatar me={me} size={44} className="activity-line__avatar" />
-        : <Avatar user={who} size={44} className="activity-line__avatar" />}
+        ? <Avatar me={me} size={36} className="activity-line__avatar" />
+        : <Avatar user={who} size={36} className="activity-line__avatar" />}
       <div className="activity-line__text">
         <span className="activity-line__sentence">{sentence}</span>
+        {!music && line.creator && <span className="activity-line__creator">{line.creator}</span>}
         <time className="activity-line__time" dateTime={line.at}>{timeAgo(line.at, now)}</time>
         {children}
       </div>
       <span aria-hidden="true" className="activity-line__cover">
-        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={56} />
+        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={48} />
       </span>
     </div>
+  );
+}
+
+/** The person's note on the title, as a short quote: 3 lines, with More / Less when there is more. */
+function PostNote({ text, who }: { text: string; who: string }) {
+  const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const el = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node || open) return;
+    const measure = () => {
+      // Without layout (tests) fall back to a length guess.
+      setOverflows(node.clientHeight > 0 ? node.scrollHeight > node.clientHeight + 1 : text.length > 160 || text.split('\n').length > 3);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [text, open]);
+  return (
+    <blockquote className="feed-post__note" aria-label={`${who}'s note`}>
+      <p ref={el} className={open ? 'feed-post__note-text' : 'feed-post__note-text feed-post__note-text--clamped'}>{text}</p>
+      {(overflows || open) && (
+        <button type="button" className="feed-post__note-more" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {open ? 'Less' : 'More'}
+        </button>
+      )}
+    </blockquote>
   );
 }

@@ -12,7 +12,7 @@ export function searchEntries(
   lists: Category[],
   q: string,
 ): { category: Category; rows: Entry[] }[] {
-  const filter = { q, status: '' as const, genre: '' };
+  const filter = { q, status: '' as const, genre: '', tag: '' };
   if (!q.trim()) return [];
   const out: { category: Category; rows: Entry[] }[] = [];
   for (const category of lists) {

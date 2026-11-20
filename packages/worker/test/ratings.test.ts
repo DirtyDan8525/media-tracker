@@ -297,9 +297,11 @@ describe('close calls (N6, N7)', () => {
     const [a, b, c, d] = await seed(uid, 'anime', [8, 8, 8.2, 9]);
     await save(A, 'anime', { picks: [pick(a!, b!, { isTie: true })] });
     const body = (await (await as(A, '/api/ratings/anime/close')).json()) as { pairs: [string, string][]; total: number; items: SetItem[] };
-    expect(body.total).toBe(2);
-    expect(body.pairs.map((pr) => [...pr].sort().join()).sort()).toEqual([[a, c].sort().join(), [b, c].sort().join()].sort());
-    expect(body.items.map((i) => i.id).sort()).toEqual([a, b, c].sort());
+    // Only neighbours in the shown order are asked (2026-11-19): c, then the tied a/b. The a–b tie is answered.
+    expect(body.total).toBe(1);
+    const first = [a!, b!].sort()[0]!;
+    expect(body.pairs.map((pr) => [...pr].sort().join())).toEqual([[first, c!].sort().join()]);
+    expect(body.items.map((i) => i.id).sort()).toEqual([first, c!].sort());
     expect(body.items.map((i) => i.id)).not.toContain(d);
   });
 
@@ -315,7 +317,7 @@ describe('close calls (N6, N7)', () => {
     expect(res.status).toBe(200);
     expect(spy.queries).toBeLessThanOrEqual(13);
     const { counts } = (await res.json()) as { counts: Record<string, number> };
-    expect(counts).toMatchObject({ anime: 3, movies: 1, tv: 0, tv_seasons: 1, anime_seasons: 0, books: 0 });
+    expect(counts).toMatchObject({ anime: 2, movies: 1, tv: 0, tv_seasons: 1, anime_seasons: 0, books: 0 });
   });
 });
 

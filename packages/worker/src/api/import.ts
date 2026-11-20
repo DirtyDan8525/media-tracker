@@ -37,6 +37,9 @@ interface CleanSeason { label: string; rating: number | null; notes: string }
 interface CleanRow {
   category: Category; title: string; status: ImportRow['status']; rating: number | null;
   genres: string; creator: string; album: string; coverUrl: string; notes: string; seasons: CleanSeason[];
+  // Extras (AniList import); null/false when the row has none.
+  progress: number | null; progressTotal: number | null; source: string | null; sourceId: string | null;
+  releaseDate: string; isPrivate: boolean; startedAt: string | null; finishedAt: string | null; rewatches: number;
 }
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -71,6 +74,15 @@ function cleanRow(input: unknown): CleanRow | null {
     coverUrl: f.coverUrl ?? '',
     notes: f.notes ?? '',
     seasons,
+    progress: f.progress ?? null,
+    progressTotal: f.progressTotal ?? null,
+    source: f.source ?? null,
+    sourceId: f.sourceId ?? null,
+    releaseDate: f.releaseDate ?? '',
+    isPrivate: f.isPrivate ?? false,
+    startedAt: f.startedAt ?? null,
+    finishedAt: f.finishedAt ?? null,
+    rewatches: f.rewatches ?? 0,
   };
 }
 
@@ -166,6 +178,18 @@ importApi.post('/', async (c) => {
     }
   });
 
+  // Rows that carry extras (progress, source, release date, privacy, dates, rewatches) get them in one UPDATE from JSON,
+  // so the insert statements and the sheet import's chunk sizing stay as they were.
+  const extras = clean.flatMap((r, i) => {
+    if (r.progress === null && r.progressTotal === null && r.source === null && r.releaseDate === '' && !r.isPrivate
+      && r.startedAt === null && r.finishedAt === null && r.rewatches === 0) return [];
+    return [{
+      id: entryVals[i]![0], progress: r.progress, total: r.progressTotal, source: r.source, sourceId: r.sourceId,
+      releaseDate: r.releaseDate, isPrivate: r.isPrivate ? 1 : 0,
+      startedAt: r.startedAt, finishedAt: r.finishedAt, rewatches: r.rewatches,
+    }];
+  });
+
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
@@ -189,6 +213,20 @@ importApi.post('/', async (c) => {
       db
         .prepare(`INSERT INTO seasons (id, entry_id, label, rating, notes, created_at, tier, prior_mean, strength) VALUES ${placeholders(IMPORT_SEASON_PARAMS, part.length)}`)
         .bind(...(part.flat() as never[])),
+    );
+  }
+  if (extras.length > 0) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE entries SET progress = json_extract(j.value, '$.progress'), progress_total = json_extract(j.value, '$.total'),
+             source = json_extract(j.value, '$.source'), source_id = json_extract(j.value, '$.sourceId'),
+             release_date = json_extract(j.value, '$.releaseDate'), is_private = json_extract(j.value, '$.isPrivate'),
+             started_at = json_extract(j.value, '$.startedAt'), finished_at = json_extract(j.value, '$.finishedAt'),
+             rewatches = json_extract(j.value, '$.rewatches')
+           FROM json_each(?) j WHERE entries.id = json_extract(j.value, '$.id')`,
+        )
+        .bind(JSON.stringify(extras)),
     );
   }
   await db.batch(stmts);

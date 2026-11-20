@@ -110,8 +110,44 @@ export interface Entry {
   progress?: number | null;
   /** Episode or chapter total when known (from a lookup or typed); null when unknown. */
   progressTotal?: number | null;
+  /** Your own labels on this title, A-Z (absent on rows cached before 0018). */
+  tags?: string[];
+  /** 'YYYY-MM-DD' the title was started; null = not set (absent on rows cached before 0018). */
+  startedAt?: string | null;
+  /** 'YYYY-MM-DD' the title was finished; null = not set. */
+  finishedAt?: string | null;
+  /** How many times again you have been through it (absent on rows cached before 0018). */
+  rewatches?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export const TAG_NAME_MAX = 30;
+export const TAGS_PER_USER_MAX = 50;
+export const TAGS_PER_ENTRY_MAX = 20;
+export const REWATCHES_MAX = 999;
+
+/** A tag with how many of your titles carry it (Settings > Tags). */
+export interface TagInfo { id: string; name: string; count: number }
+
+/** Statuses that count as "started": the first time a title gets one, Started fills itself. */
+export const ACTIVE_STATUSES: readonly Status[] = ['Watching / In Progress', 'Rewatching'];
+
+/** TVmaze's show statuses (kept in a TV title's length label) in the app's words. */
+const AIRING_WORDS: Record<string, string> = {
+  'Running': 'Still airing',
+  'Ended': 'Finished airing',
+  'To Be Determined': 'Between seasons',
+  'In Development': 'In development',
+};
+
+/** Whether a TV title is still airing, from what its lookup stored; null when nothing is stored (anime, other lists). */
+export function airingOf(e: Pick<Entry, 'category' | 'lengthLabel'>): string | null {
+  if (e.category !== 'tv') return null;
+  for (const part of e.lengthLabel.split('·').map((x) => x.trim())) {
+    if (Object.hasOwn(AIRING_WORDS, part)) return AIRING_WORDS[part]!;
+  }
+  return null;
 }
 
 export interface Season {
@@ -166,6 +202,8 @@ export interface UserSettings {
   nav: NavSettings;
   /** PC: clicking a list row opens the cover viewer panel (Dan, 2026-11-19). On by default. */
   coverViewer: boolean;
+  /** Your own order for the lists (side bar, list menus, phone Lists menu). Lists not named keep the admin's order after these. Empty = the admin's order. */
+  listOrder: Category[];
 }
 
 export const NAV_SIDES = ['left', 'right'] as const;
@@ -190,6 +228,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   notify: { messages: true, friendRequests: true, comments: true, reactions: true, signups: true },
   nav: { side: 'left', collapsed: false },
   coverViewer: true,
+  listOrder: [],
 };
 
 // Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).
@@ -209,6 +248,28 @@ export interface ImportRow {
   coverUrl: string;
   notes: string;
   seasons?: { label: string; rating: number | null; notes: string }[];
+  /** Optional extras (the AniList import sets them; the Sheet import never does). */
+  progress?: number;
+  progressTotal?: number;
+  source?: SourceId;
+  sourceId?: string;
+  /** 'YYYY' */
+  releaseDate?: string;
+  isPrivate?: boolean;
+  /** 'YYYY-MM-DD' */
+  startedAt?: string;
+  finishedAt?: string;
+  rewatches?: number;
+}
+
+/** GET /api/import/anilist: the user's public AniList lists, mapped to import rows with duplicates already left out. */
+export interface AniListImportPreview {
+  user: string;
+  rows: ImportRow[];
+  /** Rows per list that will be imported (duplicates excluded). */
+  counts: { anime: number; manga: number };
+  /** Titles left out because they are already on the user's lists. */
+  skipped: { anime: number; manga: number };
 }
 
 export interface ImportPreview {

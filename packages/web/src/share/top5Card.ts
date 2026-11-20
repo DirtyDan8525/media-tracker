@@ -70,10 +70,18 @@ const TOP5_STYLES: BoxStyle[] = ['poster', 'row', 'row', 'compact', 'compact'];
 
 const font = (weight: 400 | 500 | 700 | 800, size: number) => `${weight} ${size}px Inter`;
 
+/** The user-perceived characters of `text` (an emoji with joiners or a letter with accents stays whole); code points where `Intl.Segmenter` is missing. */
+function graphemes(text: string): string[] {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (x) => x.segment);
+  }
+  return [...text];
+}
+
 /** `text` cut with "…" so it measures within `maxWidth` in the current font ('' when not even "…" fits). */
 export function fitText(ctx: CardCtx, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
-  const chars = [...text];
+  const chars = graphemes(text);
   let lo = 0;
   let hi = chars.length;
   // The longest prefix that fits with the ellipsis.

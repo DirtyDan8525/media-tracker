@@ -1,22 +1,21 @@
-import { CATEGORY_CONFIG, type Category, type Status } from '@media-tracker/shared';
-import { createContext, useCallback, useId, useContext, useRef, useState, type HTMLAttributes, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
-import { CoverImage } from '../../design/components/CoverImage';
+import { type Category, type SourceId, type Status } from '@media-tracker/shared';
+import { createContext, useCallback, useEffect, useId, useContext, useRef, useState, type HTMLAttributes, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { Icon } from '../../design/components/Icon';
-import { RatingBadge } from '../../design/components/RatingBadge';
-import { StatusPill } from '../../design/components/StatusPill';
-import { LIST_LABEL } from '../../nav';
+import { CoverViewer } from './CoverViewer';
+import { getDeviceDefaults } from '../../data/deviceDefaults';
 
 /* ---------- Column widths ---------- */
 
-export type ColId = 'cover' | 'rating' | 'title' | 'status' | 'progress' | 'genres' | 'creator' | 'avg' | 'notes';
+export type ColId = 'cover' | 'rating' | 'title' | 'status' | 'progress' | 'genres' | 'creator' | 'avg' | 'notes'
+  | 'tags' | 'started' | 'finished' | 'rewatches' | 'airing';
 
 /**
  * Default column widths in px: each is as narrow as its content allows (Progress holds "− [ 999 ] / [ 999 ] +": two 44 px buttons,
  * two number boxes and the slash, measured 226 px, plus the cell's 28 px of padding). A table never gets narrower than their sum; any room beyond it is shared
  * in proportion, so Notes grows with the window but never takes it over. Keep in step with lists.css.
  */
-export const COL_WIDTHS: Record<ColId, number> = { cover: 64, rating: 80, title: 200, status: 140, progress: 260, genres: 150, creator: 140, avg: 96, notes: 220 };
+export const COL_WIDTHS: Record<ColId, number> = { cover: 64, rating: 80, title: 200, status: 140, progress: 260, genres: 150, creator: 140, avg: 96, notes: 220,
+  tags: 180, started: 120, finished: 120, rewatches: 100, airing: 140 };
 /** No column is dragged narrower than this. */
 export const MIN_COL_WIDTH = 48;
 export const NUDGE_PX = 16;
@@ -26,7 +25,9 @@ const storeKey = (list: string) => `mt-col-widths:${list}`;
 
 function loadWidths(list: string): Widths {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(storeKey(list)) ?? 'null');
+    const saved = localStorage.getItem(storeKey(list));
+    // Nothing saved on this device: the admin's starting widths (a column they don't name keeps its built-in width).
+    const raw: unknown = saved === null ? getDeviceDefaults().columnWidths : JSON.parse(saved);
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
     const out: Widths = {};
     for (const id of Object.keys(COL_WIDTHS) as ColId[]) {
@@ -54,6 +55,82 @@ export function useColumnWidths(list: string) {
   return { custom, commit };
 }
 
+/* ---------- Optional columns ("Columns ▾") ---------- */
+
+/** The columns a person can switch on (off by default). Progress and Genres keep their own automatic rules. */
+export const OPTIONAL_COLUMNS = [
+  { id: 'tags', label: 'Tags' },
+  { id: 'started', label: 'Started' },
+  { id: 'finished', label: 'Finished' },
+  { id: 'rewatches', label: 'Rewatches' },
+  { id: 'airing', label: 'Airing' },
+] as const satisfies readonly ColumnDef[];
+export type OptionalColId = (typeof OPTIONAL_COLUMNS)[number]['id'];
+const colsKey = (list: string) => `mt-columns:${list}`;
+
+function loadOptional(list: string): OptionalColId[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(colsKey(list)) ?? 'null');
+    if (!Array.isArray(raw)) return [];
+    return OPTIONAL_COLUMNS.map((c) => c.id).filter((id) => raw.includes(id));
+  } catch {
+    return [];
+  }
+}
+function saveOptional(list: string, on: OptionalColId[]): void {
+  try {
+    if (on.length === 0) localStorage.removeItem(colsKey(list));
+    else localStorage.setItem(colsKey(list), JSON.stringify(on));
+  } catch { /* storage unavailable: the choice lasts for this visit */ }
+}
+
+/** The optional columns switched on for `list`, remembered on this device like the column widths. */
+export function useOptionalColumns(list: string) {
+  const [state, setState] = useState(() => ({ list, on: loadOptional(list) }));
+  let on = state.on;
+  if (state.list !== list) { on = loadOptional(list); setState({ list, on }); }
+  const toggle = useCallback((id: OptionalColId) => {
+    const next = OPTIONAL_COLUMNS.map((c) => c.id).filter((c) => (c === id ? !on.includes(c) : on.includes(c)));
+    saveOptional(list, next);
+    setState({ list, on: next });
+  }, [list, on]);
+  return { on, toggle };
+}
+
+/** "Columns ▾": a button that opens a small panel of checkboxes. Escape or a click outside closes it and returns focus to the button. */
+export function ColumnsMenu({ choices, on, onToggle }: { choices: readonly ColumnDef[]; on: readonly string[]; onToggle: (id: OptionalColId) => void }) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [open]);
+  return (
+    <div className="columns-menu" ref={root}
+      onKeyDown={(e) => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); button.current?.focus(); } }}>
+      <button type="button" ref={button} className="btn btn--ghost btn--compact" aria-expanded={open} aria-controls={open ? panelId : undefined}
+        onClick={() => setOpen((v) => !v)}>
+        Columns<Icon name="chevron-down" size={16} />
+      </button>
+      {open && (
+        <div id={panelId} className="columns-menu__panel" role="group" aria-label="Show columns">
+          <h3>Show columns</h3>
+          {choices.map((c) => (
+            <label key={c.id} className="columns-menu__item">
+              <input type="checkbox" checked={on.includes(c.id)} onChange={() => onToggle(c.id as OptionalColId)} />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Cover viewer ---------- */
 
 /** Off for people who switched "Cover viewer" off in Settings (AppFrame provides it); on where there is no setting (public page). */
@@ -70,19 +147,17 @@ export interface ViewerItem {
   releaseDate: string;
   genres: string;
   synopsis: string;
+  /** Where the title came from (the viewer's Spotify / trailer / YouTube buttons use it). */
+  source?: SourceId | null;
+  sourceId?: string | null;
   /** Where "Open" goes; null = no page to open (public profile). */
   to: string | null;
   /** Router state for that page's Back button. */
   state?: unknown;
 }
 
-const SYNOPSIS_MAX = 320;
-const shortSynopsis = (s: string): string => {
-  const t = s.trim();
-  if (t.length <= SYNOPSIS_MAX) return t;
-  const cut = t.slice(0, SYNOPSIS_MAX);
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), SYNOPSIS_MAX - 40)).trimEnd()}…`;
-};
+/** How long the pointer rests on a row before the viewer shows it. */
+export const HOVER_DELAY_MS = 120;
 
 const isField = (el: EventTarget | null) => el instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
 const INTERACTIVE = 'a, button, input, select, textarea, [role="button"], [contenteditable="true"]';
@@ -96,6 +171,14 @@ export function useRowViewer(items: ViewerItem[]) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = enabled ? items.find((i) => i.id === selectedId) ?? null : null;
   const tableRef = useRef<HTMLTableElement>(null);
+  // Hovering (mouse) or focusing a row shows it after a short pause, so sweeping the pointer down the table doesn't flicker.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const cancelHover = () => clearTimeout(hoverTimer.current);
+  useEffect(() => cancelHover, []);
+  const preview = (id: string) => {
+    cancelHover();
+    if (id !== selectedId) hoverTimer.current = setTimeout(() => setSelectedId(id), HOVER_DELAY_MS);
+  };
 
   const focusRow = (id: string) => {
     const row = [...(tableRef.current?.querySelectorAll<HTMLElement>('tr[data-row]') ?? [])].find((r) => r.dataset.row === id);
@@ -122,7 +205,10 @@ export function useRowViewer(items: ViewerItem[]) {
       'data-row': id,
       'aria-selected': selected?.id === id,
       tabIndex: stop === id ? 0 : -1,
-      onClick: (e) => { if (!(e.target as HTMLElement).closest(INTERACTIVE)) setSelectedId(id); },
+      onClick: (e) => { if (!(e.target as HTMLElement).closest(INTERACTIVE)) { cancelHover(); setSelectedId(id); } },
+      onMouseEnter: () => preview(id),
+      onMouseLeave: cancelHover,
+      onFocus: () => preview(id),
     };
   };
   const tableProps = {
@@ -144,42 +230,6 @@ export function useRowViewer(items: ViewerItem[]) {
   return { enabled, selected, close, rowProps, tableProps };
 }
 export type RowViewer = ReturnType<typeof useRowViewer>;
-
-/** The panel docked beside the table: the big cover and the facts. */
-export function CoverViewer({ item, onClose }: { item: ViewerItem; onClose: () => void }) {
-  const navigate = useNavigate();
-  const cfg = CATEGORY_CONFIG[item.category];
-  const year = item.releaseDate.slice(0, 4);
-  const meta = [item.creator, year].filter(Boolean).join(' · ');
-  const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
-  const synopsis = shortSynopsis(item.synopsis);
-  return (
-    <aside className="cover-viewer" aria-label={`${item.title}, cover viewer`}
-      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
-      <button type="button" className="cover-viewer__close" aria-label="Close cover viewer" title="Close" onClick={onClose}>
-        <Icon name="close" size={20} />
-      </button>
-      <CoverImage src={item.coverUrl} alt={`${item.title} cover`} square={cfg.square} fluid width={320} className="cover--hero cover-viewer__cover" />
-      <h2 className="cover-viewer__title">{item.title}</h2>
-      <p className="cover-viewer__list">{LIST_LABEL[item.category]}</p>
-      <div className="cover-viewer__facts">
-        <RatingBadge rating={item.rating} size="md" />
-        {item.status && cfg.hasStatus && <StatusPill status={item.status} category={item.category} />}
-      </div>
-      {meta && <p className="cover-viewer__meta">{meta}</p>}
-      {genres.length > 0 && (
-        <p className="cover-viewer__genres">
-          <span className="sr-only">{item.genres}</span>
-          {genres.map((g, i) => <span key={`${g}-${i}`} className="genre-pill" aria-hidden="true">{g}</span>)}
-        </p>
-      )}
-      {synopsis && <p className="cover-viewer__synopsis">{synopsis}</p>}
-      {item.to !== null && (
-        <button type="button" className="btn btn--primary cover-viewer__open" onClick={() => navigate(item.to!, { state: item.state })}>Open</button>
-      )}
-    </aside>
-  );
-}
 
 /* ---------- The table frame: columns, resize handles, reset, and the viewer beside it ---------- */
 

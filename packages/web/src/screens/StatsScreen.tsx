@@ -196,9 +196,9 @@ export function ListCard({ name, s, index, tiers }: { name: string; s: ListStats
       <dl className="stats__list-dl">
         <div><dt>Entries</dt><dd>{s.entries}</dd></div>
         <div><dt>Rated</dt><dd>{s.rated}</dd></div>
+        <div><dt>Average</dt><dd>{s.average === null ? DASH : formatRating(s.average)}</dd></div>
         <div><dt>Completed</dt><dd>{s.completed ?? DASH}</dd></div>
         <div><dt>Highest</dt><dd>{s.highest === null ? DASH : formatRating(s.highest)}</dd></div>
-        {s.average === null && <div><dt>Average</dt><dd>{DASH}</dd></div>}
       </dl>
     </li>
   );

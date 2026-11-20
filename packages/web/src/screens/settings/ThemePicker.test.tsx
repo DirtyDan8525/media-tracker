@@ -179,6 +179,20 @@ describe('Settings: Custom colours', () => {
     await waitFor(() => expect(css('--muted-text')).toBe('#a6a6bb'));
   });
 
+  it('a Highlight that no button label reads on warns on the Highlight row; a readable one does not', async () => {
+    mockApi(themeName('Custom'));
+    renderApp('/settings/appearance');
+    const box = await screen.findByRole('textbox', { name: 'Highlight hex' });
+    const u = user();
+    await u.clear(box);
+    await u.type(box, '#777777');
+    expect(screen.getByText(/^Button text is hard to read on Highlight \(\d\.\d:1; aim for 4\.5:1\)\.$/)).toBeInTheDocument();
+    expect(box.closest('.color-row')!.querySelector('[aria-label="Hard to read"]')).not.toBeNull();
+    await u.clear(box);
+    await u.type(box, '#ff9f43');
+    expect(screen.queryByText(/Button text is hard to read/)).not.toBeInTheDocument();
+  });
+
   it('shows no warnings for a readable palette', async () => {
     mockApi(themeName('Custom'));
     renderApp('/settings/appearance');

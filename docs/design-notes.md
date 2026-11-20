@@ -65,3 +65,4 @@
 - Q3 custom lists: max **6** per person.
 - Q4 trailers: also for TV shows and anime (not only movies).
 - Dan will send menu reorganisation changes separately; custom-list entry points wait for those.
+- Admin Defaults (Dan, 2026-11-19): cover EVERY user setting (rating/close-call options, lists shown + order, side bar side/width/collapsed, cover viewer, theme, privacy defaults, text sizes, future settings). Behaviour "Both": everyone follows the admin default for any setting they never changed themselves; a per-setting "Apply to everyone" (with confirm) also overrides people who changed it.

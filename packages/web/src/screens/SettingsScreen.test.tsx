@@ -119,7 +119,12 @@ describe('Settings: Export my data', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Export my data' }));
 
     const busy = await screen.findByRole('button', { name: 'Exporting…' });
-    expect(busy).toBeDisabled();
+    // aria-disabled keeps keyboard focus on the row while it works, and a second press does nothing.
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    busy.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(busy).toHaveFocus();
+    expect(calls.filter((c) => c.path === '/api/export')).toHaveLength(1);
     const call = calls.find((c) => c.path === '/api/export');
     expect(call?.method).toBe('GET');
     expect(call?.init?.credentials).toBe('same-origin');

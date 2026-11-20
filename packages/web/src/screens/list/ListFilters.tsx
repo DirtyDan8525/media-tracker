@@ -13,6 +13,8 @@ export interface ListFiltersProps {
   filter: ListFilter;
   onChange: (next: Partial<ListFilter>) => void;
   genres: { genre: string; count: number }[];
+  /** Your tags on this list's titles, with counts (absent = none to filter by). */
+  tags?: { tag: string; count: number }[];
   /** The Sort chip, rendered first in the chip row. */
   sort?: ReactNode;
   /** The Plan to watch view: the list is already only planned titles, so there is no Status chip. */
@@ -64,12 +66,14 @@ export function SearchBox({ category, filter, onChange, compact }: Pick<ListFilt
 }
 
 /** The chip row: Sort, then Status (lists with a Status column) and Genre (lists with genres). */
-export function FilterChips({ category, filter, onChange, genres, sort, planned }: ListFiltersProps) {
+export function FilterChips({ category, filter, onChange, genres, tags = [], sort, planned }: ListFiltersProps) {
   const showStatus = CATEGORY_CONFIG[category].hasStatus && !planned;
   const showGenre = genres.length > 0 || filter.genre !== '';
   const genreList = filter.genre && !genres.some((g) => g.genre.toLowerCase() === filter.genre.toLowerCase())
     ? [{ genre: filter.genre, count: 0 }, ...genres] : genres;
-  if (!sort && !showStatus && !showGenre) return null;
+  const showTag = tags.length > 0 || filter.tag !== '';
+  const tagList = filter.tag && !tags.some((t) => t.tag.toLowerCase() === filter.tag.toLowerCase()) ? [{ tag: filter.tag, count: 0 }, ...tags] : tags;
+  if (!sort && !showStatus && !showGenre && !showTag) return null;
   return (
     <div className="chip-row">
       {sort}
@@ -85,6 +89,13 @@ export function FilterChips({ category, filter, onChange, genres, sort, planned 
           onChange={(e) => onChange({ genre: e.target.value })}>
           <option value="">Genre: All</option>
           {genreList.map((g) => <option key={g.genre} value={g.genre}>{g.count ? `${g.genre} (${g.count})` : g.genre}</option>)}
+        </select>
+      )}
+      {showTag && (
+        <select aria-label="Tag" className={`select-chip${filter.tag ? ' is-on' : ''}`} value={filter.tag}
+          onChange={(e) => onChange({ tag: e.target.value })}>
+          <option value="">Tag: All</option>
+          {tagList.map((t) => <option key={t.tag} value={t.tag}>{t.count ? `${t.tag} (${t.count})` : t.tag}</option>)}
         </select>
       )}
     </div>
@@ -105,11 +116,14 @@ export function PlanSwitch({ category, on, onChange }: { category: Category; on:
   );
 }
 
-/** What the Filters button counts and the chips show: the status and the genre. */
-export function activeFilters(category: Category, filter: ListFilter, planned: boolean): { key: 'status' | 'genre'; label: string }[] {
-  const out: { key: 'status' | 'genre'; label: string }[] = [];
+export type FilterKey = 'status' | 'genre' | 'tag';
+
+/** What the Filters button counts and the chips show: the status, the genre and the tag. */
+export function activeFilters(category: Category, filter: ListFilter, planned: boolean): { key: FilterKey; label: string }[] {
+  const out: { key: FilterKey; label: string }[] = [];
   if (filter.status && !planned) out.push({ key: 'status', label: statusLabel(filter.status, category) });
   if (filter.genre) out.push({ key: 'genre', label: filter.genre });
+  if (filter.tag) out.push({ key: 'tag', label: `Tag: ${filter.tag}` });
   return out;
 }
 
@@ -131,7 +145,7 @@ export function FilterBar({ category, filter, onChange, count, onOpenFilters, pl
 }
 
 /** Active filters as small chips; each removes itself. */
-export function ActiveChips({ chips, onRemove }: { chips: { key: 'status' | 'genre'; label: string }[]; onRemove: (key: 'status' | 'genre') => void }) {
+export function ActiveChips({ chips, onRemove }: { chips: { key: FilterKey; label: string }[]; onRemove: (key: FilterKey) => void }) {
   if (!chips.length) return null;
   return (
     <div className="active-chips">
@@ -147,15 +161,16 @@ export function ActiveChips({ chips, onRemove }: { chips: { key: 'status' | 'gen
 const GENRES_SHOWN = 8;
 
 /** The Filters bottom sheet: Status, Genres, Sort; Clear and "Show N". Changes apply as you tap. */
-export function FilterSheet({ category, filter, onChange, genres, sort, onSort, planned, shown, onClear, onClose }: {
+export function FilterSheet({ category, filter, onChange, genres, tags = [], sort, onSort, planned, shown, onClear, onClose }: {
   category: Category; filter: ListFilter; onChange: (next: Partial<ListFilter>) => void;
-  genres: { genre: string; count: number }[]; sort: SortKey; onSort: (k: SortKey) => void;
+  genres: { genre: string; count: number }[]; tags?: { tag: string; count: number }[]; sort: SortKey; onSort: (k: SortKey) => void;
   planned: boolean; shown: number; onClear: () => void; onClose: () => void;
 }) {
   const [all, setAll] = useState(false);
   const showStatus = CATEGORY_CONFIG[category].hasStatus && !planned;
   const list = filter.genre && !genres.some((g) => g.genre.toLowerCase() === filter.genre.toLowerCase())
     ? [{ genre: filter.genre, count: 0 }, ...genres] : genres;
+  const tagList = filter.tag && !tags.some((t) => t.tag.toLowerCase() === filter.tag.toLowerCase()) ? [{ tag: filter.tag, count: 0 }, ...tags] : tags;
   const picked = list.findIndex((g) => g.genre.toLowerCase() === filter.genre.toLowerCase());
   const visible = all || list.length <= GENRES_SHOWN ? list : list.filter((g, i) => i < GENRES_SHOWN || i === picked);
   const footer = (
@@ -175,6 +190,19 @@ export function FilterSheet({ category, filter, onChange, genres, sort, onSort, 
               {STATUSES.filter((st) => st !== PLAN_STATUS || filter.status === st).map((st) => (
                 <Button key={st} variant="chip" active={filter.status === st} onClick={() => onChange({ status: filter.status === st ? '' : st })}>
                   {statusLabel(st, category)}
+                </Button>
+              ))}
+            </div>
+          </>
+        )}
+        {tagList.length > 0 && (
+          <>
+            <h3 className="filters-sheet__label" id="fs-tags">Tags</h3>
+            <div className="filters-sheet__chips" role="group" aria-labelledby="fs-tags">
+              {tagList.map((t) => (
+                <Button key={t.tag} variant="chip" active={t.tag.toLowerCase() === filter.tag.toLowerCase()}
+                  onClick={() => onChange({ tag: t.tag.toLowerCase() === filter.tag.toLowerCase() ? '' : t.tag })}>
+                  {t.tag}
                 </Button>
               ))}
             </div>

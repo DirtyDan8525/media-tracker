@@ -1,5 +1,8 @@
 import type { MiddlewareHandler } from 'hono';
-import { CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, validateTierSet, type Category, type UserSettings } from '@media-tracker/shared';
+import {
+  CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, applyDefaults, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
+  type Category, type Customized, type NewPersonDefaults, type UserSettings,
+} from '@media-tracker/shared';
 import type { Env } from '../env';
 import { clearedCookie, readSessionToken, ROLL_AFTER_MS, expiryFrom, sessionCookie, sha256Hex } from './session';
 
@@ -8,7 +11,12 @@ export interface AppUser {
   email: string;
   username: string | null;
   isAdmin: boolean;
+  /** Effective settings: the admin defaults overlaid with what the person changed themselves. */
   settings: UserSettings;
+  /** The settings the person set themselves (a sparse tree mirroring `settings`); the rest follow the admin defaults. */
+  customized: Customized;
+  /** The settings as stored, before the admin defaults are laid under them (what a settings save writes back). */
+  storedSettings: UserSettings;
   avatarAt: string | null;
   createdAt: string | null;
   displayName: string | null;
@@ -37,10 +45,15 @@ interface UserRow {
   display_name: string | null;
   bio: string | null;
   status: UserStatus;
+  /** The `defaults` app_settings value (JSON text), when the query selected it; undefined = no overlay. */
+  app_defaults?: string | null;
 }
 
 /** The users columns `toAppUser` reads (prefix each with an alias as needed). */
 export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_at, created_at, display_name, bio, status';
+
+/** A select-list item: the admin `defaults` row's JSON, which toAppUser overlays under the person's own changes. */
+export const APP_DEFAULTS_SQL = "(SELECT value_json FROM app_settings WHERE key = 'defaults') AS app_defaults";
 
 const SETTINGS_KEYS = Object.keys(DEFAULT_USER_SETTINGS) as (keyof UserSettings)[];
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -74,15 +87,42 @@ export function loadSettings(json: string): UserSettings {
     if (typeof known.nav.collapsed === 'boolean') nav.collapsed = known.nav.collapsed;
   }
   const coverViewer = typeof known.coverViewer === 'boolean' ? known.coverViewer : DEFAULT_USER_SETTINGS.coverViewer;
+  const listOrder: Category[] = [];
+  if (Array.isArray(known.listOrder)) {
+    for (const c of known.listOrder) if (typeof c === 'string' && Object.hasOwn(CATEGORY_CONFIG, c) && !listOrder.includes(c as Category)) listOrder.push(c as Category);
+  }
   // merge over defaults so older rows missing a key still get one
-  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer };
+  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer, listOrder };
+}
+
+/** The raw `customized` tree of a stored settings JSON, or null for an account from before tracking (or corrupt JSON). */
+function storedCustomized(json: string): Customized | null {
+  try {
+    const v: unknown = JSON.parse(json);
+    return isPlainObject(v) ? parseCustomized(v.customized) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stored settings as the person sees them: the admin defaults (`app_defaults`, the `defaults` row's JSON text; undefined = none
+ * known, so no overlay) under everything they changed themselves. Accounts with no `customized` tree count a stored value that
+ * differs from the built-in default as their own.
+ */
+export function readSettings(json: string, appDefaults?: string | null | NewPersonDefaults): { settings: UserSettings; customized: Customized; storedSettings: UserSettings } {
+  const stored = loadSettings(json);
+  const customized = storedCustomized(json) ?? legacyCustomized(stored);
+  if (appDefaults === undefined) return { settings: stored, customized, storedSettings: stored };
+  const d = typeof appDefaults === 'object' && appDefaults !== null ? appDefaults : resolveDefaults(appDefaults);
+  return { settings: applyDefaults(stored, customized, d), customized, storedSettings: stored };
 }
 
 /**
  * The admin is the user with is_admin set (the first signup on a fresh install) or the one whose
  * email is ADMIN_EMAIL (Dan's row from before Phase 4b).
  */
-export function toAppUser(row: UserRow, adminEmail: string | undefined): AppUser {
+export function toAppUser(row: UserRow, adminEmail: string | undefined, appDefaults?: NewPersonDefaults): AppUser {
   const admin = (adminEmail ?? '').trim().toLowerCase();
   return {
     id: row.id,
@@ -94,13 +134,13 @@ export function toAppUser(row: UserRow, adminEmail: string | undefined): AppUser
     displayName: row.display_name ?? null,
     bio: row.bio ?? null,
     status: row.status,
-    settings: loadSettings(row.settings_json),
+    ...readSettings(row.settings_json, appDefaults ?? row.app_defaults),
   };
 }
 
 /** Dev only (DEV_EMAIL): the user with this email, created active on first use. 1 query, 3 on creation. */
 async function getOrCreateUser(env: Env, email: string): Promise<AppUser> {
-  const select = () => env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE email = ?`).bind(email).first<UserRow>();
+  const select = () => env.DB.prepare(`SELECT ${USER_COLS}, ${APP_DEFAULTS_SQL} FROM users WHERE email = ?`).bind(email).first<UserRow>();
 
   const existing = await select();
   if (existing) return toAppUser(existing, env.ADMIN_EMAIL);
@@ -121,7 +161,7 @@ async function getOrCreateUser(env: Env, email: string): Promise<AppUser> {
 /** A6: the only calls a pending user may make (plus /api/auth/*, which is mounted outside requireUser). */
 const PENDING_ALLOWED = new Set(['GET /api/me', 'PUT /api/me/username', 'PUT /api/me/display-name']);
 
-const SESSION_SQL = `SELECT ${USER_COLS.split(', ').map((k) => `u.${k}`).join(', ')}, s.expires_at AS s_expires_at, s.last_used_at AS s_last_used_at
+const SESSION_SQL = `SELECT ${USER_COLS.split(', ').map((k) => `u.${k}`).join(', ')}, ${APP_DEFAULTS_SQL}, s.expires_at AS s_expires_at, s.last_used_at AS s_last_used_at
   FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`;
 
 /**

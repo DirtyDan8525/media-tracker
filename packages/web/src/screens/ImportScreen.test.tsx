@@ -121,7 +121,7 @@ describe('ImportScreen', () => {
     expect(parseWorkbook).not.toHaveBeenCalled();
   });
 
-  it('sends 400 rows in chunks of at most 150 under one importId, then saves only the settings that were present', async () => {
+  it('sends 400 rows in chunks of at most 145 under one importId, then saves only the settings that were present', async () => {
     const { calls } = importBackend();
     renderApp('/import');
     await chooseMock(preview(Array.from({ length: 400 }, (_, i) => row(i)), { settings: { theme: 'Ocean', compareAsk: 'Off' } }));
@@ -129,7 +129,7 @@ describe('ImportScreen', () => {
     expect(await screen.findByText('Imported 400 titles')).toBeInTheDocument();
 
     const posts = importPosts(calls);
-    expect(posts.map((p) => p.rows.length)).toEqual([150, 150, 100]);
+    expect(posts.map((p) => p.rows.length)).toEqual([145, 145, 110]);
     expect(new Set(posts.map((p) => p.importId)).size).toBe(1);
     expect(posts[0]!.importId).toMatch(UUID);
     const puts = calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings');
@@ -180,7 +180,7 @@ describe('ImportScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Import 400 titles' }));
 
     expect(await screen.findByText('Import stopped')).toBeInTheDocument();
-    expect(screen.getByText(/150 of 400/)).toBeInTheDocument();
+    expect(screen.getByText(/145 of 400/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try the rest again' })).toBeInTheDocument();
     expect(importPosts(calls)).toHaveLength(2); // stopped: no third chunk
     expect(calls.some((c) => c.method === 'PUT')).toBe(false); // settings only after the rows succeeded
@@ -199,7 +199,7 @@ describe('ImportScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Try the rest again' }));
     expect(await screen.findByText('Imported 400 titles')).toBeInTheDocument();
     const posts = importPosts(calls);
-    expect(posts.map((p) => p.rows.length)).toEqual([150, 150, 150, 100]);
+    expect(posts.map((p) => p.rows.length)).toEqual([145, 145, 145, 110]);
     expect(posts[2]!.rows[0]!.title).toBe(posts[1]!.rows[0]!.title);
     // every chunk carries its index, and the retry re-sends the failed chunk (1) with the same one
     expect(posts.map((p) => p.chunk)).toEqual([0, 1, 1, 2]);

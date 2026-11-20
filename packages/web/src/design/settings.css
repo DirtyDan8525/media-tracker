@@ -83,9 +83,9 @@
 /* ---------- Your data: Export my data ---------- */
 .export-row { width: 100%; border: none; background: transparent; font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; }
 .group__card > * + .export-row { border-top: 1px solid var(--grid-line); }
-.export-row:hover:not(:disabled) { background: var(--alt-row); }
+.export-row:hover:not([aria-disabled='true']) { background: var(--alt-row); }
 .export-row:focus-visible { outline-offset: -2px; }
-.export-row:disabled { cursor: progress; }
+.export-row[aria-disabled='true'] { cursor: progress; }
 
 /* ---------- Appearance row: the current theme's Background, Cards and Highlight (SettingsMore.v2) ---------- */
 .theme-dots { display: inline-flex; gap: 3px; margin-right: var(--space-4); vertical-align: middle; }
@@ -101,3 +101,4 @@
 .tier-editor__to { margin: 0 0 0 var(--space-2); font-size: var(--fs-meta); color: var(--muted-text); }
 .tier-editor__actions { display: flex; gap: var(--space-5); }
 .tier-editor__actions .btn { flex: 1; }
+.settings-inline-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }

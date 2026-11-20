@@ -56,7 +56,7 @@ describe('admin only', () => {
   it('every Phase 6c admin route is 403 for a member and 401 signed out', async () => {
     const routes: [string, string][] = [
       ['GET', '/api/admin/app'], ['PUT', '/api/admin/app/brand'], ['DELETE', '/api/admin/app/brand'],
-      ['GET', '/api/admin/comments'], ['GET', '/api/admin/numbers'], ['POST', '/api/admin/lookup/check'],
+      ['POST', '/api/admin/defaults/apply'], ['GET', '/api/admin/comments'], ['GET', '/api/admin/numbers'], ['POST', '/api/admin/lookup/check'],
       ['POST', '/api/admin/lookup/explain'], ['GET', '/api/admin/backup'],
     ];
     for (const [method, path] of routes) {
@@ -161,7 +161,7 @@ describe('feature switches', () => {
     env.DB.prepare("INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at) VALUES ('p1', 'uRen', 'e1', 'rated', '{}', ?1, ?1)").bind(iso(1)),
   ]);
 
-  it('all nine are on by default and listed in GET /api/app', async () => {
+  it('every switch is on by default and listed in GET /api/app', async () => {
     const f = (await json(await call(null, '/api/app'))).features;
     expect(Object.keys(f)).toEqual([...FEATURE_KEYS]);
     expect(Object.values(f)).toEqual(FEATURE_KEYS.map(() => true));

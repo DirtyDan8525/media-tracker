@@ -2,6 +2,7 @@ import { loadAppSettings } from '../settings/appSettings';
 import { Hono } from 'hono';
 import {
   CATEGORY_CONFIG,
+  ACTIVE_STATUSES,
   PLAN_ORDER_MAX,
   PLAN_STATUS,
   findDuplicate,
@@ -20,7 +21,7 @@ import {
   applyRatingEdit, loadSet, loadSets, planEdit, planRemove, ratedFields, rowToComparison, runBatch, setWriteStatements,
   tierFieldsFor, typedOf, type LoadedItem, type RatingEdit,
 } from '../ratings/store';
-import { activityForCreate, activityForPatch } from './activity';
+import { activityForCreate, activityForPatch, activityForSeason } from './activity';
 import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
 
 export { validateEntryInput, validateSeasonInput } from './entryValidation';
@@ -42,7 +43,21 @@ export interface EntryRow {
   tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number;
   plan_order: number | null;
   progress: number | null; progress_total: number | null;
+  started_at?: string | null; finished_at?: string | null; rewatches?: number | null;
+  /** JSON array of the title's tag names (ENTRY_SELECT's sub-select; absent from `e.*` selects). */
+  tags_json?: string | null;
   typed: number | null;
+}
+
+/** The names in a `tags_json` column, A-Z (the sub-select orders them). */
+export function parseTags(json: string | null | undefined): string[] {
+  if (!json) return [];
+  try {
+    const v: unknown = JSON.parse(json);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 export interface SeasonRow {
   id: string; entry_id: string; label: string; rating: number | null; notes: string; created_at: string;
@@ -86,6 +101,10 @@ export function rowToEntry(r: EntryRow): Entry {
     planOrder: r.plan_order ?? null,
     progress: r.progress ?? null,
     progressTotal: r.progress_total ?? null,
+    tags: parseTags(r.tags_json),
+    startedAt: r.started_at ?? null,
+    finishedAt: r.finished_at ?? null,
+    rewatches: r.rewatches ?? 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -98,7 +117,10 @@ export function rowToSeason(r: SeasonRow): Season {
   };
 }
 
-export const ENTRY_SELECT = `SELECT e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg FROM entries e`;
+/** One sub-select, no extra query: the title's tags as a JSON array of names, A-Z (one batched read for every row). */
+export const TAGS_SUBSELECT = `(SELECT json_group_array(n.name) FROM (SELECT t.name AS name FROM entry_tags et JOIN tags t ON t.id = et.tag_id WHERE et.entry_id = e.id ORDER BY t.name COLLATE NOCASE) n) AS tags_json`;
+
+export const ENTRY_SELECT = `SELECT e.*, (SELECT AVG(s.rating) FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL) AS season_avg, ${TAGS_SUBSELECT} FROM entries e`;
 
 // camelCase field -> column, with boolean columns stored 0/1. The rating fields (rating, tier,
 // scoreLocked) are not written through this map: they go through the ratings model.
@@ -109,6 +131,7 @@ const COLUMNS: Record<keyof PlainFields, string> = {
   synopsis: 'synopsis', lengthLabel: 'length_label', origin: 'origin', detailsState: 'details_state',
   isPrivate: 'is_private', notesPrivate: 'notes_private', source: 'source', sourceId: 'source_id',
   lookupState: 'lookup_state', progress: 'progress', progressTotal: 'progress_total',
+  startedAt: 'started_at', finishedAt: 'finished_at', rewatches: 'rewatches',
 };
 const dbValue = (v: unknown) => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
 
@@ -159,6 +182,19 @@ async function editStored(
       .bind(userId, id, new Date().toISOString())]
     : [];
   return { stmts: [...undo, ...setWriteStatements(db, userId, set, changed, loaded.stored)], before, item };
+}
+
+/**
+ * Started / Finished fill themselves (More stats): the first time a title gets an active status, Started is today if empty;
+ * when it becomes Completed, Finished is today if empty. A date sent in the same request wins (even null: the person cleared it).
+ * `have` is what is stored (nothing on create). Mutates `fields`, the plain columns about to be written.
+ */
+function autoDates(fields: { status?: Entry['status']; startedAt?: string | null; finishedAt?: string | null },
+  have: { started_at: string | null; finished_at: string | null }): void {
+  const today = new Date().toISOString().slice(0, 10);
+  const status = fields.status;
+  if (status && (ACTIVE_STATUSES as readonly string[]).includes(status) && !('startedAt' in fields) && !have.started_at) fields.startedAt = today;
+  if (status === 'Completed' && !('finishedAt' in fields) && !have.finished_at) fields.finishedAt = today;
 }
 
 async function readJson(req: Request): Promise<unknown> {
@@ -272,6 +308,7 @@ entries.post('/entries', async (c) => {
     typedTitle: rest.typedTitle ?? rest.title,
     lookupState: rest.lookupState ?? 'pending',
   };
+  autoDates(values, { started_at: null, finished_at: null });
 
   // AD6: privacy the person did not choose starts as the admin's default for new titles (1 query).
   const { defaults } = await loadAppSettings(db);
@@ -327,9 +364,9 @@ entries.patch('/entries/:id', async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
   const userId = c.var.user.id;
-  const owned = await db.prepare('SELECT category, rating, typed, tier, prior_mean, strength, score_locked, progress, progress_total FROM entries WHERE id = ? AND user_id = ?')
+  const owned = await db.prepare('SELECT category, rating, typed, tier, prior_mean, strength, score_locked, progress, progress_total, started_at, finished_at FROM entries WHERE id = ? AND user_id = ?')
     .bind(id, userId)
-    .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number; progress: number | null; progress_total: number | null }>();
+    .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number; progress: number | null; progress_total: number | null; started_at: string | null; finished_at: string | null }>();
   if (!owned) return c.json(notFound, 404);
 
   const v = validateEntryInput(await readJson(c.req.raw), 'patch', owned.category);
@@ -339,6 +376,8 @@ entries.patch('/entries/:id', async (c) => {
   const nextProgress = 'progress' in rest ? rest.progress : owned.progress;
   const nextTotal = 'progressTotal' in rest ? rest.progressTotal : owned.progress_total;
   if (nextProgress != null && nextTotal != null && nextProgress > nextTotal) return c.json(invalid, 400);
+
+  autoDates(rest, owned);
 
   let ratingStmts: D1PreparedStatement[] = [];
   const queued: D1PreparedStatement[] = [];
@@ -442,9 +481,12 @@ entries.post('/entries/:id/seasons', async (c) => {
     rated = item;
     setStmts = setWriteStatements(db, userId, set, changed.filter((i) => i.id !== base.id), loaded.stored);
   }
+  const now = new Date().toISOString();
   await runBatch(db, [
     db.prepare(`INSERT INTO seasons (id, entry_id, label, notes, ${RATED_COLS.join(', ')}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(base.id, entryId, base.label, base.notes, ...ratedValues(rated), new Date().toISOString()),
+      .bind(base.id, entryId, base.label, base.notes, ...ratedValues(rated), now),
+    // A rated season posts to the feed (rated, from nothing); re-fitted neighbours log nothing.
+    ...activityForSeason(db, userId, base.id, null, rated.rating, now),
     ...setStmts,
   ]);
   return c.json(seasonOf(base, rated), 201);
@@ -469,14 +511,21 @@ entries.patch('/seasons/:id', async (c) => {
   const tiers = tiersFor(c.var.user.settings, set);
   let rated: RatedItem = { id, title: '', ...ratedFields(owned, tiers) };
   let ratingStmts: D1PreparedStatement[] = [];
+  let logged: D1PreparedStatement[] = [];
   if (hasEdit) {
     const r = await editStored(db, userId, set, tiers, rated, id, edit);
     if (r === 'invalid') return c.json(invalid, 400);
     if (r === 'gone') return c.json(notFound, 404);
-    if (r !== null) { ratingStmts = r.stmts; rated = r.item; }
+    if (r !== null) {
+      ratingStmts = r.stmts;
+      rated = r.item;
+      // Only the edited season logs (shown rating changed, not cleared); neighbours re-fitted in ratingStmts never do.
+      logged = activityForSeason(db, userId, id, r.before.rating, r.item.rating, new Date().toISOString());
+    }
   }
   await runBatch(db, [
     db.prepare('UPDATE seasons SET label = ?, notes = ? WHERE id = ?').bind(base.label, base.notes, id),
+    ...logged,
     ...ratingStmts,
   ]);
   return c.json(seasonOf(base, rated));

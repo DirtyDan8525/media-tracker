@@ -54,6 +54,21 @@ describe('Stats screen', () => {
     expect(within(cards).queryByText(/Loved/)).not.toBeInTheDocument();
   });
 
+  it('every list card has the same five rows, an average of nothing shows a dash like the table', async () => {
+    fakeBackend({ entries: [
+      makeEntry({ category: 'anime', title: 'A', rating: 9 }), makeEntry({ category: 'anime', title: 'B', rating: 8 }),
+      makeEntry({ category: 'movies', title: 'M', rating: null }),
+    ] });
+    renderApp('/stats');
+    const cards = await screen.findByRole('list', { name: 'Stats by list' });
+    const dds = (name: string) => {
+      const card = within(cards).getByRole('heading', { name }).closest('li')!;
+      return Array.from(card.querySelectorAll('dt')).map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+    };
+    expect(dds('Anime')).toEqual([['Entries', '2'], ['Rated', '2'], ['Average', '8.5'], ['Completed', '0'], ['Highest', '9.0']]);
+    expect(dds('Movies')).toEqual([['Entries', '1'], ['Rated', '0'], ['Average', '—'], ['Completed', '0'], ['Highest', '—']]);
+  });
+
   it('labels the all-media numbers and charts have text equivalents', async () => {
     fakeBackend({ entries: rows() });
     renderApp('/stats');

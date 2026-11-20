@@ -164,3 +164,31 @@
 }
 .avatar-viewer__img { display: block; max-width: 100%; max-height: 100%; width: min(90vmin, 720px); aspect-ratio: 1; object-fit: contain; border-radius: var(--radius-lg, 12px); }
 .avatar-viewer__close { position: absolute; top: max(var(--space-4), env(safe-area-inset-top)); right: var(--space-4); color: #fff; }
+
+/* ---------- PC side bar: resize handle, reorder-lists sheet ---------- */
+/* The handle is a zero-width sticky sibling of the nav, so it straddles the nav's inner edge on either side and never scrolls away with it. */
+.side-nav-resize { position: sticky; top: 0; align-self: flex-start; flex: none; width: 0; height: 100dvh; z-index: 5; }
+.side-nav-resize__grip {
+  position: absolute; top: 0; bottom: 0; left: -6px; width: 12px; cursor: col-resize; touch-action: none; outline: none;
+}
+.side-nav-resize__grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; background: transparent; transition: background var(--dur-fast) var(--ease); }
+.side-nav-resize__grip:hover::before, .side-nav-resize__grip:focus-visible::before, .side-nav-resize__grip.is-dragging::before { background: var(--highlight); }
+.side-nav-resize__grip:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+
+.lists-order { display: flex; flex-direction: column; gap: var(--space-4); }
+.lists-order__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.lists-order__row { display: flex; align-items: center; gap: var(--space-2); min-height: 52px; padding: var(--space-1) var(--space-3); border-radius: var(--radius-lg); background: var(--card); }
+.lists-order__row.is-dragging { background: var(--panel); box-shadow: var(--shadow-float); }
+.lists-order__row.is-off .lists-order__name { color: var(--muted-text); }
+.lists-order__name { flex: 1; min-width: 0; font-weight: 600; color: var(--bright-text); }
+.lists-order__handle, .lists-order__move {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap);
+  color: var(--muted-text); border-radius: var(--radius-md); cursor: pointer;
+}
+.lists-order__handle { cursor: grab; touch-action: none; }
+.lists-order__move:hover:not(:disabled), .lists-order__handle:hover { background: var(--panel); color: var(--bright-text); }
+.lists-order__move:disabled { opacity: 0.35; cursor: default; }
+.lists-order__handle:focus-visible, .lists-order__move:focus-visible { outline: 2px solid var(--highlight); outline-offset: -2px; }
+.lists-order__arrow { display: flex; }
+.lists-order__arrow--up { transform: rotate(-90deg); }
+.lists-order__arrow--down { transform: rotate(90deg); }

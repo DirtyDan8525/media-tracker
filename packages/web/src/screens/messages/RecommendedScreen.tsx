@@ -30,7 +30,7 @@ export function RecommendedScreen() {
           {recs.data.map(({ message, sender }) => (
             <li key={message.id} className="rec-item">
               <span className="rec-item__from">from @{sender.username} · {ageText(message.createdAt, now)}</span>
-              {message.rec && <RecCard rec={message.rec} senderName={nameOf(sender)} note={message.text} />}
+              {message.rec && <RecCard rec={message.rec} senderName={nameOf(sender)} senderUsername={sender.username} note={message.text} />}
             </li>
           ))}
         </ul>

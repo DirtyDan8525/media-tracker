@@ -53,7 +53,7 @@ export function FriendProfile() {
   if (profile.isPending) {
     return (
       <div className="screen" aria-busy="true" aria-label="Loading">
-        <div className="friend-top"><BackButton to="/friends" /></div>
+        <div className="friend-top"><BackButton to="/friends" pc /></div>
         <div className="screen__body stack-10"><Skeleton height={96} /><Skeleton height={64} /><Skeleton height={64} /></div>
       </div>
     );
@@ -62,7 +62,7 @@ export function FriendProfile() {
     const missing = (profile.error as { status?: number } | null)?.status === 404;
     return (
       <div className="screen">
-        <div className="friend-top"><BackButton to="/friends" /></div>
+        <div className="friend-top"><BackButton to="/friends" pc /></div>
         <div className="screen__body">
           {missing ? (
             <EmptyState icon="info" title="We couldn't find that person" body="Check the username, or ask them for their invite link."
@@ -92,7 +92,7 @@ function StrangerView({ user, relation }: { user: PublicUser; relation: 'none' |
   };
   return (
     <div className="screen">
-      <div className="friend-top"><BackButton to="/friends" /></div>
+      <div className="friend-top"><BackButton to="/friends" pc /></div>
       <div className="screen__body social-page">
         <div className="friend-id">
           <PersonAvatar user={user} size={96} viewable name={who(user)} />
@@ -148,7 +148,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
   return (
     <div className="screen">
       <div className="friend-top">
-        <BackButton to="/friends" />
+        <BackButton to="/friends" pc />
         <MoreMenu user={user} friends={friends.data} />
       </div>
       <div className="screen__body social-page friend-page">
@@ -235,7 +235,7 @@ export function FriendTable({ username, rows, linkTo, name }: { username: string
   const back = backState(`${name ?? `@${username}`}'s lists`);
   const items = useMemo<ViewerItem[]>(() => rows.map((e) => ({
     id: e.id, title: e.title, category: e.category, coverUrl: e.coverUrl, rating: e.rating, status: e.status, creator: e.creator,
-    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, to: href ? href(e.id) : null, state: back,
+    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, source: e.source, sourceId: e.sourceId, to: href ? href(e.id) : null, state: back,
   })), [rows, href, back.backLabel]); // eslint-disable-line react-hooks/exhaustive-deps
   const viewer = useRowViewer(items);
   const cfg = CATEGORY_CONFIG[rows[0]!.category];

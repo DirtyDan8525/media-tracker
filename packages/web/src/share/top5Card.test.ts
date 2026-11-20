@@ -77,6 +77,22 @@ describe('fitText', () => {
     expect(long.startsWith(fitted.slice(0, -1).trimEnd())).toBe(true);
     expect(fitText(ctx, 'anything', 10)).toBe('');
   });
+
+  it('cuts by grapheme: never inside an emoji sequence or a combined character', () => {
+    const { ctx } = fakeCtx();
+    const family = '👨‍👩‍👧'; // 8 UTF-16 units, one grapheme
+    const text = `ab${family}${family}${family}cd`;
+    for (let width = 40; width < 200; width += 20) {
+      const fitted = fitText(ctx, text, width);
+      const body = fitted.slice(0, -1);
+      if (body === '') continue;
+      expect(text.startsWith(body)).toBe(true);
+      expect(['', 'a', 'ab', `ab${family}`, `ab${family}${family}`, `ab${family}${family}${family}`]).toContain(body);
+    }
+    const accents = 'e\u0301e\u0301e\u0301e\u0301'; // four é as e + combining acute
+    const cut = fitText(ctx, accents, 60).slice(0, -1);
+    expect(cut.length % 2).toBe(0);
+  });
 });
 
 describe('drawShareCard', () => {
@@ -272,6 +288,25 @@ describe('drawShareCard', () => {
     for (const role of ['Bright text', 'Text', 'Muted text']) {
       for (const surface of ['Background', 'Cards']) {
         expect(contrast(t[role]!, t[surface]!), `${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  // The #1 poster's text sits on a blurred cover under a Background scrim. Whatever the cover looks
+  // like (worst cases: pure white and pure black), the scrim as drawn must keep text at 4.5:1.
+  it.each(Object.keys(THEMES))('%s: card text on the poster keeps ≥ 4.5:1 over the cover scrim, even a white or black cover', (name) => {
+    const t: ThemeColors = THEMES[name]!;
+    const { ctx, ops } = fakeCtx();
+    drawShareCard(ctx, input({ colors: t, rows: [row(1, { cover })] }));
+    const scrim = ops.find((o) => o.op === 'fillRect' && o.fillStyle === t.Background && o.globalAlpha < 1)!;
+    expect(scrim, 'a Background scrim is drawn over the backdrop').toBeDefined();
+    const a = scrim.globalAlpha;
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const hex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+    for (const cover of ['#ffffff', '#000000']) {
+      const under = hex(rgb(t.Background!).map((v, k) => v * a + rgb(cover)[k]! * (1 - a)));
+      for (const role of ['Bright text', 'Text']) {
+        expect(contrast(t[role]!, under), `${role} over a ${cover} cover`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });

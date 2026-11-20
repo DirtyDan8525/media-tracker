@@ -1,11 +1,12 @@
 import type { Entry } from '@media-tracker/shared';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { localDb } from '../db/local';
 import { mockFetch } from '../test/mockApi';
 import { makeQueryClient } from '../test/queryClient';
+import { writeEntry } from './entryCache';
 import { refreshCategories, useAllEntries, useEntries } from './useEntries';
 
 function entry(id: string, over: Partial<Entry> = {}): Entry {
@@ -83,5 +84,43 @@ describe('refreshCategories', () => {
     await refreshCategories(qc, ['anime']);
     expect(qc.getQueryData<Entry[]>(['entries', 'anime'])![0]).toMatchObject({ tier: null, priorMean: null, strength: null, scoreLocked: false });
     expect((await localDb.entries.get('old'))).toMatchObject({ tier: null, scoreLocked: false });
+  });
+});
+
+describe('writeEntry → useAllEntries', () => {
+  const setup = async () => {
+    mockFetch({ 'GET /api/entries': { body: [entry('a1', { rating: 7 }), entry('a2')] } });
+    const qc = makeQueryClient();
+    const wrap = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const hook = renderHook(() => useAllEntries(['anime', 'movies']), { wrapper: wrap });
+    await waitFor(() => expect(hook.result.current.data.anime?.map((e) => e.id)).toEqual(['a1', 'a2']));
+    return { qc, hook };
+  };
+
+  it('an edited entry replaces its row, and a new one is added, in the combined data and on the device', async () => {
+    const { qc, hook } = await setup();
+    act(() => writeEntry(qc, entry('a1', { rating: 9.5 })));
+    await waitFor(() => expect(hook.result.current.data.anime!.find((e) => e.id === 'a1')!.rating).toBe(9.5));
+    expect(hook.result.current.data.anime).toHaveLength(2);
+    act(() => writeEntry(qc, entry('a3')));
+    await waitFor(() => expect(hook.result.current.data.anime!.map((e) => e.id).sort()).toEqual(['a1', 'a2', 'a3']));
+    await waitFor(async () => expect((await localDb.entries.get('a1'))?.rating).toBe(9.5));
+  });
+
+  it('replaceId swaps a temporary row for the saved one; persist:false stays out of the device DB', async () => {
+    const { qc, hook } = await setup();
+    act(() => writeEntry(qc, entry('tmp-1'), { persist: false }));
+    await waitFor(() => expect(hook.result.current.data.anime!.map((e) => e.id)).toContain('tmp-1'));
+    expect(await localDb.entries.get('tmp-1')).toBeUndefined();
+    act(() => writeEntry(qc, entry('real-1'), { replaceId: 'tmp-1' }));
+    await waitFor(() => expect(hook.result.current.data.anime!.map((e) => e.id).sort()).toEqual(['a1', 'a2', 'real-1']));
+  });
+
+  it('a write into another list reaches that list only', async () => {
+    const { qc, hook } = await setup();
+    await waitFor(() => expect(hook.result.current.data.movies).toBeDefined());
+    act(() => writeEntry(qc, entry('m9', { category: 'movies' })));
+    await waitFor(() => expect(hook.result.current.data.movies!.map((e) => e.id)).toContain('m9'));
+    expect(hook.result.current.data.anime!.map((e) => e.id)).toEqual(['a1', 'a2']); // the mock serves the same rows to every list
   });
 });

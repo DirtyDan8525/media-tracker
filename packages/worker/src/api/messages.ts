@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import {
   CATEGORY_CONFIG, GROUP_MAX, GROUP_NAME_MAX, IMAGE_MAX_BYTES, MESSAGES_PAGE, MESSAGE_MAX, MESSAGE_RATE_PER_MIN, RECOMMENDED_MAX,
   type Conversation, type ConversationKind, type ConversationList, type ConversationSummary, type LastMessage, type Message,
-  type MessageKind, type MessagePage, type PublicUser, type RecSnapshot, type RecommendedItem, type SourceId,
+  type MessageKind, type MessagePage, type PublicUser, type RecSnapshot, type RecommendedItem, type ReplyInfo, type SourceId,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
 import { pushNewMessage } from '../push/events';
@@ -69,9 +69,11 @@ function recOf(v: unknown): RecSnapshot | null {
   if (rating !== null && (typeof rating !== 'number' || !Number.isFinite(rating) || rating < 0 || rating > 10)) return null;
   const source = r.source === undefined || r.source === null ? null : r.source;
   if (source !== null && (typeof source !== 'string' || !SOURCES.includes(source))) return null;
+  const entryId = r.entryId === undefined || r.entryId === null ? undefined : r.entryId;
+  if (entryId !== undefined && (typeof entryId !== 'string' || entryId === '' || entryId.length > 64)) return null;
   return {
     category: r.category as RecSnapshot['category'], title: r.title.trim(), creator, coverUrl, rating,
-    source: source as SourceId | null, sourceId,
+    source: source as SourceId | null, sourceId, ...(entryId !== undefined ? { entryId } : {}),
   };
 }
 
@@ -84,18 +86,47 @@ function parseRec(json: string | null): RecSnapshot | null {
   }
 }
 
-interface MessageRow {
-  id: string; conversation_id: string; sender_id: string; kind: MessageKind; body: string; rec_json: string | null;
-  has_image: number; created_at: string; deleted_at: string | null;
+/** The reply columns (aliased r_*), present when the query joins the replied-to message (REPLY_JOIN). */
+interface ReplyCols {
+  r_id: string | null; r_sender: string | null; r_kind: MessageKind | null; r_body: string | null; r_rec_title: string | null;
+  r_deleted_at: string | null; r_username: string | null; r_display_name: string | null;
 }
-const MESSAGE_COLS = `m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.rec_json, m.image_key IS NOT NULL AS has_image, m.created_at, m.deleted_at`;
+interface MessageRow extends Partial<ReplyCols> {
+  id: string; conversation_id: string; sender_id: string; kind: MessageKind; body: string; rec_json: string | null;
+  has_image: number; reply_to: string | null; created_at: string; deleted_at: string | null;
+}
+const MESSAGE_COLS = `m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.rec_json, m.image_key IS NOT NULL AS has_image, m.reply_to, m.created_at, m.deleted_at`;
+/** One join answers every reply's quote: no extra query per message. */
+const REPLY_COLS = `r.id AS r_id, r.sender_id AS r_sender, r.kind AS r_kind, substr(r.body, 1, 300) AS r_body, json_extract(r.rec_json, '$.title') AS r_rec_title,
+            r.deleted_at AS r_deleted_at, ru.username AS r_username, ru.display_name AS r_display_name`;
+const REPLY_JOIN = `LEFT JOIN messages r ON r.id = m.reply_to LEFT JOIN users ru ON ru.id = r.sender_id AND ru.status = 'active'`;
+const SNIPPET_MAX = 100;
+
+/** A quote's one-line snippet: the text with whitespace collapsed, a rec's title, nothing for a picture. */
+function snippetOf(kind: MessageKind, body: string | null, recTitle: string | null): string {
+  const t = kind === 'rec' ? (recTitle ?? '') : kind === 'image' ? '' : (body ?? '');
+  const one = t.replace(/\s+/g, ' ').trim();
+  const chars = Array.from(one);
+  return chars.length > SNIPPET_MAX ? `${chars.slice(0, SNIPPET_MAX - 1).join('')}…` : one;
+}
+
+const DELETED_REPLY = (id: string): ReplyInfo => ({ id, senderId: '', senderName: '', kind: 'text', snippet: '', deleted: true });
+
+function replyOf(r: MessageRow): ReplyInfo | null {
+  if (r.reply_to === null || r.r_id === undefined) return null;
+  if (r.r_id === null || r.r_deleted_at !== null) return DELETED_REPLY(r.reply_to);
+  return {
+    id: r.r_id, senderId: r.r_sender!, senderName: r.r_display_name || (r.r_username ? `@${r.r_username}` : ''), kind: r.r_kind!,
+    snippet: snippetOf(r.r_kind!, r.r_body ?? null, r.r_rec_title ?? null), deleted: false,
+  };
+}
 
 function toMessage(r: MessageRow): Message {
   const deleted = r.deleted_at !== null;
   return {
     id: r.id, conversationId: r.conversation_id, senderId: r.sender_id, kind: r.kind,
     text: deleted ? '' : r.body, rec: deleted ? null : parseRec(r.rec_json), image: !deleted && r.has_image === 1,
-    deleted, createdAt: r.created_at,
+    deleted, replyTo: deleted ? null : replyOf(r), createdAt: r.created_at,
   };
 }
 
@@ -156,7 +187,7 @@ messages.get('/conversations', async (c) => {
   const db = c.env.DB;
   const { results } = await db.prepare(
     `SELECT c.id, c.kind, c.name, c.created_by, c.created_at, c.last_message_at, ${READ_ONLY_SQL} AS read_only,
-            lm.kind AS lm_kind, substr(lm.body, 1, 200) AS lm_body, lm.sender_id AS lm_sender, lm.created_at AS lm_at, lm.deleted_at AS lm_deleted,
+            lm.kind AS lm_kind, substr(lm.body, 1, 200) AS lm_body, json_extract(lm.rec_json, '$.title') AS lm_rec_title, lm.sender_id AS lm_sender, lm.created_at AS lm_at, lm.deleted_at AS lm_deleted,
             EXISTS (SELECT 1 FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
                      WHERE x.conversation_id = c.id AND x.sender_id <> ?2 AND x.deleted_at IS NULL
                        AND (m.last_read_at IS NULL OR x.created_at > m.last_read_at)) AS unread
@@ -166,13 +197,14 @@ messages.get('/conversations', async (c) => {
       WHERE m.user_id = ?2 ORDER BY c.last_message_at DESC, c.id LIMIT ${LIST_MAX}`,
   ).bind(null, me).all<{
     id: string; kind: ConversationKind; name: string | null; created_by: string; created_at: string; last_message_at: string; read_only: number;
-    lm_kind: MessageKind | null; lm_body: string | null; lm_sender: string | null; lm_at: string | null; lm_deleted: string | null; unread: number;
+    lm_kind: MessageKind | null; lm_body: string | null; lm_rec_title: string | null; lm_sender: string | null; lm_at: string | null; lm_deleted: string | null; unread: number;
   }>();
   const members = await membersOf(db, results.map((r) => r.id));
   const conversations: ConversationSummary[] = results.map((r) => {
     const deleted = r.lm_deleted !== null;
     const last: LastMessage | null = r.lm_kind === null ? null : {
       kind: r.lm_kind, text: deleted ? '' : Array.from(r.lm_body ?? '').slice(0, PREVIEW_MAX).join(''),
+      ...(r.lm_kind === 'rec' && !deleted ? { recTitle: Array.from(r.lm_rec_title ?? '').slice(0, PREVIEW_MAX).join('') || null } : {}),
       senderId: r.lm_sender!, deleted, createdAt: r.lm_at!,
     };
     return {
@@ -310,8 +342,8 @@ messages.get('/conversations/:id/messages', async (c) => {
     ? 'AND (m.created_at, m.id) < (SELECT created_at, id FROM messages WHERE id = ?2 AND conversation_id = ?1)'
     : '';
   const select = db.prepare(
-    `SELECT ${MESSAGE_COLS}, u.username AS u_username, u.display_name AS u_display_name, u.avatar_at AS u_avatar_at
-       FROM messages m JOIN users u ON u.id = m.sender_id AND u.status = 'active'
+    `SELECT ${MESSAGE_COLS}, ${REPLY_COLS}, u.username AS u_username, u.display_name AS u_display_name, u.avatar_at AS u_avatar_at
+       FROM messages m JOIN users u ON u.id = m.sender_id AND u.status = 'active' ${REPLY_JOIN}
       WHERE m.conversation_id = ?1 ${cursor} ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit + 1}`,
   );
   const stmts = [before !== undefined ? select.bind(id, before) : select.bind(id)];
@@ -350,9 +382,9 @@ async function sendGate(c: { env: AppEnv['Bindings']; var: AppEnv['Variables']; 
 }
 
 /** The batch that stores a message: the row, the chat's last_message_at, and the sender's own read mark. */
-const insertMessage = (db: D1Database, m: { id: string; conv: string; sender: string; kind: MessageKind; body: string; rec: string | null; image: string | null; now: string }) => [
-  db.prepare(`INSERT INTO messages (id, conversation_id, sender_id, kind, body, rec_json, image_key, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`)
-    .bind(m.id, m.conv, m.sender, m.kind, m.body, m.rec, m.image, m.now),
+const insertMessage = (db: D1Database, m: { id: string; conv: string; sender: string; kind: MessageKind; body: string; rec: string | null; image: string | null; replyTo?: string | null; now: string }) => [
+  db.prepare(`INSERT INTO messages (id, conversation_id, sender_id, kind, body, rec_json, image_key, reply_to, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`)
+    .bind(m.id, m.conv, m.sender, m.kind, m.body, m.rec, m.image, m.replyTo ?? null, m.now),
   db.prepare('UPDATE conversations SET last_message_at = ? WHERE id = ?').bind(m.now, m.conv),
   db.prepare('UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?').bind(m.now, m.conv, m.sender),
 ];
@@ -370,10 +402,31 @@ messages.post('/conversations/:id/messages', featureOn('messages'), async (c) =>
   if (text === null || (body.rec !== undefined && rec === null) || text.length > MESSAGE_MAX || (rec === null && text === '')) {
     return c.json(invalid, 400);
   }
+  // A reply: the original must be in this same chat and still visible (not deleted). +1 query, only for replies.
+  let replyTo: ReplyInfo | null = null;
+  if (body.replyTo !== undefined && body.replyTo !== null) {
+    if (typeof body.replyTo !== 'string' || body.replyTo === '' || body.replyTo.length > 64) return c.json(invalid, 400);
+    const o = await c.env.DB.prepare(
+      `SELECT r.id, r.sender_id, r.kind, substr(r.body, 1, 300) AS body, json_extract(r.rec_json, '$.title') AS rec_title, ru.username, ru.display_name
+         FROM messages r LEFT JOIN users ru ON ru.id = r.sender_id AND ru.status = 'active'
+        WHERE r.id = ?1 AND r.conversation_id = ?2 AND r.deleted_at IS NULL`,
+    ).bind(body.replyTo, id).first<{ id: string; sender_id: string; kind: MessageKind; body: string; rec_title: string | null; username: string | null; display_name: string | null }>();
+    if (!o) return c.json({ error: 'invalid_reply' }, 400);
+    replyTo = {
+      id: o.id, senderId: o.sender_id, senderName: o.display_name || (o.username ? `@${o.username}` : ''), kind: o.kind,
+      snippet: snippetOf(o.kind, o.body, o.rec_title), deleted: false,
+    };
+  }
+  // A card keeps `entryId` only when it is the sender's own entry (so tapping it can open the title); anything else is dropped. +1 query, only with one.
+  let card = rec;
+  if (card?.entryId !== undefined) {
+    const own = await c.env.DB.prepare('SELECT 1 AS ok FROM entries WHERE id = ? AND user_id = ?').bind(card.entryId, me).first();
+    if (!own) { const { entryId: _drop, ...rest } = card; card = rest; }
+  }
   const msgId = newId();
-  const kind: MessageKind = rec ? 'rec' : 'text';
-  await c.env.DB.batch(insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind, body: text, rec: rec ? JSON.stringify(rec) : null, image: null, now: gate.now }));
-  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind, text, rec, image: false, deleted: false, createdAt: gate.now };
+  const kind: MessageKind = card ? 'rec' : 'text';
+  await c.env.DB.batch(insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind, body: text, rec: card ? JSON.stringify(card) : null, image: null, replyTo: replyTo?.id ?? null, now: gate.now }));
+  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind, text, rec: card, image: false, deleted: false, replyTo, createdAt: gate.now };
   pushNewMessage(c.env, ctxOf(c), id, c.var.user, kind, text);
   return c.json(msg, 201);
 });
@@ -432,7 +485,7 @@ messages.post('/conversations/:id/messages/image', featureOn('messages'), async 
     await c.env.MEDIA!.delete(key).catch(() => undefined);
     throw e;
   }
-  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind: 'image', text: '', rec: null, image: true, deleted: false, createdAt: gate.now };
+  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind: 'image', text: '', rec: null, image: true, deleted: false, replyTo: null, createdAt: gate.now };
   pushNewMessage(c.env, ctxOf(c), id, c.var.user, 'image', '');
   return c.json(msg, 201);
 });
@@ -441,15 +494,16 @@ messages.post('/conversations/:id/messages/image', featureOn('messages'), async 
 messages.get('/messages/recommended', async (c) => {
   const me = c.var.user.id;
   const { results } = await c.env.DB.prepare(
-    `SELECT ${MESSAGE_COLS}, u.username AS u_username, u.display_name AS u_display_name, u.avatar_at AS u_avatar_at
+    `SELECT ${MESSAGE_COLS}, (cm.last_read_at IS NULL OR m.created_at > cm.last_read_at) AS unread,
+            u.username AS u_username, u.display_name AS u_display_name, u.avatar_at AS u_avatar_at
        FROM messages m
        JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?1
        JOIN users u ON u.id = m.sender_id AND u.status = 'active'
       WHERE m.kind = 'rec' AND m.sender_id <> ?1 AND m.deleted_at IS NULL
       ORDER BY m.created_at DESC, m.id DESC LIMIT ${RECOMMENDED_MAX}`,
-  ).bind(me).all<MessageRow & { u_username: string | null; u_display_name: string | null; u_avatar_at: string | null }>();
+  ).bind(me).all<MessageRow & { unread: number; u_username: string | null; u_display_name: string | null; u_avatar_at: string | null }>();
   const items: RecommendedItem[] = results.map((r) => ({
-    message: toMessage(r),
+    message: toMessage(r), unread: r.unread === 1,
     sender: publicUser({ id: r.sender_id, username: r.u_username, display_name: r.u_display_name, avatar_at: r.u_avatar_at }),
   }));
   return c.json({ items });

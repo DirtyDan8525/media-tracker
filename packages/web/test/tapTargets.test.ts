@@ -89,20 +89,8 @@ describe('tap targets are at least 44 px (spec section 6)', () => {
     }
   });
 
-  // A link stretched over its row: its ::after fills the nearest positioned ancestor (the row), so
-  // the hit area is the row's height, as long as the link itself is not positioned.
-  it.each([
-    ['a.activity-line__title', '.activity-line'],
-  ] as const)('%s is stretched over %s', (link, row) => {
-    const after = rules(`${link}::after`).join(';');
-    expect(after, `${link}::after`).toMatch(/content:\s*['"]{2}/);
-    expect(after).toMatch(/position:\s*absolute/);
-    expect(after).toMatch(/inset:\s*0(;|$|\s)/);
-    expect(rules(link).join(';'), `${link} must not be positioned`).not.toMatch(/position:\s*(relative|absolute)/);
-    expect(rules(row).join(';'), `${row} needs position: relative`).toMatch(/position:\s*relative/);
-    const size = declared(row, ['height', 'min-height']) ?? 0;
-    expect(size, `${row} is ${size}px`).toBeGreaterThanOrEqual(TAP);
-  });
+  // (2026-11-19) The Activity row is no longer a stretched link: tapping the row opens the post's
+  // details sheet, and the title link keeps its own 44 px hit area through padding.
 
   it.each(['.add-fab', '.profile-btn'])('%s is also at least 44 px wide', (selector) => {
     expect(declared(selector, ['width', 'min-width']) ?? 0).toBeGreaterThanOrEqual(TAP);

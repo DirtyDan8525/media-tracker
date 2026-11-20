@@ -4,7 +4,7 @@
  * and reads stored values with `resolveAppSettings`, which falls back to the default for any
  * key that is unset or no longer valid.
  */
-import { CATEGORY_CONFIG, type Category } from './types';
+import { CATEGORY_CONFIG, COMPARE_ASK, DEFAULT_USER_SETTINGS, NAV_SIDES, NOTIFY_KEYS, SEARCH_SCOPE, type Category, type NotifyKey } from './types';
 import { THEMES } from './theme';
 
 export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists'] as const;
@@ -13,7 +13,7 @@ export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 const ALL_CATEGORIES = Object.keys(CATEGORY_CONFIG) as Category[];
 
 /** AD2: every switch is on by default. */
-export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner'] as const;
+export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner', 'everyoneNotes'] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export type Features = Record<FeatureKey, boolean>;
 
@@ -39,12 +39,51 @@ export interface Brand {
   accent: string | null;
 }
 
+/**
+ * Settings that live only in the browser (localStorage), so an admin default can only be the value a device
+ * starts with when it has nothing saved; "Apply to everyone" cannot reach them.
+ */
+export interface DeviceDefaults {
+  /** PC side bar width in px (200-360); null = the built-in 240. */
+  navWidth: number | null;
+  /** Chat and Activity text size, as a percent: one of TEXT_SIZE_STEPS. */
+  chatTextSize: number;
+  activityTextSize: number;
+  /** Starting width in px for a table column (by column id), on every list; a column not named keeps its built-in width. */
+  columnWidths: Record<string, number>;
+}
+
+/**
+ * Admin -> Defaults (Dan, 2026-11-19): one default for every per-user setting. Everyone follows it for any
+ * setting they never changed themselves (see userDefaults.ts); sign-up copies nothing. Not covered: Custom colours
+ * (personal) and rating tiers (changing them re-fits scores, so they stay per person).
+ */
 export interface NewPersonDefaults {
+  /** Which lists are on (Settings -> Tabs). */
   lists: Category[];
+  animeSeasons: boolean;
+  tvSeasons: boolean;
+  /** Everyone's own list order; empty = the admin's order (the `lists` setting). */
+  listOrder: Category[];
   theme: string;
+  /** Rating: "Ask me to compare close ratings" (a COMPARE_ASK value). */
+  compareAsk: string;
+  searchScope: string;
+  navSide: (typeof NAV_SIDES)[number];
+  navCollapsed: boolean;
+  coverViewer: boolean;
+  notify: Record<NotifyKey, boolean>;
+  /** Not per-person settings: what a new title starts as (server-side, applies to everyone already). */
   privateByDefault: boolean;
   notesPrivateByDefault: boolean;
+  device: DeviceDefaults;
 }
+
+export const TEXT_SIZE_STEPS = [85, 100, 115, 125, 140] as const;
+export const NAV_WIDTH_RANGE = { min: 200, max: 360 } as const;
+/** Column ids a starting width may name (the web table's ColId; a web test keeps the two in step). */
+export const COLUMN_IDS = ['cover', 'rating', 'title', 'status', 'progress', 'genres', 'creator', 'avg', 'notes', 'tags', 'started', 'finished', 'rewatches', 'airing'] as const;
+export const COLUMN_WIDTH_RANGE = { min: 48, max: 600 } as const;
 
 export interface ListsSetting {
   /** Every list once, in display order. */
@@ -85,7 +124,22 @@ export const APP_SETTING_DEFAULTS: AppSettings = {
   comingSoon: null,
   about: null,
   brand: { name: 'Media Tracker', welcome: '', accent: null },
-  defaults: { lists: [...ALL_CATEGORIES], theme: 'Midnight', privateByDefault: false, notesPrivateByDefault: false },
+  defaults: {
+    lists: [...ALL_CATEGORIES],
+    animeSeasons: DEFAULT_USER_SETTINGS.tabs.animeSeasons!,
+    tvSeasons: DEFAULT_USER_SETTINGS.tabs.tvSeasons!,
+    listOrder: [],
+    theme: DEFAULT_USER_SETTINGS.theme,
+    compareAsk: DEFAULT_USER_SETTINGS.compareAsk,
+    searchScope: DEFAULT_USER_SETTINGS.searchScope,
+    navSide: DEFAULT_USER_SETTINGS.nav.side,
+    navCollapsed: DEFAULT_USER_SETTINGS.nav.collapsed,
+    coverViewer: DEFAULT_USER_SETTINGS.coverViewer,
+    notify: { ...DEFAULT_USER_SETTINGS.notify },
+    privateByDefault: false,
+    notesPrivateByDefault: false,
+    device: { navWidth: null, chatTextSize: 100, activityTextSize: 100, columnWidths: {} },
+  },
   lists: { order: [...ALL_CATEGORIES], hidden: [] },
 };
 
@@ -169,17 +223,70 @@ function brand(v: unknown): Validated<Brand> {
   return ok({ name, welcome: welcome.trim(), accent });
 }
 
+const DEFAULTS_KEYS = [
+  'lists', 'animeSeasons', 'tvSeasons', 'listOrder', 'theme', 'compareAsk', 'searchScope', 'navSide', 'navCollapsed', 'coverViewer',
+  'notify', 'privateByDefault', 'notesPrivateByDefault', 'device',
+] as const;
+
+function device(v: unknown): Validated<DeviceDefaults> {
+  const d = APP_SETTING_DEFAULTS.defaults.device;
+  if (v === undefined) return ok({ ...d, columnWidths: {} });
+  if (!isObj(v) || !hasOnly(v, ['navWidth', 'chatTextSize', 'activityTextSize', 'columnWidths'])) return bad;
+  const navWidth = v.navWidth === undefined ? d.navWidth : v.navWidth;
+  if (navWidth !== null && !(Number.isInteger(navWidth) && (navWidth as number) >= NAV_WIDTH_RANGE.min && (navWidth as number) <= NAV_WIDTH_RANGE.max)) return bad;
+  const size = (x: unknown, dflt: number) => (x === undefined ? dflt : (TEXT_SIZE_STEPS as readonly unknown[]).includes(x) ? (x as number) : null);
+  const chat = size(v.chatTextSize, d.chatTextSize);
+  const activity = size(v.activityTextSize, d.activityTextSize);
+  if (chat === null || activity === null) return bad;
+  const columnWidths: Record<string, number> = {};
+  if (v.columnWidths !== undefined) {
+    if (!isObj(v.columnWidths)) return bad;
+    for (const [k, w] of Object.entries(v.columnWidths)) {
+      if (!(COLUMN_IDS as readonly string[]).includes(k) || !Number.isInteger(w) || (w as number) < COLUMN_WIDTH_RANGE.min || (w as number) > COLUMN_WIDTH_RANGE.max) return bad;
+      columnWidths[k] = w as number;
+    }
+  }
+  return ok({ navWidth: navWidth as number | null, chatTextSize: chat, activityTextSize: activity, columnWidths });
+}
+
 function defaults(v: unknown): Validated<NewPersonDefaults> {
-  if (!isObj(v) || !hasOnly(v, ['lists', 'theme', 'privateByDefault', 'notesPrivateByDefault'])) return bad;
+  if (!isObj(v) || !hasOnly(v, DEFAULTS_KEYS)) return bad;
   const d = APP_SETTING_DEFAULTS.defaults;
   const lists = v.lists === undefined ? d.lists : categoryList(v.lists);
   if (lists === null || lists.length < 1) return bad;
+  const listOrder = v.listOrder === undefined ? d.listOrder : categoryList(v.listOrder);
+  if (listOrder === null) return bad;
   const theme = v.theme === undefined ? d.theme : v.theme;
+  // The Custom colour theme is personal, so it is not a choice for everyone.
   if (typeof theme !== 'string' || !Object.hasOwn(THEMES, theme)) return bad;
-  const priv = v.privateByDefault === undefined ? d.privateByDefault : v.privateByDefault;
-  const notes = v.notesPrivateByDefault === undefined ? d.notesPrivateByDefault : v.notesPrivateByDefault;
-  if (typeof priv !== 'boolean' || typeof notes !== 'boolean') return bad;
-  return ok({ lists, theme, privateByDefault: priv, notesPrivateByDefault: notes });
+  const bools = {} as Record<'animeSeasons' | 'tvSeasons' | 'navCollapsed' | 'coverViewer' | 'privateByDefault' | 'notesPrivateByDefault', boolean>;
+  for (const k of ['animeSeasons', 'tvSeasons', 'navCollapsed', 'coverViewer', 'privateByDefault', 'notesPrivateByDefault'] as const) {
+    if (v[k] === undefined) { bools[k] = d[k]; continue; }
+    if (typeof v[k] !== 'boolean') return bad;
+    bools[k] = v[k];
+  }
+  const compareAsk = v.compareAsk === undefined ? d.compareAsk : v.compareAsk;
+  if (typeof compareAsk !== 'string' || !(COMPARE_ASK as readonly string[]).includes(compareAsk)) return bad;
+  const searchScope = v.searchScope === undefined ? d.searchScope : v.searchScope;
+  if (typeof searchScope !== 'string' || !(SEARCH_SCOPE as readonly string[]).includes(searchScope)) return bad;
+  const navSide = v.navSide === undefined ? d.navSide : v.navSide;
+  if (typeof navSide !== 'string' || !(NAV_SIDES as readonly string[]).includes(navSide)) return bad;
+  const notify = { ...d.notify };
+  if (v.notify !== undefined) {
+    if (!isObj(v.notify) || !hasOnly(v.notify, NOTIFY_KEYS)) return bad;
+    for (const k of NOTIFY_KEYS) {
+      if (!(k in v.notify)) continue;
+      if (typeof v.notify[k] !== 'boolean') return bad;
+      notify[k] = v.notify[k];
+    }
+  }
+  const dev = device(v.device);
+  if (!dev.ok) return bad;
+  return ok({
+    lists, listOrder, theme, compareAsk, searchScope, notify, device: dev.value,
+    navSide: navSide as NewPersonDefaults['navSide'],
+    ...bools,
+  });
 }
 
 function lists(v: unknown): Validated<ListsSetting> {
@@ -219,7 +326,7 @@ export function resolveAppSettings(rows: { key: string; value_json: string }[]):
   return out;
 }
 
-/** What GET /api/app returns to everyone, signed in or not (`defaults` is admin-only: it only matters at sign-up). */
+/** What GET /api/app returns to everyone, signed in or not (`defaults` is admin-only; its per-person part reaches people through /api/me). */
 export interface PublicAppSettings {
   features: Features;
   /** null when there is none or its end date has passed. */
@@ -229,6 +336,8 @@ export interface PublicAppSettings {
   about: string | null;
   brand: Brand;
   lists: ListsSetting;
+  /** Device-only starting values (side bar width, text sizes, column widths): the app reads them when a device has nothing saved. */
+  device: DeviceDefaults;
 }
 
 /** The public subset; the announcement counts as ended after its last day (UTC). */
@@ -243,6 +352,7 @@ export function publicAppSettings(s: AppSettings, now: Date = new Date()): Publi
     about: s.about,
     brand: s.brand,
     lists: s.lists,
+    device: s.defaults.device,
   };
 }
 

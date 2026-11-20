@@ -71,6 +71,7 @@ export function useChat(id: string): { query: ReturnType<typeof useChatPage>; ch
     // The server marked it read: the badge and the list's dot are out of date.
     void qc.invalidateQueries({ queryKey: UNREAD_KEY });
     void qc.invalidateQueries({ queryKey: listKey });
+    void qc.invalidateQueries({ queryKey: recommendedKey });
   }, [newest, qc]);
 
   const page = query.data;
@@ -119,7 +120,8 @@ function addToChat(qc: QueryClient, m: Message): void {
 export function useSendText(conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => api.post<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, { text }),
+    mutationFn: ({ text, replyTo }: { text: string; replyTo?: string | null }) =>
+      api.post<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, { text, ...(replyTo ? { replyTo } : {}) }),
     onSuccess: (m) => addToChat(qc, m),
   });
 }
@@ -128,8 +130,8 @@ export function useSendText(conversationId: string) {
 export function useSendRec(conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ rec, text }: { rec: RecSnapshot; text?: string }) =>
-      api.post<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, { rec, ...(text ? { text } : {}) }),
+    mutationFn: ({ rec, text, replyTo }: { rec: RecSnapshot; text?: string; replyTo?: string | null }) =>
+      api.post<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, { rec, ...(text ? { text } : {}), ...(replyTo ? { replyTo } : {}) }),
     onSuccess: (m) => addToChat(qc, m),
   });
 }
@@ -161,6 +163,7 @@ export function sendErrorText(e: unknown, what: 'message' | 'picture' = 'message
     if (e.status === 429) return "You're sending too fast. Wait a minute and try again.";
     if (e.status === 503) return 'Pictures need setup.';
     if (e.status === 403) return "You can't message them any more.";
+    if (e.status === 400 && e.error === 'invalid_reply') return "That message is gone, so it can't be replied to.";
     if (e.status === 413 || e.status === 415) return "That picture can't be sent.";
   }
   return what === 'picture' ? "Couldn't send the picture. Try again." : "Couldn't send. Try again.";
@@ -173,7 +176,12 @@ export function useDeleteMessage(conversationId: string) {
     mutationFn: (id: string) => api.del(`/api/messages/${encodeURIComponent(id)}`),
     onSuccess: (_r, id) => {
       qc.setQueryData<MessagePage>(chatKey(conversationId), (old) =>
-        old && { ...old, messages: old.messages.map((m) => (m.id === id ? { ...m, deleted: true, text: '', rec: null, image: false } : m)) });
+        old && {
+          ...old,
+          // The deleted message loses its quote; replies to it now read "Original message deleted".
+          messages: old.messages.map((m) => (m.id === id ? { ...m, deleted: true, text: '', rec: null, image: false, replyTo: null }
+            : m.replyTo?.id === id ? { ...m, replyTo: { id, senderId: '', senderName: '', kind: 'text' as const, snippet: '', deleted: true } } : m)),
+        });
       void qc.invalidateQueries({ queryKey: [...MESSAGES_KEY, 'recommended'] });
       void qc.invalidateQueries({ queryKey: listKey });
     },
@@ -245,8 +253,9 @@ export function conversationTitle(c: Pick<Conversation, 'kind' | 'name' | 'membe
 }
 
 /** A title's snapshot for a recommendation (M7). */
-export function recFromEntry(e: { category: RecSnapshot['category']; title: string; creator: string | null; coverUrl: string; rating: number | null; source: RecSnapshot['source']; sourceId: string | null }): RecSnapshot {
-  return { category: e.category, title: e.title, creator: e.creator || null, coverUrl: e.coverUrl, rating: e.rating, source: e.source, sourceId: e.sourceId };
+export function recFromEntry(e: { id?: string; category: RecSnapshot['category']; title: string; creator: string | null; coverUrl: string; rating: number | null; source: RecSnapshot['source']; sourceId: string | null }): RecSnapshot {
+  // `entryId` is the entry it came from; the server keeps it only when it is the sender's own (so the card can open that title).
+  return { category: e.category, title: e.title, creator: e.creator || null, coverUrl: e.coverUrl, rating: e.rating, source: e.source, sourceId: e.sourceId, ...(e.id ? { entryId: e.id } : {}) };
 }
 
 export interface ShareResult { sent: number; failed: number; rateLimited: boolean }

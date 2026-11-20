@@ -221,28 +221,83 @@ export function closeQuestionsFor(id: string, items: readonly CloseItem[], compa
   if (me === undefined) return [];
   const t = hundredths(me.typed);
   const answered = answeredPairs(comparisons);
+  const settled = settledBy(comparisons);
   return askable(items)
-    .filter((i) => i.id !== id && Math.abs(hundredths(i.typed) - t) <= CLOSE_HUNDREDTHS && !answered.has(pairKey(id, i.id)))
+    .filter((i) => i.id !== id && Math.abs(hundredths(i.typed) - t) <= CLOSE_HUNDREDTHS && !answered.has(pairKey(id, i.id)) && !settled(id, i.id))
     .map((i) => ({ i, d: Math.abs(hundredths(i.typed) - t) }))
     .sort((a, b) => a.d - b.d || a.i.title.localeCompare(b.i.title) || cmpStr(a.i.id, b.i.id))
     .slice(0, max)
     .map(({ i }) => i.id);
 }
 
-/** Calls `f(a, b, d)` for every unanswered close pair (a before b in id order), d = distance in hundredths. */
-function forEachClosePair(items: readonly CloseItem[], comparisons: readonly PickRow[], f: (a: string, b: string, d: number, top: number) => void): void {
-  const xs = askable(items).map((i) => ({ id: i.id, T: hundredths(i.typed) })).sort((a, b) => a.T - b.T || cmpStr(a.id, b.id));
-  const answered = answeredPairs(comparisons);
-  for (let i = 0; i < xs.length; i++) {
-    for (let j = i + 1; j < xs.length && xs[j]!.T - xs[i]!.T <= CLOSE_HUNDREDTHS; j++) {
-      const a = xs[i]!, b = xs[j]!;
-      if (answered.has(pairKey(a.id, b.id))) continue;
-      f(a.id < b.id ? a.id : b.id, a.id < b.id ? b.id : a.id, b.T - a.T, b.T);
+/**
+ * Order already settled by picks, transitively: a beat b, and b beat c, settles a vs c (Dan,
+ * 2026-11-19: a friend spent ages in Sharpen because every pair within 0.3 was asked, so 20
+ * titles around 9.x gave 190 questions). "About the same" joins two titles into one group, so
+ * a = b and b beat c settles a vs c too.
+ */
+function settledBy(comparisons: readonly PickRow[]): (a: string, b: string) => boolean {
+  const active = comparisons.filter((c) => c.undoneAt === null && c.winnerId !== c.loserId);
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
+    parent.set(x, r);
+    return r;
+  };
+  for (const c of active) if (c.isTie) { const ra = find(c.winnerId), rb = find(c.loserId); if (ra !== rb) parent.set(ra, rb); }
+  const beats = new Map<string, string[]>();
+  for (const c of active) {
+    if (c.isTie) continue;
+    const w = find(c.winnerId), l = find(c.loserId);
+    const xs = beats.get(w);
+    if (xs === undefined) beats.set(w, [l]); else xs.push(l);
+  }
+  const memo = new Map<string, Set<string>>();
+  const below = (id: string): Set<string> => {
+    let out = memo.get(id);
+    if (out !== undefined) return out;
+    out = new Set();
+    const stack = [...(beats.get(id) ?? [])];
+    while (stack.length > 0) {
+      const x = stack.pop()!;
+      if (out.has(x)) continue;
+      out.add(x);
+      for (const y of beats.get(x) ?? []) stack.push(y);
     }
+    memo.set(id, out);
+    return out;
+  };
+  return (a, b) => {
+    const ra = find(a), rb = find(b);
+    return ra === rb || below(ra).has(rb) || below(rb).has(ra);
+  };
+}
+
+/**
+ * Calls `f(a, b, d)` for each close pair still worth asking (a before b in id order), d = distance
+ * in hundredths. Only NEIGHBOURS in the current shown order are asked (like an insertion sort):
+ * once every close neighbour pair is picked, the order is fully set, so at most n − 1 questions
+ * are open at a time instead of every pair within 0.3. Pairs already picked, or settled through
+ * other picks, are skipped.
+ */
+function forEachClosePair(items: readonly CloseItem[], comparisons: readonly PickRow[], f: (a: string, b: string, d: number, top: number) => void): void {
+  const rated = askable(items);
+  const shown = numberFirst(rated, comparisons);
+  const xs = rated.map((i) => ({ id: i.id, T: hundredths(i.typed), S: shown.get(i.id)?.hundredths ?? hundredths(i.typed) }))
+    .sort((a, b) => b.S - a.S || b.T - a.T || cmpStr(a.id, b.id));
+  const answered = answeredPairs(comparisons);
+  const settled = settledBy(comparisons);
+  for (let i = 0; i + 1 < xs.length; i++) {
+    const a = xs[i]!, b = xs[i + 1]!;
+    const d = Math.abs(a.T - b.T);
+    if (d > CLOSE_HUNDREDTHS) continue;
+    if (answered.has(pairKey(a.id, b.id)) || settled(a.id, b.id)) continue;
+    f(a.id < b.id ? a.id : b.id, a.id < b.id ? b.id : a.id, d, Math.max(a.T, b.T));
   }
 }
 
-/** How many unanswered close pairs a set has (N7). */
+/** How many close questions are open for a set now (N7): neighbour pairs only, see forEachClosePair. */
 export function countClosePairs(items: readonly CloseItem[], comparisons: readonly PickRow[]): number {
   let n = 0;
   forEachClosePair(items, comparisons, () => { n++; });

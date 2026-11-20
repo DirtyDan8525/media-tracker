@@ -83,12 +83,23 @@ describe('Switches (AD2)', () => {
     expect(sw).toBeChecked();
   });
 
-  it('has a named switch for each of the nine features', async () => {
+  it('has a named switch for each feature', async () => {
     adminBackend();
     renderApp('/admin/switches');
     await screen.findByRole('switch', { name: 'Sign-ups open' });
     expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-labelledby') && document.getElementById(s.getAttribute('aria-labelledby')!)!.textContent))
-      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner']);
+      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner', 'Everyone feed shows notes to non-friends']);
+  });
+
+  it('the notes switch is on by default, off saves everyoneNotes: false, and it is in the admin switch list', async () => {
+    const { calls } = adminBackend();
+    renderApp('/admin/switches');
+    const sw = await screen.findByRole('switch', { name: 'Everyone feed shows notes to non-friends' });
+    expect(sw).toBeChecked();
+    await userEvent.click(sw);
+    await waitFor(() => expect(puts(calls)).toHaveLength(1));
+    expect(puts(calls)[0]).toMatchObject({ path: '/api/admin/app/features', body: { value: expect.objectContaining({ everyoneNotes: false, feed: true }) } });
+    expect(sw).not.toBeChecked();
   });
 });
 
@@ -212,18 +223,71 @@ describe('App text and look (AD5) and Defaults (AD6)', () => {
     expect(puts(calls)).toHaveLength(0);
   });
 
-  it('Defaults saves the lists on, theme and the two private switches; needs one list', async () => {
+  it('Defaults covers every setting in groups, saves a change at once, and needs one list', async () => {
     const { calls } = adminBackend();
     renderApp('/admin/defaults');
-    for (const n of ['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga', 'YouTube']) await userEvent.click(await screen.findByRole('checkbox', { name: n }));
-    await userEvent.click(screen.getByRole('button', { name: 'Save defaults' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Pick at least one list');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Games' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Anime' }));
+    for (const h of ['Rating', 'Lists', 'Side bar (on a computer)', 'Look', 'Privacy', 'Text size and columns']) expect(await screen.findByRole('heading', { name: h })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch', { name: 'Cover viewer' }));
+    await waitFor(() => expect(puts(calls)).toHaveLength(1));
+    expect(puts(calls)[0]!.body).toEqual({ value: expect.objectContaining({ coverViewer: false, theme: 'Midnight', lists: expect.any(Array) }) });
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Theme' }), 'Sakura');
+    await userEvent.click(screen.getByRole('radio', { name: 'On the right' }));
     await userEvent.click(screen.getByRole('switch', { name: 'New titles private' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Save defaults' }));
-    await screen.findByText(/Defaults saved/);
-    expect(puts(calls)[0]!.body).toEqual({ value: { lists: ['anime', 'games'], theme: 'Midnight', privateByDefault: true, notesPrivateByDefault: false } });
+    await waitFor(() => expect(puts(calls)).toHaveLength(4));
+    expect(puts(calls)[3]!.body).toEqual({ value: expect.objectContaining({ theme: 'Sakura', navSide: 'right', coverViewer: false, privateByDefault: true }) });
+    for (const n of ['Anime', 'Movies', 'TV Shows', 'Albums', 'Songs', 'Games', 'Books', 'Manga']) await userEvent.click(screen.getByRole('checkbox', { name: n }));
+    await waitFor(() => expect(puts(calls)).toHaveLength(12));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'YouTube' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pick at least one list');
+    expect(puts(calls)).toHaveLength(12);
+  });
+
+  it('every per-person row has Reset to built-in and Apply to everyone; device-only rows say "Starting value on new devices" and cannot be applied', async () => {
+    adminBackend();
+    renderApp('/admin/defaults');
+    await screen.findByRole('heading', { name: 'Rating' });
+    const applyRows = ['Ask to compare close ratings', 'Lists on', 'Anime seasons', 'TV seasons', 'List order', 'Search', 'Side bar side', 'Side bar folded', 'Cover viewer', 'Theme'];
+    for (const r of applyRows) {
+      const row = screen.getByRole('group', { name: r });
+      expect(within(row).getByRole('button', { name: `Reset ${r} to built-in` })).toBeInTheDocument();
+      expect(within(row).getByRole('button', { name: `Apply ${r} to everyone` })).toBeInTheDocument();
+    }
+    for (const r of ['Side bar width', 'Chat text size', 'Activity text size', 'Table column widths']) {
+      const row = screen.getByRole('group', { name: r });
+      expect(within(row).getByText(/Starting value on new devices/)).toBeInTheDocument();
+      expect(within(row).queryByRole('button', { name: /Apply/ })).toBeNull();
+      expect(within(row).getByRole('button', { name: `Reset ${r} to built-in` })).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole('group', { name: 'New titles private' })).queryByRole('button', { name: /Apply/ })).toBeNull();
+  });
+
+  it('Apply to everyone asks first ("... for all N people, including those who changed it"), then posts the key; Cancel posts nothing', async () => {
+    const { calls } = adminBackend({
+      'GET /api/admin/app': () => ({ body: { settings: APP_SETTING_DEFAULTS, set: [], people: 6 } }),
+      'POST /api/admin/defaults/apply': () => ({ body: { key: 'theme', people: 6 } }),
+    });
+    renderApp('/admin/defaults');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply Theme to everyone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Apply Theme to everyone?' });
+    expect(within(dialog).getByText('This changes Theme for all 6 people, including those who changed it.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(calls.filter((c) => c.path === '/api/admin/defaults/apply')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Apply Theme to everyone' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apply to everyone' }));
+    expect(await screen.findByText('Theme applied to 6 people.')).toBeInTheDocument();
+    expect(calls.filter((c) => c.path === '/api/admin/defaults/apply').map((c) => c.body)).toEqual([{ key: 'theme' }]);
+  });
+
+  it('Reset to built-in saves the built-in value; a device value saves under device', async () => {
+    const { calls, state } = adminBackend();
+    state.settings.defaults = { ...state.settings.defaults, theme: 'Sakura', device: { ...state.settings.defaults.device, chatTextSize: 125 } };
+    renderApp('/admin/defaults');
+    await userEvent.click(await screen.findByRole('button', { name: 'Reset Theme to built-in' }));
+    await waitFor(() => expect(puts(calls)).toHaveLength(1));
+    expect(puts(calls)[0]!.body).toEqual({ value: expect.objectContaining({ theme: 'Midnight' }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Reset Chat text size to built-in' }));
+    await waitFor(() => expect(puts(calls)).toHaveLength(2));
+    expect(puts(calls)[1]!.body).toEqual({ value: expect.objectContaining({ device: expect.objectContaining({ chatTextSize: 100 }) }) });
   });
 });
 

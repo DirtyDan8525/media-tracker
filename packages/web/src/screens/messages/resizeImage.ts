@@ -1,7 +1,10 @@
-/** M6: the phone/PC resizes before upload: longest side at most 1600 px, JPEG about 0.82, at most 1.5 MB. */
+/**
+ * Photos are resized on the phone/PC before upload: longest side at most 1600 px, JPEG about 0.8, under 2 MB (the server's
+ * limit). Drawing onto a canvas and encoding again drops all metadata, so EXIF and the photo's location never leave the device.
+ */
 export const MAX_SIDE = 1600;
-export const JPEG_QUALITY = 0.82;
-export const TARGET_BYTES = 1.5 * 1024 * 1024;
+export const JPEG_QUALITY = 0.8;
+export const TARGET_BYTES = 1.9 * 1024 * 1024;
 
 /** The size that fits `max` on its longest side (never enlarged), aspect kept. */
 export function fitWithin(width: number, height: number, max = MAX_SIDE): { width: number; height: number } {
@@ -26,7 +29,7 @@ async function decode(file: Blob): Promise<{ source: CanvasImageSource; width: n
 const toBlob = (canvas: HTMLCanvasElement, quality: number) =>
   new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
 
-/** A JPEG of `file` fitted to 1600 px; lowers the quality in steps when it is still over 1.5 MB. Rejects when the file is not a readable picture. */
+/** A JPEG of `file` fitted to 1600 px; lowers the quality in steps when it is still over the target. Rejects when the file is not a readable picture. */
 export async function resizeImage(file: Blob): Promise<Blob> {
   const img = await decode(file);
   try {

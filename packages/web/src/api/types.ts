@@ -18,4 +18,6 @@ export interface Me {
   status: 'pending' | 'active' | 'removed';
   /** Phase 7: your custom lists, oldest first. Absent on copies cached before them (normalizeMe fills []). */
   customLists: CustomList[];
+  /** Your 4 most recently used custom reaction emoji, newest first (the pickers' "Recent" row). Absent on older copies. */
+  recentEmoji?: string[];
 }

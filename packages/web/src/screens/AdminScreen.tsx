@@ -324,6 +324,7 @@ function AdminHub() {
     { to: '/admin/look', title: 'App text and look', sub: st ? `${st.defaults.theme} · ${st.brand.accent ? `${accentName(st.brand.accent).toLowerCase()} accent` : 'theme accent'}` : null },
     { to: '/admin/defaults', title: 'Defaults for new people', sub: st ? `${st.defaults.lists.length} lists on · private titles ${st.defaults.privateByDefault ? 'on' : 'off'}` : null },
     { to: '/admin/content', title: "What's new / Coming soon / About", sub: customContent === null ? null : customContent ? 'Custom text' : 'Built-in text' },
+    { to: '/admin/media', title: 'Photos and voice memos', sub: st ? `Kept ${st.media.retentionMonths} months · ${st.media.capMb} MB per person` : null },
     { to: '/admin/moderation', title: 'Moderation', sub: 'Recent comments' },
     { to: '/admin/lookup', title: 'Lookup tools', sub: 'Check sources, why a title was missed' },
     { to: '/admin/backup', title: 'Backup', sub: 'Download a copy of everything' },

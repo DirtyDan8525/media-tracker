@@ -40,7 +40,7 @@ describe('Admin home (AdminHome)', () => {
     renderApp('/admin');
     const nav = await screen.findByRole('navigation', { name: 'Admin sections' });
     const titles = within(nav).getAllByRole('link').map((a) => within(a).getAllByText(/./)[0]!.textContent);
-    expect(titles).toEqual(['Numbers', 'Announcement', 'Switches', 'Lists', 'App text and look', 'Defaults for new people', "What's new / Coming soon / About", 'Moderation', 'Lookup tools', 'Backup']);
+    expect(titles).toEqual(['Numbers', 'Announcement', 'Switches', 'Lists', 'App text and look', 'Defaults for new people', "What's new / Coming soon / About", 'Photos and voice memos', 'Moderation', 'Lookup tools', 'Backup']);
     expect(await within(nav).findByText('6 members · 4 active this week')).toBeInTheDocument();
     expect(within(nav).getByText('Off')).toBeInTheDocument();
     expect(within(nav).getByText('All on')).toBeInTheDocument();
@@ -88,7 +88,7 @@ describe('Switches (AD2)', () => {
     renderApp('/admin/switches');
     await screen.findByRole('switch', { name: 'Sign-ups open' });
     expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-labelledby') && document.getElementById(s.getAttribute('aria-labelledby')!)!.textContent))
-      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner', 'Everyone feed shows notes to non-friends', 'Custom lists']);
+      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner', 'Everyone feed shows notes to non-friends', 'Custom lists', 'Photos in chats', 'Voice memos in chats']);
   });
 
   it('the notes switch is on by default, off saves everyoneNotes: false, and it is in the admin switch list', async () => {
@@ -452,5 +452,37 @@ describe('Backup (AD10)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Download a backup' }));
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't download the backup");
     expect(downloaded).toEqual([]);
+  });
+});
+
+describe('Photos and voice memos (media storage)', () => {
+  it('shows storage in use and saves the two clean-up settings', async () => {
+    const { calls } = adminBackend({
+      'GET /api/admin/media': { body: { bytes: 5 * 1024 * 1024, files: 12, configured: true, people: [{ userId: 'u2', username: 'ren', bytes: 3 * 1024 * 1024 }] } },
+    });
+    renderApp('/admin/media');
+    expect(await screen.findByText('5.0 MB')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('@ren')).toBeInTheDocument();
+    const months = screen.getByLabelText('Keep photos and voice memos for (months)');
+    const cap = screen.getByLabelText('Storage per person (MB)');
+    expect(months).toHaveValue(6);
+    expect(cap).toHaveValue(300);
+    await userEvent.clear(months);
+    await userEvent.type(months, '30');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Months must be a whole number from 1 to 24.');
+    await userEvent.clear(months);
+    await userEvent.type(months, '3');
+    await userEvent.clear(cap);
+    await userEvent.type(cap, '500');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(puts(calls).at(-1)).toMatchObject({ path: '/api/admin/app/media', body: { value: { retentionMonths: 3, capMb: 500 } } }));
+  });
+
+  it('says when the server has no storage yet', async () => {
+    adminBackend({ 'GET /api/admin/media': { body: { bytes: 0, files: 0, configured: false, people: [] } } });
+    renderApp('/admin/media');
+    expect(await screen.findByText(/isn't set up on the server yet/)).toBeInTheDocument();
   });
 });

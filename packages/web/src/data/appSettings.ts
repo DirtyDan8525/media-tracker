@@ -22,6 +22,7 @@ export function normalizeApp(raw: Partial<PublicAppSettings> | undefined): Publi
     brand: { ...d.brand, ...raw.brand },
     lists: { ...d.lists, ...raw.lists },
     device: { ...d.device, ...raw.device },
+    media: raw.media === true,
   };
 }
 
@@ -45,4 +46,11 @@ export function useFeature(key: FeatureKey): boolean {
 /** The app's name: the admin's choice, else "Media Tracker". */
 export function useAppName(): string {
   return useAppSettings().brand.name;
+}
+
+/** What the chat's + menu may offer: each needs its switch on AND the server's storage (GET /api/app `media`). */
+export function useMediaOptions(): { photos: boolean; voice: boolean } {
+  const app = useAppSettings();
+  const media = app.media === true;
+  return { photos: media && app.features.photos, voice: media && app.features.voice };
 }

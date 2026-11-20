@@ -2,7 +2,8 @@ import type { ReactElement } from 'react';
 import type { BuiltinCategory } from '@media-tracker/shared';
 
 export type IconName = BuiltinCategory | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group';
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group'
+  | 'mic' | 'play' | 'pause' | 'reply';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
 const PATHS: Record<IconName, ReactElement> = {
@@ -21,6 +22,10 @@ const PATHS: Record<IconName, ReactElement> = {
   back: <path d="M15 5l-7 7 7 7" />,
   image: <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 16l5-5 4 4 3-3 4 4" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
+  mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" /></>,
+  play: <path d="M8 5v14l11-7z" />,
+  pause: <path d="M8 5v14M16 5v14" />,
+  reply: <path d="M10 8L5 12l5 4M5 12h9a5 5 0 0 1 5 5v1" />,
   upload: <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1" /></>,
   compare: <path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />,

@@ -385,7 +385,10 @@ describe('deleting (M5)', () => {
   it('deleting a picture message deletes the R2 object and the picture is gone', async () => {
     const dm = await direct(A, b);
     const img = await json<Message>(await upload(A, dm, PNG));
-    expect((await env.MEDIA!.list()).objects.map((o) => o.key)).toEqual([`msg/${dm}/${img.id}`]);
+    const keys = (await env.MEDIA!.list()).objects.map((o) => o.key);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(new RegExp(`^msg/${dm}/[0-9a-f]{32}$`));
+    expect(keys[0]).not.toContain(img.id); // not guessable from the message id
     expect((await as(B, `/api/messages/${img.id}/image`)).status).toBe(200);
     expect((await as(A, `/api/messages/${img.id}`, 'DELETE')).status).toBe(204);
     expect((await env.MEDIA!.list()).objects).toEqual([]);
@@ -395,7 +398,7 @@ describe('deleting (M5)', () => {
 });
 
 describe('pictures (M6)', () => {
-  it('stores jpeg, png and webp at msg/<conv>/<id>; members fetch them with private immutable nosniff headers', async () => {
+  it('stores jpeg, png and webp at msg/<conv>/<random>; members fetch them with private immutable nosniff headers', async () => {
     const dm = await direct(A, b);
     for (const [bytes, type] of [[PNG, 'image/png'], [JPEG, 'image/jpeg'], [WEBP, 'image/webp']] as const) {
       const res = await upload(A, dm, bytes, type);
@@ -408,12 +411,14 @@ describe('pictures (M6)', () => {
       expect(got.headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
       expect(got.headers.get('x-content-type-options')).toBe('nosniff');
       expect(new Uint8Array(await got.arrayBuffer())).toEqual(bytes);
-      expect(await env.MEDIA!.head(`msg/${dm}/${m.id}`)).not.toBeNull();
+      const key = (await env.DB.prepare('SELECT image_key FROM messages WHERE id = ?').bind(m.id).first<{ image_key: string }>())!.image_key;
+      expect(await env.MEDIA!.head(key)).not.toBeNull();
+      expect(await env.DB.prepare('SELECT kind, bytes, user_id FROM media WHERE key = ?').bind(key).first()).toEqual({ kind: 'photo', bytes: bytes.byteLength, user_id: a });
     }
     expect((await page(B, dm)).messages.filter((m) => m.image)).toHaveLength(3);
   });
 
-  it('wrong type 415, over 5 MB 413, wrong magic bytes 400, empty 400, nothing stored; a content-type with parameters is fine', async () => {
+  it('wrong type 415, over 2 MB 413, wrong magic bytes 400, empty 400, nothing stored; a content-type with parameters is fine', async () => {
     const dm = await direct(A, b);
     expect((await upload(A, dm, PNG, 'image/gif')).status).toBe(415);
     expect((await upload(A, dm, PNG, 'text/plain')).status).toBe(415);
@@ -421,10 +426,10 @@ describe('pictures (M6)', () => {
     expect((await upload(A, dm, new TextEncoder().encode('<svg onload=alert(1)>............'), 'image/png')).status).toBe(400);
     expect((await upload(A, dm, new Uint8Array(0), 'image/png')).status).toBe(400);
     expect((await upload(A, dm, PNG.slice(0, 8), 'image/png')).status).toBe(400);
-    const big = new Uint8Array(5 * 1024 * 1024 + 1);
+    const big = new Uint8Array(2 * 1024 * 1024 + 1);
     big.set(PNG);
     expect((await upload(A, dm, big, 'image/png')).status).toBe(413);
-    const ok = new Uint8Array(5 * 1024 * 1024);
+    const ok = new Uint8Array(2 * 1024 * 1024);
     ok.set(PNG);
     expect((await upload(A, dm, ok, 'image/png; charset=binary')).status).toBe(201);
     expect((await env.MEDIA!.list()).objects).toHaveLength(1);
@@ -555,7 +560,7 @@ describe('replies, rec entry links, rec previews and unread recs', () => {
     await postMsg(A, dm, { text: 'r', replyTo: live.id });
     const spy = spyD1(env.DB);
     expect((await as(A, `/api/conversations/${dm}/messages`, 'GET', undefined, spy.db)).status).toBe(200);
-    expect(spy.queries).toBe(1 + 2 + 1); // sign-in + access + page + read mark: the join adds none
+    expect(spy.queries).toBe(1 + 2 + 1); // sign-in + access + page + the read mark (no reactions in the chat: none read)
   });
 
   it('when the original is deleted later the quote reads deleted; a deleted reply shows no quote; a hard-deleted original is the same', async () => {
@@ -674,12 +679,12 @@ describe('query counts (+ sign-in 1)', () => {
   it.each([
     ['GET /conversations', 2],
     ['GET /conversations/:id', 2],
-    ['GET messages (first page)', 2],
-    ['GET messages (older page)', 2],
+    ['GET messages (first page)', 2], // access, the page (the chat has no reactions, which the access query already knows)
+    ['GET messages (older page)', 3], // access, the page, its reactions
     ['POST message', 2], // the feature switch read (AD2) + the membership gate
-    ['POST picture', 2],
+    ['POST picture', 3], // the settings (switches, cap), the gate, the sender's storage total
     ['GET image', 1],
-    ['DELETE message', 2],
+    ['DELETE message', 3], // the lookup, then the soft delete and its reactions' removal
     ['GET recommended', 1],
     ['GET unread', 1],
   ])('%s', async (name, routeQueries) => {
@@ -701,7 +706,7 @@ describe('query counts (+ sign-in 1)', () => {
     };
     const res = await call[name]!();
     expect(res.status).toBeLessThan(300);
-    const extra = name === 'POST message' || name === 'POST picture' ? 3 : name === 'GET messages (first page)' ? 1 : 0; // the send batch's 3 statements; the read mark
+    const extra = name === 'POST message' ? 3 : name === 'POST picture' ? 4 : name === 'GET messages (first page)' ? 1 : 0; // the send batch's 3 statements; the read mark
     expect(spy.queries).toBe(1 + routeQueries + extra);
     expect(spy.maxParams).toBeLessThanOrEqual(10);
   });
@@ -791,5 +796,145 @@ describe('the 5 s poll: the newest page carries an ETag, and an unchanged chat a
     const older = await as(A, `/api/conversations/${dm}/messages?before=${m.id}`);
     expect(older.status).toBe(200);
     expect(older.headers.get('ETag')).toBeNull();
+  });
+});
+
+describe('message reactions', () => {
+  const react = (email: string, conv: string, mid: string, emoji: unknown, db?: D1Database) => as(email, `/api/conversations/${conv}/messages/${mid}/reaction`, 'PUT', { emoji }, db);
+  const unreact = (email: string, conv: string, mid: string, db?: D1Database) => as(email, `/api/conversations/${conv}/messages/${mid}/reaction`, 'DELETE', undefined, db);
+  const poll = (email: string, conv: string, tag?: string | null, db?: D1Database) =>
+    run(email, `/api/conversations/${conv}/messages`, { headers: tag ? { 'If-None-Match': tag } : {} }, db);
+
+  it('one reaction per person: add, the same emoji again changes nothing, a different one replaces, DELETE removes', async () => {
+    const g = await group(A, [b, c], 'Trio');
+    const m = await say(B, g, 'hi');
+    let res = await react(A, g, m.id, '❤️');
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ reactions: [{ userId: a, emoji: '❤️' }], recentEmoji: [] });
+    expect((await json(await react(A, g, m.id, '❤️'))).reactions).toEqual([{ userId: a, emoji: '❤️' }]);
+    res = await react(C, g, m.id, '🔥');
+    expect((await json<{ reactions: unknown[] }>(res)).reactions).toEqual([{ userId: a, emoji: '❤️' }, { userId: c, emoji: '🔥' }]);
+    res = await react(A, g, m.id, '😂'); // replaces
+    expect((await json<{ reactions: unknown[] }>(res)).reactions).toEqual([{ userId: c, emoji: '🔥' }, { userId: a, emoji: '😂' }]);
+    expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM message_reactions').first<{ n: number }>())!.n).toBe(2);
+    res = await unreact(A, g, m.id);
+    expect(await json(res)).toEqual({ reactions: [{ userId: c, emoji: '🔥' }] });
+    expect(await unreact(A, g, m.id)).toHaveProperty('status', 200); // removing nothing is fine
+    // the page carries them
+    const p = await page(B, g);
+    expect(p.messages[0]!.reactions).toEqual([{ userId: c, emoji: '🔥' }]);
+  });
+
+  it('custom emoji work like the activity reactions: exactly one emoji; text, two emoji, empty, a number or nothing are 400', async () => {
+    const dm = await direct(A, b);
+    const m = await say(B, dm, 'hi');
+    for (const ok of ['🦊', '👍🏽', '🇯🇵', '👨‍👩‍👧']) expect((await react(A, dm, m.id, ok)).status).toBe(200);
+    for (const bad of ['a', '❤️❤️', '', 5, null, undefined, '❤️ ', 'x'.repeat(40)]) expect((await react(A, dm, m.id, bad)).status, JSON.stringify(bad)).toBe(400);
+    expect((await as(A, `/api/conversations/${dm}/messages/${m.id}/reaction`, 'PUT')).status).toBe(400);
+  });
+
+  it('members only: a stranger and a friend outside the chat get 404; so does an unknown message, a message of another chat, or a deleted one', async () => {
+    const dm = await direct(A, b);
+    const other = await direct(A, c);
+    const m = await say(B, dm, 'hi');
+    const elsewhere = await say(C, other, 'elsewhere');
+    for (const who of [C, D]) {
+      expect((await react(who, dm, m.id, '❤️')).status).toBe(404);
+      expect((await unreact(who, dm, m.id)).status).toBe(404);
+    }
+    expect((await react(A, dm, 'nope', '❤️')).status).toBe(404);
+    expect((await react(A, dm, elsewhere.id, '❤️')).status).toBe(404);
+    expect((await unreact(A, dm, elsewhere.id)).status).toBe(404);
+    expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM message_reactions').first<{ n: number }>())!.n).toBe(0);
+    await react(A, dm, m.id, '❤️');
+    expect((await as(B, `/api/messages/${m.id}`, 'DELETE')).status).toBe(204);
+    expect((await react(A, dm, m.id, '🔥')).status).toBe(404);
+    // deleting the message drops its reactions, and the page shows none
+    expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM message_reactions').first<{ n: number }>())!.n).toBe(0);
+    expect((await page(A, dm)).messages[0]).toMatchObject({ deleted: true, reactions: [] });
+  });
+
+  it('a read-only chat (no longer friends) can still be read but not reacted in (403)', async () => {
+    const dm = await direct(A, b);
+    const m = await say(B, dm, 'hi');
+    await react(A, dm, m.id, '❤️');
+    expect((await as(A, `/api/friends/${b}`, 'DELETE')).status).toBe(204);
+    expect((await react(A, dm, m.id, '🔥')).status).toBe(403);
+    expect((await unreact(A, dm, m.id)).status).toBe(403);
+    expect((await page(B, dm)).messages[0]!.reactions).toEqual([{ userId: a, emoji: '❤️' }]);
+  });
+
+  it('the page reads every reaction in ONE extra query, however many messages and reactions there are', async () => {
+    const g = await group(A, [b, c], 'Trio');
+    const ms: Message[] = [];
+    for (let i = 0; i < 6; i++) ms.push(await say(B, g, `m${i}`));
+    for (const m of ms) { await react(A, g, m.id, '❤️'); await react(C, g, m.id, '🔥'); }
+    const spy = spyD1(env.DB);
+    const res = await as(A, `/api/conversations/${g}/messages`, 'GET', undefined, spy.db);
+    expect(res.status).toBe(200);
+    expect(spy.queries).toBe(1 + 3 + 1); // sign-in, access, page, reactions + the read mark
+    const p = await json<MessagePage>(res);
+    expect(p.messages.every((m) => m.reactions!.length === 2)).toBe(true);
+    // a chat with no reactions costs the same
+    const spy2 = spyD1(env.DB);
+    await as(A, `/api/conversations/${await group(A, [b])}/messages`, 'GET', undefined, spy2.db);
+    expect(spy2.queries).toBe(1 + 2 + 1); // an empty page has nothing to look up
+  });
+
+  it('a reaction route costs sign-in + feature switch + access + one batch (3-5 statements)', async () => {
+    const dm = await direct(A, b);
+    const m = await say(B, dm, 'hi');
+    const spy = spyD1(env.DB);
+    expect((await react(A, dm, m.id, '❤️', spy.db)).status).toBe(200);
+    expect(spy.queries).toBeLessThanOrEqual(1 + 1 + 1 + 5);
+    expect(spy.maxParams).toBeLessThanOrEqual(10);
+  });
+
+  it('a person who left the group no longer shows on its messages', async () => {
+    const g = await group(A, [b, c], 'Trio');
+    const m = await say(B, g, 'hi');
+    await react(C, g, m.id, '🔥');
+    await react(A, g, m.id, '❤️');
+    expect((await as(C, `/api/conversations/${g}/members/me`, 'DELETE')).status).toBe(204);
+    expect((await page(A, g)).messages[0]!.reactions).toEqual([{ userId: a, emoji: '❤️' }]);
+  });
+
+  it('the poll tag changes when a reaction is added, replaced or removed; otherwise 304', async () => {
+    const dm = await direct(A, b);
+    const m = await say(B, dm, 'hi');
+    const t0 = (await poll(A, dm)).headers.get('ETag')!;
+    expect((await poll(A, dm, t0)).status).toBe(304);
+    await react(B, dm, m.id, '❤️');
+    const r1 = await poll(A, dm, t0);
+    expect(r1.status).toBe(200);
+    expect((await json<MessagePage>(r1)).messages[0]!.reactions).toEqual([{ userId: b, emoji: '❤️' }]);
+    const t1 = r1.headers.get('ETag')!;
+    expect(t1).not.toBe(t0);
+    expect((await poll(A, dm, t1)).status).toBe(304);
+    // replaced: same count, a different emoji
+    await react(B, dm, m.id, '🔥');
+    const r2 = await poll(A, dm, t1);
+    expect(r2.status).toBe(200);
+    const t2 = r2.headers.get('ETag')!;
+    expect(t2).not.toBe(t1);
+    expect((await json<MessagePage>(r2)).messages[0]!.reactions).toEqual([{ userId: b, emoji: '🔥' }]);
+    // my own change shows on the other side too, and a removal changes it back to an empty list
+    await unreact(B, dm, m.id);
+    const r3 = await poll(A, dm, t2);
+    expect(r3.status).toBe(200);
+    expect((await json<MessagePage>(r3)).messages[0]!.reactions).toEqual([]);
+    expect((await poll(A, dm, r3.headers.get('ETag'))).status).toBe(304);
+    // an idle poll still reads nothing but the access query
+    const spy = spyD1(env.DB);
+    expect((await poll(A, dm, r3.headers.get('ETag'), spy.db)).status).toBe(304);
+    expect(spy.queries).toBe(2);
+  });
+
+  it('deleting the group (the last one leaves) cascades the reactions away', async () => {
+    const g = await group(A, [b, c], 'Trio');
+    const m = await say(B, g, 'hi');
+    await react(A, g, m.id, '❤️');
+    for (const who of [B, C, A]) await as(who, `/api/conversations/${g}/members/me`, 'DELETE'); // the last one out deletes the group
+    expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM message_reactions').first<{ n: number }>())!.n).toBe(0);
   });
 });

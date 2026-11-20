@@ -6,15 +6,16 @@
  */
 import { BUILTIN_CATEGORIES, COMPARE_ASK, DEFAULT_USER_SETTINGS, NAV_SIDES, NOTIFY_KEYS, SEARCH_SCOPE, isBuiltinCategory, type BuiltinCategory, type NotifyKey } from './types';
 import { THEMES } from './theme';
+import { MEDIA_CAP_MB_RANGE, MEDIA_RETENTION_RANGE } from './messages';
 
-export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists'] as const;
+export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists', 'media'] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
 /** Admin settings cover the built-in lists only: custom lists are personal. */
 const ALL_CATEGORIES: BuiltinCategory[] = [...BUILTIN_CATEGORIES];
 
 /** AD2: every switch is on by default. */
-export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner', 'everyoneNotes', 'customLists'] as const;
+export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner', 'everyoneNotes', 'customLists', 'photos', 'voice'] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export type Features = Record<FeatureKey, boolean>;
 
@@ -92,6 +93,12 @@ export interface ListsSetting {
   hidden: BuiltinCategory[];
 }
 
+/** Photos and voice memos in chats: how long files are kept, and how much each person may keep (oldest removed first). */
+export interface MediaSetting {
+  retentionMonths: number;
+  capMb: number;
+}
+
 export interface AppSettings {
   features: Features;
   announcement: Announcement;
@@ -102,6 +109,7 @@ export interface AppSettings {
   brand: Brand;
   defaults: NewPersonDefaults;
   lists: ListsSetting;
+  media: MediaSetting;
 }
 
 export const ANNOUNCEMENT_MAX = 280;
@@ -142,6 +150,7 @@ export const APP_SETTING_DEFAULTS: AppSettings = {
     device: { navWidth: null, chatTextSize: 100, activityTextSize: 100, columnWidths: {} },
   },
   lists: { order: [...ALL_CATEGORIES], hidden: [] },
+  media: { retentionMonths: 6, capMb: 300 },
 };
 
 export type Validated<T> = { ok: true; value: T } | { ok: false };
@@ -299,8 +308,18 @@ function lists(v: unknown): Validated<ListsSetting> {
   return ok({ order, hidden });
 }
 
+function media(v: unknown): Validated<MediaSetting> {
+  if (!isObj(v) || !hasOnly(v, ['retentionMonths', 'capMb'])) return bad;
+  const d = APP_SETTING_DEFAULTS.media;
+  const months = v.retentionMonths === undefined ? d.retentionMonths : v.retentionMonths;
+  const cap = v.capMb === undefined ? d.capMb : v.capMb;
+  if (!Number.isInteger(months) || (months as number) < MEDIA_RETENTION_RANGE.min || (months as number) > MEDIA_RETENTION_RANGE.max) return bad;
+  if (!Number.isInteger(cap) || (cap as number) < MEDIA_CAP_MB_RANGE.min || (cap as number) > MEDIA_CAP_MB_RANGE.max) return bad;
+  return ok({ retentionMonths: months as number, capMb: cap as number });
+}
+
 const VALIDATORS: { [K in AppSettingKey]: (v: unknown) => Validated<AppSettings[K]> } = {
-  features, announcement, whatsNew, comingSoon, about, brand, defaults, lists,
+  features, announcement, whatsNew, comingSoon, about, brand, defaults, lists, media,
 };
 
 export const isAppSettingKey = (k: string): k is AppSettingKey => (APP_SETTING_KEYS as readonly string[]).includes(k);
@@ -339,6 +358,8 @@ export interface PublicAppSettings {
   lists: ListsSetting;
   /** Device-only starting values (side bar width, text sizes, column widths): the app reads them when a device has nothing saved. */
   device: DeviceDefaults;
+  /** The server has photo and voice memo storage (the R2 MEDIA binding). Set by GET /api/app; absent = unknown (treated as no). */
+  media?: boolean;
 }
 
 /** The public subset; the announcement counts as ended after its last day (UTC). */

@@ -1,8 +1,8 @@
 import { nameOf, type Conversation, type Message, type PublicUser } from '@media-tracker/shared';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { ApiError } from '../../api/client';
-import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage } from '../../data/messages';
+import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage, useReactToMessage } from '../../data/messages';
 import { CoverBackdrop } from '../../design/components/CoverBackdrop';
 import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
@@ -23,7 +23,10 @@ import { useChatTextSize } from '../../design/components/useTextSize';
 import { AddPeopleSheet, LeaveSheet, RenameSheet } from './GroupSheets';
 import { RecCard } from './RecCard';
 import { useBackdropCover } from './useBackdropCover';
-import { clock, quoteText, snippetOfMessage } from './format';
+import { quoteText, snippetOfMessage } from './format';
+import { MessageMenu, reactionGroups } from './MessageMenu';
+import { LONG_PRESS_MS, SWIPE_REPLY_PX, useBubbleGestures } from './useBubbleGestures';
+import { VoicePlayer } from './VoicePlayer';
 import '../../design/messages.css';
 
 /** Back in a chat. Phone: the round arrow to the Messages list. PC (no arrow of its own): a "Back" button that returns to where you opened the chat from, else the Messages list. */
@@ -62,6 +65,9 @@ export function ChatScreen() {
   return <Chat conversation={conv.data} />;
 }
 
+/** The hidden hint every bubble points at (aria-describedby). */
+const HINT_ID = 'chat-bubble-hint';
+
 /** A pause this long starts a new run of bubbles (more space above it, the name again in a group). */
 const RUN_GAP_MS = 10 * 60_000;
 
@@ -78,6 +84,8 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const [viewing, setViewing] = useState<Message | null>(null);
   const [live, setLive] = useState('');
   const [reply, setReply] = useState<ReplyDraft | null>(null);
+  const [menuFor, setMenuFor] = useState<{ m: Message; anchor: HTMLElement | null } | null>(null);
+  const [whoFor, setWhoFor] = useState<Message | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const textSize = useChatTextSize();
   const mineColors = useBubbleMineColors();
@@ -108,7 +116,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
       const fresh = chat.messages.filter((m) => !seen.current!.has(m.id) && m.senderId !== me.id && !m.deleted);
       if (fresh.length > 0) {
         const m = fresh[fresh.length - 1]!;
-        const what = m.kind === 'image' ? 'sent a picture' : m.kind === 'rec' ? `recommended ${m.rec?.title ?? 'a title'}` : m.text;
+        const what = m.kind === 'image' ? 'sent a photo' : m.kind === 'voice' ? 'sent a voice memo' : m.kind === 'rec' ? `recommended ${m.rec?.title ?? 'a title'}` : m.text;
         setLive(fresh.length > 1 ? `${fresh.length} new messages. ${nameFor(m.senderId)}: ${what}` : `${nameFor(m.senderId)}: ${what}`);
       }
     }
@@ -134,6 +142,23 @@ function Chat({ conversation }: { conversation: Conversation }) {
   }
 
   const loaded = new Set((chat?.messages ?? []).map((m) => m.id));
+  const react = useReactToMessage(conversation.id, me.id, (id, fn) => chat?.patchMessage(id, fn));
+  const setReaction = (m: Message, emoji: string | null) => {
+    react.mutate({ messageId: m.id, emoji }, { onError: () => toast.show("Couldn't save your reaction. Try again.") });
+  };
+  // A chip: yours again takes it off; another one becomes yours (one per person).
+  const toggleReaction = (m: Message, emoji: string) => {
+    const mineNow = (m.reactions ?? []).find((r) => r.userId === me.id)?.emoji;
+    setReaction(m, mineNow === emoji ? null : emoji);
+  };
+  const copy = async (m: Message) => {
+    try {
+      await navigator.clipboard.writeText(m.text);
+      toast.show('Copied');
+    } catch {
+      toast.show("Couldn't copy. Select the text instead.");
+    }
+  };
   const startReply = (m: Message) => setReply({ id: m.id, name: m.senderId === me.id ? 'yourself' : nameFor(m.senderId), snippet: snippetOfMessage(m) });
   // A quote scrolls to its original and marks it for a moment (a ring, no motion needed); focus follows so keyboard and screen reader users arrive there too.
   const flashTimer = useRef<number | undefined>(undefined);
@@ -170,8 +195,10 @@ function Chat({ conversation }: { conversation: Conversation }) {
     const mine = m.senderId === me.id;
     rows.push(
       <Bubble key={m.id} m={m} mine={mine} first={first && !newDay} showWho={isGroup && !mine && first} lastOfRun={!next || breaks(m, next)} sender={users[m.senderId]}
-        name={nameFor(m.senderId)} meId={me.id} canDelete={mine || me.isAdmin} canReply={!readOnly && !m.deleted} flash={flash === m.id}
-        isLoaded={(id) => loaded.has(id)} onReply={() => startReply(m)} onJump={jumpTo} onOptions={() => setDeleting(m)} onOpenImage={() => setViewing(m)} />,
+        name={nameFor(m.senderId)} meId={me.id} isGroup={isGroup} wide={wide} canDelete={mine || me.isAdmin} canReply={!readOnly && !m.deleted}
+        canReact={!readOnly && !m.deleted} flash={flash === m.id}
+        isLoaded={(id) => loaded.has(id)} onReply={() => startReply(m)} onJump={jumpTo} onMenu={(anchor) => setMenuFor({ m, anchor })}
+        onOpenImage={() => setViewing(m)} onToggleReaction={(e) => toggleReaction(m, e)} onWhoReacted={() => setWhoFor(m)} />,
     );
   });
 
@@ -218,6 +245,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
         )}
       </div>
       <p className="sr-only chat__live" role="status" aria-live="polite">{live}</p>
+      <p id={HINT_ID} hidden>Press Enter for reactions, reply and more.</p>
 
       {readOnly ? (
         <p className="chat__readonly" role="note">
@@ -239,6 +267,26 @@ function Chat({ conversation }: { conversation: Conversation }) {
         }>
         <p className="hint">It's replaced by “Message deleted” for everyone in the chat.</p>
       </Sheet>
+      {menuFor && (() => {
+        // The menu follows the live message (a poll may have changed its reactions).
+        const m = msgs.find((x) => x.id === menuFor.m.id) ?? menuFor.m;
+        const mine = m.senderId === me.id;
+        return (
+          <MessageMenu m={m} meId={me.id} users={users} wide={wide} anchor={menuFor.anchor}
+            canReact={!readOnly && !m.deleted} canReply={!readOnly && !m.deleted} canDelete={mine || me.isAdmin}
+            onClose={() => setMenuFor(null)} onReact={(e) => setReaction(m, e)} onReply={() => startReply(m)}
+            onCopy={() => void copy(m)} onDelete={() => setDeleting(m)} />
+        );
+      })()}
+      <Sheet open={whoFor !== null} title="Reactions" onClose={() => setWhoFor(null)}>
+        {whoFor && (
+          <ul className="msg-menu__who">
+            {reactionGroups(msgs.find((x) => x.id === whoFor.id) ?? whoFor, me.id, users).map((g) => (
+              <li key={g.emoji}><span className="msg-menu__who-emoji" aria-hidden="true">{g.emoji}</span><span className="sr-only">{g.emoji}: </span>{g.names.join(', ')}</li>
+            ))}
+          </ul>
+        )}
+      </Sheet>
       <Sheet open={viewing !== null} title="Picture" onClose={() => setViewing(null)}>
         {viewing && <img className="chat__full" src={messageImageUrl(viewing.id)} alt={`Picture from ${nameFor(viewing.senderId)}, full size`} />}
       </Sheet>
@@ -248,59 +296,58 @@ function Chat({ conversation }: { conversation: Conversation }) {
   return wide ? <div className="chat-page has-backdrop"><CoverBackdrop src={cover} className="backdrop--side" />{screenEl}</div> : screenEl;
 }
 
-/** Touch: holding a bubble this long starts a reply (a mouse has the Reply button; the keyboard reaches the same button). */
-const LONG_PRESS_MS = 450;
-
-function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, canDelete, canReply, flash, isLoaded, onReply, onJump, onOptions, onOpenImage }: {
+/** One message: its bubble (text, photo, voice memo, recommendation or a note), the quote above a reply, reactions under it. */
+function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, isGroup, wide, canDelete, canReply, canReact, flash, isLoaded, onReply, onJump, onMenu, onOpenImage, onToggleReaction, onWhoReacted }: {
   /** Your own message, or any message for the admin (AD7). */
   canDelete: boolean;
   canReply: boolean;
+  canReact: boolean;
   flash: boolean;
   /** Starts a new run (more space above). */
   first: boolean;
   lastOfRun: boolean;
   meId: string;
+  isGroup: boolean;
+  wide: boolean;
   isLoaded: (id: string) => boolean;
   m: Message; mine: boolean; showWho: boolean; sender: PublicUser | undefined; name: string;
-  onReply: () => void; onJump: (id: string) => void; onOptions: () => void; onOpenImage: () => void;
+  onReply: () => void; onJump: (id: string) => void; onMenu: (anchor: HTMLElement | null) => void; onOpenImage: () => void;
+  onToggleReaction: (emoji: string) => void; onWhoReacted: () => void;
 }) {
-  const press = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
-  const stop = () => { if (press.current) window.clearTimeout(press.current.timer); };
-  useEffect(() => stop, []);
-  const touch = canReply ? {
-    onPointerDown: (e: ReactPointerEvent) => {
-      if (e.pointerType !== 'touch' || (e.target as HTMLElement).closest('button, a')) return;
-      stop();
-      const p = { timer: 0, x: e.clientX, y: e.clientY, fired: false };
-      p.timer = window.setTimeout(() => { p.fired = true; navigator.vibrate?.(10); onReply(); }, LONG_PRESS_MS);
-      press.current = p;
-    },
-    onPointerMove: (e: ReactPointerEvent) => { const p = press.current; if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) stop(); },
-    onPointerUp: stop,
-    onPointerCancel: stop,
-    // The long press must not also pop the phone's text-selection menu.
-    onContextMenu: (e: { preventDefault: () => void }) => { if (press.current?.fired) { e.preventDefault(); press.current = null; } },
-  } : {};
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  // Swipe toward the middle of the screen: their messages (left) to the right, mine (right) to the left.
+  const { dx, handlers } = useBubbleGestures({
+    dir: mine ? -1 : 1, holdEnabled: true, swipeEnabled: canReply,
+    onHold: () => onMenu(bubbleRef.current), onSwipe: onReply,
+  });
   const q = m.replyTo;
+  const quoteWho = q && !q.deleted ? (q.senderId === meId ? 'You' : q.senderName || 'Someone') : '';
+  const quoteInner = q && (
+    <>
+      <span className="bubble__quote-label">Reply</span>
+      {isGroup && quoteWho && <b className="bubble__quote-who">{quoteWho}</b>}
+      <span className="bubble__quote-text">{quoteText(q)}</span>
+    </>
+  );
   const quote = q && (q.deleted ? (
     <div className="bubble__quote bubble__quote--deleted"><span className="bubble__quote-text">Original message deleted</span></div>
   ) : isLoaded(q.id) ? (
     <button type="button" className="bubble__quote" aria-label={`In reply to ${q.senderId === meId ? 'you' : q.senderName || 'someone'}: ${quoteText(q)}. Go to that message`} onClick={() => onJump(q.id)}>
-      <b className="bubble__quote-who">{q.senderId === meId ? 'You' : q.senderName || 'Someone'}</b>
-      <span className="bubble__quote-text">{quoteText(q)}</span>
+      {quoteInner}
     </button>
   ) : (
-    <div className="bubble__quote">
-      <b className="bubble__quote-who">{q.senderId === meId ? 'You' : q.senderName || 'Someone'}</b>
-      <span className="bubble__quote-text">{quoteText(q)}</span>
-    </div>
+    <div className="bubble__quote">{quoteInner}</div>
   ));
   const body = m.deleted ? (
     <span className="bubble__deleted">Message deleted</span>
+  ) : m.expired ? (
+    <span className="bubble__deleted bubble__expired">{m.kind === 'voice' ? 'Voice memo expired' : 'Photo expired'}</span>
   ) : m.kind === 'image' ? (
     <button type="button" className="bubble__photo" aria-label={`Open picture from ${name} full size`} onClick={onOpenImage}>
       <img src={messageImageUrl(m.id)} alt={`Picture from ${name}`} loading="lazy" />
     </button>
+  ) : m.kind === 'voice' && m.voice ? (
+    <VoicePlayer id={m.id} durationMs={m.voice.durationMs} from={mine ? 'you' : name} />
   ) : m.kind === 'rec' && m.rec ? (
     <>
       <span className="bubble__label" aria-hidden="true">Recommendation</span>
@@ -309,7 +356,10 @@ function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, canDel
   ) : (
     <span className="bubble__text">{m.text}</span>
   );
+  const reactions = m.deleted ? [] : summarize(m, meId);
   const cls = `bubble-row${mine ? ' bubble-row--mine' : ''}${first ? ' bubble-row--first' : ''}${flash ? ' is-flash' : ''}`;
+  const optsLabel = mine ? 'Message options' : `Message options for ${name}'s message`;
+  const swiping = dx !== 0;
   return (
     <li className={cls} data-mid={m.id} tabIndex={-1}>
       {!mine && (
@@ -320,17 +370,65 @@ function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, canDel
       <div className="bubble-col">
         {showWho && <span className="bubble__who">{name}</span>}
         <div className="bubble-wrap">
-          <div className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}`} {...touch}>
+          <span className={`bubble__swipe-hint${Math.abs(dx) >= SWIPE_REPLY_PX ? ' is-ready' : ''}`} aria-hidden="true"
+            style={{ opacity: Math.min(Math.abs(dx) / SWIPE_REPLY_PX, 1) }}>
+            <Icon name="reply" size={18} />
+          </span>
+          {/* Focusable: Enter or Space opens the message menu (the same one a hold, a right-click or "⋯" opens). */}
+          <div ref={bubbleRef} tabIndex={0} aria-describedby={HINT_ID}
+            className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}${m.kind === 'voice' && !m.deleted && !m.expired ? ' bubble--voice' : ''}${swiping ? ' is-swiping' : ''}`}
+            style={swiping ? { transform: `translateX(${dx}px)` } : undefined}
+            onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onMenu(e.currentTarget); } }}
+            {...handlers}>
             {quote}
             {body}
-            <time className="bubble__time" dateTime={m.createdAt}>{clock(m.createdAt)}</time>
           </div>
-          <span className="bubble__actions">
+          {/* PC: Reply and ⋯ show on hover or focus. Phone: hidden from sight (hold or swipe instead) but there for screen readers. */}
+          <span className={`bubble__actions${wide ? '' : ' bubble__actions--sr'}`}>
             {canReply && <button type="button" className="bubble__reply" aria-label={`Reply to ${mine ? 'your own' : `${name}'s`} message`} onClick={onReply}>Reply</button>}
-            {canDelete && !m.deleted && <IconButton label={mine ? 'Message options' : `Message options for ${name}'s message`} icon="more" look="plain" className="bubble__opts" onClick={onOptions} />}
+            {(canReact || canReply || canDelete || m.text !== '') && (
+              <IconButton label={optsLabel} icon="more" look="plain" className="bubble__opts" aria-haspopup="dialog"
+                onClick={(e) => onMenu((e.currentTarget as HTMLElement).closest('.bubble-wrap')?.querySelector<HTMLElement>('.bubble') ?? null)} />
+            )}
           </span>
         </div>
+        {reactions.length > 0 && (
+          <ReactionRow items={reactions} disabled={!canReact} onToggle={onToggleReaction} onWho={onWhoReacted} />
+        )}
       </div>
     </li>
+  );
+}
+
+/** The chips under a bubble: one per emoji, a count when more than one person used it, yours highlighted. */
+function summarize(m: Message, meId: string): { emoji: string; count: number; mine: boolean }[] {
+  const out = new Map<string, { emoji: string; count: number; mine: boolean }>();
+  for (const r of m.reactions ?? []) {
+    const c = out.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false };
+    c.count++;
+    if (r.userId === meId) c.mine = true;
+    out.set(r.emoji, c);
+  }
+  return [...out.values()];
+}
+
+function ReactionRow({ items, disabled, onToggle, onWho }: { items: { emoji: string; count: number; mine: boolean }[]; disabled: boolean; onToggle: (emoji: string) => void; onWho: () => void }) {
+  const hold = useRef<number | undefined>(undefined);
+  const held = useRef(false);
+  useEffect(() => () => window.clearTimeout(hold.current), []);
+  return (
+    <div role="group" aria-label="Reactions" className="msg-reactions"
+      onTouchStart={() => { held.current = false; window.clearTimeout(hold.current); hold.current = window.setTimeout(() => { held.current = true; navigator.vibrate?.(10); onWho(); }, LONG_PRESS_MS); }}
+      onTouchMove={() => window.clearTimeout(hold.current)} onTouchEnd={() => window.clearTimeout(hold.current)} onTouchCancel={() => window.clearTimeout(hold.current)}
+      onContextMenu={(e) => { e.preventDefault(); if (!held.current) onWho(); held.current = false; }}>
+      {items.map((r) => (
+        <button key={r.emoji} type="button" className="msg-reactions__chip" aria-pressed={r.mine} disabled={disabled}
+          aria-label={`${r.emoji} ${r.count}${r.mine ? ', yours' : ''}`}
+          onClick={(e) => { if (held.current) { held.current = false; e.preventDefault(); return; } onToggle(r.emoji); }}>
+          <span aria-hidden="true">{r.emoji}</span>
+          {r.count > 1 && <span aria-hidden="true" className="msg-reactions__n">{r.count}</span>}
+        </button>
+      ))}
+    </div>
   );
 }

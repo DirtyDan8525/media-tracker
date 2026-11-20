@@ -80,6 +80,28 @@ export function messagesBackend(opts: { conversations?: Conversation[]; messages
       }
       return notFound;
     },
+    'POST /api/conversations/:id/messages/image': (_b, _u, p) => {
+      const m = makeMessage({ conversationId: p.id!, senderId: ME.id, kind: 'image', text: '', image: true, createdAt: new Date().toISOString() });
+      (messages[p.id!] ??= []).push(m);
+      return { status: 201, body: m };
+    },
+    'POST /api/conversations/:id/messages/voice': (_b, url, p) => {
+      const m = makeMessage({ conversationId: p.id!, senderId: ME.id, kind: 'voice', text: '', voice: { durationMs: Number(url.searchParams.get('ms')) }, createdAt: new Date().toISOString() });
+      (messages[p.id!] ??= []).push(m);
+      return { status: 201, body: m };
+    },
+    'PUT /api/conversations/:id/messages/:mid/reaction': (b, _u, p) => {
+      const m = (messages[p.id!] ?? []).find((x) => x.id === p.mid);
+      if (!m || m.deleted) return notFound;
+      m.reactions = [...(m.reactions ?? []).filter((r) => r.userId !== ME.id), { userId: ME.id, emoji: (b as { emoji: string }).emoji }];
+      return { body: { reactions: m.reactions } };
+    },
+    'DELETE /api/conversations/:id/messages/:mid/reaction': (_b, _u, p) => {
+      const m = (messages[p.id!] ?? []).find((x) => x.id === p.mid);
+      if (!m) return notFound;
+      m.reactions = (m.reactions ?? []).filter((r) => r.userId !== ME.id);
+      return { body: { reactions: m.reactions } };
+    },
     'GET /api/messages/recommended': () => ({ body: { items: state.recommended } }),
     'POST /api/conversations': (b) => {
       const { userIds, name } = b as { userIds: string[]; name?: string };

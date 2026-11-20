@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { IMAGE_TYPES } from '@media-tracker/shared';
+import { IMAGE_TYPES, VOICE_TYPES } from '@media-tracker/shared';
 import { requireUser, type AppEnv } from './auth/user';
 import { auth } from './api/auth';
 import { me } from './api/me';
@@ -21,6 +21,8 @@ import { admin } from './api/admin';
 import { push } from './api/push';
 import { appInfo } from './api/app';
 import { publicApi } from './api/public';
+import { runRetention } from './media/store';
+import type { Env } from './env';
 
 export type { AppUser, AppEnv } from './auth/user';
 export type { Env } from './env';
@@ -44,10 +46,13 @@ app.use('/api/*', async (c, next) => {
   if (site === 'cross-site') return c.json({ error: 'forbidden' }, 403);
   const type = c.req.header('Content-Type');
   const mime = type?.split(';')[0]!.trim().toLowerCase();
-  // A picture upload is the one raw body: an image type, which a cross-site <form> cannot send without a preflight.
+  // A photo or voice memo upload is the one raw body: an image or audio type, which a cross-site <form> cannot send without a preflight.
+  const path = new URL(c.req.url).pathname;
   const isImageUpload = method === 'POST' && mime !== undefined && (IMAGE_TYPES as readonly string[]).includes(mime)
-    && /^\/api\/conversations\/[^/]+\/messages\/image$/.test(new URL(c.req.url).pathname);
-  const isJson = mime === 'application/json' || isImageUpload;
+    && /^\/api\/conversations\/[^/]+\/messages\/image$/.test(path);
+  const isVoiceUpload = method === 'POST' && mime !== undefined && (VOICE_TYPES as readonly string[]).includes(mime)
+    && /^\/api\/conversations\/[^/]+\/messages\/voice$/.test(path);
+  const isJson = mime === 'application/json' || isImageUpload || isVoiceUpload;
   const sameOrigin = site === undefined || site === 'same-origin' || site === 'none';
   if (!isJson && !(method === 'DELETE' && type === undefined && sameOrigin)) {
     return c.json({ error: 'unsupported_media_type' }, 415);
@@ -109,4 +114,10 @@ app.onError((err, c) => {
   return c.json({ error: 'internal_error' }, 500);
 });
 
-export default app;
+/** The daily media cleanup (wrangler.toml [triggers] crons): files past the admin's months, and over each person's cap. */
+export async function scheduled(event: Pick<ScheduledController, 'scheduledTime'>, env: Env): Promise<void> {
+  const report = await runRetention(env, new Date(event.scheduledTime));
+  console.log('media retention', JSON.stringify(report));
+}
+
+export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

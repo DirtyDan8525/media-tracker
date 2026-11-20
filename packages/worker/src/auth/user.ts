@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import {
-  DEFAULT_USER_SETTINGS, isCategoryKey, NOTIFY_KEYS, applyDefaults, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
+  DEFAULT_USER_SETTINGS, isCategoryKey, NOTIFY_KEYS, applyDefaults, parseRecentEmoji, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
   type Category, type CustomList, type Customized, type NewPersonDefaults, type UserSettings,
 } from '@media-tracker/shared';
 import type { Env } from '../env';
@@ -27,6 +27,8 @@ export interface AppUser {
   status: UserStatus;
   /** Their custom lists (migration 0020), oldest first; read with the user row at no extra query. */
   customLists: CustomList[];
+  /** Their 4 most recently used custom reaction emoji, newest first (migration 0021); read with the user row. */
+  recentEmoji: string[];
 }
 
 export type UserStatus = 'pending' | 'active' | 'removed';
@@ -48,6 +50,7 @@ interface UserRow {
   display_name: string | null;
   bio: string | null;
   status: UserStatus;
+  recent_emoji?: string | null;
   /** The `defaults` app_settings value (JSON text), when the query selected it; undefined = no overlay. */
   app_defaults?: string | null;
   /** CUSTOM_LISTS_SQL, when the query selected it. */
@@ -55,7 +58,7 @@ interface UserRow {
 }
 
 /** The users columns `toAppUser` reads (prefix each with an alias as needed). */
-export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_at, created_at, display_name, bio, status';
+export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_at, created_at, display_name, bio, status, recent_emoji';
 
 /** A select-list item: the admin `defaults` row's JSON, which toAppUser overlays under the person's own changes. */
 export const APP_DEFAULTS_SQL = "(SELECT value_json FROM app_settings WHERE key = 'defaults') AS app_defaults";
@@ -143,6 +146,7 @@ export function toAppUser(row: UserRow, adminEmail: string | undefined, appDefau
     bio: row.bio ?? null,
     status: row.status,
     customLists: parseLists(row.custom_lists_json),
+    recentEmoji: parseRecentEmoji(row.recent_emoji),
     ...readSettings(row.settings_json, appDefaults ?? row.app_defaults),
   };
 }

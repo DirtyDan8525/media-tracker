@@ -38,6 +38,9 @@ export const BACKUP_TABLES: Readonly<Record<string, readonly string[]>> = {
   tags: [],
   entry_tags: [],
   custom_lists: [],
+  message_reactions: [],
+  /** The photo / voice memo ledger (keys, sizes, dates); the files themselves are in R2 and not in any backup. */
+  media: [],
 };
 
 /** The same for the response's `excluded` note, so the file says what it leaves out. */

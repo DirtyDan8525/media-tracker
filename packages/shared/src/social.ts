@@ -21,6 +21,33 @@ export const isReaction = (v: unknown): v is Reaction => {
   return false;
 };
 
+/** How many custom emoji (not in REACTIONS) each person's "Recent" row keeps. */
+export const RECENT_EMOJI_MAX = 4;
+
+/** A stored recent-emoji list (users.recent_emoji, JSON text): only valid custom emoji, deduplicated, at most RECENT_EMOJI_MAX. */
+export function parseRecentEmoji(json: string | null | undefined): string[] {
+  if (!json) return [];
+  let v: unknown;
+  try {
+    v = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const e of v) {
+    if (isReaction(e) && !(REACTIONS as readonly string[]).includes(e) && !out.includes(e)) out.push(e);
+    if (out.length === RECENT_EMOJI_MAX) break;
+  }
+  return out;
+}
+
+/** The list after reacting with `emoji`: a custom one moves to the front (newest first); a quick-set one changes nothing. */
+export function withRecentEmoji(list: readonly string[], emoji: string): string[] {
+  if ((REACTIONS as readonly string[]).includes(emoji) || !isReaction(emoji)) return [...list];
+  return [emoji, ...list.filter((e) => e !== emoji)].slice(0, RECENT_EMOJI_MAX);
+}
+
 export const COMMENT_MAX = 500;
 /** Cloudflare Access free plan. */
 export const ACCESS_SEATS = 50;

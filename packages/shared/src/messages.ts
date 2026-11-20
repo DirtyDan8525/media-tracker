@@ -6,8 +6,17 @@ export const MESSAGE_MAX = 2000;
 /** A group holds at most this many members, you included. */
 export const GROUP_MAX = 20;
 export const GROUP_NAME_MAX = 60;
-export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** A photo after the phone/PC has resized and compressed it (longest side 1600 px, quality about 0.8). */
+export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** Voice memos: at most 2 minutes and 1 MB (about 24-32 kbps Opus or AAC is well under it). */
+export const VOICE_MAX_BYTES = 1024 * 1024;
+export const VOICE_MAX_MS = 120_000;
+/** What MediaRecorder makes: WebM/Opus (Chrome, Android, Firefox), MP4/AAC (iPhone Safari), Ogg/Opus (older Firefox). */
+export const VOICE_TYPES = ['audio/webm', 'audio/mp4', 'audio/ogg'] as const;
+/** Media retention (admin, Settings > Media): files older than this many months are removed, and each person keeps at most capMb. */
+export const MEDIA_RETENTION_RANGE = { min: 1, max: 24 } as const;
+export const MEDIA_CAP_MB_RANGE = { min: 10, max: 10_000 } as const;
 /** Messages per page, and sent per minute per user (429 beyond it). */
 export const MESSAGES_PAGE = 50;
 export const MESSAGE_RATE_PER_MIN = 30;
@@ -15,7 +24,7 @@ export const MESSAGE_RATE_PER_MIN = 30;
 export const RECOMMENDED_MAX = 100;
 
 export type ConversationKind = 'direct' | 'group';
-export type MessageKind = 'text' | 'image' | 'rec';
+export type MessageKind = 'text' | 'image' | 'rec' | 'voice';
 
 /** The title a recommendation carries (M7): a snapshot, so it survives the sender editing or deleting the entry. */
 export interface RecSnapshot {
@@ -40,10 +49,17 @@ export interface ReplyInfo {
   /** Display name or @username of the original's sender; '' when deleted. */
   senderName: string;
   kind: MessageKind;
-  /** One line (100 characters at most): the text, a recommendation's title, '' for a picture or a deleted message. */
+  /** One line (100 characters at most): the text, a recommendation's title, '' for a picture, a voice memo or a deleted message. */
   snippet: string;
   /** The original was deleted (or is gone): the quote reads "Original message deleted". */
   deleted: boolean;
+}
+
+/** One person's reaction to a message (one per person per message). */
+export interface MessageReaction {
+  userId: string;
+  /** One emoji (isReaction: the activity reactions' rule). */
+  emoji: string;
 }
 
 export interface Message {
@@ -54,12 +70,18 @@ export interface Message {
   /** The text, or a recommendation's note. '' once deleted. */
   text: string;
   rec: RecSnapshot | null;
-  /** A picture message: fetch GET /api/messages/:id/image. */
+  /** A picture message whose file is still there: fetch GET /api/messages/:id/media. */
   image: boolean;
+  /** A voice memo whose file is still there (GET /api/messages/:id/media), with its length; null/absent otherwise. */
+  voice?: { durationMs: number } | null;
+  /** A photo or voice memo whose file was cleaned up (older than the admin's months, or over its sender's storage cap). */
+  expired?: boolean;
   /** Soft-deleted by its sender: text, rec and picture are gone. */
   deleted: boolean;
   /** The message this one replies to; null when it is not a reply (or it was deleted itself). */
   replyTo: ReplyInfo | null;
+  /** Reactions of the chat's active members, oldest first; [] (or absent) when none, and always none once deleted. */
+  reactions?: MessageReaction[];
   createdAt: string;
 }
 

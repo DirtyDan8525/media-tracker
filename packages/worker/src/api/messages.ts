@@ -4,17 +4,20 @@
  * a signed-in active user (requireUser); a conversation, its messages and its pictures exist only for
  * its members: anyone else gets 404, never 403. Query counts are noted per route (+ sign-in 1-3).
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   CATEGORY_CONFIG, GROUP_MAX, GROUP_NAME_MAX, IMAGE_MAX_BYTES, MESSAGES_PAGE, MESSAGE_MAX, MESSAGE_RATE_PER_MIN, RECOMMENDED_MAX,
+  VOICE_MAX_BYTES, VOICE_MAX_MS, withRecentEmoji,
   type Conversation, type ConversationKind, type ConversationList, type ConversationSummary, type LastMessage, type Message,
-  type MessageKind, type MessagePage, type PublicUser, type RecSnapshot, type RecommendedItem, type ReplyInfo, type SourceId,
+  type MessageKind, type MessagePage, type MessageReaction, type PublicUser, type RecSnapshot, type RecommendedItem, type ReplyInfo, type SourceId,
+  isReaction,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
 import { pushNewMessage } from '../push/events';
 import { ctxOf } from '../push/send';
 import { sha256Hex } from '../auth/session';
-import { featureOn } from '../settings/appSettings';
+import { featureOn, loadAppSettings } from '../settings/appSettings';
+import { makeRoom, removeMedia } from '../media/store';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, pair, publicUser, type PublicUserRow } from '../social/visibility';
 
 export const messages = new Hono<AppEnv>();
@@ -94,18 +97,21 @@ interface ReplyCols {
 }
 interface MessageRow extends Partial<ReplyCols> {
   id: string; conversation_id: string; sender_id: string; kind: MessageKind; body: string; rec_json: string | null;
-  has_image: number; reply_to: string | null; created_at: string; deleted_at: string | null;
+  has_image: number; voice_ms: number | null; reply_to: string | null; created_at: string; deleted_at: string | null;
 }
-const MESSAGE_COLS = `m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.rec_json, m.image_key IS NOT NULL AS has_image, m.reply_to, m.created_at, m.deleted_at`;
+/** has_image: the photo or voice memo file is still there (its key is cleared when retention removes it). voice_ms: a PK lookup, voice only. */
+const MESSAGE_COLS = `m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.rec_json, m.image_key IS NOT NULL AS has_image,
+            CASE WHEN m.kind = 'voice' AND m.image_key IS NOT NULL THEN (SELECT duration_ms FROM media WHERE key = m.image_key) END AS voice_ms,
+            m.reply_to, m.created_at, m.deleted_at`;
 /** One join answers every reply's quote: no extra query per message. */
 const REPLY_COLS = `r.id AS r_id, r.sender_id AS r_sender, r.kind AS r_kind, substr(r.body, 1, 300) AS r_body, json_extract(r.rec_json, '$.title') AS r_rec_title,
             r.deleted_at AS r_deleted_at, ru.username AS r_username, ru.display_name AS r_display_name`;
 const REPLY_JOIN = `LEFT JOIN messages r ON r.id = m.reply_to LEFT JOIN users ru ON ru.id = r.sender_id AND ru.status = 'active'`;
 const SNIPPET_MAX = 100;
 
-/** A quote's one-line snippet: the text with whitespace collapsed, a rec's title, nothing for a picture. */
+/** A quote's one-line snippet: the text with whitespace collapsed, a rec's title, nothing for a picture or a voice memo. */
 function snippetOf(kind: MessageKind, body: string | null, recTitle: string | null): string {
-  const t = kind === 'rec' ? (recTitle ?? '') : kind === 'image' ? '' : (body ?? '');
+  const t = kind === 'rec' ? (recTitle ?? '') : kind === 'image' || kind === 'voice' ? '' : (body ?? '');
   const one = t.replace(/\s+/g, ' ').trim();
   const chars = Array.from(one);
   return chars.length > SNIPPET_MAX ? `${chars.slice(0, SNIPPET_MAX - 1).join('')}…` : one;
@@ -122,12 +128,16 @@ function replyOf(r: MessageRow): ReplyInfo | null {
   };
 }
 
-function toMessage(r: MessageRow): Message {
+function toMessage(r: MessageRow, reactions: MessageReaction[] = []): Message {
   const deleted = r.deleted_at !== null;
+  const media = r.kind === 'image' || r.kind === 'voice';
+  const there = !deleted && media && r.has_image === 1;
   return {
     id: r.id, conversationId: r.conversation_id, senderId: r.sender_id, kind: r.kind,
-    text: deleted ? '' : r.body, rec: deleted ? null : parseRec(r.rec_json), image: !deleted && r.has_image === 1,
-    deleted, replyTo: deleted ? null : replyOf(r), createdAt: r.created_at,
+    text: deleted ? '' : r.body, rec: deleted ? null : parseRec(r.rec_json), image: there && r.kind === 'image',
+    voice: there && r.kind === 'voice' ? { durationMs: r.voice_ms ?? 0 } : null,
+    expired: !deleted && media && r.has_image !== 1,
+    deleted, replyTo: deleted ? null : replyOf(r), reactions: deleted ? [] : reactions, createdAt: r.created_at,
   };
 }
 
@@ -154,6 +164,8 @@ interface PollState {
   last_read_at: string | null;
   /** Every user's public fields and status: names and pictures on the page, and who is active (users is a small table). */
   people_key: string;
+  /** Bumped by every reaction add, replace or remove in the chat (0 = it never had one). */
+  reaction_rev: number;
 }
 
 /**
@@ -169,6 +181,7 @@ function accessOf(db: D1Database, id: string, me: string, cutoff: string, poll =
     ? `, (SELECT json_array(x.created_at, x.id) FROM messages x WHERE x.conversation_id = c.id ORDER BY x.created_at DESC, x.id DESC LIMIT 1) AS newest_key,
             (SELECT json_array(COUNT(*), MAX(x.deleted_at)) FROM messages x WHERE x.conversation_id = c.id AND x.deleted_at IS NOT NULL) AS deleted_key,
             m.last_read_at,
+            c.reaction_rev,
             (SELECT json_group_array(json_array(p.id, p.username, p.display_name, p.avatar_at, p.status)) FROM users p) AS people_key`
     : '';
   return db.prepare(
@@ -187,7 +200,7 @@ function accessOf(db: D1Database, id: string, me: string, cutoff: string, poll =
  * reading the page. Weak, per caller.
  */
 async function pageTag(me: string, limit: number, a: Access & PollState): Promise<string> {
-  const key = JSON.stringify([me, limit, a.read_only, a.newest_key, a.deleted_key, a.people_key]);
+  const key = JSON.stringify([me, limit, a.read_only, a.newest_key, a.deleted_key, a.people_key, a.reaction_rev, a.member_count]);
   return `W/"${(await sha256Hex(key)).slice(0, 32)}"`;
 }
 
@@ -363,7 +376,7 @@ messages.delete('/conversations/:id/members/me', async (c) => {
   }
   const { results } = await db.prepare('SELECT image_key FROM messages WHERE conversation_id = ? AND image_key IS NOT NULL').bind(id).all<{ image_key: string }>();
   await db.prepare('DELETE FROM conversations WHERE id = ?').bind(id).run();
-  if (c.env.MEDIA && results.length > 0) await c.env.MEDIA.delete(results.map((r) => r.image_key)).catch(() => undefined);
+  if (results.length > 0) await removeMedia(c.env, results.map((r) => r.image_key)).catch(() => undefined);
   return c.body(null, 204);
 });
 
@@ -413,12 +426,87 @@ messages.get('/conversations/:id/messages', async (c) => {
   for (const r of page) {
     users[r.sender_id] ??= publicUser({ id: r.sender_id, username: r.u_username, display_name: r.u_display_name, avatar_at: r.u_avatar_at });
   }
+  // The newest page knows from the poll state whether the chat ever had a reaction: never (the usual case) = no query.
+  const none = before === undefined && (a as Access & PollState).reaction_rev === 0;
+  const reactions = none ? new Map<string, MessageReaction[]>() : await reactionsOf(db, page.filter((r) => r.deleted_at === null).map((r) => r.id));
   const body: MessagePage = {
-    messages: page.map(toMessage), users, readOnly: a.read_only === 1,
+    messages: page.map((r) => toMessage(r, reactions.get(r.id))), users, readOnly: a.read_only === 1,
     next: rows.length > limit ? page[page.length - 1]!.id : null,
   };
   return tag === null ? c.json(body) : c.json(body, 200, { ETag: tag, 'Cache-Control': 'private, no-cache' });
 });
+
+/** The reactions of these messages by message id, oldest first (1 query for the whole page; only current members who are active). */
+async function reactionsOf(db: D1Database, ids: string[]): Promise<Map<string, MessageReaction[]>> {
+  const out = new Map<string, MessageReaction[]>();
+  if (ids.length === 0) return out;
+  const { results } = await db.prepare(
+    // CROSS JOIN keeps the page's ids as the outer loop: one primary-key range per message, never a scan of the chat's reactions.
+    `SELECT r.message_id, r.user_id, r.emoji FROM json_each(?1) j CROSS JOIN message_reactions r ON r.message_id = j.value
+       JOIN conversation_members cm ON cm.conversation_id = r.conversation_id AND cm.user_id = r.user_id
+       JOIN users u ON u.id = r.user_id AND u.status = 'active'
+      ORDER BY r.created_at, r.user_id`,
+  ).bind(JSON.stringify(ids)).all<{ message_id: string; user_id: string; emoji: string }>();
+  for (const r of results) {
+    const list = out.get(r.message_id) ?? [];
+    list.push({ userId: r.user_id, emoji: r.emoji });
+    out.set(r.message_id, list);
+  }
+  return out;
+}
+
+/**
+ * Your reaction to a message of a chat you are in: PUT {emoji} sets it (a different emoji replaces yours), DELETE removes it.
+ * 1 + 1 + a batch of 4-5 (+ sign-in). Both answer {reactions} (the message's list); a PUT also answers {recentEmoji} (your Recent row). Not a member / no such message / a deleted one = 404;
+ * a former friend's read-only chat = 403 (as for sending); a bad emoji = 400 (the activity reactions' rule: exactly one emoji).
+ */
+const reactionRoute = (set: boolean) => async (c: Context<AppEnv>) => {
+  const me = c.var.user.id;
+  const db = c.env.DB;
+  const id = c.req.param('id') ?? '';
+  const messageId = c.req.param('messageId') ?? '';
+  const a = await accessOf(db, id, me, '');
+  if (!a) return c.json(notFound, 404);
+  let emoji = '';
+  if (set) {
+    const body = await readJson(c.req.raw);
+    if (!body || !isReaction(body.emoji)) return c.json(invalid, 400);
+    emoji = body.emoji as string;
+  }
+  if (a.read_only === 1) return c.json({ error: 'read_only' }, 403);
+  const live = `SELECT 1 FROM messages WHERE id = ?1 AND conversation_id = ?2 AND deleted_at IS NULL`;
+  const list = db.prepare(`SELECT user_id, emoji FROM message_reactions WHERE message_id = ?1 ORDER BY created_at, user_id`).bind(messageId);
+  const stmts = set
+    ? [
+      db.prepare(
+        `INSERT INTO message_reactions (message_id, conversation_id, user_id, emoji, created_at) SELECT ?1, ?2, ?3, ?4, ?5 WHERE EXISTS (${live})
+         ON CONFLICT (message_id, user_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at WHERE emoji <> excluded.emoji`,
+      ).bind(messageId, id, me, emoji, new Date().toISOString()),
+      db.prepare(live).bind(messageId, id),
+      list,
+    ]
+    : [
+      db.prepare('DELETE FROM message_reactions WHERE message_id = ?1 AND user_id = ?2').bind(messageId, me),
+      db.prepare(live).bind(messageId, id),
+      list,
+    ];
+  // The chat's reaction revision (the poll's ETag) moves with every change.
+  stmts.push(db.prepare(`UPDATE conversations SET reaction_rev = reaction_rev + 1 WHERE id = ?2 AND EXISTS (${live})`).bind(messageId, id));
+  // A custom emoji (not in the quick set) goes to the front of your "Recent" row, in the same batch.
+  const recent = set ? withRecentEmoji(c.var.user.recentEmoji, emoji) : null;
+  if (recent && JSON.stringify(recent) !== JSON.stringify(c.var.user.recentEmoji)) {
+    stmts.push(db.prepare(`UPDATE users SET recent_emoji = ?3 WHERE id = ?4 AND EXISTS (${live})`).bind(messageId, id, JSON.stringify(recent), me));
+  }
+  const [, exists, res] = await db.batch(stmts);
+  if (exists!.results.length === 0) {
+    // The reaction row (if any) of a message that is not live is not served; a delete of it is harmless.
+    return c.json(notFound, 404);
+  }
+  const reactions: MessageReaction[] = (res!.results as { user_id: string; emoji: string }[]).map((r) => ({ userId: r.user_id, emoji: r.emoji }));
+  return c.json(recent ? { reactions, recentEmoji: recent } : { reactions });
+};
+messages.put('/conversations/:id/messages/:messageId/reaction', featureOn('messages'), reactionRoute(true));
+messages.delete('/conversations/:id/messages/:messageId/reaction', featureOn('messages'), reactionRoute(false));
 
 /**
  * The gate every send shares: member (404), picture storage (503, when `needsMedia`), read-only (403), the rate limit
@@ -482,7 +570,7 @@ messages.post('/conversations/:id/messages', featureOn('messages'), async (c) =>
   const msgId = newId();
   const kind: MessageKind = card ? 'rec' : 'text';
   await c.env.DB.batch(insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind, body: text, rec: card ? JSON.stringify(card) : null, image: null, replyTo: replyTo?.id ?? null, now: gate.now }));
-  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind, text, rec: card, image: false, deleted: false, replyTo, createdAt: gate.now };
+  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind, text, rec: card, image: false, voice: null, expired: false, deleted: false, replyTo, reactions: [], createdAt: gate.now };
   pushNewMessage(c.env, ctxOf(c), id, c.var.user, kind, text);
   return c.json(msg, 201);
 });
@@ -520,31 +608,67 @@ async function readCapped(req: Request, max: number): Promise<Uint8Array | null>
   return out;
 }
 
-// A picture (raw body): 1 query + a batch of 3 (+ sign-in), plus the R2 put. 201 with the message.
-messages.post('/conversations/:id/messages/image', featureOn('messages'), async (c) => {
+const VOICE_OK: Record<string, (b: Uint8Array) => boolean> = {
+  // EBML header (WebM / Matroska).
+  'audio/webm': (b) => b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3,
+  // ISO BMFF: a box size, then 'ftyp'.
+  'audio/mp4': (b) => b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70,
+  'audio/ogg': (b) => b[0] === 0x4f && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53,
+};
+
+/**
+ * A photo or a voice memo (raw body, its type in Content-Type; checked by its first bytes). The cap: when the sender's files
+ * plus this one would pass the admin's per-person cap, their oldest are removed first. 1 (settings) + 1 (gate) + 1 (their total)
+ * + a batch of 4 (+ sign-in), plus the R2 put (and removals only when over the cap). 201 with the message.
+ */
+async function uploadMedia(c: Context<AppEnv>, kind: 'photo' | 'voice') {
   const me = c.var.user.id;
-  const id = c.req.param('id');
+  const id = c.req.param('id') ?? '';
+  // The switches (Messages, and Photos or Voice memos) and the cap come from one settings read.
+  const settings = await loadAppSettings(c.env.DB);
+  if (!settings.features.messages || !settings.features[kind === 'photo' ? 'photos' : 'voice']) return c.json({ error: 'feature_off' }, 403);
   const gate = await sendGate(c, id, true);
   if ('response' in gate) return gate.response;
   const type = (c.req.header('Content-Type') ?? '').split(';')[0]!.trim().toLowerCase();
-  const matches = IMAGE_EXT_OK[type];
-  if (!Object.hasOwn(IMAGE_EXT_OK, type) || !matches) return c.json({ error: 'unsupported_media_type' }, 415);
-  const bytes = await readCapped(c.req.raw, IMAGE_MAX_BYTES);
+  const table = kind === 'photo' ? IMAGE_EXT_OK : VOICE_OK;
+  const matches = Object.hasOwn(table, type) ? table[type] : undefined;
+  if (!matches) return c.json({ error: 'unsupported_media_type' }, 415);
+  let durationMs: number | null = null;
+  if (kind === 'voice') {
+    // The length the recorder measured: 1 ms .. 2 minutes (a little slack for timer rounding).
+    const ms = Number(c.req.query('ms'));
+    if (!Number.isInteger(ms) || ms < 1 || ms > VOICE_MAX_MS + 1000) return c.json({ error: 'too_long' }, 400);
+    durationMs = Math.min(ms, VOICE_MAX_MS);
+  }
+  const bytes = await readCapped(c.req.raw, kind === 'photo' ? IMAGE_MAX_BYTES : VOICE_MAX_BYTES);
   if (bytes === null) return c.json({ error: 'too_large' }, 413);
   if (bytes.byteLength < 12 || !matches(bytes)) return c.json(invalid, 400);
+  await makeRoom(c.env, me, settings.media.capMb, bytes.byteLength);
   const msgId = newId();
-  const key = `msg/${id}/${msgId}`;
+  // Not guessable: a random 128-bit name under the chat (served only through GET /api/messages/:id/media, to members).
+  const key = `msg/${id}/${newId()}`;
+  const msgKind: MessageKind = kind === 'photo' ? 'image' : 'voice';
   await c.env.MEDIA!.put(key, bytes, { httpMetadata: { contentType: type } });
   try {
-    await c.env.DB.batch(insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind: 'image', body: '', rec: null, image: key, now: gate.now }));
+    await c.env.DB.batch([
+      ...insertMessage(c.env.DB, { id: msgId, conv: id, sender: me, kind: msgKind, body: '', rec: null, image: key, now: gate.now }),
+      c.env.DB.prepare('INSERT INTO media (key, conversation_id, message_id, user_id, kind, bytes, duration_ms, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)')
+        .bind(key, id, msgId, me, kind, bytes.byteLength, durationMs, gate.now),
+    ]);
   } catch (e) {
     await c.env.MEDIA!.delete(key).catch(() => undefined);
     throw e;
   }
-  const msg: Message = { id: msgId, conversationId: id, senderId: me, kind: 'image', text: '', rec: null, image: true, deleted: false, replyTo: null, createdAt: gate.now };
-  pushNewMessage(c.env, ctxOf(c), id, c.var.user, 'image', '');
+  const msg: Message = {
+    id: msgId, conversationId: id, senderId: me, kind: msgKind, text: '', rec: null, image: kind === 'photo',
+    voice: kind === 'voice' ? { durationMs: durationMs! } : null, expired: false, deleted: false, replyTo: null, reactions: [], createdAt: gate.now,
+  };
+  pushNewMessage(c.env, ctxOf(c), id, c.var.user, msgKind, '');
   return c.json(msg, 201);
-});
+}
+
+messages.post('/conversations/:id/messages/image', (c) => uploadMedia(c, 'photo'));
+messages.post('/conversations/:id/messages/voice', (c) => uploadMedia(c, 'voice'));
 
 // Recs sent to you, newest first: 1 query (+ sign-in). Static path: registered before /messages/:id.
 messages.get('/messages/recommended', async (c) => {
@@ -565,24 +689,38 @@ messages.get('/messages/recommended', async (c) => {
   return c.json({ items });
 });
 
-// A picture, to members only: 1 query + the R2 get (+ sign-in).
-messages.get('/messages/:id/image', async (c) => {
+// A photo or voice memo, to members only: 1 query + the R2 get (+ sign-in). Byte ranges are answered (206) so audio can seek
+// and Safari plays it. /image is the older name of the same route.
+const serveMedia = async (c: Context<AppEnv>) => {
   const row = await c.env.DB.prepare(
     `SELECT m.image_key FROM messages m JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?2
       WHERE m.id = ?1 AND m.deleted_at IS NULL AND m.image_key IS NOT NULL`,
-  ).bind(c.req.param('id'), c.var.user.id).first<{ image_key: string }>();
+  ).bind(c.req.param('id') ?? '', c.var.user.id).first<{ image_key: string }>();
   if (!row) return c.json(notFound, 404);
   if (!c.env.MEDIA) return c.json({ error: 'not_configured' }, 503);
-  const obj = await c.env.MEDIA.get(row.image_key);
+  const ranged = c.req.header('Range') !== undefined;
+  const obj = await c.env.MEDIA.get(row.image_key, ranged ? { range: c.req.raw.headers } : undefined);
   if (!obj) return c.json(notFound, 404);
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-      'Cache-Control': 'private, max-age=31536000, immutable',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
-});
+  const headers: Record<string, string> = {
+    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
+    // Private (never a shared cache), and the file under a key never changes.
+    'Cache-Control': 'private, max-age=31536000, immutable',
+    'X-Content-Type-Options': 'nosniff',
+    'Accept-Ranges': 'bytes',
+  };
+  const r = obj.range as { offset?: number; length?: number; suffix?: number } | undefined;
+  if (ranged && r) {
+    const length = r.suffix !== undefined ? Math.min(r.suffix, obj.size) : (r.length ?? obj.size - (r.offset ?? 0));
+    const offset = r.suffix !== undefined ? obj.size - length : (r.offset ?? 0);
+    headers['Content-Range'] = `bytes ${offset}-${offset + length - 1}/${obj.size}`;
+    headers['Content-Length'] = String(length);
+    return new Response(obj.body, { status: 206, headers });
+  }
+  headers['Content-Length'] = String(obj.size);
+  return new Response(obj.body, { headers });
+};
+messages.get('/messages/:id/media', serveMedia);
+messages.get('/messages/:id/image', serveMedia);
 
 // Delete your own message (soft): 1 + 1 queries (+ sign-in). Not a member of its chat = 404; someone else's = 403.
 messages.delete('/messages/:id', async (c) => {
@@ -599,9 +737,12 @@ messages.delete('/messages/:id', async (c) => {
   if (!row) return c.json(notFound, 404);
   if (row.sender_id !== me && !asAdmin) return c.json({ error: 'forbidden' }, 403);
   if (row.deleted_at !== null) return c.body(null, 204);
-  await c.env.DB.prepare(
-    `UPDATE messages SET body = '', rec_json = NULL, image_key = NULL, deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
-  ).bind(new Date().toISOString(), id).run();
-  if (row.image_key && c.env.MEDIA) await c.env.MEDIA.delete(row.image_key).catch(() => undefined);
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE messages SET body = '', rec_json = NULL, image_key = NULL, deleted_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(new Date().toISOString(), id),
+    // A deleted message keeps no reactions.
+    c.env.DB.prepare('DELETE FROM message_reactions WHERE message_id = ?').bind(id),
+  ]);
+  // Its file goes now (R2 and the ledger); the daily run would catch it otherwise.
+  if (row.image_key) await removeMedia(c.env, [row.image_key]).catch(() => undefined);
   return c.body(null, 204);
 });

@@ -20,7 +20,7 @@ export function pushNewMessage(env: Env, ctx: Ctx, conversationId: string, sende
     const { results } = await env.DB.prepare('SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id <> ?').bind(conversationId, sender.id).all<{ user_id: string }>();
     const who = nameOf(sender);
     const title = conv?.kind === 'group' ? `${who} in ${conv.name ?? 'group chat'}` : who;
-    const body = kind === 'image' ? 'Sent a picture' : kind === 'rec' ? (text ? clip(text) : 'Recommended something') : clip(text);
+    const body = kind === 'image' ? 'Sent a photo' : kind === 'voice' ? 'Sent a voice memo' : kind === 'rec' ? (text ? clip(text) : 'Recommended something') : clip(text);
     for (const r of results) notify(env, ctx, r.user_id, 'messages', { title, body, tag: `chat-${conversationId}`, url: `/messages/${conversationId}` });
   });
 }

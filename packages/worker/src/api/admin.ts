@@ -13,6 +13,7 @@ import { BACKUP_EXCLUDED_NOTE, BACKUP_TABLES } from '../admin/backup';
 import { CATEGORIES } from './entryValidation';
 import { checkSources, explainLookup } from '../lookup/adminTools';
 import { forgetAppSettings, loadAppSettings } from '../settings/appSettings';
+import { mediaUsage, removeUserMedia } from '../media/store';
 import { publicUser, PUBLIC_USER_COLS, type PublicUserRow } from '../social/visibility';
 import { createResetLink, createSignupLink } from './auth';
 
@@ -83,13 +84,20 @@ admin.post('/users/:id/reset-link', async (c) => {
 });
 
 // POST /api/admin/users/:id/delete: deletes the person and, by cascade, everything of theirs (lists,
-// sessions, friendships, activity). Never yourself. 1 query (+ sign-in).
+// sessions, friendships, activity, messages), and their media files. Never yourself. 2-4 queries (+ sign-in).
 admin.post('/users/:id/delete', async (c) => {
   const id = c.req.param('id');
   if (id === c.get('user').id) return c.json({ error: 'self' }, 400);
   const res = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
-  return res.meta.changes ? c.body(null, 204) : c.json(notFound, 404);
+  if (!res.meta.changes) return c.json(notFound, 404);
+  // Their photos and voice memos go too: the ledger rows outlive the cascade, so the files can be found (1-3 more queries + R2).
+  await removeUserMedia(c.env, id);
+  return c.body(null, 204);
 });
+
+// GET /api/admin/media -> { bytes, files, people, configured }: photo and voice memo storage in use (live files), the 10 biggest
+// users, and whether the server has the storage at all. 1 batch of 2 (+ sign-in).
+admin.get('/media', async (c) => c.json({ ...(await mediaUsage(c.env.DB)), configured: c.env.MEDIA !== undefined }));
 
 export type SignupLinkStatus = 'unused' | 'used' | 'expired' | 'revoked';
 export interface SignupLinkItem {

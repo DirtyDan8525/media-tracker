@@ -58,6 +58,18 @@ export function useAdminNumbers() {
   return useQuery({ queryKey: ['admin-numbers'], queryFn: () => api.get<AdminNumbers>('/api/admin/numbers'), staleTime: 0 });
 }
 
+export interface AdminMedia {
+  bytes: number;
+  files: number;
+  people: { userId: string; username: string | null; bytes: number }[];
+  /** The server has the storage (R2 MEDIA binding). */
+  configured: boolean;
+}
+
+export function useAdminMedia() {
+  return useQuery({ queryKey: ['admin-media'], queryFn: () => api.get<AdminMedia>('/api/admin/media'), staleTime: 0 });
+}
+
 export function useCheckSources() {
   return useMutation({ mutationFn: () => api.post<{ sources: SourceCheck[] }>('/api/admin/lookup/check').then((r) => r.sources) });
 }

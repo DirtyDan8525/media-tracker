@@ -10,4 +10,5 @@ import { cachedAppSettings } from '../settings/appSettings';
 export const appInfo = new Hono<AppEnv>();
 
 // 0-1 queries: this isolate's copy, read again after a minute or an admin save here (settings/appSettings.ts).
-appInfo.get('/', async (c) => c.json(publicAppSettings(await cachedAppSettings(c.env.DB)), 200, { 'Cache-Control': 'no-store' }));
+// `media`: whether this server can store photos and voice memos (the R2 MEDIA binding); the composer hides them without it.
+appInfo.get('/', async (c) => c.json({ ...publicAppSettings(await cachedAppSettings(c.env.DB)), media: c.env.MEDIA !== undefined }, 200, { 'Cache-Control': 'no-store' }));

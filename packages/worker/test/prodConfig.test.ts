@@ -38,6 +38,11 @@ describe('wrangler.toml production vars', () => {
     expect(lines.slice(start).join('\n')).not.toMatch(/DEV_EMAIL|LOOKUP_FAKE/);
   });
 
+  it('runs the daily media cleanup (cron) in dev and production', () => {
+    expect(toml).toMatch(/\[triggers\]\s*crons = \["17 4 \* \* \*"\]/);
+    expect(toml).toMatch(/\[env\.production\.triggers\]\s*crons = \["17 4 \* \* \*"\]/);
+  });
+
   it('binds the MEDIA R2 bucket in dev and production (Phase 6 pictures)', () => {
     expect(toml).toMatch(/\[\[r2_buckets\]\]\s*binding = "MEDIA"\s*bucket_name = "media-tracker-media"/);
     // Production's lines stay commented until the bucket exists (a deploy fails otherwise).

@@ -137,8 +137,8 @@ export function cleanDisplayName(raw: unknown): string | null | undefined {
 
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists } = user;
-  return { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists };
+  const { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists, recentEmoji } = user;
+  return { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists, recentEmoji };
 }
 
 // 2 queries (≤ 21 when the lazy typed-number backfill finds sets to re-fit; Ruling N2). The

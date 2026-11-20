@@ -1,20 +1,24 @@
 import { MESSAGE_MAX, type RecSnapshot } from '@media-tracker/shared';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../../api/client';
-import { sendErrorText, useSendRec, useSendText } from '../../data/messages';
+import { useMediaOptions } from '../../data/appSettings';
+import { sendErrorText, useSendImage, useSendRec, useSendText, useSendVoice } from '../../data/messages';
 import { Icon } from '../../design/components/Icon';
 import { IconButton } from '../../design/components/IconButton';
 import { useToast } from '../../design/components/Toast';
 import { useIsWide } from '../../hooks';
 import { RecommendPicker } from './RecommendPicker';
+import { resizeImage } from './resizeImage';
+import { VoiceRecorder } from './VoiceRecorder';
 
 /** The counter shows from here on. */
 const COUNTER_FROM = 1800;
 
 /**
- * The chat's composer: a Recommend button (one picker over all your lists, optional note), the text field and Send. Sending pictures is
- * hidden for now (Dan, 2026-11-17): the server and useSendImage stay, the Photo option is gone. On PC Enter sends and Shift+Enter starts a
- * new line; on a phone Enter is a new line (Send is the button). 2000 characters at most, with a counter near the limit.
+ * The chat's composer: a "+" (More options) menu, the text field and Send. The menu offers Send a recommendation (one picker over
+ * all your lists, optional note), Send a photo and Record a voice memo; the last two only when their admin switch is on and the
+ * server has the storage (useMediaOptions). On PC Enter sends and Shift+Enter starts a new line; on a phone Enter is a new line
+ * (Send is the button). 2000 characters at most, with a counter near the limit. More items can join the menu's list.
  */
 export interface ReplyDraft { id: string; name: string; snippet: string }
 
@@ -23,9 +27,24 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
   const wide = useIsWide();
   const sendText = useSendText(conversationId);
   const sendRec = useSendRec(conversationId);
+  const sendImage = useSendImage(conversationId);
+  const sendVoice = useSendVoice(conversationId);
+  const options = useMediaOptions();
   const [text, setText] = useState('');
   const [picker, setPicker] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [recording, setRecording] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const menuWrap = useRef<HTMLDivElement>(null);
+  const plus = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: PointerEvent) => { if (!menuWrap.current?.contains(e.target as Node)) setMenu(false); };
+    document.addEventListener('pointerdown', away);
+    menuWrap.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    return () => document.removeEventListener('pointerdown', away);
+  }, [menu]);
   // Choosing a message to reply to moves you to the field, ready to type.
   useEffect(() => { if (reply) field.current?.focus(); }, [reply?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const replyTo = reply?.id ?? null;
@@ -74,6 +93,59 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
     }
   }
 
+  async function sendPhoto(file: File | undefined) {
+    if (!file) return;
+    let blob: Blob;
+    try {
+      // Resized (longest side 1600 px) and re-encoded: the copy carries no EXIF or location.
+      blob = await resizeImage(file);
+    } catch {
+      toast.show("That file isn't a photo that can be sent.");
+      return;
+    }
+    try {
+      await sendImage.mutateAsync(blob);
+      onSent();
+    } catch (e) {
+      toast.show(sendErrorText(e, 'picture'));
+    }
+  }
+
+  async function sendMemo(blob: Blob, durationMs: number) {
+    try {
+      await sendVoice.mutateAsync({ blob, durationMs });
+      setRecording(false);
+      onSent();
+      field.current?.focus();
+    } catch (e) {
+      toast.show(sendErrorText(e, 'voice'));
+    }
+  }
+
+  /** The + menu's items, in order (add new ones here). */
+  const items: { key: string; label: string; icon: 'share' | 'image' | 'mic'; run: () => void }[] = [
+    { key: 'rec', label: 'Send a recommendation', icon: 'share', run: () => setPicker(true) },
+    ...(options.photos ? [{ key: 'photo', label: 'Send a photo', icon: 'image' as const, run: () => fileInput.current?.click() }] : []),
+    ...(options.voice ? [{ key: 'voice', label: 'Record a voice memo', icon: 'mic' as const, run: () => setRecording(true) }] : []),
+  ];
+  const closeMenu = (refocus: boolean) => { setMenu(false); if (refocus) plus.current?.focus(); };
+  function onMenuKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Escape' && menu) { e.stopPropagation(); closeMenu(true); return; }
+    if (!menu || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+    const all = [...(menuWrap.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    all[(at + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+  }
+
+  if (recording) {
+    return (
+      <div className="composer">
+        <VoiceRecorder sending={sendVoice.isPending} onSend={(b, ms) => void sendMemo(b, ms)} onClose={() => { setRecording(false); field.current?.focus(); }} />
+      </div>
+    );
+  }
+
   return (
     <div className="composer">
       {reply && (
@@ -83,9 +155,25 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
         </div>
       )}
       <div className="composer__row">
-        <button type="button" className="icon-btn icon-btn--outlined composer__rec" aria-label="Recommend" title="Recommend" aria-haspopup="dialog" onClick={() => setPicker(true)}>
-          <Icon name="share" size={22} />
-        </button>
+        <div className="composer__more" ref={menuWrap} onKeyDown={onMenuKey}>
+          <button ref={plus} type="button" className="icon-btn icon-btn--outlined composer__plus" aria-label="More options" title="More options"
+            aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
+            <Icon name="plus" size={22} />
+          </button>
+          {menu && (
+            <div role="menu" aria-label="More options" className="menu composer__menu">
+              {items.map((it) => (
+                <button key={it.key} type="button" role="menuitem" className="menu__item composer__menu-item" onClick={() => { closeMenu(false); it.run(); }}>
+                  <Icon name={it.icon} size={20} /> {it.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {options.photos && (
+          <input ref={fileInput} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true"
+            data-testid="photo-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void sendPhoto(f); }} />
+        )}
         <textarea ref={field} className="input composer__field" rows={1} aria-label="Message" placeholder="Message" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} aria-invalid={over || undefined} />
         <button type="button" className="icon-btn icon-btn--outlined composer__send" aria-label="Send" title="Send" disabled={!canSend} onClick={() => void send()}>

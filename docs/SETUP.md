@@ -64,21 +64,34 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0020_custom_lists.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0022_media.sql`) with a green check.
 
-## Pictures in messages (create the picture storage once, before step 7)
+## Turn on photos and voice memos (optional, once)
 
-Messages can carry pictures. They are stored in Cloudflare R2 (a bucket named `media-tracker-media`), and the app expects the bucket to exist when you deploy:
+Chats can carry photos and voice memos. They are stored in Cloudflare R2 (a storage bucket named `media-tracker-media`). Until you do the steps below, everything else works and the chat's **+** menu simply doesn't offer **Send a photo** or **Record a voice memo**.
 
-```
-npm exec -w packages/worker -- wrangler r2 bucket create media-tracker-media
-```
+1. **Add a payment method in Cloudflare** (once): Cloudflare dashboard → **R2 Object Storage** → follow the prompt to add a card or PayPal. R2's free tier is 10 GB of storage and plenty of requests each month; a few friends' photos and memos stay far below that, and the app cleans old files up by itself (see below), so you are not charged for normal use.
+2. **Create the bucket:**
+   ```
+   npm exec -w packages/worker -- wrangler r2 bucket create media-tracker-media
+   ```
+   **Success:** it prints `Created bucket 'media-tracker-media'`. If it says the bucket already exists, that is fine.
+3. **Uncomment three lines** in `packages/worker/wrangler.toml`: find these under the comment "Photos and voice memos in chats" in the `[env.production]` part, and remove the `# ` at the start of each:
+   ```
+   # [[env.production.r2_buckets]]
+   # binding = "MEDIA"
+   # bucket_name = "media-tracker-media"
+   ```
+   (With the lines uncommented but no bucket, the deploy stops with an error about `media-tracker-media`: do step 2 first.)
+4. **Apply the database updates** (adds `0021_message_reactions.sql` and `0022_media.sql` if you don't have them yet):
+   ```
+   npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
+   ```
+5. **Deploy:** `npm run deploy` (step 7).
 
-Cloudflare may ask you to add a payment method once before it turns R2 on. The free tier is 10 GB, far more than a few friends' pictures will use, so you are not charged for normal use.
+**Success:** in a chat, tap **+**: it now lists **Send a photo** and **Record a voice memo**. Admin → **Photos and voice memos** shows the storage in use.
 
-**Success:** it prints `Created bucket 'media-tracker-media'`. If it says the bucket already exists, that is fine.
-
-Then turn pictures on: in `packages/worker/wrangler.toml`, find the three commented lines under `# Pictures in messages` (`# [[env.production.r2_buckets]]`, `# binding = "MEDIA"`, `# bucket_name = "media-tracker-media"`) and remove the `# ` at the start of each, then deploy. (Until you do, everything else works and sending a picture says pictures aren't set up. With the lines uncommented but no bucket, the deploy stops with an error about `media-tracker-media`.)
+**Clean-up:** once a day (04:17 UTC, a scheduled run set up by the deploy, nothing to do) photos and voice memos older than **6 months** are removed, and anyone whose files add up to more than **300 MB** loses their oldest files until they fit. Both numbers are in Admin → **Photos and voice memos**. A removed file's message stays and reads "Photo expired" or "Voice memo expired". Admin → **Switches** has **Photos in chats** and **Voice memos in chats** to turn either off for everyone.
 
 ## 7. Deploy the app
 
@@ -258,13 +271,15 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0017_message_replies.sql`: replying to a message in a chat (one new column on `messages`, `reply_to`; existing messages are not replies). Apply it **before** deploying: the new app reads this column.
    - `0013_app_settings.sql`: the admin's app settings (a new table, `app_settings`: announcement, switches, app text and look, defaults for new people). Apply it **before** deploying.
    - `0012_push.sql`: notifications (new tables `push_subscriptions` and `push_throttle`). Apply it **before** deploying. Turning notifications on is optional: see "Notifications (optional)" after step 8.
-   - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Pictures are optional: see "Pictures in messages" after section 6.
+   - `0011_messages.sql`: messages, group chats and recommendations (new tables `conversations`, `conversation_members` and `messages`). Apply it **before** deploying. Photos and voice memos are optional: see "Turn on photos and voice memos" after section 6.
    - `0010_progress.sql`: episode progress (two new columns on titles, `progress` and `progress_total`; titles you already have start with none). Apply it **before** deploying: the new app reads and writes these columns.
    - `0009_number_first.sql`: the number-first rating model (Phase 5). Apply it **before** deploying.
    - `0007_signup_links.sql`: the table behind pre-approved sign-up links (Admin > Sign-up links). Apply it **before** deploying.
    - `0006_social.sql`: friends, invite links, reactions, comments, and the app's own sign-in (passwords, sessions, approvals) (Phase 4). Apply it **before** deploying: the new app reads these tables. Coming from a version before Phase 4b, do the whole update with "Switching to the app's own sign-in" below instead.
    - `0019_query_indexes.sql`: faster, cheaper reads (new indexes on messages, activity, comments, reactions, titles and seasons; no data changes), so the app stays well inside D1's free daily read limit. Apply it **before** deploying: the new app names these indexes.
    - `0020_custom_lists.sql`: custom lists (a new table, `custom_lists`, up to 6 lists a person) and a per-title link (a new `link` column on titles; titles you already have start with none). Apply it **before** deploying: the new app reads both.
+   - `0021_message_reactions.sql`: reactions on chat messages (a new table, `message_reactions`), each person's recent custom emojis (a new `recent_emoji` column on users), and voice memos as a kind of message (the `messages` table is rebuilt with the same rows, replies and indexes; nothing is lost). Apply it **before** deploying: the new app reads these.
+   - `0022_media.sql`: the list of stored photos and voice memos (a new table, `media`) that the daily clean-up and the storage cap use. Apply it **before** deploying. Turning photos and voice memos on is optional: see "Turn on photos and voice memos" after section 6.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:
@@ -324,7 +339,7 @@ Two kinds of backup. **Keep the SQL one**; the JSON one is for reading.
 ```
 npm exec -w packages/worker -- wrangler d1 execute media-tracker --remote --env production --file media-tracker-backup.sql
 ```
-**Success:** it reports the number of queries run and no error. The export already contains the table definitions and the migration record, so do **not** run `migrations apply` first on that database. Pictures sent in messages live in the separate storage bucket and are not in either backup.
+**Success:** it reports the number of queries run and no error. The export already contains the table definitions and the migration record, so do **not** run `migrations apply` first on that database. Photos and voice memos sent in chats live in the separate storage bucket and are not in either backup.
 
 
 ### Automatic nightly backups (separate from Cloudflare)

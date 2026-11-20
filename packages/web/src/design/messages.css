@@ -75,38 +75,100 @@
 .bubble-row--mine .bubble-wrap { flex-direction: row-reverse; }
 .bubble { position: relative; padding: var(--space-5) var(--space-7); border-radius: 18px; background: var(--card); color: var(--text); min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .bubble--mine { background: var(--bubble-mine-bg, var(--highlight)); color: var(--bubble-mine-text, var(--on-highlight-small, var(--on-highlight))); border-bottom-right-radius: 6px; }
-/* My text bubbles: the text and time use the on-accent colour (>= 4.5:1, bubbleColors.ts); a card or a deleted note keeps its neutral look. */
-.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__text,
-.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__time { color: var(--bubble-mine-text, var(--on-highlight-small, var(--on-highlight))); }
+/* My text bubbles: the text uses the on-accent colour (>= 4.5:1, bubbleColors.ts); a card or a deleted note keeps its neutral look. */
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__text { color: var(--bubble-mine-text, var(--on-highlight-small, var(--on-highlight))); }
 .bubble-row:not(.bubble-row--mine) .bubble { border-bottom-left-radius: 6px; }
 .bubble--deleted { background: transparent; border: 1px dashed var(--grid-line); }
 .bubble--rec { padding: var(--space-4); background: var(--card); color: var(--text); }
 .bubble__text { font-size: calc(var(--fs-body) * var(--chat-scale, 1)); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--bright-text); }
 .bubble__deleted { font-size: var(--fs-sm); font-style: italic; color: var(--muted-text); }
 .bubble__label { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding: 0 var(--space-2); }
-.bubble__time { align-self: flex-end; font-size: 11px; color: var(--muted-text); font-variant-numeric: tabular-nums; }
 .bubble__photo { all: unset; display: block; cursor: pointer; border-radius: var(--radius-lg); overflow: hidden; min-width: 44px; min-height: 44px; }
 .bubble__photo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .bubble__photo img { display: block; max-width: 100%; max-height: 280px; width: auto; height: auto; background: var(--panel); }
 .bubble__opts { flex: none; }
+/* No time on the bubbles (it is in the message menu). Touch: sideways drags are ours (swipe to reply), up and down scroll. */
+.bubble { touch-action: pan-y; }
+.bubble:focus { outline: none; }
+.bubble:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.bubble.is-swiping { z-index: 1; }
+@media (prefers-reduced-motion: no-preference) { .bubble:not(.is-swiping) { transition: transform .18s ease-out; } }
+.bubble-wrap { position: relative; }
+.bubble__swipe-hint {
+  position: absolute; top: 50%; left: 4px; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; background: var(--panel); color: var(--muted-text); pointer-events: none;
+}
+.bubble-row--mine .bubble__swipe-hint { left: auto; right: 4px; }
+.bubble__swipe-hint.is-ready { color: var(--highlight); }
+.bubble__expired { font-style: italic; }
+/* Phone: the actions are for screen readers only (hold or swipe the bubble instead). */
+.bubble__actions--sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* PC: Reply and ⋯ appear on hover or when anything in the row has focus. */
+.bubble__actions:not(.bubble__actions--sr) .bubble__opts { opacity: 0; }
+.bubble-row:hover .bubble__actions .bubble__opts, .bubble-row:focus-within .bubble__actions .bubble__opts { opacity: 1; }
+
+/* Reactions under a bubble */
+.msg-reactions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: calc(-1 * var(--space-2)); padding: 0 var(--space-3); }
+.bubble-row--mine .msg-reactions { justify-content: flex-end; }
+.msg-reactions__chip {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; min-width: 32px;
+  padding: 0 var(--space-3); border-radius: var(--radius-pill); background: var(--card); border: 1px solid var(--grid-line); font-size: 15px;
+  cursor: pointer; justify-content: center; -webkit-touch-callout: none; user-select: none;
+}
+.msg-reactions__chip[aria-pressed='true'] { border-color: var(--highlight); background: var(--panel); }
+.msg-reactions__chip:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.msg-reactions__chip:disabled { cursor: default; }
+.msg-reactions__n { font-size: var(--fs-meta); color: var(--bright-text); font-variant-numeric: tabular-nums; }
+
+/* The message menu: a sheet on phones, a popover beside the bubble on PC. */
+.msg-menu { display: flex; flex-direction: column; gap: var(--space-5); }
+.msg-menu__time { margin: 0; font-size: var(--fs-sm); color: var(--muted-text); }
+.msg-menu__who { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text); }
+.msg-menu__who-emoji { display: inline-block; width: 28px; }
+.msg-menu__actions { display: flex; flex-direction: column; border-top: 1px solid var(--grid-line); padding-top: var(--space-3); }
+.msg-pop {
+  position: fixed; z-index: 60; width: min(340px, calc(100vw - 16px)); padding: var(--space-5); border-radius: var(--radius-xl);
+  background: var(--card); border: 1px solid var(--grid-line); box-shadow: var(--shadow-float);
+}
+
+/* A voice memo */
+.bubble--voice { min-width: min(260px, 70vw); }
+.voice { display: flex; align-items: center; gap: var(--space-4); }
+.voice__play {
+  all: unset; box-sizing: border-box; flex: none; width: var(--tap); height: var(--tap); border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; background: var(--panel); color: var(--bright-text); cursor: pointer;
+}
+.voice__play:focus-visible, .voice__speed:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.voice__track { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.voice__slider { width: 100%; min-height: 28px; margin: 0; accent-color: var(--highlight); cursor: pointer; touch-action: none; }
+.voice__time { font-size: var(--fs-meta); font-variant-numeric: tabular-nums; color: inherit; opacity: .85; }
+.voice__speed {
+  all: unset; box-sizing: border-box; flex: none; min-width: var(--tap); min-height: var(--tap); border-radius: var(--radius-pill);
+  display: flex; align-items: center; justify-content: center; font-size: var(--fs-meta); font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.bubble--mine .voice, .bubble--mine .voice__speed { color: var(--bubble-mine-text, var(--on-highlight)); }
+.bubble--mine .voice__slider { accent-color: var(--bubble-mine-text, var(--on-highlight)); }
 .bubble__actions { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
 .bubble-row--mine .bubble__actions { flex-direction: row-reverse; }
 .bubble__reply { border: 0; background: transparent; color: var(--muted-text); font: inherit; font-size: var(--fs-meta); font-weight: 600; min-height: var(--tap); padding: 0 var(--space-4); border-radius: var(--radius-pill); cursor: pointer; }
 .bubble__reply:hover { background: var(--panel); color: var(--bright-text); }
 .bubble__reply:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
-/* Mouse: the Reply button shows on hover or focus. Touch: hidden (long-press replies) but still reachable by a screen reader and on focus. */
+/* Mouse: the Reply button shows on hover or focus. Touch screens hold the bubble for its menu instead (and copy from there). */
 @media (hover: hover) { .bubble__reply { opacity: 0; } .bubble-row:hover .bubble__reply, .bubble-row:focus-within .bubble__reply { opacity: 1; } }
-@media (hover: none) { .bubble__reply { opacity: 0; pointer-events: none; position: absolute; width: 1px; min-width: 0; padding: 0; overflow: hidden; } .bubble__reply:focus-visible { opacity: 1; pointer-events: auto; position: static; width: auto; padding: 0 var(--space-4); } .bubble { -webkit-touch-callout: none; } }
+@media (hover: none) { .bubble { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
 
 /* The quote above a reply: who and one line of what; tapping it goes to the original when it is loaded. */
-.bubble__quote { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-2) var(--space-4); border-left: 3px solid var(--highlight); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); text-align: left; }
+.bubble__quote { all: unset; box-sizing: border-box; display: flex; flex-direction: row; align-items: baseline; gap: var(--space-2); min-width: 0; max-width: 100%; padding: var(--space-1) var(--space-3); border-left: 3px solid var(--highlight); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); text-align: left; }
 button.bubble__quote { cursor: pointer; }
 button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
-.bubble__quote-who { font-size: var(--fs-meta); font-weight: 700; color: var(--bright-text); }
-.bubble__quote-text { font-size: var(--fs-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Compact: a small "Reply", the name in a group, then a few words on one line. */
+.bubble__quote-label { flex: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .8; }
+.bubble__quote-who { flex: none; font-size: 12px; font-weight: 700; color: var(--bright-text); }
+.bubble__quote-text { min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble__quote--deleted .bubble__quote-text { font-style: italic; color: var(--muted-text); }
 .bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote { background: color-mix(in srgb, var(--bubble-mine-text) 12%, transparent); border-left-color: var(--bubble-mine-text); color: var(--bubble-mine-text); }
 .bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote-who,
+.bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote-label,
 .bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote-text { color: var(--bubble-mine-text); }
 .bubble--mine:not(.bubble--rec):not(.bubble--deleted) .bubble__quote--deleted .bubble__quote-text { color: var(--bubble-mine-text); }
 
@@ -163,8 +225,19 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
 .messages-new { display: flex; gap: var(--space-4); }
 .messages-new .btn { flex: 1; min-height: var(--tap); gap: var(--space-3); text-decoration: none; }
 
-/* The composer's Recommend button (replaces the + menu). */
-.composer__rec { flex: none; }
+/* The composer's + (More options) menu: opens upward over the chat. */
+.composer__more { position: relative; flex: none; }
+.composer__menu { top: auto; bottom: calc(100% + var(--space-2)); right: auto; left: 0; min-width: 240px; }
+.composer__menu-item { gap: var(--space-4); }
+/* Recording a voice memo: the strip replaces the composer row. */
+.recorder { display: flex; align-items: center; gap: var(--space-4); max-width: 760px; margin: 0 auto; min-height: var(--tap); }
+.frame--wide .recorder { max-width: 100%; }
+.recorder__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted-text); flex: none; }
+.recorder__dot.is-live { background: #e5484d; }
+@media (prefers-reduced-motion: no-preference) { .recorder__dot.is-live { animation: rec-pulse 1.2s ease-in-out infinite; } @keyframes rec-pulse { 50% { opacity: .35; } } }
+.recorder__time { flex: 1; font-variant-numeric: tabular-nums; color: var(--bright-text); }
+.recorder__note { font-size: var(--fs-meta); color: var(--muted-text); }
+.recorder__error { flex: 1; margin: 0; font-size: var(--fs-sm); color: var(--bright-text); }
 
 /* PC (>= 1024 px): the open chat fills the whole main area and scales with the window (Dan, 2026-11-19); the thread fills the height between header and composer. */
 @media (min-width: 1024px) {

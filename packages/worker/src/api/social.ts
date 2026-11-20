@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   COMMENT_MAX,
   isReaction,
+  withRecentEmoji,
   type Comment,
   type PublicUser,
   type PostSocial,
@@ -121,10 +122,16 @@ social.post('/reactions', featureOn('reactions'), async (c) => {
     .bind(idOf(target), user.id, emoji)
     .first<{ id: string }>();
   if (!removed) {
-    await db
+    const insert = db
       .prepare(`INSERT OR IGNORE INTO reactions (id, ${column}, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), idOf(target), user.id, emoji, new Date().toISOString())
-      .run();
+      .bind(crypto.randomUUID(), idOf(target), user.id, emoji, new Date().toISOString());
+    // A custom emoji (not in the quick set) goes to the front of your "Recent" row, in the same batch.
+    const recent = withRecentEmoji(user.recentEmoji, emoji);
+    if (JSON.stringify(recent) !== JSON.stringify(user.recentEmoji)) {
+      await db.batch([insert, db.prepare('UPDATE users SET recent_emoji = ? WHERE id = ?').bind(JSON.stringify(recent), user.id)]);
+    } else {
+      await insert.run();
+    }
     pushReaction(c.env, ctxOf(c), at.ownerId, user, idOf(target), emoji);
   }
   return c.json(await socialOf(db, user.id, target));

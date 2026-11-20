@@ -1,8 +1,21 @@
 import type { PostSocial } from '@media-tracker/shared';
-import { render, screen, within } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
+import { ME_KEY } from '../../data/useMe';
+import { makeMe } from '../../test/mockApi';
+import { makeQueryClient } from '../../test/queryClient';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ReactButton, ReactionChips } from './ReactionBar';
+
+/** The pickers read your Recent emoji from the signed-in user (the `me` query); seeded here without a server. */
+function render(ui: ReactElement, recentEmoji: string[] = []) {
+  const qc = makeQueryClient();
+  qc.setQueryData(ME_KEY, { ...makeMe(), recentEmoji });
+  qc.setQueryDefaults(ME_KEY, { staleTime: Infinity, queryFn: () => qc.getQueryData(ME_KEY) });
+  return { qc, ...rtlRender(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>) };
+}
 
 const social: PostSocial = { reactions: { '❤️': 3, '🔥': 1 }, mine: ['🔥'], comments: 0 };
 
@@ -101,5 +114,39 @@ describe('ReactButton', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(btn).toHaveFocus();
+  });
+
+  it('a Recent row under the quick set shows your last custom emojis, newest first; hidden when there are none', async () => {
+    const onPick = vi.fn();
+    render(<ReactButton mine={[]} onPick={onPick} />, ['🦊', '🐸']);
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    const recent = screen.getByRole('group', { name: 'Recent' });
+    expect(within(recent).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['🦊', '🐸']);
+    // the arrows go from the quick row into the Recent row
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'More emojis' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(within(recent).getByRole('button', { name: '🦊' })).toHaveFocus();
+    await userEvent.click(within(recent).getByRole('button', { name: '🐸' }));
+    expect(onPick).toHaveBeenCalledWith('🐸');
+  });
+
+  it('no Recent row when you have none', async () => {
+    render(<ReactButton mine={[]} onPick={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    expect(screen.queryByRole('group', { name: 'Recent' })).not.toBeInTheDocument();
+  });
+
+  it('adding a custom emoji puts it at the front of Recent at once (max 4, deduplicated); a quick one does not', async () => {
+    const { qc } = render(<ReactButton mine={[]} onPick={() => {}} />, ['🦊', '🐸', '🍜', '🎸']);
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    await userEvent.click(screen.getByRole('button', { name: '❤️' }));
+    expect((qc.getQueryData(ME_KEY) as { recentEmoji: string[] }).recentEmoji).toEqual(['🦊', '🐸', '🍜', '🎸']);
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More emojis' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Type any emoji' }), '🌙{Enter}');
+    expect((qc.getQueryData(ME_KEY) as { recentEmoji: string[] }).recentEmoji).toEqual(['🌙', '🦊', '🐸', '🍜']);
+    await userEvent.click(screen.getByRole('button', { name: 'React' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Recent' })).getByRole('button', { name: '🍜' }));
+    expect((qc.getQueryData(ME_KEY) as { recentEmoji: string[] }).recentEmoji).toEqual(['🍜', '🌙', '🦊', '🐸']);
   });
 });

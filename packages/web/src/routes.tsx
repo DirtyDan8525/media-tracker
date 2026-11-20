@@ -25,6 +25,7 @@ import { LookScreen } from './screens/admin/Look';
 import { DefaultsScreen } from './screens/admin/Defaults';
 import { ModerationScreen } from './screens/admin/Moderation';
 import { NumbersScreen } from './screens/admin/Numbers';
+import { MediaScreen } from './screens/admin/Media';
 import { SwitchesScreen } from './screens/admin/Switches';
 import { ListScreen } from './screens/ListScreen';
 import { MoreScreen } from './screens/MoreScreen';
@@ -163,6 +164,7 @@ export const routes: RouteObject[] = [
           { path: 'admin/moderation', element: <AdminRoute><ModerationScreen /></AdminRoute> },
           { path: 'admin/lookup', element: <AdminRoute><LookupToolsScreen /></AdminRoute> },
           { path: 'admin/backup', element: <AdminRoute><BackupScreen /></AdminRoute> },
+          { path: 'admin/media', element: <AdminRoute><MediaScreen /></AdminRoute> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },

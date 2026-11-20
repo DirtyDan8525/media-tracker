@@ -21,7 +21,7 @@ function setup(over: Parameters<typeof messagesBackend>[0] = {}, extra: Record<s
 afterEach(() => vi.useRealTimers());
 
 describe('Chat', () => {
-  it('shows day separators, mine on the right and theirs on the left, with times', async () => {
+  it('shows day separators, mine on the right and theirs on the left, and no time on the bubbles', async () => {
     setup({
       messages: {
         c1: [
@@ -38,7 +38,8 @@ describe('Chat', () => {
     expect(mine).toHaveClass('bubble-row--mine');
     expect(within(list).getByText('ok are we doing Frieren tonight?').closest('li')).not.toHaveClass('bubble-row--mine');
     expect(within(list).getByText('old news')).toBeInTheDocument();
-    expect(mine.querySelector('time')).not.toBeNull();
+    expect(list.querySelector('.bubble time')).toBeNull(); // the time is in the message menu
+    expect(within(list).getAllByText(/^(Today|Yesterday|\w{3}, \w{3} \d+)$/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { level: 1, name: 'Ren' })).toBeInTheDocument();
   });
 
@@ -185,25 +186,132 @@ describe('Chat', () => {
       expect(screen.getByRole('group', { name: 'Replying to' })).toBeInTheDocument();
     });
 
-    it('long-press on a touch screen starts a reply; moving away or lifting early does not', async () => {
+    const touch = (el: Element, type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
+      fireEvent[type](el, type === 'touchEnd' ? { touches: [], changedTouches: [{ clientX: x, clientY: y }] } : { touches: [{ clientX: x, clientY: y }], changedTouches: [{ clientX: x, clientY: y }] });
+
+    it("swipe to reply (touch): their message is dragged right, past 60 px it starts a reply; short drags snap back", async () => {
+      setup({ messages: { c1: two() } });
+      renderApp('/messages/c1');
+      const bubble = (await screen.findByText('want to watch Frieren tonight?')).closest('.bubble') as HTMLElement;
+      // a short drag: follows the finger, then snaps back without a reply
+      touch(bubble, 'touchStart', 20, 100);
+      touch(bubble, 'touchMove', 50, 102);
+      expect(bubble.style.transform).toBe('translateX(30px)');
+      touch(bubble, 'touchEnd', 50, 102);
+      expect(bubble.style.transform).toBe('');
+      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
+      // the wrong way (toward the edge) does nothing
+      touch(bubble, 'touchStart', 120, 100);
+      touch(bubble, 'touchMove', 40, 100);
+      touch(bubble, 'touchEnd', 40, 100);
+      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
+      // far enough
+      touch(bubble, 'touchStart', 20, 100);
+      touch(bubble, 'touchMove', 60, 100);
+      touch(bubble, 'touchMove', 95, 104);
+      expect(bubble.querySelector('.bubble__swipe-hint') ?? bubble.parentElement!.querySelector('.bubble__swipe-hint.is-ready')).not.toBeNull();
+      touch(bubble, 'touchEnd', 95, 104);
+      expect(screen.getByRole('group', { name: 'Replying to' })).toHaveTextContent('Replying to Ren: want to watch Frieren tonight?');
+    });
+
+    it('swipe to reply on my own message goes left (toward the middle) and replies to myself', async () => {
+      setup({ messages: { c1: two() } });
+      renderApp('/messages/c1');
+      const bubble = (await screen.findByText('my own line')).closest('.bubble') as HTMLElement;
+      touch(bubble, 'touchStart', 300, 100);
+      touch(bubble, 'touchMove', 360, 100); // right: toward the edge, nothing
+      touch(bubble, 'touchEnd', 360, 100);
+      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
+      touch(bubble, 'touchStart', 300, 100);
+      touch(bubble, 'touchMove', 270, 100);
+      expect(bubble.style.transform).toBe('translateX(-30px)');
+      touch(bubble, 'touchMove', 220, 101);
+      touch(bubble, 'touchEnd', 220, 101);
+      expect(screen.getByRole('group', { name: 'Replying to' })).toHaveTextContent('Replying to yourself: my own line');
+    });
+
+    it('a mostly vertical drag is a scroll: no swipe, no menu', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       setup({ messages: { c1: two() } });
       renderApp('/messages/c1');
-      const bubble = (await screen.findByText('want to watch Frieren tonight?')).closest('.bubble')!;
-      fireEvent.pointerDown(bubble, { pointerType: 'touch', clientX: 10, clientY: 10 });
+      const bubble = (await screen.findByText('want to watch Frieren tonight?')).closest('.bubble') as HTMLElement;
+      touch(bubble, 'touchStart', 20, 100);
+      touch(bubble, 'touchMove', 45, 160);
+      expect(bubble.style.transform).toBe('');
+      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+      touch(bubble, 'touchEnd', 45, 160);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
+    });
+
+    it('a still hold (450 ms) opens the message menu with when it was sent; lifting early or moving does not', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      setup({ messages: { c1: two() } });
+      renderApp('/messages/c1');
+      const bubble = (await screen.findByText('want to watch Frieren tonight?')).closest('.bubble') as HTMLElement;
+      touch(bubble, 'touchStart', 20, 100);
       await act(async () => { await vi.advanceTimersByTimeAsync(200); });
-      fireEvent.pointerUp(bubble, { pointerType: 'touch' });
+      touch(bubble, 'touchEnd', 20, 100);
       await act(async () => { await vi.advanceTimersByTimeAsync(600); });
-      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
-      fireEvent.pointerDown(bubble, { pointerType: 'touch', clientX: 10, clientY: 10 });
-      fireEvent.pointerMove(bubble, { pointerType: 'touch', clientX: 10, clientY: 60 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      touch(bubble, 'touchStart', 20, 100);
+      touch(bubble, 'touchMove', 20, 140);
       await act(async () => { await vi.advanceTimersByTimeAsync(600); });
-      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
-      fireEvent.pointerDown(bubble, { pointerType: 'touch', clientX: 10, clientY: 10 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      touch(bubble, 'touchEnd', 20, 140);
+      touch(bubble, 'touchStart', 20, 100);
       await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      const menu = screen.getByRole('dialog', { name: 'Message options' });
+      expect(within(menu).getByText(/^(Today|Yesterday|\w{3} \d+) at \d{1,2}:\d{2}/)).toBeInTheDocument();
+      expect(within(menu).getByRole('group', { name: 'Reactions' })).toBeInTheDocument();
+      expect(within(menu).getByRole('button', { name: 'Reply' })).toBeInTheDocument();
+      expect(within(menu).getByRole('button', { name: 'Copy text' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument(); // not mine
+      touch(bubble, 'touchEnd', 20, 100);
+      // the old long-press-to-reply is gone
+      expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
+      await userEvent.click(within(menu).getByRole('button', { name: 'Reply' }));
       expect(screen.getByRole('group', { name: 'Replying to' })).toHaveTextContent('Replying to Ren');
-      // a mouse press-and-hold does nothing
-      fireEvent.pointerUp(bubble, { pointerType: 'touch' });
+    });
+
+    it('the menu on my own message: Reply replies to myself; Copy text copies', async () => {
+      const writeText = vi.fn(async () => undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      setup({ messages: { c1: two() } });
+      renderApp('/messages/c1');
+      const bubble = (await screen.findByText('my own line')).closest('.bubble') as HTMLElement;
+      bubble.focus();
+      await userEvent.keyboard('{Enter}');
+      let menu = screen.getByRole('dialog', { name: 'Message options' });
+      await userEvent.click(within(menu).getByRole('button', { name: 'Copy text' }));
+      expect(writeText).toHaveBeenCalledWith('my own line');
+      expect(await screen.findByText('Copied')).toBeInTheDocument();
+      bubble.focus();
+      await userEvent.keyboard(' ');
+      menu = screen.getByRole('dialog', { name: 'Message options' });
+      await userEvent.click(within(menu).getByRole('button', { name: 'Reply' }));
+      expect(screen.getByRole('group', { name: 'Replying to' })).toHaveTextContent('Replying to yourself: my own line');
+    });
+
+    it('PC: right-click opens the same menu as a popover with the full time; Escape closes it and focus returns to the bubble', async () => {
+      setViewportWidth(1280);
+      try {
+        setup({ messages: { c1: [makeMessage({ id: 'o1', senderId: REN_U.id, text: 'pc line', createdAt: new Date(new Date().setHours(15, 2, 0, 0) - 86_400_000 * 3).toISOString() })] } });
+        renderApp('/messages/c1');
+        const bubble = (await screen.findByText('pc line')).closest('.bubble') as HTMLElement;
+        fireEvent.contextMenu(bubble);
+        const menu = screen.getByRole('dialog', { name: 'Message options' });
+        expect(menu).toHaveClass('msg-pop');
+        expect(within(menu).getByText(/^\w{3} \d+ at 3:02\s?PM$/)).toBeInTheDocument();
+        await userEvent.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(bubble).toHaveFocus();
+        // and the hover "⋯" opens it too
+        await userEvent.click(screen.getByRole('button', { name: "Message options for Ren's message" }));
+        expect(screen.getByRole('dialog', { name: 'Message options' })).toBeInTheDocument();
+      } finally {
+        setViewportWidth(390);
+      }
     });
 
     it('sends replyTo with the message and shows the quote above it; the bar clears', async () => {
@@ -215,7 +323,9 @@ describe('Chat', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Send' }));
       const sent = (await screen.findByText('yes please')).closest('.bubble')!;
       expect(calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages')?.body).toEqual({ text: 'yes please', replyTo: 'o1' });
-      expect(within(sent as HTMLElement).getByText('Ren')).toBeInTheDocument();
+      // A compact quote: a small "Reply" label and the words (no name in a direct chat)
+      expect(within(sent as HTMLElement).getByText('Reply', { selector: '.bubble__quote-label' })).toBeInTheDocument();
+      expect(within(sent as HTMLElement).queryByText('Ren')).not.toBeInTheDocument();
       expect(within(sent as HTMLElement).getByText('want to watch Frieren tonight?')).toBeInTheDocument();
       expect(screen.queryByRole('group', { name: 'Replying to' })).not.toBeInTheDocument();
     });
@@ -245,9 +355,9 @@ describe('Chat', () => {
       setup({ messages: { c1: [makeMessage({ senderId: ME.id, text: 'target', id: 'tgt' }), makeMessage({ senderId: REN_U.id, text: 'late reply', replyTo: { id: 'tgt', senderId: ME.id, senderName: 'dan', kind: 'text', snippet: 'target', deleted: false } }), makeMessage({ text: 'older', replyTo: gone })] } });
       renderApp('/messages/c1');
       expect(await screen.findByText('Original message deleted')).toBeInTheDocument();
-      expect(screen.getByText('You')).toBeInTheDocument(); // my own message quoted
       await userEvent.click(screen.getByRole('button', { name: 'Message options' }));
-      await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete message' }));
+      await userEvent.click(within(screen.getByRole('dialog', { name: 'Message options' })).getByRole('button', { name: 'Delete' }));
+      await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete this message?' })).getByRole('button', { name: 'Delete message' }));
       await waitFor(() => expect(screen.getAllByText('Original message deleted')).toHaveLength(2));
     });
 
@@ -362,19 +472,25 @@ describe('Chat', () => {
     });
   });
 
-  it('deleting your own message: ⋯ opens a confirm sheet with big buttons; Delete turns it into "Message deleted"', async () => {
+  it('deleting your own message: the menu\'s Delete opens a confirm sheet with big buttons; Delete turns it into "Message deleted"', async () => {
     setup({ messages: { c1: [makeMessage({ senderId: ME.id, text: 'oops' }), makeMessage({ senderId: REN_U.id, text: 'theirs' })] } });
     renderApp('/messages/c1');
     await screen.findByText('oops');
-    // Only your own messages have options.
-    expect(screen.getAllByRole('button', { name: 'Message options' })).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Message options' }));
+    const openDelete = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Message options' }));
+      await userEvent.click(within(screen.getByRole('dialog', { name: 'Message options' })).getByRole('button', { name: 'Delete' }));
+    };
+    // Someone else's message has a menu too, without Delete.
+    await userEvent.click(screen.getByRole('button', { name: "Message options for Ren's message" }));
+    expect(within(screen.getByRole('dialog', { name: 'Message options' })).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await openDelete();
     const sheet = await screen.findByRole('dialog', { name: 'Delete this message?' });
     expect(within(sheet).getByRole('button', { name: 'Delete message' })).toHaveClass('btn--big');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
     expect(screen.getByText('oops')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Message options' }));
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete message' }));
+    await openDelete();
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete this message?' })).getByRole('button', { name: 'Delete message' }));
     await waitFor(() => expect(screen.queryByText('oops')).not.toBeInTheDocument());
     expect(screen.getByText('Message deleted')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -386,6 +502,7 @@ describe('Chat', () => {
     renderApp('/messages/c1');
     await screen.findByText('rude thing');
     await userEvent.click(screen.getByRole('button', { name: "Message options for Ren's message" }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Message options' })).getByRole('button', { name: 'Delete' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete this message?' })).getByRole('button', { name: 'Delete message' }));
     await waitFor(() => expect(screen.queryByText('rude thing')).not.toBeInTheDocument());
     expect(screen.getByText('Message deleted')).toBeInTheDocument();
@@ -494,7 +611,7 @@ describe('Chat', () => {
       expect(field).toHaveValue('spam');
     });
 
-    it('no picture option: the composer has no Photo item and no file input (sending pictures is hidden)', async () => {
+    it('no photo option while the server has no storage (GET /api/app media is absent): no file input, no "+" photo item', async () => {
       setup();
       renderApp('/messages/c1');
       await screen.findByRole('textbox', { name: 'Message' });
@@ -509,8 +626,9 @@ describe('Chat', () => {
       const { calls } = setup({}, {}, entries);
       renderApp('/messages/c1');
       await screen.findByRole('textbox', { name: 'Message' });
-      expect(screen.getByRole('button', { name: 'Recommend' })).toHaveAttribute('title', 'Recommend');
-      await userEvent.click(screen.getByRole('button', { name: 'Recommend' }));
+      expect(screen.queryByRole('button', { name: 'Recommend' })).not.toBeInTheDocument(); // it moved into the + menu
+      await userEvent.click(screen.getByRole('button', { name: 'More options' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Send a recommendation' }));
       const picker = await screen.findByRole('dialog', { name: 'Recommend a title' });
       // no list chips: titles of every list are in one list, and the search filters across them
       expect(within(picker).queryByRole('group', { name: 'List' })).not.toBeInTheDocument();

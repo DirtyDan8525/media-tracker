@@ -15,6 +15,8 @@ const SWITCHES: Record<FeatureKey, { label: string; desc: string; off?: string }
   installBanner: { label: 'Install banner', desc: '"Add to Home screen" prompt' },
   everyoneNotes: { label: 'Everyone feed shows notes to non-friends', desc: 'Off: only friends see the note on a post. Private notes stay hidden either way.' },
   customLists: { label: 'Custom lists', desc: 'Off: no one can make a new list. Lists people already have keep working.' },
+  photos: { label: 'Photos in chats', desc: 'Send a photo from the chat\'s + menu (needs the storage set up)' },
+  voice: { label: 'Voice memos in chats', desc: 'Record a voice memo from the chat\'s + menu (needs the storage set up)' },
 };
 
 /** /admin/switches (AD2): one switch per feature, saved the moment it is flipped. */

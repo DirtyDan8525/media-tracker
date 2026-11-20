@@ -153,6 +153,11 @@ async function seed(db: D1Database) {
       db.prepare(`UPDATE conversation_members SET last_read_at = (SELECT MAX(created_at) FROM messages WHERE conversation_id = ?1) WHERE conversation_id = ?1`).bind(c.id),
     ]);
   }
+  // Message reactions on the group: two on every third message (about 330 rows); the direct chats have none.
+  await db.prepare(`INSERT INTO message_reactions (message_id, conversation_id, user_id, emoji, created_at)
+    SELECT m.id, m.conversation_id, u.id, '❤️', m.created_at FROM messages m JOIN (SELECT 'u1' AS id UNION ALL SELECT 'u2') u
+     WHERE m.conversation_id = 'cg' AND CAST(substr(m.id, 4) AS INTEGER) % 3 = 0`).run();
+  await db.prepare(`UPDATE conversations SET reaction_rev = 1 WHERE id = 'cg'`).run();
   await db.prepare(`UPDATE users SET feed_seen_at = '2026-01-30T00:00:00.000Z'`).run();
   await db.prepare(`INSERT INTO app_settings (key, value_json, updated_at) VALUES ('features', '{}', '2026-01-01'), ('announcement', '{"text":"hi"}', '2026-01-01')`).run();
 }
@@ -165,9 +170,11 @@ const HOT: { name: string; path: string; budget: number; conditional?: true; pre
     prep: "UPDATE users SET feed_seen_at = '2026-03-01T00:00:00.000Z' WHERE id = 'u0'" },
   { name: 'GET /api/conversations (30 s poll)', path: '/api/conversations', budget: 350 },
   { name: 'GET chat page (5 s poll, direct)', path: '/api/conversations/cd1/messages', budget: 220 },
-  { name: 'GET chat page (5 s poll, group)', path: '/api/conversations/cg/messages', budget: 220 },
+  // The group carries message reactions (2 on every third message): about 4 rows per reaction on top of the page's ~140.
+  { name: 'GET chat page (5 s poll, group, reactions)', path: '/api/conversations/cg/messages', budget: 450 },
   { name: 'GET chat page, idle poll (If-None-Match: 304)', path: '/api/conversations/cd1/messages', budget: 40, conditional: true },
   { name: 'GET group page, idle poll (If-None-Match: 304)', path: '/api/conversations/cg/messages', budget: 45, conditional: true },
+  { name: 'GET group page, older (with reactions)', path: '/api/conversations/cg/messages?before=cg_200', budget: 450 },
   { name: 'GET /api/conversations/:id', path: '/api/conversations/cd1', budget: 40 },
   { name: 'GET /api/messages/recommended', path: '/api/messages/recommended', budget: 250 },
   { name: 'GET /api/activity?show=everyone', path: '/api/activity?show=everyone', budget: 900 },

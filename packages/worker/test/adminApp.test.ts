@@ -206,6 +206,24 @@ describe('feature switches', () => {
     expect((await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '👍' })).status).toBe(200);
   });
 
+  it('Recent emoji: a custom emoji on a post goes to the front of /api/me recentEmoji (newest first, deduplicated, 4 kept); the quick set does not', async () => {
+    await seedPost();
+    const recent = async () => (await json(await call('vance@x.com', '/api/me'))).recentEmoji;
+    expect(await recent()).toEqual([]);
+    const spy = spyD1(env.DB);
+    await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '🦊' }, { db: spy.db });
+    expect(spy.binds.some((b) => /UPDATE users SET recent_emoji/.test(b.sql))).toBe(true);
+    expect(await recent()).toEqual(['🦊']);
+    await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '❤️' }); // the quick set: not recorded
+    expect(await recent()).toEqual(['🦊']);
+    // 🦊 a second time takes the reaction off (a toggle): removing records nothing.
+    for (const e of ['🐸', '🍜', '🎸', '🦊', '🌙']) await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: e });
+    expect(await recent()).toEqual(['🌙', '🎸', '🍜', '🐸']);
+    await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '🍜' }); // off
+    await call('vance@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '🍜' }); // on again: to the front, once
+    expect(await recent()).toEqual(['🍜', '🌙', '🎸', '🐸']);
+  });
+
   it('friends off: requests, accepting and invite links are 403; the list still reads', async () => {
     await env.DB.prepare("UPDATE users SET invite_code = 'ABCD2345' WHERE id = 'uRen'").run();
     await env.DB.prepare("INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES ('uRen', 'uVance', 'pending', 'uRen', ?)").bind(iso(1)).run();

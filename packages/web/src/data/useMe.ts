@@ -19,6 +19,7 @@ export function normalizeMe(me: Me): Me {
   return {
     ...me,
     customLists,
+    recentEmoji: Array.isArray(me.recentEmoji) ? me.recentEmoji : [],
     customized: me.customized ?? {},
     settings: {
       ...DEFAULT_USER_SETTINGS,

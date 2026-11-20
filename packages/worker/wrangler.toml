@@ -16,14 +16,19 @@ database_name = "media-tracker"
 database_id = "00000000-0000-0000-0000-000000000000" # local dev only; the real id goes in [env.production] below
 migrations_dir = "migrations"
 
-# Pictures in messages (Phase 6). Dev uses a local R2 emulation; production needs the bucket created first (docs/SETUP.md).
+# Photos and voice memos in chats. Dev uses a local R2 emulation; production needs the bucket created first (docs/SETUP.md).
 # Until the production block below is uncommented, `wrangler deploy --env production` prints a warning that MEDIA is "at the
-# top level, but not on env.production". It is expected and harmless (production answers "pictures not set up"), and it
+# top level, but not on env.production". It is expected and harmless (production hides photos and voice memos), and it
 # goes away once the bucket exists and those lines are uncommented. (Wrangler 4.160 checks each binding by name, so an empty
 # `r2_buckets = []` under [env.production] does not silence it; moving this to an [env.dev] would change `npm run dev` and e2e.)
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "media-tracker-media"
+
+# Daily media cleanup at 04:17 UTC (a quiet hour): photos and voice memos older than the admin's months, and each person's
+# oldest files past their storage cap (src/media/store.ts). Without the MEDIA bucket it finds nothing to do.
+[triggers]
+crons = ["17 4 * * *"]
 
 [vars]
 ENVIRONMENT = "dev"
@@ -53,8 +58,12 @@ database_name = "media-tracker"
 database_id = "a0e8ea97-58e8-4669-bbb8-fc3616d53da8" # from `wrangler d1 create media-tracker`
 migrations_dir = "migrations"
 
-# Pictures in messages (Phase 6). Uncomment after creating the bucket (docs/SETUP.md "Pictures in messages");
-# with the lines in place, a deploy fails until the bucket exists. Without them, pictures answer "not set up".
+[env.production.triggers]
+crons = ["17 4 * * *"]
+
+# Photos and voice memos in chats. Uncomment the three lines below ONLY after creating the bucket
+# (docs/SETUP.md "Turn on photos and voice memos"); with them in place, a deploy fails until the bucket exists.
+# While they stay commented, the app works and simply hides Send a photo / Record a voice memo.
 # [[env.production.r2_buckets]]
 # binding = "MEDIA"
 # bucket_name = "media-tracker-media"

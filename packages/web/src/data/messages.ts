@@ -1,11 +1,13 @@
 import {
-  type Conversation, type ConversationList, type ConversationSummary, type Message, type MessagePage, type PublicUser, type RecommendedItem,
+  type Conversation, type ConversationList, type ConversationSummary, type Message, type MessagePage, type MessageReaction, type PublicUser, type RecommendedItem,
   type RecSnapshot,
 } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
 import { UNREAD_KEY } from './feed';
+import { ME_KEY, storeMe } from './useMe';
+import type { Me } from '../api/types';
 import type { FriendEntry } from '@media-tracker/shared';
 
 /** Phase 6 (docs/plans/2026-11-17-phase6-messages.md): chats, groups, pictures and recommendations. */
@@ -32,6 +34,8 @@ const chatKey = (id: string) => [...MESSAGES_KEY, 'chat', id] as const;
 const recommendedKey = [...MESSAGES_KEY, 'recommended'] as const;
 
 export const messageImageUrl = (id: string): string => `/api/messages/${encodeURIComponent(id)}/image`;
+/** A voice memo's file (members only; byte ranges work, so the player can seek). */
+export const messageMediaUrl = (id: string): string => `/api/messages/${encodeURIComponent(id)}/media`;
 
 export function useConversations() {
   // Structural sharing keeps the same array while a poll brings nothing new, so a new reference means a change.
@@ -68,6 +72,8 @@ export interface Chat {
   hasOlder: boolean;
   loadingOlder: boolean;
   loadOlder: () => Promise<void>;
+  /** Changes one loaded message at once (the newest page's cache and the older pages): optimistic reactions. */
+  patchMessage: (id: string, fn: (m: Message) => Message) => void;
 }
 
 /**
@@ -105,6 +111,11 @@ export function useChat(id: string): { query: ReturnType<typeof useChatPage>; ch
     }
   }, [cursor, id, loadingOlder]);
 
+  const patchMessage = useCallback((mid: string, fn: (m: Message) => Message) => {
+    qc.setQueryData<MessagePage>(chatKey(id), (old) => old && { ...old, messages: old.messages.map((m) => (m.id === mid ? fn(m) : m)) });
+    setOlder((o) => o && { ...o, messages: o.messages.map((m) => (m.id === mid ? fn(m) : m)) });
+  }, [id, qc]);
+
   if (!page) return { query, chat: null };
   const all = [...page.messages];
   const have = new Set(all.map((m) => m.id));
@@ -113,7 +124,7 @@ export function useChat(id: string): { query: ReturnType<typeof useChatPage>; ch
   const messages = all.reverse();
   return {
     query,
-    chat: { messages, users: { ...older?.users, ...page.users }, readOnly: page.readOnly, hasOlder: cursor !== null, loadingOlder, loadOlder },
+    chat: { messages, users: { ...older?.users, ...page.users }, readOnly: page.readOnly, hasOlder: cursor !== null, loadingOlder, loadOlder, patchMessage },
   };
 }
 
@@ -154,37 +165,78 @@ export function useSendRec(conversationId: string) {
   });
 }
 
-/** A picture (already resized): the raw bytes with their content type. */
+/** POSTs raw bytes (a photo or voice memo) with their content type; errors are ApiError like the JSON client's. */
+async function upload(path: string, blob: Blob, type: string): Promise<Message> {
+  const res = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': type }, body: blob });
+  const text = await res.text();
+  let data: unknown;
+  try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
+  if (!res.ok) {
+    const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
+    throw new ApiError(res.status, code, data);
+  }
+  return data as Message;
+}
+
+/** A photo (already resized and re-encoded, so no EXIF or location): the raw bytes with their content type. */
 export function useSendImage(conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (blob: Blob) => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}/messages/image`, {
-        method: 'POST', credentials: 'same-origin', headers: { 'content-type': blob.type || 'image/jpeg' }, body: blob,
-      });
-      const text = await res.text();
-      let data: unknown;
-      try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
-      if (!res.ok) {
-        const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
-        throw new ApiError(res.status, code, data);
-      }
-      return data as Message;
-    },
+    mutationFn: (blob: Blob) => upload(`/api/conversations/${encodeURIComponent(conversationId)}/messages/image`, blob, blob.type || 'image/jpeg'),
     onSuccess: (m) => addToChat(qc, m),
   });
 }
 
+/** A voice memo: the recording and how long it is (the server allows 2 minutes). */
+export function useSendVoice(conversationId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ blob, durationMs }: { blob: Blob; durationMs: number }) =>
+      upload(`/api/conversations/${encodeURIComponent(conversationId)}/messages/voice?ms=${Math.max(1, Math.round(durationMs))}`, blob, blob.type || 'audio/webm'),
+    onSuccess: (m) => addToChat(qc, m),
+  });
+}
+
+/**
+ * Your reaction to a message: an emoji sets it (replacing yours), null removes it. Shown at once (`patch`), then the server's
+ * list; a failure puts the server's state back on the next poll and calls `onError`.
+ */
+export function useReactToMessage(conversationId: string, meId: string, patch: (id: string, fn: (m: Message) => Message) => void) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string | null }) => {
+      const path = `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reaction`;
+      return emoji === null ? api.del<{ reactions: MessageReaction[] }>(path) : api.put<{ reactions: MessageReaction[]; recentEmoji?: string[] }>(path, { emoji });
+    },
+    onMutate: ({ messageId, emoji }) => {
+      patch(messageId, (m) => {
+        const others = (m.reactions ?? []).filter((r) => r.userId !== meId);
+        return { ...m, reactions: emoji === null ? others : [...others, { userId: meId, emoji }] };
+      });
+    },
+    onSuccess: (res, { messageId }) => {
+      if (res && Array.isArray(res.reactions)) patch(messageId, (m) => ({ ...m, reactions: res.reactions }));
+      const recent = (res as { recentEmoji?: string[] } | undefined)?.recentEmoji;
+      if (Array.isArray(recent)) {
+        const me = qc.getQueryData<Me>(ME_KEY);
+        if (me) { const next = { ...me, recentEmoji: recent }; qc.setQueryData(ME_KEY, next); void storeMe(next); }
+      }
+    },
+    onError: () => { void qc.invalidateQueries({ queryKey: chatKey(conversationId) }); },
+  });
+}
+
 /** What to tell someone when a send failed. */
-export function sendErrorText(e: unknown, what: 'message' | 'picture' = 'message'): string {
+export function sendErrorText(e: unknown, what: 'message' | 'picture' | 'voice' = 'message'): string {
   if (e instanceof ApiError) {
     if (e.status === 429) return "You're sending too fast. Wait a minute and try again.";
-    if (e.status === 503) return 'Pictures need setup.';
+    if (e.status === 503) return 'Photos and voice memos need setup.';
     if (e.status === 403) return "You can't message them any more.";
     if (e.status === 400 && e.error === 'invalid_reply') return "That message is gone, so it can't be replied to.";
-    if (e.status === 413 || e.status === 415) return "That picture can't be sent.";
+    if (e.status === 413) return what === 'voice' ? 'That voice memo is too big to send.' : 'That photo is too big to send.';
+    if (e.status === 415 || (e.status === 400 && what !== 'message')) return what === 'voice' ? "That voice memo can't be sent." : "That photo can't be sent.";
   }
-  return what === 'picture' ? "Couldn't send the picture. Try again." : "Couldn't send. Try again.";
+  return what === 'picture' ? "Couldn't send the photo. Try again." : what === 'voice' ? "Couldn't send the voice memo. Try again." : "Couldn't send. Try again.";
 }
 
 /** Deletes your own message (soft: the chat shows "Message deleted"). */
@@ -197,7 +249,7 @@ export function useDeleteMessage(conversationId: string) {
         old && {
           ...old,
           // The deleted message loses its quote; replies to it now read "Original message deleted".
-          messages: old.messages.map((m) => (m.id === id ? { ...m, deleted: true, text: '', rec: null, image: false, replyTo: null }
+          messages: old.messages.map((m) => (m.id === id ? { ...m, deleted: true, text: '', rec: null, image: false, voice: null, reactions: [], replyTo: null }
             : m.replyTo?.id === id ? { ...m, replyTo: { id, senderId: '', senderName: '', kind: 'text' as const, snippet: '', deleted: true } } : m)),
         });
       void qc.invalidateQueries({ queryKey: [...MESSAGES_KEY, 'recommended'] });

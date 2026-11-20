@@ -49,6 +49,15 @@ describe('numberFirst', () => {
     for (const v of Object.values(low)) expect(v).toBeGreaterThanOrEqual(0);
   });
 
+  test('"About the same" keeps two equal numbers equal even when other picks give them different strengths (Dan, 2026-11-20)', () => {
+    const r = shown([it('mha', 10), it('cp', 10), it('fma', 10)], [pick('mha', 'cp'), pick('cp', 'fma', true)]);
+    expect(r.cp).toBe(r.fma);
+    expect(r.mha).toBe(10);
+    expect(r.cp).toBeLessThan(10);
+    // Alone, a tie between two 10s leaves both at 10.
+    expect(shown([it('cp', 10), it('fma', 10)], [pick('cp', 'fma', true)])).toEqual({ cp: 10, fma: 10 });
+  });
+
   test('one pick between two 9.6s gives 9.62 and 9.58 (wireframe)', () => {
     expect(shown([it('inv', 9.6), it('arc', 9.6)], [pick('inv', 'arc')])).toEqual({ inv: 9.62, arc: 9.58 });
     expect(shown([it('inv', 9.6), it('arc', 9.6)], [pick('arc', 'inv')])).toEqual({ inv: 9.58, arc: 9.62 });

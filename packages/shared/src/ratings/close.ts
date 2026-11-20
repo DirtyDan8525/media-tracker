@@ -95,10 +95,12 @@ function solveCluster(nodes: Node[], picks: readonly PickRow[], s: Map<string, n
   const out: number[][] = nodes.map(() => []);
   const indeg = new Int32Array(k);
   const decisive = new Set<string>();
+  const tied = new Set<string>();
   for (const p of picks) {
     let w = idx.get(p.winnerId), l = idx.get(p.loserId);
     if (w === undefined || l === undefined) continue;
     if (p.isTie) {
+      tied.add(pairKey(p.winnerId, p.loserId));
       // "About the same" never reorders: the higher typed number stays first (equal numbers: no edge).
       if (nodes[w]!.T === nodes[l]!.T) continue;
       if (nodes[w]!.T < nodes[l]!.T) [w, l] = [l, w];
@@ -134,7 +136,9 @@ function solveCluster(nodes: Node[], picks: readonly PickRow[], s: Map<string, n
       const a = order[j - 1]!, b = order[j]!;
       let gap: number;
       if (a.T > b.T) gap = Math.min(G, a.T - b.T);
-      else if (a.T === b.T && Math.abs(a.strength - b.strength) <= 1e-9 && !decisive.has(pairKey(a.id, b.id))) gap = 0;
+      // Equal typed numbers stay equal when the two were called "About the same" (Dan, 2026-11-20: a tie between two
+      // 10s pulled them apart because other picks gave them different strengths), or when nothing tells them apart.
+      else if (a.T === b.T && !decisive.has(pairKey(a.id, b.id)) && (tied.has(pairKey(a.id, b.id)) || Math.abs(a.strength - b.strength) <= 1e-9)) gap = 0;
       else gap = G;
       D[j] = D[j - 1]! + gap;
     }

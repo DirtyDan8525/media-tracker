@@ -12,7 +12,7 @@ import { loadSettings, type AppEnv } from '../auth/user';
 import { BACKUP_EXCLUDED_NOTE, BACKUP_TABLES } from '../admin/backup';
 import { CATEGORIES } from './entryValidation';
 import { checkSources, explainLookup } from '../lookup/adminTools';
-import { loadAppSettings } from '../settings/appSettings';
+import { forgetAppSettings, loadAppSettings } from '../settings/appSettings';
 import { publicUser, PUBLIC_USER_COLS, type PublicUserRow } from '../social/visibility';
 import { createResetLink, createSignupLink } from './auth';
 
@@ -191,6 +191,7 @@ admin.put('/app/:key', async (c) => {
   await c.env.DB.prepare(
     'INSERT INTO app_settings (key, value_json, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT (key) DO UPDATE SET value_json = ?2, updated_at = ?3',
   ).bind(key, JSON.stringify(value), new Date().toISOString()).run();
+  forgetAppSettings();
   return c.json({ key, value });
 });
 
@@ -199,6 +200,7 @@ admin.delete('/app/:key', async (c) => {
   const key = c.req.param('key');
   if (!isAppSettingKey(key)) return c.json(notFound, 404);
   await c.env.DB.prepare('DELETE FROM app_settings WHERE key = ?').bind(key).run();
+  forgetAppSettings();
   return c.body(null, 204);
 });
 

@@ -4,7 +4,9 @@ import { conversationTitle, useConversations, useRecommended } from '../../data/
 import { EmptyState } from '../../design/components/EmptyState';
 import { Icon } from '../../design/components/Icon';
 import { Skeleton } from '../../design/components/Skeleton';
-import { useNow } from '../../hooks';
+import { useIsWide, useNow } from '../../hooks';
+import { CoverBackdrop } from '../../design/components/CoverBackdrop';
+import { useBackdropCover } from './useBackdropCover';
 import { PageHeader } from '../../shell/PageHeader';
 import { useSessionMe } from '../../shell/SessionGate';
 import { ChatAvatar } from './ChatAvatar';
@@ -17,6 +19,8 @@ export function MessagesScreen() {
   const list = useConversations();
   const recs = useRecommended();
   const now = useNow();
+  const wide = useIsWide();
+  const cover = useBackdropCover([], wide);
   // Only recommendations you haven't seen yet (their chat not opened since they arrived) count.
   const recCount = recs.data?.filter((i) => i.unread).length ?? 0;
   // Phone: Messages sits under the Friends tab, so its back arrow goes to Friends (without Friends it keeps the profile button).
@@ -46,9 +50,7 @@ export function MessagesScreen() {
       </div>
     );
   }
-  return (
-    <div className="screen">
-      {header}
+  const body = (
       <div className="screen__body stack-10 messages-page">
         {newRow}
         <Link to="/messages/recommended" className="group__row messages-rec-link">
@@ -83,6 +85,15 @@ export function MessagesScreen() {
           </ul>
         )}
       </div>
-    </div>
   );
+  // PC: a centred column over a blurred cover of one of your top titles (picked once per visit).
+  if (wide) {
+    return (
+      <div className="screen messages-screen has-backdrop">
+        <CoverBackdrop src={cover} className="backdrop--side" />
+        <div className="messages-col">{header}{body}</div>
+      </div>
+    );
+  }
+  return <div className="screen">{header}{body}</div>;
 }

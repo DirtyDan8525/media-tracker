@@ -64,14 +64,17 @@ describe('Chat', () => {
     expect(list.querySelector('.bubble-row__avatar .avatar')!.closest('li')).toHaveTextContent('two');
   });
 
+  const at = (h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(h, m, 0, 0); return d.toISOString(); };
+
   it('a direct chat shows their picture once per run (28 px), none beside mine; a long pause or a day starts a new run with more space', async () => {
     setup({
       messages: {
         c1: [
-          makeMessage({ senderId: REN_U.id, text: 'a', createdAt: hoursAgo(3) }),
-          makeMessage({ senderId: REN_U.id, text: 'b', createdAt: new Date(Date.now() - 3 * 3_600_000 + 60_000).toISOString() }),
-          makeMessage({ senderId: REN_U.id, text: 'c', createdAt: hoursAgo(2) }),
-          makeMessage({ senderId: ME.id, text: 'd', createdAt: hoursAgo(1) }),
+          // Fixed times on one day (yesterday 09:00–11:00), so the test can't cross midnight.
+          makeMessage({ senderId: REN_U.id, text: 'a', createdAt: at(9, 0) }),
+          makeMessage({ senderId: REN_U.id, text: 'b', createdAt: at(9, 1) }),
+          makeMessage({ senderId: REN_U.id, text: 'c', createdAt: at(10, 0) }),
+          makeMessage({ senderId: ME.id, text: 'd', createdAt: at(11, 0) }),
         ],
       },
     });

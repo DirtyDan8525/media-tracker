@@ -10,9 +10,21 @@ import type { FriendEntry } from '@media-tracker/shared';
 
 /** Phase 6 (docs/plans/2026-11-17-phase6-messages.md): chats, groups, pictures and recommendations. */
 export const MESSAGES_KEY = ['messages'] as const;
-/** M4: an open chat checks every 5 s while the page is visible; the list every 30 s and on focus. */
+/**
+ * M4: an open chat checks every 5 s while the page is visible; the list every 30 s and on focus. Neither polls while the
+ * tab is hidden (refetchIntervalInBackground: false: TanStack skips the tick when document.visibilityState is 'hidden').
+ * The chat's 5 s check is a conditional request (the Worker's ETag, revalidated by the browser), so an idle chat costs
+ * almost nothing; the list slows down while nothing in it changes (listPollMs).
+ */
 export const CHAT_POLL_MS = 5_000;
 export const LIST_POLL_MS = 30_000;
+
+/** The list's poll interval: 30 s while it changes, 60 s after 2 minutes without a change, 120 s after 10. */
+export function listPollMs(unchangedForMs: number): number {
+  if (unchangedForMs >= 10 * 60_000) return 4 * LIST_POLL_MS;
+  if (unchangedForMs >= 2 * 60_000) return 2 * LIST_POLL_MS;
+  return LIST_POLL_MS;
+}
 
 const listKey = [...MESSAGES_KEY, 'list'] as const;
 const convKey = (id: string) => [...MESSAGES_KEY, 'conversation', id] as const;
@@ -22,10 +34,16 @@ const recommendedKey = [...MESSAGES_KEY, 'recommended'] as const;
 export const messageImageUrl = (id: string): string => `/api/messages/${encodeURIComponent(id)}/image`;
 
 export function useConversations() {
+  // Structural sharing keeps the same array while a poll brings nothing new, so a new reference means a change.
+  const changed = useRef<{ data: unknown; at: number }>({ data: undefined, at: Date.now() });
   return useQuery({
     queryKey: listKey,
     queryFn: async () => (await api.get<ConversationList>('/api/conversations')).conversations,
-    refetchInterval: LIST_POLL_MS,
+    refetchInterval: (query) => {
+      const now = Date.now();
+      if (query.state.data !== changed.current.data) changed.current = { data: query.state.data, at: now };
+      return listPollMs(now - changed.current.at);
+    },
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',

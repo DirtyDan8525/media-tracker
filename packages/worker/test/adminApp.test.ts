@@ -7,6 +7,7 @@ import type { LookupInfo, SourceId } from '@media-tracker/shared';
 import { BACKUP_SKIPPED_TABLES, BACKUP_TABLES } from '../src/admin/backup';
 import { SOURCES, type SourceEntry } from '../src/lookup/sources/index';
 import { spyD1 } from './d1spy';
+import { APP_SETTINGS_TTL_MS, cachedAppSettings, forgetAppSettings } from '../src/settings/appSettings';
 
 // Phase 6c, AD1-AD11 (server side): app settings, feature switches, defaults, moderation, numbers, lookup tools, backup.
 const ADMIN = 'dan@x.com';
@@ -96,6 +97,22 @@ describe('GET /api/app (AD1)', () => {
     expect(body.brand.name).toBe('Our Shelf');
     expect(body.announcement).toMatchObject({ text: 'Maintenance Sunday', link: 'https://x.test/' });
   });
+
+  it('answers from this isolate\'s copy for a minute (0 queries); an admin save or delete here drops it at once', async () => {
+    expect((await json(await call(null, '/api/app'))).brand.name).toBe(APP_SETTING_DEFAULTS.brand.name);
+    const spy = spyD1(env.DB);
+    await call(null, '/api/app', 'GET', undefined, { db: spy.db });
+    expect(spy.queries).toBe(0);
+    await put('brand', { name: 'Fresh' });
+    expect((await json(await call(null, '/api/app'))).brand.name).toBe('Fresh');
+    expect((await admin('/api/admin/app/brand', 'DELETE')).status).toBe(204);
+    expect((await json(await call(null, '/api/app'))).brand.name).toBe(APP_SETTING_DEFAULTS.brand.name);
+    // Older than the TTL: read again.
+    const later = await cachedAppSettings(env.DB, Date.now() + APP_SETTINGS_TTL_MS + 1);
+    expect(later.brand.name).toBe(APP_SETTING_DEFAULTS.brand.name);
+    await env.DB.prepare("INSERT INTO app_settings VALUES ('brand', '{\"name\":\"Behind\"}', ?)").bind(iso(0)).run();
+    expect((await cachedAppSettings(env.DB, Date.now() + 2 * APP_SETTINGS_TTL_MS + 2)).brand.name).toBe('Behind');
+  });
 });
 
 describe('PUT /api/admin/app/:key (AD1)', () => {
@@ -150,6 +167,7 @@ describe('PUT /api/admin/app/:key (AD1)', () => {
     expect((await admin('/api/admin/app/brand', 'DELETE')).status).toBe(204);
     expect((await json(await call(null, '/api/app'))).brand).toEqual(APP_SETTING_DEFAULTS.brand);
     await env.DB.prepare("INSERT INTO app_settings VALUES ('brand', '{\"name\":\"\"}', ?)").bind(iso(0)).run();
+    forgetAppSettings(); // written behind the API's back: drop GET /api/app's per-isolate copy
     expect((await json(await call(null, '/api/app'))).brand).toEqual(APP_SETTING_DEFAULTS.brand);
   });
 });

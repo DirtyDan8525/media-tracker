@@ -9,6 +9,13 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Media Tracker</title>
+    <script>
+      // Text size is per device: apply it before the first paint (deviceLook.ts has the same table).
+      try {
+        var s = { smaller: 0.9, larger: 1.12, largest: 1.25 }[localStorage.getItem('mt-text-scale')];
+        if (s) document.documentElement.style.setProperty('--app-scale', String(s));
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

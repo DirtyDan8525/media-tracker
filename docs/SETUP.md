@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0018_tags_dates.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0019_query_indexes.sql`) with a green check.
 
 ## Pictures in messages (create the picture storage once, before step 7)
 
@@ -263,6 +263,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0009_number_first.sql`: the number-first rating model (Phase 5). Apply it **before** deploying.
    - `0007_signup_links.sql`: the table behind pre-approved sign-up links (Admin > Sign-up links). Apply it **before** deploying.
    - `0006_social.sql`: friends, invite links, reactions, comments, and the app's own sign-in (passwords, sessions, approvals) (Phase 4). Apply it **before** deploying: the new app reads these tables. Coming from a version before Phase 4b, do the whole update with "Switching to the app's own sign-in" below instead.
+   - `0019_query_indexes.sql`: faster, cheaper reads (new indexes on messages, activity, comments, reactions, titles and seasons; no data changes), so the app stays well inside D1's free daily read limit. Apply it **before** deploying: the new app names these indexes.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:

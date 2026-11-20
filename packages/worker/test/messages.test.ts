@@ -713,3 +713,83 @@ describe('query counts (+ sign-in 1)', () => {
     expect(spy.queries).toBe(3);
   });
 });
+
+describe('the 5 s poll: the newest page carries an ETag, and an unchanged chat answers 304', () => {
+  const poll = (email: string, conv: string, tag?: string | null, db?: D1Database) =>
+    run(email, `/api/conversations/${conv}/messages`, { headers: tag ? { 'If-None-Match': tag } : {} }, db);
+
+  it('304 with no page read while nothing changed; 200 with a new tag after a message, a delete, a rename or lost friendship', async () => {
+    const dm = await direct(A, b);
+    const first = await say(B, dm, 'hi');
+    const r0 = await poll(A, dm);
+    expect(r0.status).toBe(200);
+    expect(r0.headers.get('Cache-Control')).toBe('private, no-cache');
+    const t0 = r0.headers.get('ETag')!;
+    expect(t0).toMatch(/^W\/"[0-9a-f]{32}"$/);
+
+    const spy = spyD1(env.DB);
+    const same = await poll(A, dm, t0, spy.db);
+    expect(same.status).toBe(304);
+    expect(same.headers.get('ETag')).toBe(t0);
+    expect(spy.queries).toBe(2); // sign-in + the access query; no page, no read mark
+
+    // A new message: a full page with a new tag (and it marks the chat read).
+    await say(B, dm, 'again');
+    const r1 = await poll(A, dm, t0);
+    expect(r1.status).toBe(200);
+    const t1 = r1.headers.get('ETag')!;
+    expect(t1).not.toBe(t0);
+    expect((await json<MessagePage>(r1)).messages.map((m) => m.text)).toEqual(['again', 'hi']);
+    expect((await poll(A, dm, t1)).status).toBe(304);
+
+    // A deletion changes the page, so the tag.
+    expect((await as(B, `/api/messages/${first.id}`, 'DELETE')).status).toBe(204);
+    const r2 = await poll(A, dm, t1);
+    expect(r2.status).toBe(200);
+    expect((await json<MessagePage>(r2)).messages[1]).toMatchObject({ id: first.id, deleted: true });
+    const t2 = r2.headers.get('ETag')!;
+
+    // A sender's new display name shows on the page.
+    expect((await as(B, '/api/me/display-name', 'PUT', { displayName: 'Ren!' })).status).toBe(200);
+    const r3 = await poll(A, dm, t2);
+    expect(r3.status).toBe(200);
+    expect((await json<MessagePage>(r3)).users[b]).toMatchObject({ displayName: 'Ren!' });
+    const t3 = r3.headers.get('ETag')!;
+
+    // Unfriending makes the direct chat read-only.
+    expect((await as(A, `/api/friends/${b}`, 'DELETE')).status).toBe(204);
+    const r4 = await poll(A, dm, t3);
+    expect(r4.status).toBe(200);
+    expect((await json<MessagePage>(r4)).readOnly).toBe(true);
+  });
+
+  it('the tag is per person and per page size; an unread chat never answers 304 (the page marks it read)', async () => {
+    const dm = await direct(A, b);
+    await say(B, dm, 'hi');
+    const tagA = (await poll(A, dm)).headers.get('ETag')!;
+    const r = await poll(B, dm, tagA);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('ETag')).not.toBe(tagA);
+    const small = await run(A, `/api/conversations/${dm}/messages?limit=1`, { headers: { 'If-None-Match': tagA } });
+    expect(small.status).toBe(200);
+
+    // Unread for A: last_read_at behind the newest message, so even a matching tag gets the page and the read mark.
+    const tag = (await poll(A, dm)).headers.get('ETag')!;
+    await env.DB.prepare('UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?').bind('2000-01-01T00:00:00.000Z', dm, a).run();
+    expect(await unread(A)).toBe(1);
+    const again = await poll(A, dm, tag);
+    expect(again.status).toBe(200);
+    expect(again.headers.get('ETag')).toBe(tag);
+    expect(await unread(A)).toBe(0);
+    expect((await poll(A, dm, tag)).status).toBe(304);
+  });
+
+  it('older pages carry no tag', async () => {
+    const dm = await direct(A, b);
+    const m = await say(B, dm, 'one');
+    await say(B, dm, 'two');
+    const older = await as(A, `/api/conversations/${dm}/messages?before=${m.id}`);
+    expect(older.status).toBe(200);
+    expect(older.headers.get('ETag')).toBeNull();
+  });
+});

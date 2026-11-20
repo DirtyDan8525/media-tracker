@@ -17,6 +17,10 @@ database_id = "00000000-0000-0000-0000-000000000000" # local dev only; the real 
 migrations_dir = "migrations"
 
 # Pictures in messages (Phase 6). Dev uses a local R2 emulation; production needs the bucket created first (docs/SETUP.md).
+# Until the production block below is uncommented, `wrangler deploy --env production` prints a warning that MEDIA is "at the
+# top level, but not on env.production". It is expected and harmless (production answers "pictures not set up"), and it
+# goes away once the bucket exists and those lines are uncommented. (Wrangler 4.160 checks each binding by name, so an empty
+# `r2_buckets = []` under [env.production] does not silence it; moving this to an [env.dev] would change `npm run dev` and e2e.)
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "media-tracker-media"

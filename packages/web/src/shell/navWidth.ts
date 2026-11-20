@@ -4,6 +4,8 @@ import { useSyncExternalStore } from 'react';
 export const NAV_MIN_W = 200;
 export const NAV_MAX_W = 360;
 export const NAV_DEFAULT_W = 240;
+/** The width the side bar has when nothing was dragged: grows with the window, like `--side-nav-w` in tokens.css (clamp(240px, 14vw, 300px)). */
+export const defaultNavWidth = (viewportW: number): number => Math.min(300, Math.max(NAV_DEFAULT_W, Math.round(viewportW * 0.14)));
 export const NAV_NUDGE_PX = 16;
 export const NAV_WIDTH_KEY = 'mt-side-nav-w';
 

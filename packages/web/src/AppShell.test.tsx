@@ -446,7 +446,7 @@ describe('app shell', () => {
     renderApp('/more');
     expect(await screen.findByRole('heading', { level: 1, name: 'More' })).toBeInTheDocument();
     const main = screen.getByRole('main').querySelector<HTMLElement>('.screen__body')!;
-    expect(linkNames(main)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats', 'Import from Google Sheets', 'Help & how-tos', 'Install instructions', "What's new", 'Coming soon', 'About Media Tracker']);
+    expect(linkNames(main)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats', 'Import from Google Sheets', 'Import from AniList', 'Help & how-tos', 'Install instructions', "What's new", 'Coming soon', 'About Media Tracker']);
     expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ratings', 'Your data', 'App']);
     const tabs = screen.getByRole('navigation', { name: 'Main' });
     expect(within(tabs).getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page');

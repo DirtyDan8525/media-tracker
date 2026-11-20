@@ -5,9 +5,9 @@
 import { Hono } from 'hono';
 import { publicAppSettings } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
-import { loadAppSettings } from '../settings/appSettings';
+import { cachedAppSettings } from '../settings/appSettings';
 
 export const appInfo = new Hono<AppEnv>();
 
-// 1 query.
-appInfo.get('/', async (c) => c.json(publicAppSettings(await loadAppSettings(c.env.DB)), 200, { 'Cache-Control': 'no-store' }));
+// 0-1 queries: this isolate's copy, read again after a minute or an admin save here (settings/appSettings.ts).
+appInfo.get('/', async (c) => c.json(publicAppSettings(await cachedAppSettings(c.env.DB)), 200, { 'Cache-Control': 'no-store' }));

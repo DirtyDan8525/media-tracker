@@ -1,7 +1,8 @@
 import { THEMES } from '@media-tracker/shared';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { reloadDeviceLook, THEME_KEY } from '../../design/deviceLook';
 import { contrast } from '../../design/theme';
 import { makeMe, mockApi, type Call } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
@@ -9,6 +10,7 @@ import { warningText } from './CustomColors';
 
 const css = (name: string) => document.documentElement.style.getPropertyValue(name);
 const puts = (calls: Call[]) => calls.filter((c) => c.method === 'PUT' && c.path === '/api/me/settings').map((c) => c.body);
+const stored = () => JSON.parse(localStorage.getItem(THEME_KEY) ?? 'null') as { theme: string; colors: Record<string, string> } | null;
 const themeName = (theme: string, colors: Record<string, string> = {}) => {
   const me = makeMe();
   return makeMe({ settings: { ...me.settings, theme, colors } });
@@ -28,49 +30,56 @@ describe('Settings: theme picker', () => {
     expect(screen.queryByRole('heading', { name: 'Custom colours' })).not.toBeInTheDocument();
   });
 
-  it('picking Ocean saves it and applies its colours', async () => {
+  it('picking Ocean saves it on this device only (nothing goes to the account) and applies its colours', async () => {
     const calls = mockApi(makeMe());
     renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Ocean' }));
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Ocean' } }]));
     await waitFor(() => expect(css('--bg')).toBe('#0f1c2b'));
+    expect(stored()).toEqual({ theme: 'Ocean', colors: {} });
+    expect(puts(calls)).toEqual([]);
     expect(screen.getByRole('radio', { name: 'Ocean' })).toBeChecked();
+    expect(screen.getAllByText('Saved on this device only.').length).toBeGreaterThan(0);
+  });
+
+  it("this device's theme wins over the account's, which only starts a device that has not chosen", async () => {
+    localStorage.setItem(THEME_KEY, JSON.stringify({ theme: 'Forest', colors: {} }));
+    reloadDeviceLook();
+    mockApi(themeName('Sakura'));
+    renderApp('/settings/appearance');
+    expect(await screen.findByRole('radio', { name: 'Forest' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Sakura' })).not.toBeChecked();
+    await waitFor(() => expect(css('--bg')).toBe(THEMES.Forest!.Background));
+  });
+
+  it('a device with nothing saved starts from the account theme', async () => {
+    mockApi(themeName('Sakura'));
+    renderApp('/settings/appearance');
+    expect(await screen.findByRole('radio', { name: 'Sakura' })).toBeChecked();
+    expect(stored()).toBeNull();
+    await waitFor(() => expect(css('--bg')).toBe('#fff7f9'));
   });
 
   it('picking Custom with no saved colours starts from the theme on screen', async () => {
     const calls = mockApi(themeName('Sakura'));
     renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Custom' }));
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Custom', colors: THEMES.Sakura } }]));
     expect(await screen.findByRole('heading', { name: 'Custom colours' })).toBeInTheDocument();
+    expect(stored()).toEqual({ theme: 'Custom', colors: THEMES.Sakura });
+    expect(puts(calls)).toEqual([]);
     expect(screen.getByRole('textbox', { name: 'Background hex' })).toHaveValue('#fff7f9');
     expect(css('--bg')).toBe('#fff7f9');
   });
 
   it('picking Custom again keeps the colours saved before', async () => {
-    const calls = mockApi(themeName('Ocean', { Background: '#101010' }));
+    mockApi(themeName('Ocean', { Background: '#101010' }));
     renderApp('/settings/appearance');
     await userEvent.click(await screen.findByRole('radio', { name: 'Custom' }));
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { theme: 'Custom' } }]));
+    expect(stored()).toEqual({ theme: 'Custom', colors: { Background: '#101010' } });
     expect(await screen.findByRole('textbox', { name: 'Background hex' })).toHaveValue('#101010');
-  });
-
-  it('a failed theme save shows the toast and the old theme comes back', async () => {
-    mockApi(makeMe(), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings/appearance');
-    await userEvent.click(await screen.findByRole('radio', { name: 'Forest' }));
-    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Midnight' })).toBeChecked());
-    expect(css('--bg')).toBe('#1b1b25');
   });
 });
 
 describe('Settings: Custom colours', () => {
-  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
-  afterEach(() => { vi.useRealTimers(); });
-  const user = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
-  const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
-
   it('has a colour input and a hex box for each of the 10 roles', async () => {
     mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
@@ -82,114 +91,68 @@ describe('Settings: Custom colours', () => {
   });
 
   it('an invalid hex shows the error and is not saved', async () => {
-    const calls = mockApi(themeName('Custom'));
+    mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Text hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#zzzzzz');
+    await userEvent.clear(box);
+    await userEvent.type(box, '#zzzzzz');
     expect(await screen.findByText('Use a colour like #1b1b25.')).toBeInTheDocument();
     expect(box).toHaveAttribute('aria-invalid', 'true');
-    await tick(1000);
-    expect(puts(calls)).toEqual([]);
+    expect(stored()).toBeNull();
     expect(css('--text')).toBe('#e6e6ed');
   });
 
-  it('editing Text to #333333 applies at once, warns, and saves 500 ms after the last edit', async () => {
+  it('editing Text to #333333 applies at once, warns, and saves on this device (not the account)', async () => {
     const calls = mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Text hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#333333');
+    await userEvent.clear(box);
+    await userEvent.type(box, '#333333');
     expect(css('--text')).toBe('#333333');
     expect(screen.getByText(warning('Text', 'Background', '#333333', '#1b1b25'))).toBeInTheDocument();
     expect(screen.getByText(warning('Text', 'Cards', '#333333', '#232339'))).toBeInTheDocument();
     expect(screen.getByText(/^Text is hard to read on Background \(\d\.\d:1; aim for 4\.5:1\)\.$/)).toBeInTheDocument();
-    await tick(400);
+    expect(stored()).toEqual({ theme: 'Custom', colors: { ...THEMES.Midnight, Text: '#333333' } });
     expect(puts(calls)).toEqual([]);
-    await tick(200);
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { Text: '#333333' } } }]));
     expect(screen.getByLabelText('Text', { selector: 'input[type="color"]' })).toHaveValue('#333333');
   });
 
-  it('the colour input saves the role too, and edits to two roles go in one save', async () => {
-    const calls = mockApi(themeName('Custom'));
+  it('the colour input saves the role too, and two roles are both kept', async () => {
+    mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
     const bg = await screen.findByLabelText('Background', { selector: 'input[type="color"]' });
     fireEvent.input(bg, { target: { value: '#000000' } });
     fireEvent.input(screen.getByLabelText('Highlight', { selector: 'input[type="color"]' }), { target: { value: '#00ff00' } });
     expect(css('--bg')).toBe('#000000');
     expect(screen.getByRole('textbox', { name: 'Background hex' })).toHaveValue('#000000');
-    await tick(600);
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { Background: '#000000', Highlight: '#00ff00' } } }]));
-  });
-
-  it('a saved edit is kept when you leave before 500 ms', async () => {
-    const calls = mockApi(themeName('Custom'));
-    const { router } = renderApp('/settings/appearance');
-    const box = await screen.findByRole('textbox', { name: 'Muted text hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#55556a');
-    await act(async () => { await router.navigate('/more'); });
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { 'Muted text': '#55556a' } } }]));
+    expect(stored()!.colors).toMatchObject({ Background: '#000000', Highlight: '#00ff00' });
   });
 
   it('a half-typed hex in one row survives another row being saved', async () => {
-    const calls = mockApi(themeName('Custom'));
+    mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
     const text = await screen.findByRole('textbox', { name: 'Text hex' });
     const muted = screen.getByRole('textbox', { name: 'Muted text hex' });
-    const u = user();
-    await u.clear(text);
-    await u.type(text, '#cccccc');
-    await u.clear(muted);
-    await u.type(muted, '#zz');
-    await u.tab();
+    await userEvent.clear(text);
+    await userEvent.type(text, '#cccccc');
+    await userEvent.clear(muted);
+    await userEvent.type(muted, '#zz');
+    await userEvent.tab();
     expect(screen.getByText('Use a colour like #1b1b25.')).toBeInTheDocument();
-    await tick(600);
-    await waitFor(() => expect(puts(calls)).toEqual([{ settings: { colors: { Text: '#cccccc' } } }]));
+    expect(stored()!.colors.Text).toBe('#cccccc');
     expect(muted).toHaveValue('#zz');
-    expect(screen.getByText('Use a colour like #1b1b25.')).toBeInTheDocument();
-  });
-
-  it('a failed colour save shows the toast and the saved colour comes back', async () => {
-    mockApi(themeName('Custom'), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    renderApp('/settings/appearance');
-    const box = await screen.findByRole('textbox', { name: 'Text hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#333333');
-    await tick(600);
-    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
-    await waitFor(() => expect(box).toHaveValue('#e6e6ed'));
-    expect(css('--text')).toBe('#e6e6ed');
-  });
-
-  it('a save that fails after you have left still shows the toast', async () => {
-    mockApi(themeName('Custom'), { 'PUT /api/me/settings': { status: 500, body: { error: 'boom' } } });
-    const { router } = renderApp('/settings/appearance');
-    const box = await screen.findByRole('textbox', { name: 'Muted text hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#55556a');
-    await act(async () => { await router.navigate('/more'); });
-    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't save your settings. Try again.");
-    await waitFor(() => expect(css('--muted-text')).toBe('#a6a6bb'));
   });
 
   it('a Highlight that no button label reads on warns on the Highlight row; a readable one does not', async () => {
     mockApi(themeName('Custom'));
     renderApp('/settings/appearance');
     const box = await screen.findByRole('textbox', { name: 'Highlight hex' });
-    const u = user();
-    await u.clear(box);
-    await u.type(box, '#777777');
+    await userEvent.clear(box);
+    await userEvent.type(box, '#777777');
     expect(screen.getByText(/^Button text is hard to read on Highlight \(\d\.\d:1; aim for 4\.5:1\)\.$/)).toBeInTheDocument();
     expect(box.closest('.color-row')!.querySelector('[aria-label="Hard to read"]')).not.toBeNull();
-    await u.clear(box);
-    await u.type(box, '#ff9f43');
+    await userEvent.clear(box);
+    await userEvent.type(box, '#ff9f43');
     expect(screen.queryByText(/Button text is hard to read/)).not.toBeInTheDocument();
   });
 

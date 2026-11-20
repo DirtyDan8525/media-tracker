@@ -1,12 +1,11 @@
 import type { ThemeColors } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
+import { setDeviceTheme } from '../../design/deviceLook';
 import { Icon } from '../../design/components/Icon';
 import { applyTheme, contrastWarnings, ROLE_VARS, themeColors, type ContrastWarning } from '../../design/theme';
 import { useSessionMe } from '../../shell/SessionGate';
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-const SAVE_DELAY_MS = 500;
 const ROLES = Object.keys(ROLE_VARS) as (keyof typeof ROLE_VARS)[];
 
 /** One decimal, rounded down, so a ratio just under 4.5 never reads as "4.5:1". */
@@ -16,12 +15,10 @@ export const warningText = (w: ContrastWarning) =>
 
 /**
  * Settings → Custom colours (SettingsCustom.v2), shown only for the Custom theme: per role a colour
- * input and a hex box. Edits apply at once and save 500 ms after the last one (only the roles that
- * changed); leaving the screen saves what is waiting. Hard-to-read pairs warn but still save (Ruling P11).
+ * input and a hex box. Edits apply and save at once, on this device only. Hard-to-read pairs warn but still save (Ruling P11).
  */
 export function CustomColors() {
   const me = useSessionMe();
-  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const baseId = useId();
   const saved = themeColors(me.settings);
   const savedKey = JSON.stringify(saved);
@@ -30,14 +27,9 @@ export function CustomColors() {
   const [text, setText] = useState<Record<string, string>>(saved);
   const [bad, setBad] = useState<Record<string, boolean>>({});
   const draftRef = useRef(draft);
-  const pending = useRef<Record<string, string>>({});
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // The saved colours changed under us (a failed save rolled back, or another device): show them,
-  // unless an edit is still waiting to be saved. Our own save landing (saved == draft) changes nothing,
-  // so a half-typed hex in another row stays as typed.
+  // The saved colours changed under us (say, another tab): show them. Our own save landing changes nothing.
   useEffect(() => {
-    if (Object.keys(pending.current).length > 0) return;
     if (JSON.stringify(draftRef.current) === savedKey) return;
     const next = JSON.parse(savedKey) as ThemeColors;
     draftRef.current = next;
@@ -46,38 +38,13 @@ export function CustomColors() {
     setBad({});
   }, [savedKey]);
 
-  const flush = useRef(() => {});
-  flush.current = () => {
-    clearTimeout(timer.current);
-    const colors = pending.current;
-    if (Object.keys(colors).length === 0) return;
-    pending.current = {};
-    const before = savedKey; // what the server has; edits live only in the draft until now
-    save.mutate({ colors }, {
-      onError: () => {
-        // The rollback can land in the same render as the optimistic value, so the effect above may not
-        // see a change: put the saved colours back here, unless newer edits are waiting.
-        if (Object.keys(pending.current).length > 0) return;
-        const prev = JSON.parse(before) as ThemeColors;
-        draftRef.current = prev;
-        setDraft(prev);
-        setText(prev);
-        setBad({});
-        applyTheme({ theme: 'Custom', colors: prev });
-      },
-    });
-  };
-  useEffect(() => () => flush.current(), []);
-
+  // Colours are saved on this device only, so an edit applies and saves at once (no waiting on the server).
   function commit(role: string, hex: string) {
-    const value = hex.toLowerCase();
-    const next = { ...draftRef.current, [role]: value };
+    const next = { ...draftRef.current, [role]: hex.toLowerCase() };
     draftRef.current = next;
     setDraft(next);
     applyTheme({ theme: 'Custom', colors: next });
-    pending.current = { ...pending.current, [role]: value };
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => flush.current(), SAVE_DELAY_MS);
+    setDeviceTheme({ theme: 'Custom', colors: next });
   }
 
   function onColor(role: string, value: string) {

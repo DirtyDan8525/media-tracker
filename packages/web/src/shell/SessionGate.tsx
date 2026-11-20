@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuthState } from '../api/auth';
 import { AFTER_SETUP_KEY } from '../data/social';
@@ -7,6 +7,7 @@ import { useMe } from '../data/useMe';
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { RemovedScreen, WaitingScreen } from '../screens/auth/WaitingScreen';
 import { CfSetContext, ThemeColorsContext } from '../design/ThemeContext';
+import { useDeviceTheme, withDeviceLook } from '../design/deviceLook';
 import { cfFor, applyTheme, themeColors } from '../design/theme';
 import { RateOnCompleteHost } from '../screens/entry/RateOnCompleteHost';
 import { Button } from '../design/components/Button';
@@ -33,8 +34,11 @@ function ToSetup({ from }: { from: string }) {
 /** The signed-in user, for screens under the gate (which only renders them once it has one). */
 export function useSessionMe(): Me {
   const { data } = useMe();
-  if (!data) throw new Error('useSessionMe outside SessionGate');
-  return data;
+  const dev = useDeviceTheme();
+  // Theme and colours are per device: this device's choice wins over the account's value.
+  const me = useMemo(() => (data && dev ? { ...data, settings: withDeviceLook(data.settings, dev) } : data), [data, dev]);
+  if (!me) throw new Error('useSessionMe outside SessionGate');
+  return me;
 }
 
 /**
@@ -44,7 +48,8 @@ export function SessionGate() {
   const { data: me, isError, refetch, isFetching } = useMe();
   const { pathname, search } = useLocation();
   const auth = useAuthState();
-  const settings = me?.settings;
+  const dev = useDeviceTheme();
+  const settings = useMemo(() => (me ? withDeviceLook(me.settings, dev) : undefined), [me, dev]);
   const accent = useAppSettings().brand.accent;
 
   useEffect(() => {
@@ -86,8 +91,8 @@ export function SessionGate() {
   if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={afterSetupPath() ?? homePath(me.settings)} replace />;
 
   return (
-    <ThemeColorsContext.Provider value={themeColors(me.settings)}>
-      <CfSetContext.Provider value={cfFor(me.settings)}>
+    <ThemeColorsContext.Provider value={themeColors(settings!)}>
+      <CfSetContext.Provider value={cfFor(settings!)}>
         <Outlet />
         <RateOnCompleteHost />
       </CfSetContext.Provider>

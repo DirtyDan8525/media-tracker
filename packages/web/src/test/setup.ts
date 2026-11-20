@@ -5,11 +5,15 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { resetAuthState } from '../api/auth';
 import { localDb } from '../db/local';
+import { reloadDeviceLook, TEXT_SCALE_KEY, THEME_KEY } from '../design/deviceLook';
 import { setViewportWidth } from './viewport';
 
 beforeEach(async () => {
   setViewportWidth(390);
   sessionStorage.clear();
+  localStorage.removeItem(THEME_KEY);
+  localStorage.removeItem(TEXT_SCALE_KEY);
+  reloadDeviceLook();
   resetAuthState();
   await localDb.delete();
   await localDb.open();

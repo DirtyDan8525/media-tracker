@@ -13,6 +13,7 @@ import {
 import type { AppEnv } from '../auth/user';
 import { pushNewMessage } from '../push/events';
 import { ctxOf } from '../push/send';
+import { sha256Hex } from '../auth/session';
 import { featureOn } from '../settings/appSettings';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, pair, publicUser, type PublicUserRow } from '../social/visibility';
 
@@ -130,28 +131,69 @@ function toMessage(r: MessageRow): Message {
   };
 }
 
-/** Whether the direct chat aliased `c` has lost its friendship (the other member is not an accepted active friend of ?2). */
+/**
+ * Whether the direct chat aliased `c` has lost its friendship (the other member is not an accepted active friend of ?2).
+ * The pair's own friendships row is looked up by its key (user_a < user_b), rather than listing all of ?2's friends per chat.
+ */
 const READ_ONLY_SQL = `(c.kind = 'direct' AND NOT EXISTS (
-    SELECT 1 FROM conversation_members o WHERE o.conversation_id = c.id AND o.user_id <> ?2 AND o.user_id IN (${FRIEND_IDS_SQL('?2')})))`;
+    SELECT 1 FROM conversation_members o JOIN users ou ON ou.id = o.user_id AND ou.status = 'active'
+      JOIN friendships f ON f.user_a = min(o.user_id, ?2) AND f.user_b = max(o.user_id, ?2) AND f.status = 'accepted'
+     WHERE o.conversation_id = c.id AND o.user_id <> ?2))`;
 
 interface Access {
   kind: ConversationKind; name: string | null; created_by: string; created_at: string;
   read_only: number; newest: string; recent: number; member_count: number;
 }
 
+/** What the newest page of a chat depends on, read without reading the page (accessOf with `poll`). */
+interface PollState {
+  /** JSON [created_at, id] of the newest message, or null in an empty chat. */
+  newest_key: string | null;
+  /** JSON [count, latest deleted_at] of the chat's deleted messages (a partial index: usually no rows). */
+  deleted_key: string;
+  last_read_at: string | null;
+  /** Every user's public fields and status: names and pictures on the page, and who is active (users is a small table). */
+  people_key: string;
+}
+
 /**
  * 1 query: the caller's membership of conversation `id` (null = not a member or no such chat: answer 404),
  * with what the write routes need: read-only, newest message time, how many the caller sent since `cutoff`.
+ * `recent` is counted only for a send (a cutoff given); without one it is 0, so reads never count every message
+ * the caller ever sent.
  */
-const accessOf = (db: D1Database, id: string, me: string, cutoff: string) =>
-  db.prepare(
+function accessOf(db: D1Database, id: string, me: string, cutoff: string): Promise<Access | null>;
+function accessOf(db: D1Database, id: string, me: string, cutoff: '', poll: true): Promise<(Access & PollState) | null>;
+function accessOf(db: D1Database, id: string, me: string, cutoff: string, poll = false) {
+  const pollCols = poll
+    ? `, (SELECT json_array(x.created_at, x.id) FROM messages x WHERE x.conversation_id = c.id ORDER BY x.created_at DESC, x.id DESC LIMIT 1) AS newest_key,
+            (SELECT json_array(COUNT(*), MAX(x.deleted_at)) FROM messages x WHERE x.conversation_id = c.id AND x.deleted_at IS NOT NULL) AS deleted_key,
+            m.last_read_at,
+            (SELECT json_group_array(json_array(p.id, p.username, p.display_name, p.avatar_at, p.status)) FROM users p) AS people_key`
+    : '';
+  return db.prepare(
     `SELECT c.kind, c.name, c.created_by, c.created_at, ${READ_ONLY_SQL} AS read_only,
             COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id), '') AS newest,
-            (SELECT COUNT(*) FROM messages WHERE sender_id = ?2 AND created_at >= ?3) AS recent,
-            (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) AS member_count
+            ${cutoff === '' ? '0' : '(SELECT COUNT(*) FROM messages WHERE sender_id = ?2 AND created_at >= ?3)'} AS recent,
+            (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) AS member_count${pollCols}
        FROM conversations c JOIN conversation_members m ON m.conversation_id = c.id AND m.user_id = ?2
       WHERE c.id = ?1`,
-  ).bind(id, me, cutoff).first<Access>();
+  ).bind(...(cutoff === '' ? [id, me] : [id, me, cutoff])).first<Access & Partial<PollState>>();
+}
+
+/**
+ * The newest page's validator: changes whenever anything the page shows could have changed (a new message, a deletion,
+ * a name, picture or status, read-only, the page size), so a conditional poll that matches can answer 304 without
+ * reading the page. Weak, per caller.
+ */
+async function pageTag(me: string, limit: number, a: Access & PollState): Promise<string> {
+  const key = JSON.stringify([me, limit, a.read_only, a.newest_key, a.deleted_key, a.people_key]);
+  return `W/"${(await sha256Hex(key)).slice(0, 32)}"`;
+}
+
+/** Whether an If-None-Match header names `tag`. */
+const matchesTag = (header: string | undefined, tag: string) =>
+  header !== undefined && header.split(',').some((t) => t.trim() === tag || t.trim() === '*');
 
 /** Active members of the conversations, by conversation id (1 query). */
 async function membersOf(db: D1Database, ids: string[]): Promise<Map<string, PublicUser[]>> {
@@ -190,7 +232,7 @@ messages.get('/conversations', async (c) => {
             lm.kind AS lm_kind, substr(lm.body, 1, 200) AS lm_body, json_extract(lm.rec_json, '$.title') AS lm_rec_title, lm.sender_id AS lm_sender, lm.created_at AS lm_at, lm.deleted_at AS lm_deleted,
             EXISTS (SELECT 1 FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
                      WHERE x.conversation_id = c.id AND x.sender_id <> ?2 AND x.deleted_at IS NULL
-                       AND (m.last_read_at IS NULL OR x.created_at > m.last_read_at)) AS unread
+                       AND x.created_at > COALESCE(m.last_read_at, '')) AS unread
        FROM conversation_members m JOIN conversations c ON c.id = m.conversation_id
        LEFT JOIN messages lm ON lm.id = (SELECT x.id FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
                                           WHERE x.conversation_id = c.id ORDER BY x.created_at DESC, x.id DESC LIMIT 1)
@@ -326,6 +368,7 @@ messages.delete('/conversations/:id/members/me', async (c) => {
 });
 
 // A page of a chat, newest first: 1 + 2 queries (+ sign-in). The first page (no `before`) marks it read.
+// A conditional poll of the first page that still matches its ETag: 1 query (+ sign-in), answered 304.
 messages.get('/conversations/:id/messages', async (c) => {
   const me = c.var.user.id;
   const db = c.env.DB;
@@ -336,8 +379,21 @@ messages.get('/conversations/:id/messages', async (c) => {
   if (!Number.isInteger(limit) || limit < 1 || limit > MESSAGES_PAGE || (before !== undefined && (before === '' || before.length > 64))) {
     return c.json(invalid, 400);
   }
-  const a = await accessOf(db, id, me, '');
+  // The newest page (the 5 s poll) carries an ETag: the browser revalidates it (Cache-Control: no-cache), and while nothing
+  // changed the answer is 304 from the access query alone, without reading the page. An older page has no validator.
+  const a = before === undefined ? await accessOf(db, id, me, '', true) : await accessOf(db, id, me, '');
   if (!a) return c.json(notFound, 404);
+  let tag: string | null = null;
+  if (before === undefined) {
+    const poll = a as Access & PollState;
+    tag = await pageTag(me, limit, poll);
+    const newestAt = poll.newest_key === null ? null : (JSON.parse(poll.newest_key) as [string, string])[0];
+    // Already read up to the newest message, so the read mark this page would write changes nothing either.
+    const read = newestAt === null || (poll.last_read_at !== null && poll.last_read_at >= newestAt);
+    if (read && matchesTag(c.req.header('If-None-Match'), tag)) {
+      return c.body(null, 304, { ETag: tag, 'Cache-Control': 'private, no-cache' });
+    }
+  }
   const cursor = before !== undefined
     ? 'AND (m.created_at, m.id) < (SELECT created_at, id FROM messages WHERE id = ?2 AND conversation_id = ?1)'
     : '';
@@ -361,7 +417,7 @@ messages.get('/conversations/:id/messages', async (c) => {
     messages: page.map(toMessage), users, readOnly: a.read_only === 1,
     next: rows.length > limit ? page[page.length - 1]!.id : null,
   };
-  return c.json(body);
+  return tag === null ? c.json(body) : c.json(body, 200, { ETag: tag, 'Cache-Control': 'private, no-cache' });
 });
 
 /**

@@ -6,6 +6,7 @@ import { ctxOf } from '../push/send';
 import { featureOn } from '../settings/appSettings';
 import { ENTRY_SELECT, type EntryRow } from './entries';
 import {
+  FRIEND_IDS_SQL,
   PUBLIC_USER_COLS,
   pair,
   publicUser,
@@ -72,7 +73,8 @@ friends.get('/entries', async (c) => {
   if (category !== undefined && !Object.hasOwn(CATEGORY_CONFIG, category)) return c.json(invalid, 400);
   const me = c.var.user.id;
   const stmt = c.env.DB.prepare(
-    `${ENTRY_SELECT} WHERE e.user_id <> ?1 AND ${visibleEntrySql('e', '?1')}
+    // visibleEntrySql without its "your own" branch (excluded here anyway), so your own titles are never read.
+    `${ENTRY_SELECT} WHERE e.user_id <> ?1 AND e.is_private = 0 AND e.user_id IN (${FRIEND_IDS_SQL('?1')})
      AND (e.rating IS NOT NULL OR EXISTS (SELECT 1 FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL))
      ${category ? 'AND e.category = ?2' : ''} ORDER BY e.user_id, e.created_at, e.rowid`,
   );

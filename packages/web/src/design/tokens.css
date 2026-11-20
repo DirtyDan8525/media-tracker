@@ -66,21 +66,22 @@
 
   /* type */
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --fs-tab: 11px;        /* bottom-tab label */
-  --fs-pill: 12px;       /* status pill */
-  --fs-meta: 13px;       /* sub-lines, section headers, chips */
-  --fs-sm: 14px;         /* PC table, side-nav footer */
-  --fs-body: 15px;       /* rows, settings items */
-  --fs-lg: 16px;         /* rating, paragraphs, primary buttons */
-  --fs-brand: 18px;      /* top 5 hero title */
-  --fs-title: 26px;      /* phone screen title */
-  --fs-title-pc: 28px;   /* PC screen title */
+  /* Text sizes multiply by --app-scale (90/100/112/125 %), set on <html> per device (deviceLook.ts). */
+  --fs-tab: calc(11px * var(--app-scale, 1));        /* bottom-tab label */
+  --fs-pill: calc(12px * var(--app-scale, 1));       /* status pill */
+  --fs-meta: calc(13px * var(--app-scale, 1));       /* sub-lines, section headers, chips */
+  --fs-sm: calc(14px * var(--app-scale, 1));         /* PC table, side-nav footer */
+  --fs-body: calc(15px * var(--app-scale, 1));       /* rows, settings items */
+  --fs-lg: calc(16px * var(--app-scale, 1));         /* rating, paragraphs, primary buttons */
+  --fs-brand: calc(18px * var(--app-scale, 1));      /* top 5 hero title */
+  --fs-title: calc(26px * var(--app-scale, 1));      /* phone screen title */
+  --fs-title-pc: calc(28px * var(--app-scale, 1));   /* PC screen title */
 
   /* sizes */
   --tap: 44px;           /* minimum tap target */
   --btn-h: 48px;         /* standard button */
   --bottom-tabs-h: 76px;
-  --side-nav-w: 240px;
+  --side-nav-w: clamp(240px, 14vw, 300px); /* grows a little with the window until the person drags it (navWidth.ts) */
   --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
   --see-through: 0.9;    /* Lists menu: Cards at this alpha over a blur (B5) */
 

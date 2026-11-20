@@ -54,9 +54,10 @@ export function typedOf(
  */
 export async function ensureTyped(db: D1Database, userId: string, settings: Pick<UserSettings, 'tiers'>): Promise<number> {
   const [e, s] = await db.batch([
-    db.prepare('SELECT DISTINCT category FROM entries WHERE user_id = ? AND rating IS NOT NULL AND typed IS NULL').bind(userId),
+    // Both read only the rows still waiting (migration 0019's partial indexes; usually none), not every title.
+    db.prepare('SELECT DISTINCT category FROM entries INDEXED BY idx_entries_untyped WHERE user_id = ? AND rating IS NOT NULL AND typed IS NULL').bind(userId),
     db.prepare(
-      `SELECT DISTINCT e.category FROM seasons s JOIN entries e ON e.id = s.entry_id
+      `SELECT DISTINCT e.category FROM seasons s INDEXED BY idx_seasons_untyped CROSS JOIN entries e ON e.id = s.entry_id
         WHERE e.user_id = ? AND s.rating IS NOT NULL AND s.typed IS NULL`,
     ).bind(userId),
   ]);

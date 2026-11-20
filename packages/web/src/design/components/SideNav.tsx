@@ -5,7 +5,7 @@ import type { Me } from '../../api/types';
 import { useAppName } from '../../data/appSettings';
 import { LIST_LABEL, SEARCH_PATH } from '../../nav';
 import { ListsOrderSheet } from '../../shell/ListsOrderSheet';
-import { clampNavWidth, NAV_DEFAULT_W, NAV_MAX_W, NAV_MIN_W, NAV_NUDGE_PX } from '../../shell/navWidth';
+import { clampNavWidth, defaultNavWidth, NAV_MAX_W, NAV_MIN_W, NAV_NUDGE_PX } from '../../shell/navWidth';
 import { Avatar } from './Avatar';
 import { countText } from './BottomTabs';
 import { Icon, type IconName } from './Icon';
@@ -68,7 +68,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
   const navRef = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; w: number } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const shownWidth = width ?? NAV_DEFAULT_W;
+  const shownWidth = width ?? defaultNavWidth(typeof window === 'undefined' ? 0 : window.innerWidth);
   // The handle sits on the nav's inner edge: dragging toward the content widens a left nav and narrows a right one.
   const sign = side === 'right' ? -1 : 1;
   const onGripDown = (e: PointerEvent<HTMLDivElement>) => {

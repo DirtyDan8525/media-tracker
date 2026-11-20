@@ -174,8 +174,13 @@ activity.get('/', async (c) => {
   const db = c.env.DB;
   const viewer = c.var.user.id;
   const cursor = before !== undefined ? 'AND (a.created_at, a.id) < (?2, ?3)' : '';
+  // Friends / Everyone walk the anchors newest first (migration 0019's partial index, the activity row first: CROSS JOIN)
+  // and stop after a page, instead of collecting every visible post and sorting. You keeps its own (user_id, created_at) index.
+  const from = show === 'you'
+    ? 'activity a JOIN entries e'
+    : 'activity a INDEXED BY idx_activity_anchor_created CROSS JOIN entries e';
   const anchorSql = `SELECT a.id, a.user_id, a.created_at
-      FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
+      FROM ${from} ON e.id = a.entry_id AND e.user_id = a.user_id
      WHERE a.post_id IS NULL AND ${SCOPE[show]} ${cursor}
      ORDER BY a.created_at DESC, a.id DESC LIMIT ${PAGE + 1}`;
   const anchorStmt = db.prepare(anchorSql);
@@ -274,8 +279,9 @@ const capped = (sql: string) => `(SELECT COUNT(*) FROM (${sql} LIMIT ${UNREAD_CA
 // A8: nothing from pending or removed users counts.
 activity.get('/unread', async (c) => {
   const seen = `COALESCE((SELECT feed_seen_at FROM users WHERE id = ?1), '')`;
-  const onMine = (t: string) => `(${t}.entry_id IN (SELECT id FROM entries WHERE user_id = ?1)
-      OR ${t}.activity_id IN (SELECT id FROM activity WHERE user_id = ?1))`;
+  // On one of your entries or posts: a key lookup per new comment or reaction, which are found by created_at (indexed).
+  const onMine = (t: string) => `(EXISTS (SELECT 1 FROM entries oe WHERE oe.id = ${t}.entry_id AND oe.user_id = ?1)
+      OR EXISTS (SELECT 1 FROM activity oa WHERE oa.id = ${t}.activity_id AND oa.user_id = ?1))`;
   const posts = `SELECT 1 FROM activity a JOIN entries e ON e.id = a.entry_id AND e.user_id = a.user_id
       WHERE a.post_id IS NULL AND ${FRIENDS_POSTS} AND a.created_at > ${seen}`;
   const comments = `SELECT 1 FROM comments k WHERE k.user_id <> ?1 AND k.deleted_at IS NULL
@@ -290,7 +296,7 @@ activity.get('/unread', async (c) => {
             MIN(${UNREAD_CAP}, (SELECT COUNT(*) FROM conversation_members m WHERE m.user_id = ?1 AND EXISTS (
               SELECT 1 FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
                WHERE x.conversation_id = m.conversation_id AND x.sender_id <> ?1 AND x.deleted_at IS NULL
-                 AND (m.last_read_at IS NULL OR x.created_at > m.last_read_at)))) AS messages`,
+                 AND x.created_at > COALESCE(m.last_read_at, '')))) AS messages`,
   ).bind(c.var.user.id, c.var.user.isAdmin ? 1 : 0).first<{ feed: number; requests: number; messages: number }>();
   return c.json({ feed: row?.feed ?? 0, requests: row?.requests ?? 0, messages: row?.messages ?? 0 });
 });

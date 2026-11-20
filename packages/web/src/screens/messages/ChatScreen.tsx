@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { useParams } from 'react-router';
 import { ApiError } from '../../api/client';
 import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage } from '../../data/messages';
+import { CoverBackdrop } from '../../design/components/CoverBackdrop';
 import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
 import { EmptyState } from '../../design/components/EmptyState';
@@ -21,6 +22,7 @@ import { useBubbleMineColors } from './bubbleColors';
 import { useChatTextSize } from '../../design/components/useTextSize';
 import { AddPeopleSheet, LeaveSheet, RenameSheet } from './GroupSheets';
 import { RecCard } from './RecCard';
+import { useBackdropCover } from './useBackdropCover';
 import { clock, quoteText, snippetOfMessage } from './format';
 import '../../design/messages.css';
 
@@ -84,6 +86,8 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const menuWrap = useRef<HTMLDivElement>(null);
   const seen = useRef<Set<string> | null>(null);
 
+  const wide = useIsWide();
+  const cover = useBackdropCover(conversation.members.filter((m) => m.id !== me.id).map((m) => m.username), wide);
   const isGroup = conversation.kind === 'group';
   const title = conversationTitle(conversation, me.id);
   const users: Record<string, PublicUser> = { ...Object.fromEntries(conversation.members.map((m) => [m.id, m])), ...chat?.users };
@@ -171,7 +175,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
     );
   });
 
-  return (
+  const screenEl = (
     <div className="screen chat"
       style={{ '--chat-scale': textSize.scale, '--bubble-mine-bg': mineColors.bg, '--bubble-mine-text': mineColors.text } as CSSProperties}>
       <header className="chat__top">
@@ -240,6 +244,8 @@ function Chat({ conversation }: { conversation: Conversation }) {
       </Sheet>
     </div>
   );
+  // PC: the chat is a centred column; its sides show a blurred cover (one pick per visit, from your top titles or theirs).
+  return wide ? <div className="chat-page has-backdrop"><CoverBackdrop src={cover} className="backdrop--side" />{screenEl}</div> : screenEl;
 }
 
 /** Touch: holding a bubble this long starts a reply (a mouse has the Reply button; the keyboard reaches the same button). */

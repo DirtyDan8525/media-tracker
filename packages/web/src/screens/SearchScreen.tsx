@@ -139,7 +139,7 @@ export function SearchScreen() {
           )}
         </div>
       </PageHeader>
-      <div className="screen__body">
+      <div className="screen__body search-page">
         <p role="status" aria-live="polite" className="sr-only">{announce}</p>
         {people.length > 0 && (
           <section aria-labelledby="search-people" className="search-group">

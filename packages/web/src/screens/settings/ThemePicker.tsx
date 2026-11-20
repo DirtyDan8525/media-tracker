@@ -1,6 +1,6 @@
-import { THEMES, type UserSettings } from '@media-tracker/shared';
+import { THEMES } from '@media-tracker/shared';
 import type { CSSProperties } from 'react';
-import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../../data/useMe';
+import { setDeviceTheme } from '../../design/deviceLook';
 import { Icon } from '../../design/components/Icon';
 import { themeColors } from '../../design/theme';
 import { useSessionMe } from '../../shell/SessionGate';
@@ -9,20 +9,17 @@ const NAMES = [...Object.keys(THEMES), 'Custom'];
 
 /**
  * Settings → Appearance: a "Theme" radio group, the 12 themes in `THEMES` order then Custom
- * (SettingsAppearance.v2). Each option previews Background, Cards, Text and Highlight.
+ * (SettingsAppearance.v2), saved on this device only. Each option previews Background, Cards, Text and Highlight.
  */
 export function ThemePicker() {
   const me = useSessionMe();
-  const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
   const current = me.settings.theme;
 
   function pick(theme: string) {
     if (theme === current) return;
     // Custom with nothing saved starts from the theme on screen, so the editor opens on familiar colours.
-    const partial: Partial<UserSettings> = theme === 'Custom' && Object.keys(me.settings.colors).length === 0
-      ? { theme, colors: { ...themeColors(me.settings) } }
-      : { theme };
-    save.mutate(partial);
+    const colors = theme === 'Custom' && Object.keys(me.settings.colors).length === 0 ? { ...themeColors(me.settings) } : me.settings.colors;
+    setDeviceTheme({ theme, colors });
   }
 
   return (

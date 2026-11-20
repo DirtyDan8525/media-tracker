@@ -177,3 +177,20 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
 
 /* Title pages: the Share button shows its word beside the icon (still a 44 px tap target). */
 .detail-top .detail-top__share { border-color: transparent; color: var(--text); gap: var(--space-3); min-height: var(--tap); min-width: var(--tap); padding: 0 var(--space-5); font-weight: 600; }
+
+/* PC: the Messages list (~760 px) and an open chat (~960 px) are centred columns with a solid Background, over a blurred cover
+   (the same CoverBackdrop as the profile banner and title pages) that shows at the sides (Dan, 2026-11-20). */
+@media (min-width: 1024px) {
+  .frame--wide .messages-screen, .frame--wide .chat-page { min-height: 100dvh; overflow: clip; }
+  .frame--wide .backdrop--side { inset: 0; height: auto; }
+  .frame--wide .backdrop--side::after { background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  .frame--wide .backdrop--side img { opacity: 0.8; }
+  .frame--wide .messages-col, .frame--wide .chat-page > .chat {
+    margin-inline: auto; width: 100%; background: var(--bg); min-height: 100dvh;
+    box-shadow: 0 0 0 1px var(--grid-line), 0 0 40px rgb(0 0 0 / 0.35);
+  }
+  .frame--wide .messages-col { max-width: 760px; display: flex; flex-direction: column; }
+  .frame--wide .messages-col > .screen__body { max-width: none; width: 100%; flex: 1; }
+  .frame--wide .chat-page > .chat { max-width: 960px; }
+  .frame--wide .chat__list { max-width: 100%; }
+}

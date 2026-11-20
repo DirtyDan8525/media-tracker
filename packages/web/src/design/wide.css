@@ -12,7 +12,7 @@
   .frame--wide .profile .profile__body {
     max-width: 1200px; margin-inline: auto; width: 100%;
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8) var(--space-14); align-items: start;
-    --fs-body: 17px; --fs-sm: 15px; --fs-meta: 14px; --fs-lg: 18px; --fs-title: 34px;
+    --fs-body: calc(17px * var(--app-scale, 1)); --fs-sm: calc(15px * var(--app-scale, 1)); --fs-meta: calc(14px * var(--app-scale, 1)); --fs-lg: calc(18px * var(--app-scale, 1)); --fs-title: calc(34px * var(--app-scale, 1));
   }
   .frame--wide .profile__body > * { grid-column: 1 / -1; }
   .frame--wide .profile__body > .profile__col { grid-column: auto; display: flex; flex-direction: column; gap: var(--space-8); }
@@ -59,7 +59,7 @@
 @media (min-width: 1440px) {
   .frame--wide .screen__body { max-width: 1400px; }
   .frame--wide .stats, .frame--wide .wide-cols, .frame--wide .social-page, .frame--wide .top5 {
-    --fs-body: 16px; --fs-sm: 15px; --fs-meta: 14px; --fs-lg: 17px;
+    --fs-body: calc(16px * var(--app-scale, 1)); --fs-sm: calc(15px * var(--app-scale, 1)); --fs-meta: calc(14px * var(--app-scale, 1)); --fs-lg: calc(17px * var(--app-scale, 1));
   }
 }
 
@@ -81,7 +81,7 @@
   .frame--wide .activity-layout__feed { flex: 0 0 64%; min-width: 560px; max-width: 64%; }
   .frame--wide .activity { gap: var(--space-8); }
   .frame--wide .activity__day > ul { display: flex; flex-direction: column; gap: var(--space-5); }
-  .frame--wide .activity-screen { --fs-sm: 15px; --fs-meta: 14px; }
+  .frame--wide .activity-screen { --fs-sm: calc(15px * var(--app-scale, 1)); --fs-meta: calc(14px * var(--app-scale, 1)); }
   .frame--wide .activity-line__avatar { width: 44px !important; height: 44px !important; font-size: 18px !important; }
   .frame--wide .activity-filter, .frame--wide .search-screen__controls { max-width: 720px; }
   /* Search: each list's results in two columns. */
@@ -118,7 +118,7 @@
   .frame--wide .privacy-row { justify-content: flex-start; text-align: left; }
 
   /* Messages: chats in two columns. */
-  .frame--wide .convo-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-8); align-items: start; }
+  .frame--wide .convo-list { display: flex; flex-direction: column; gap: var(--space-3); }
 
   /* Help: the topics in two columns (each its own card, so opening one does not shift the other column). */
   .frame--wide .help__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); align-items: start; background: none; border-radius: 0; overflow: visible; }
@@ -147,4 +147,28 @@
 
 @media (min-width: 1440px) {
   .frame--wide .detail { grid-template-columns: minmax(0, 900px) 440px; }
+}
+
+/* One page width on PC (Dan, 2026-11-20, 2300 px monitor): the main screens share --page-max, left-aligned like the rest of
+   the app. Lists (tables) stay full width; the open chat is untouched. */
+:root { --page-max: 1600px; }
+@media (min-width: 1024px) {
+  .frame--wide .screen__body.top5,
+  .frame--wide .screen__body.stats,
+  .frame--wide .screen__body.friends-page,
+  .frame--wide .screen__body.friend-page,
+  .frame--wide .screen__body.social-page:has(> .friend-id),
+  .frame--wide .screen__body.activity-layout,
+  .frame--wide .screen__body.search-page { max-width: var(--page-max); }
+  /* Activity: posts ~62%, the details panel takes the rest of the same width. */
+  .frame--wide .activity-layout__feed { flex: 0 0 62%; max-width: 62%; min-width: 560px; }
+  .frame--wide .activity-panel { flex: 1 1 0; }
+}
+
+/* Side bar on big screens: a touch larger text and icons from 1600 px (its width grows via --side-nav-w in tokens.css). */
+@media (min-width: 1600px) {
+  .frame--wide .side-nav { --fs-body: calc(17px * var(--app-scale, 1)); --fs-sm: calc(16px * var(--app-scale, 1)); --fs-meta: calc(14px * var(--app-scale, 1)); }
+  .frame--wide .side-nav svg { width: 22px; height: 22px; }
+  .frame--wide .side-nav__list { min-height: 40px; }
+  .frame--wide .side-nav__link { min-height: 44px; }
 }

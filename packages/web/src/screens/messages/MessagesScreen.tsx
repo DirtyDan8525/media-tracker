@@ -68,7 +68,7 @@ export function MessagesScreen() {
               return (
                 <li key={c.id}>
                   <Link to={`/messages/${c.id}`} className={`convo${c.unread ? ' is-unread' : ''}`}
-                    aria-label={`${title}${c.unread ? ', unread' : ''}. ${preview}${when ? `, ${when}` : ''}`}>
+                    aria-label={`${title}${c.unread ? ', unread' : ''}${c.muted ? ', muted' : ''}. ${preview}${when ? `, ${when}` : ''}`}>
                     <ChatAvatar conversation={c} meId={me.id} />
                     <span className="convo__meta">
                       <span className="convo__title">{title}</span>
@@ -76,6 +76,7 @@ export function MessagesScreen() {
                     </span>
                     <span className="convo__end">
                       <span className="convo__time">{when}</span>
+                      {c.muted && <span className="convo__muted"><Icon name="bell-off" size={14} /></span>}
                       {c.unread && <span className="nav-dot nav-dot--inline" aria-hidden="true" />}
                     </span>
                   </Link>

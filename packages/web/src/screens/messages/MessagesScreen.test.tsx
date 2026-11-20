@@ -51,6 +51,19 @@ describe('Messages list', () => {
     expect(rows[1]).toHaveTextContent('Message deleted');
   });
 
+  it('a muted chat shows a bell-off icon and says "muted" in its name', async () => {
+    const group = makeConversation({ id: 'c2', kind: 'group', name: 'Anime night', members: [ME, REN_U, ALBERTO], muted: true });
+    setup({ conversations: [makeConversation(), group], messages: { c1: [makeMessage({ conversationId: 'c1' })], c2: [makeMessage({ conversationId: 'c2' })] } });
+    renderApp('/messages');
+    const list = await screen.findByRole('list', { name: 'Chats' });
+    const rows = within(list).getAllByRole('link');
+    const muted = rows.find((r) => r.getAttribute('aria-label')?.startsWith('Anime night'))!;
+    const plain = rows.find((r) => !r.getAttribute('aria-label')?.startsWith('Anime night'))!;
+    expect(muted.getAttribute('aria-label')).toContain(', muted.');
+    expect(muted.querySelector('.convo__muted')).not.toBeNull();
+    expect(plain.querySelector('.convo__muted')).toBeNull();
+  });
+
   it('marks an unread chat in its accessible name', async () => {
     const summary = makeSummary({ unread: true, last: { kind: 'text', text: 'yo', senderId: REN_U.id, deleted: false, createdAt: new Date().toISOString() } });
     setup({}, { 'GET /api/conversations': { body: { conversations: [summary] } } });

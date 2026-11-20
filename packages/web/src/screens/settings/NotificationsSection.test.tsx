@@ -4,9 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { makeMe, mockApi } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 
-// The feature is paused in the app (NOTIFICATIONS_ENABLED = false); these tests run with it on.
-vi.mock('./NotificationsSection', async (orig) => ({ ...(await orig<typeof import('./NotificationsSection')>()), NOTIFICATIONS_ENABLED: true }));
-
 // Phase 6b (P4, P6): the Notifications section of Settings.
 const KEY = 'BINvd_szNWQK5NNn9-5QvOD88cFM-aabMgjQUNKdD7d6FOE--6hMQzLfIJn6vGWKgieYqMZmC2ro_Wf4q8vspU4';
 const SUB_JSON = { endpoint: 'https://push.test/send/abc', keys: { p256dh: 'p', auth: 'a' } };
@@ -111,22 +108,18 @@ describe('Settings > Notifications', () => {
     expect(await (await section()).findByText(/blocked in your browser settings/)).toBeInTheDocument();
   });
 
-  it('per-type switches default on, save to settings.notify, and sign-ups show for the admin only', async () => {
+  it('shows Messages, Friend requests, Comments and Reactions (on by default, saved to settings.notify) and no admin sign-up switch', async () => {
     fakePush();
-    const calls = mockApi(makeMe(), withKey);
-    const { unmount } = renderApp('/settings');
+    const calls = mockApi(makeMe({ isAdmin: true }), withKey);
+    renderApp('/settings');
     const s = await section();
-    for (const name of ['Messages', 'Friend requests', 'Comments on my posts', 'Reactions to my posts']) {
+    for (const name of ['Messages', 'Friend requests', 'Comments on your posts', 'Reactions to your posts']) {
       expect(await s.findByRole('switch', { name })).toBeChecked();
     }
     expect(s.queryByRole('switch', { name: 'New sign-ups waiting' })).not.toBeInTheDocument();
-    await userEvent.click(s.getByRole('switch', { name: 'Reactions to my posts' }));
-    expect(s.getByRole('switch', { name: 'Reactions to my posts' })).not.toBeChecked();
+    expect(s.getAllByRole('switch')).toHaveLength(5); // the device switch + 4 kinds
+    await userEvent.click(s.getByRole('switch', { name: 'Reactions to your posts' }));
+    expect(s.getByRole('switch', { name: 'Reactions to your posts' })).not.toBeChecked();
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ settings: { notify: { reactions: false } } }));
-    unmount();
-
-    mockApi(makeMe({ isAdmin: true }), withKey);
-    renderApp('/settings');
-    expect(await (await section()).findByRole('switch', { name: 'New sign-ups waiting' })).toBeChecked();
   });
 });

@@ -7,22 +7,15 @@ import { useToast } from '../../design/components/Toast';
 import { useSessionMe } from '../../shell/SessionGate';
 import { InstallSteps } from '../onboarding/InstallSteps';
 
-/**
- * Dan, 2026-11-17: "I don't want them just yet". Turns the Settings section (and so every notification
- * prompt in the app) off. The server is untouched; flip to true to bring it all back.
- */
-export const NOTIFICATIONS_ENABLED = false;
-
 const LABELS: Record<NotifyKey, string> = {
   messages: 'Messages',
   friendRequests: 'Friend requests',
-  comments: 'Comments on my posts',
-  reactions: 'Reactions to my posts',
-  signups: 'New sign-ups waiting',
+  comments: 'Comments on your posts',
+  reactions: 'Reactions to your posts',
 };
 
 /**
- * Settings → Notifications (Phase 6b, P4, P6). The master switch turns notifications on for THIS device
+ * Settings → Notifications (Phase 6b, P4, P6; messages, friend requests, comments and reactions since 2026-11-20). The device switch turns notifications on for THIS device
  * (it asks the browser's permission from the tap); the per-type switches are saved with the account.
  */
 export function NotificationsSection() {
@@ -33,7 +26,7 @@ export function NotificationsSection() {
   const [installOpen, setInstallOpen] = useState(false);
   const hint = useId();
   const busy = enable.isPending || disable.isPending;
-  const keys = NOTIFY_KEYS.filter((k) => k !== 'signups' || me.isAdmin);
+  const keys = NOTIFY_KEYS;
 
   function onMaster(on: boolean) {
     if (on) {
@@ -70,7 +63,7 @@ export function NotificationsSection() {
           <span>Notifications on this device</span>
         </label>
         <p id={hint} className="field-hint group__pad">
-          {state === 'denied' ? 'Notifications are blocked in your browser settings. Allow them there, then turn this on.' : 'Tell me about new activity even when the app is closed.'}
+          {state === 'denied' ? 'Notifications are blocked in your browser settings. Allow them there, then turn this on.' : 'Get a notification for new messages, friend requests, and comments and reactions on your posts, even when the app is closed. You can mute a single chat from its menu.'}
         </p>
         {keys.map((k) => (
           <label key={k} className="switch-row">

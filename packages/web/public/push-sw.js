@@ -1,4 +1,4 @@
-// Web push (Phase 6b, P5, P7). Pulled into the generated service worker with workbox importScripts.
+// Web push (Phase 6b, P5, P7; new chat messages only since 2026-11-20). Pulled into the generated service worker with workbox importScripts.
 // Payload: { title, body, tag, url }. A new notification with the same tag replaces the old one.
 self.addEventListener('push', (event) => {
   let data = {};
@@ -9,10 +9,10 @@ self.addEventListener('push', (event) => {
   }
   const url = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/';
   event.waitUntil((async () => {
-    // A chat that is open and in front already shows the message: stay silent for it.
+    // A chat that is open, in front and focused already shows the message: stay silent for it.
     if (url.startsWith('/messages/')) {
       const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      if (open.some((c) => c.visibilityState === 'visible' && new URL(c.url).pathname === url)) return;
+      if (open.some((c) => c.visibilityState === 'visible' && c.focused === true && new URL(c.url).pathname === url)) return;
     }
     await self.registration.showNotification(data.title || 'Media Tracker', {
       body: data.body || '',

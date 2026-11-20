@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Link, useParams } from 'react-router';
 import { backState } from '../../shell/BackButton';
 import { ApiError } from '../../api/client';
-import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage, useReactToMessage } from '../../data/messages';
+import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage, useMuteConversation, useReactToMessage } from '../../data/messages';
 import { CoverBackdrop } from '../../design/components/CoverBackdrop';
 import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
@@ -79,6 +79,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const toast = useToast();
   const { query, chat } = useChat(conversation.id);
   const del = useDeleteMessage(conversation.id);
+  const mute = useMuteConversation(conversation.id);
   const [sheet, setSheet] = useState<Sheets>(null);
   const [menu, setMenu] = useState(false);
   const [deleting, setDeleting] = useState<Message | null>(null);
@@ -229,19 +230,21 @@ function Chat({ conversation }: { conversation: Conversation }) {
           <div className="chat__titles"><h1 className="chat__title">{title}</h1></div>
         )}
         <TextSizeControl step={textSize.step} onChange={textSize.set} />
-        {isGroup && (
-          <div className="chat__menu" ref={menuWrap}
-            onKeyDown={(e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); setMenu(false); menuWrap.current?.querySelector<HTMLElement>('button[aria-haspopup]')?.focus(); } }}>
-            <IconButton label="Group options" icon="more" look="plain" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)} />
-            {menu && (
-              <div role="menu" aria-label="Group options" className="menu">
-                <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('rename'); }}>Rename</button>
-                <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('add'); }}>Add people</button>
-                <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('leave'); }}>Leave</button>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="chat__menu" ref={menuWrap}
+          onKeyDown={(e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); setMenu(false); menuWrap.current?.querySelector<HTMLElement>('button[aria-haspopup]')?.focus(); } }}>
+          <IconButton label={isGroup ? 'Group options' : 'Chat options'} icon="more" look="plain" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)} />
+          {menu && (
+            <div role="menu" aria-label={isGroup ? 'Group options' : 'Chat options'} className="menu">
+              {isGroup && <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('rename'); }}>Rename</button>}
+              {isGroup && <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('add'); }}>Add people</button>}
+              <button type="button" role="menuitem" className="menu__item"
+                onClick={() => { setMenu(false); mute.mutate(!conversation.muted, { onSuccess: () => setLive(conversation.muted ? 'Notifications on for this chat' : 'Notifications muted for this chat'), onError: () => toast.show("Couldn't change that. Try again.") }); }}>
+                {conversation.muted ? 'Unmute' : 'Mute notifications'}
+              </button>
+              {isGroup && <button type="button" role="menuitem" className="menu__item" onClick={() => { setMenu(false); setSheet('leave'); }}>Leave</button>}
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="chat__scroll" ref={scroller}

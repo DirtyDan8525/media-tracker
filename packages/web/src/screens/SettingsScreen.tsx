@@ -14,7 +14,7 @@ import { PageHeader } from '../shell/PageHeader';
 import { ExportRow } from './settings/ExportRow';
 import { FillDetailsRow } from './settings/FillDetailsRow';
 import { CompareOptions } from './settings/CompareOptions';
-import { NOTIFICATIONS_ENABLED, NotificationsSection } from './settings/NotificationsSection';
+import { NotificationsSection } from './settings/NotificationsSection';
 import { SettingsLinks } from './settings/SettingsLinks';
 import { SideBarRows } from './settings/SideBarRows';
 import { TagsLink } from './settings/TagsLink';
@@ -167,7 +167,7 @@ export function SettingsScreen() {
           </div>
         </section>
 
-        {NOTIFICATIONS_ENABLED && <NotificationsSection />}
+        <NotificationsSection />
 
         {app.features.closeCalls && (
           <section aria-labelledby="set-ratings" className="group">

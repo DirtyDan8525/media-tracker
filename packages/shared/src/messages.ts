@@ -96,6 +96,8 @@ export interface Conversation {
   members: PublicUser[];
   /** A direct chat whose two people are no longer friends: reading only. */
   readOnly: boolean;
+  /** You muted this chat: it sends you no push notifications. */
+  muted: boolean;
 }
 
 export interface LastMessage {

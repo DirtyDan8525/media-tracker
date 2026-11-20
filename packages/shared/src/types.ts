@@ -230,7 +230,7 @@ export interface NavSettings {
   collapsed: boolean;
 }
 
-export const NOTIFY_KEYS = ['messages', 'friendRequests', 'comments', 'reactions', 'signups'] as const;
+export const NOTIFY_KEYS = ['messages', 'friendRequests', 'comments', 'reactions'] as const;
 export type NotifyKey = (typeof NOTIFY_KEYS)[number];
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -243,7 +243,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   compareAsk: 'Both',
   searchScope: 'all',
   tiers: {},
-  notify: { messages: true, friendRequests: true, comments: true, reactions: true, signups: true },
+  notify: { messages: true, friendRequests: true, comments: true, reactions: true },
   nav: { side: 'left', collapsed: false },
   coverViewer: true,
   listOrder: [],

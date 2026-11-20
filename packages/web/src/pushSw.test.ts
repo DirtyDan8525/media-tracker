@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 // public/push-sw.js (P5, P7): loaded into a fake service-worker scope.
 const code = readFileSync(resolve(process.cwd(), 'public/push-sw.js'), 'utf8');
 
-function load(clients: { url: string; visibilityState: string; focus?: () => Promise<void>; navigate?: (u: string) => Promise<void> }[]) {
+function load(clients: { url: string; visibilityState: string; focused?: boolean; focus?: () => Promise<void>; navigate?: (u: string) => Promise<void> }[]) {
   const handlers: Record<string, (e: unknown) => void> = {};
   const shown: { title: string; opts: any }[] = [];
   const openWindow = vi.fn(async () => undefined);
@@ -34,12 +34,15 @@ describe('push-sw.js', () => {
     expect(sw.shown[0]!.opts).toMatchObject({ body: 'are we watching Frieren?', tag: 'chat-1', icon: '/icon-192.png', data: { url: '/messages/1' } });
   });
 
-  it('stays silent for a chat that is open and visible, but not for other screens or hidden windows', async () => {
-    const open = load([{ url: 'https://app.test/messages/1', visibilityState: 'visible' }]);
+  it('stays silent for a chat that is open, visible and focused, but not for other screens or hidden windows', async () => {
+    const open = load([{ url: 'https://app.test/messages/1', visibilityState: 'visible', focused: true }]);
     await open.dispatch('push', push({ title: 'Ren', body: 'hi', tag: 'chat-1', url: '/messages/1' }));
     expect(open.shown).toHaveLength(0);
     await open.dispatch('push', push({ title: 'Ren', body: 'hi', tag: 'chat-2', url: '/messages/2' }));
     expect(open.shown).toHaveLength(1);
+    const unfocused = load([{ url: 'https://app.test/messages/1', visibilityState: 'visible', focused: false }]);
+    await unfocused.dispatch('push', push({ title: 'Ren', body: 'hi', tag: 'chat-1', url: '/messages/1' }));
+    expect(unfocused.shown).toHaveLength(1);
     const hidden = load([{ url: 'https://app.test/messages/1', visibilityState: 'hidden' }]);
     await hidden.dispatch('push', push({ title: 'Ren', body: 'hi', tag: 'chat-1', url: '/messages/1' }));
     expect(hidden.shown).toHaveLength(1);

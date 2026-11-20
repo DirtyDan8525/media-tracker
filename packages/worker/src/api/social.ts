@@ -132,7 +132,7 @@ social.post('/reactions', featureOn('reactions'), async (c) => {
     } else {
       await insert.run();
     }
-    pushReaction(c.env, ctxOf(c), at.ownerId, user, idOf(target), emoji);
+    pushReaction(c.env, ctxOf(c), at.ownerId, user, idOf(target), at.entryId, emoji);
   }
   return c.json(await socialOf(db, user.id, target));
 });
@@ -224,7 +224,7 @@ social.post('/comments', featureOn('comments'), async (c) => {
   await c.env.DB.prepare(`INSERT INTO comments (id, ${col(target)}, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)`)
     .bind(id, idOf(target), user.id, text, createdAt)
     .run();
-  pushComment(c.env, ctxOf(c), at.ownerId, user, idOf(target), text);
+  pushComment(c.env, ctxOf(c), at.ownerId, user, idOf(target), at.entryId, text);
   const comment: Comment = {
     id,
     author: { id: user.id, username: user.username ?? '', displayName: user.displayName, avatarAt: user.avatarAt },

@@ -7,7 +7,7 @@ import { buildPushHTTPRequest } from '@pushforge/builder';
 import { readSettings } from '../auth/user';
 import type { Env } from '../env';
 
-export type NotifyType = 'messages' | 'friendRequests' | 'comments' | 'reactions' | 'signups';
+export type NotifyType = 'messages' | 'friendRequests' | 'comments' | 'reactions';
 
 export interface PushPayload {
   title: string;

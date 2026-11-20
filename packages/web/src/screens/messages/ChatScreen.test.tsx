@@ -692,18 +692,39 @@ describe('Chat', () => {
   describe('group menu', () => {
     const group = () => makeConversation({ kind: 'group', name: 'Anime night', members: [ME, REN_U, ALBERTO] });
 
-    it('a direct chat has no group menu', async () => {
+    it('a direct chat has a small menu with only Mute notifications', async () => {
       setup();
       renderApp('/messages/c1');
-      await screen.findByRole('textbox', { name: 'Message' });
       expect(screen.queryByRole('button', { name: 'Group options' })).not.toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('button', { name: 'Chat options' }));
+      expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Mute notifications']);
     });
 
-    it('⋯ offers Rename, Add people and Leave', async () => {
+    it('Mute notifications saves for you, then the menu offers Unmute', async () => {
+      const { calls } = setup();
+      renderApp('/messages/c1');
+      await userEvent.click(await screen.findByRole('button', { name: 'Chat options' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Mute notifications' }));
+      await waitFor(() => expect(calls.find((c) => c.method === 'PUT' && c.path === '/api/conversations/c1/mute')?.body).toEqual({ muted: true }));
+      expect(await screen.findByText('Notifications muted for this chat')).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('button', { name: 'Chat options' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Unmute' }));
+      await waitFor(() => expect(calls.filter((c) => c.path === '/api/conversations/c1/mute').map((c) => c.body)).toEqual([{ muted: true }, { muted: false }]));
+    });
+
+    it('a group chat can be muted from its menu too', async () => {
+      const { calls } = setup({ conversations: [group()] });
+      renderApp('/messages/c1');
+      await userEvent.click(await screen.findByRole('button', { name: 'Group options' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Mute notifications' }));
+      await waitFor(() => expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/conversations/c1/mute')).toBe(true));
+    });
+
+    it('⋯ offers Rename, Add people, Mute notifications and Leave', async () => {
       setup({ conversations: [group()] });
       renderApp('/messages/c1');
       await userEvent.click(await screen.findByRole('button', { name: 'Group options' }));
-      expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Rename', 'Add people', 'Leave']);
+      expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Rename', 'Add people', 'Mute notifications', 'Leave']);
     });
 
     it('Rename saves the new name into the header', async () => {

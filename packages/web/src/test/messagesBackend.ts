@@ -18,7 +18,7 @@ export function makeMessage(over: Partial<Message> = {}): Message {
 export const FRIEREN_REC: RecSnapshot = { category: 'anime', title: 'Frieren', creator: 'Madhouse', coverUrl: '', rating: 9, source: null, sourceId: null };
 
 export function makeConversation(over: Partial<Conversation> = {}): Conversation {
-  return { id: 'c1', kind: 'direct', name: null, createdBy: ME.id, createdAt: '2026-11-01T00:00:00Z', members: [ME, REN_U], readOnly: false, ...over };
+  return { id: 'c1', kind: 'direct', name: null, createdBy: ME.id, createdAt: '2026-11-01T00:00:00Z', members: [ME, REN_U], readOnly: false, muted: false, ...over };
 }
 
 export function makeSummary(over: Partial<ConversationSummary> = {}): ConversationSummary {
@@ -114,6 +114,7 @@ export function messagesBackend(opts: { conversations?: Conversation[]; messages
       conversations.push(c);
       return { status: 201, body: c };
     },
+    'PUT /api/conversations/:id/mute': (b, _u, p) => { const c = find(p.id!)!; c.muted = (b as { muted: boolean }).muted; return { body: c }; },
     'PATCH /api/conversations/:id': (b, _u, p) => { const c = find(p.id!)!; c.name = (b as { name: string }).name || null; return { body: c }; },
     'POST /api/conversations/:id/members': (b, _u, p) => {
       const c = find(p.id!)!;

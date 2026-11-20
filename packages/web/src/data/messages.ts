@@ -286,6 +286,11 @@ export function useRenameConversation(id: string) {
   return useConversationEdit(id, (name: string) => api.patch<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { name }));
 }
 
+/** Mute or unmute a chat for yourself: a muted chat sends no push notifications. */
+export function useMuteConversation(id: string) {
+  return useConversationEdit(id, (muted: boolean) => api.put<Conversation>(`/api/conversations/${encodeURIComponent(id)}/mute`, { muted }));
+}
+
 export function useAddMembers(id: string) {
   return useConversationEdit(id, (userIds: string[]) => api.post<Conversation>(`/api/conversations/${encodeURIComponent(id)}/members`, { userIds }));
 }

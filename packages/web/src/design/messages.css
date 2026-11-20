@@ -31,6 +31,7 @@
 .convo__preview { font-size: var(--fs-sm); color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .convo.is-unread .convo__title, .convo.is-unread .convo__preview { color: var(--bright-text); font-weight: 700; }
 .convo__end { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); flex: none; }
+.convo__muted { display: inline-flex; color: var(--muted-text); }
 .convo__time { font-size: var(--fs-meta); color: var(--muted-text); font-variant-numeric: tabular-nums; }
 
 /* Chat: a column that fills the space above the bottom bar; only the message list scrolls. */

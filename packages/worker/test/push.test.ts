@@ -172,7 +172,7 @@ describe('notify (P1, P3, P4)', () => {
   });
 
   it('respects the per-type switch in settings (default all on) and ignores unknown or bad notify values', async () => {
-    expect(DEFAULT_USER_SETTINGS.notify).toEqual({ messages: true, friendRequests: true, comments: true, reactions: true, signups: true });
+    expect(DEFAULT_USER_SETTINGS.notify).toEqual({ messages: true, friendRequests: true, comments: true, reactions: true });
     const me0 = await json(await as(A, '/api/me'));
     expect(me0.settings.notify).toEqual(DEFAULT_USER_SETTINGS.notify);
     await subscribe(A);
@@ -224,7 +224,39 @@ describe('events call notify for the right user (P3)', () => {
     expect(got(e)).toEqual(['a', 'c']);
   });
 
-  it('a friend request goes to the receiver; accepting goes to the requester', async () => {
+  it('muting a chat stops its pushes for that member only; unmuting brings them back; the payload carries muted', async () => {
+    await as(C, '/api/friends/requests', 'POST', { username: 'dan' });
+    await settle();
+    await as(A, `/api/friends/${c}/accept`, 'POST');
+    const g = (await json<{ id: string }>(await as(A, '/api/conversations', 'POST', { userIds: [b, c], name: 'Movie night' }))).id;
+    expect((await json(await as(B, `/api/conversations/${g}`))).muted).toBe(false);
+    const res = await as(B, `/api/conversations/${g}/mute`, 'PUT', { muted: true });
+    expect(res.status).toBe(200);
+    expect((await json(res)).muted).toBe(true);
+    expect((await json(await as(A, `/api/conversations/${g}`))).muted).toBe(false);
+    const list = await json(await as(B, '/api/conversations'));
+    expect(list.conversations.find((x: { id: string }) => x.id === g).muted).toBe(true);
+    const e = await sinks();
+    reset();
+    await as(A, `/api/conversations/${g}/messages`, 'POST', { text: 'hi all' });
+    await settle();
+    expect(got(e)).toEqual(['c']);
+    expect((await as(B, `/api/conversations/${g}/mute`, 'PUT', { muted: false })).status).toBe(200);
+    reset();
+    await as(A, `/api/conversations/${g}/messages`, 'POST', { text: 'again' });
+    await settle();
+    expect(got(e)).toEqual(['b', 'c']);
+  });
+
+  it('the mute route is members-only (404) and validates the body (400)', async () => {
+    const id = await conv(A, b);
+    expect((await as(C, `/api/conversations/${id}/mute`, 'PUT', { muted: true })).status).toBe(404);
+    expect((await as(A, `/api/conversations/${id}/mute`, 'PUT', { muted: 'yes' })).status).toBe(400);
+    expect((await as(A, `/api/conversations/${id}/mute`, 'PUT', {})).status).toBe(400);
+    expect((await json(await as(A, `/api/conversations/${id}`))).muted).toBe(false);
+  });
+
+  it('a friend request goes to the receiver and opens Friends; accepting sends nothing', async () => {
     const e = await sinks();
     reset();
     expect((await as(C, '/api/friends/requests', 'POST', { username: 'dan' })).status).toBe(200);
@@ -233,7 +265,7 @@ describe('events call notify for the right user (P3)', () => {
     reset();
     expect((await as(A, `/api/friends/${c}/accept`, 'POST')).status).toBe(204);
     await settle();
-    expect(got(e)).toEqual(['c']);
+    expect(pushed).toEqual([]);
   });
 
   it('a comment on your post goes to the post owner, not to yourself', async () => {
@@ -271,7 +303,7 @@ describe('events call notify for the right user (P3)', () => {
     expect(pushed).toEqual([]);
   });
 
-  it('a sign-up waiting goes to the admin only', async () => {
+  it('a sign-up sends no push, not even to the admin', async () => {
     const e = await sinks();
     reset();
     const res = await app.fetch(
@@ -281,7 +313,7 @@ describe('events call notify for the right user (P3)', () => {
     );
     expect(res.status).toBe(201);
     await settle();
-    expect(got(e)).toEqual(['a']);
+    expect(got(e)).toEqual([]);
   });
 
   /** An activity post id of `email` (a rated entry makes one). */

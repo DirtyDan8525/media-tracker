@@ -152,7 +152,7 @@ const READ_ONLY_SQL = `(c.kind = 'direct' AND NOT EXISTS (
 
 interface Access {
   kind: ConversationKind; name: string | null; created_by: string; created_at: string;
-  read_only: number; newest: string; recent: number; member_count: number;
+  read_only: number; newest: string; recent: number; member_count: number; muted: number;
 }
 
 /** What the newest page of a chat depends on, read without reading the page (accessOf with `poll`). */
@@ -188,7 +188,7 @@ function accessOf(db: D1Database, id: string, me: string, cutoff: string, poll =
     `SELECT c.kind, c.name, c.created_by, c.created_at, ${READ_ONLY_SQL} AS read_only,
             COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id), '') AS newest,
             ${cutoff === '' ? '0' : '(SELECT COUNT(*) FROM messages WHERE sender_id = ?2 AND created_at >= ?3)'} AS recent,
-            (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) AS member_count${pollCols}
+            (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) AS member_count, m.muted AS muted${pollCols}
        FROM conversations c JOIN conversation_members m ON m.conversation_id = c.id AND m.user_id = ?2
       WHERE c.id = ?1`,
   ).bind(...(cutoff === '' ? [id, me] : [id, me, cutoff])).first<Access & Partial<PollState>>();
@@ -227,7 +227,7 @@ async function loadConversation(db: D1Database, id: string, me: string): Promise
   const members = await membersOf(db, [id]);
   return {
     id, kind: a.kind, name: a.name, createdBy: a.created_by, createdAt: a.created_at,
-    members: members.get(id) ?? [], readOnly: a.read_only === 1,
+    members: members.get(id) ?? [], readOnly: a.read_only === 1, muted: a.muted === 1,
   };
 }
 
@@ -242,7 +242,7 @@ messages.get('/conversations', async (c) => {
   const db = c.env.DB;
   const { results } = await db.prepare(
     `SELECT c.id, c.kind, c.name, c.created_by, c.created_at, c.last_message_at, ${READ_ONLY_SQL} AS read_only,
-            lm.kind AS lm_kind, substr(lm.body, 1, 200) AS lm_body, json_extract(lm.rec_json, '$.title') AS lm_rec_title, lm.sender_id AS lm_sender, lm.created_at AS lm_at, lm.deleted_at AS lm_deleted,
+            lm.kind AS lm_kind, substr(lm.body, 1, 200) AS lm_body, json_extract(lm.rec_json, '$.title') AS lm_rec_title, lm.sender_id AS lm_sender, lm.created_at AS lm_at, lm.deleted_at AS lm_deleted, m.muted AS muted,
             EXISTS (SELECT 1 FROM messages x JOIN users su ON su.id = x.sender_id AND su.status = 'active'
                      WHERE x.conversation_id = c.id AND x.sender_id <> ?2 AND x.deleted_at IS NULL
                        AND x.created_at > COALESCE(m.last_read_at, '')) AS unread
@@ -252,7 +252,7 @@ messages.get('/conversations', async (c) => {
       WHERE m.user_id = ?2 ORDER BY c.last_message_at DESC, c.id LIMIT ${LIST_MAX}`,
   ).bind(null, me).all<{
     id: string; kind: ConversationKind; name: string | null; created_by: string; created_at: string; last_message_at: string; read_only: number;
-    lm_kind: MessageKind | null; lm_body: string | null; lm_rec_title: string | null; lm_sender: string | null; lm_at: string | null; lm_deleted: string | null; unread: number;
+    lm_kind: MessageKind | null; lm_body: string | null; lm_rec_title: string | null; lm_sender: string | null; lm_at: string | null; lm_deleted: string | null; unread: number; muted: number;
   }>();
   const members = await membersOf(db, results.map((r) => r.id));
   const conversations: ConversationSummary[] = results.map((r) => {
@@ -264,7 +264,7 @@ messages.get('/conversations', async (c) => {
     };
     return {
       id: r.id, kind: r.kind, name: r.name, createdBy: r.created_by, createdAt: r.created_at, members: members.get(r.id) ?? [],
-      readOnly: r.read_only === 1, last, lastMessageAt: r.last_message_at, unread: r.unread === 1,
+      readOnly: r.read_only === 1, muted: r.muted === 1, last, lastMessageAt: r.last_message_at, unread: r.unread === 1,
     };
   });
   return c.json({ conversations } satisfies ConversationList);
@@ -330,6 +330,17 @@ messages.patch('/conversations/:id', async (c) => {
   if (typeof name !== 'string') return c.json(invalid, 400);
   if (a.kind !== 'group') return c.json({ error: 'not_group' }, 400);
   await c.env.DB.prepare('UPDATE conversations SET name = ? WHERE id = ?').bind(name, id).run();
+  return c.json(await loadConversation(c.env.DB, id, me));
+});
+
+// Mute or unmute a chat for yourself (body { muted: boolean }): 1 + 2 queries (+ sign-in). Not a member = 404.
+messages.put('/conversations/:id/mute', async (c) => {
+  const me = c.var.user.id;
+  const id = c.req.param('id');
+  const body = await readJson(c.req.raw);
+  if (!body || typeof body.muted !== 'boolean') return c.json(invalid, 400);
+  const res = await c.env.DB.prepare('UPDATE conversation_members SET muted = ? WHERE conversation_id = ? AND user_id = ?').bind(body.muted ? 1 : 0, id, me).run();
+  if ((res.meta.changes ?? 0) === 0) return c.json(notFound, 404);
   return c.json(await loadConversation(c.env.DB, id, me));
 });
 

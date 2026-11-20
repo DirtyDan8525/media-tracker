@@ -5,12 +5,10 @@ import { makeMe, mockApi } from '../test/mockApi';
 import { renderApp } from '../test/renderApp';
 
 describe('SettingsScreen', () => {
-  it('has no Notifications section while NOTIFICATIONS_ENABLED is false', async () => {
+  it('has a Notifications section', async () => {
     mockApi(makeMe());
     renderApp('/settings');
-    await screen.findByRole('heading', { level: 1, name: 'Settings' });
-    expect(screen.queryByRole('region', { name: 'Notifications' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Notifications' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Notifications' })).toBeInTheDocument();
   });
 
   it('turning a list off removes it from the list dropdown', async () => {

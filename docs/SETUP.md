@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0022_media.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0023_conversation_mute.sql`) with a green check.
 
 ## Turn on photos and voice memos (optional, once)
 
@@ -83,7 +83,7 @@ Chats can carry photos and voice memos. They are stored in Cloudflare R2 (a stor
    # bucket_name = "media-tracker-media"
    ```
    (With the lines uncommented but no bucket, the deploy stops with an error about `media-tracker-media`: do step 2 first.)
-4. **Apply the database updates** (adds `0021_message_reactions.sql` and `0022_media.sql` if you don't have them yet):
+4. **Apply the database updates** (adds `0021_message_reactions.sql`, `0022_media.sql` and `0023_conversation_mute.sql` if you don't have them yet):
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
@@ -152,7 +152,7 @@ Never put these keys in `wrangler.toml`. Until they are set the button still ope
 
 ### Notifications (optional)
 
-The app can send a notification to your phone or computer for new messages, friend requests, comments and reactions (and, for you as admin, a new sign-up waiting). Without these keys the app works exactly as before and Settings shows "Not set up yet" under Notifications.
+The app can send a notification to your phone or computer for new messages, friend requests, and comments and reactions on your own posts. Each person picks which of these they want under Settings > Notifications (all on to start with), and can mute a single chat from the chat's menu (the **⋯** button at the top of the chat > **Mute notifications**; a muted chat shows a small bell with a line through it in the Messages list). Tapping a message notification opens that chat; a friend request opens Friends; a comment or reaction opens the title. A chat that is open on screen does not notify. Without these keys the app works exactly as before and Settings shows "Not set up yet" under Notifications.
 
 1. Make a pair of keys (one time). This prints a **Public Key** and a **Private Key (JWK)**, a single line starting with `{`:
 
@@ -168,7 +168,7 @@ npm exec -w packages/worker -- wrangler secret put VAPID_PRIVATE_KEY --env produ
 npm exec -w packages/worker -- wrangler secret put VAPID_SUBJECT --env production
 ```
 
-3. Deploy again (`npm run deploy`, as in step 7) so the app has the notifications screen, then open Settings > Notifications and turn on **Notifications on this device**. Each person does this on each phone or computer they want notifications on.
+3. Apply the database updates (`0023_conversation_mute.sql` adds the per-chat mute), then deploy (`npm run deploy`, as in step 7). After that, each person opens Settings > Notifications and turns on **Notifications on this device**, on every phone or computer they want notifications on.
 
 **iPhone and iPad:** notifications only work in the app installed on the Home Screen (iOS 16.4 or newer; see step 10), and the browser asks permission only after you tap the switch. In Safari, Settings shows "Install the app to get notifications" instead.
 
@@ -282,6 +282,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0020_custom_lists.sql`: custom lists (a new table, `custom_lists`, up to 6 lists a person) and a per-title link (a new `link` column on titles; titles you already have start with none). Apply it **before** deploying: the new app reads both.
    - `0021_message_reactions.sql`: reactions on chat messages (a new table, `message_reactions`), each person's recent custom emojis (a new `recent_emoji` column on users), and voice memos as a kind of message (the `messages` table is rebuilt with the same rows, replies and indexes; nothing is lost). Apply it **before** deploying: the new app reads these.
    - `0022_media.sql`: the list of stored photos and voice memos (a new table, `media`) that the daily clean-up and the storage cap use. Apply it **before** deploying. Turning photos and voice memos on is optional: see "Turn on photos and voice memos" after section 6.
+   - `0023_conversation_mute.sql`: lets each person mute a chat (a new `muted` column on chat members; every chat starts unmuted). Apply it **before** deploying: the new app reads it.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:

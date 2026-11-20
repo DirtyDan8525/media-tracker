@@ -8,13 +8,12 @@ import { Button } from '../../design/components/Button';
 import { SegRadio } from '../../design/components/SegRadio';
 import { Sheet } from '../../design/components/Sheet';
 import { LIST_ORDER } from '../../nav';
-import { NOTIFICATIONS_ENABLED } from '../settings/NotificationsSection';
 import { AdminPage, Result, saveError, THEME_NAMES, useFeedback } from './parts';
 import { listLabel } from '../../lists/registry';
 
 const BUILT_IN = APP_SETTING_DEFAULTS.defaults;
 const NOTIFY_LABELS: Record<NotifyKey, string> = {
-  messages: 'Messages', friendRequests: 'Friend requests', comments: 'Comments on my posts', reactions: 'Reactions to my posts', signups: 'New sign-ups waiting',
+  messages: 'Messages', friendRequests: 'Friend requests', comments: 'Comments on your posts', reactions: 'Reactions to your posts',
 };
 
 /** /admin/defaults (Dan, 2026-11-19): a default for every per-person setting. Everyone follows it until they change that setting themselves. */
@@ -189,18 +188,16 @@ function DefaultsForm({ initial, people }: { initial: NewPersonDefaults; people:
         </div>
       </section>
 
-      {NOTIFICATIONS_ENABLED && (
-        <section aria-labelledby="df-notify" className="group">
-          <h2 id="df-notify" className="group__title">Notifications</h2>
-          <div className="group__card">
-            <Row label="Notification types" apply="notify" onApply={apply} onReset={() => void change({ notify: { ...BUILT_IN.notify } }, 'Notifications')}>
-              {(Object.keys(NOTIFY_LABELS) as NotifyKey[]).map((k) => (
-                <label key={k} className="switch-row"><input type="checkbox" role="switch" checked={d.notify[k]} onChange={(e) => void change({ notify: { ...d.notify, [k]: e.target.checked } }, 'Notifications')} /><span>{NOTIFY_LABELS[k]}</span></label>
-              ))}
-            </Row>
-          </div>
-        </section>
-      )}
+      <section aria-labelledby="df-notify" className="group">
+        <h2 id="df-notify" className="group__title">Notifications</h2>
+        <div className="group__card">
+          <Row label="Notification types" apply="notify" onApply={apply} onReset={() => void change({ notify: { ...BUILT_IN.notify } }, 'Notifications')}>
+            {(Object.keys(NOTIFY_LABELS) as NotifyKey[]).map((k) => (
+              <label key={k} className="switch-row"><input type="checkbox" role="switch" checked={d.notify[k]} onChange={(e) => void change({ notify: { ...d.notify, [k]: e.target.checked } }, 'Notifications')} /><span>{NOTIFY_LABELS[k]}</span></label>
+            ))}
+          </Row>
+        </div>
+      </section>
 
       <section aria-labelledby="df-text" className="group">
         <h2 id="df-text" className="group__title">Text size and columns</h2>

@@ -8,8 +8,6 @@ import { APP_DEFAULTS_SQL, CUSTOM_LISTS_SQL, USER_COLS, USERNAME_RE, toAppUser, 
 import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
 import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
 import { cleanDisplayName, meBody } from './me';
-import { pushSignup } from '../push/events';
-import { ctxOf } from '../push/send';
 
 export const auth = new Hono<AppEnv>();
 
@@ -111,7 +109,6 @@ auth.post('/signup', async (c) => {
   if (!created) throw new Error('signup: user not created');
   const me = meBody(toAppUser(created, c.env.ADMIN_EMAIL, app.defaults));
   // A link was offered but did not work (used, expired, revoked, unknown): the UI says so.
-  if (created.status === 'pending') pushSignup(c.env, ctxOf(c), { id, username, displayName });
   const offered = body.joinToken !== undefined && body.joinToken !== '';
   return c.json(offered && !joined ? { ...me, joinLink: 'invalid' as const } : me, 201, { 'Set-Cookie': s.cookie });
 });

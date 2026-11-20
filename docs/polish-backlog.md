@@ -22,3 +22,6 @@ Items still open after the 2026-11-19 pass. Everything else from the earlier lis
 - "Recommended to you · N" counts all recs, not unread ones.
 - Admin Delete account leaves that user's message pictures in R2 (rows cascade); an emptied group stays as an empty row.
 - Real R2 pictures and the phone chat height against the bottom bar weren't checked on a device.
+
+## Shelved ideas (Dan, 2026-11-20)
+- Pop-out messenger on PC. Options: (1) "Pop out" opens a chat in its own small browser window (easy, about half a day); (2) docked chat boxes bottom-right that stay open across pages (medium, about a day); (3) Document Picture-in-Picture always-on-top window (harder; Chrome/Edge only). Suggested order: 1, then 2.

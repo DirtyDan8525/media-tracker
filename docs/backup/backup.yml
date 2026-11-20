@@ -9,7 +9,7 @@ on:
   workflow_dispatch: {} # "Run workflow" button for a backup right now
 
 permissions:
-  contents: read
+  contents: write # only to commit the tiny last-backup.txt below (keeps GitHub from pausing the schedule)
 
 jobs:
   backup:
@@ -37,3 +37,14 @@ jobs:
           path: media-tracker-*.sql.gz
           retention-days: 90
           if-no-files-found: error
+      # GitHub pauses scheduled workflows after 60 days with no commits in the repo. A one-line
+      # commit per successful backup counts as activity, so the nightly schedule never pauses.
+      - uses: actions/checkout@v4
+      - name: Note the backup (keeps the schedule alive)
+        run: |
+          echo "Last backup: ${{ env.DAY }} (run ${{ github.run_id }})" > last-backup.txt
+          git config user.name "backup-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add last-backup.txt
+          git commit -m "Backup ${{ env.DAY }}" || echo "nothing to commit"
+          git push

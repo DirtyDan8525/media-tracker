@@ -77,3 +77,12 @@
 .activity-panel__actions { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
 .activity-panel__actions .detail__watch { margin: 0; }
 .feed-post { cursor: pointer; }
+
+/* Discover filters (2026-11-20): one row of list chips (scrolls sideways on phones) and a rating picker. */
+.activity-discover { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-4); min-width: 0; }
+.activity-discover__lists { display: flex; gap: var(--space-3); overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; padding-block: 2px; }
+.activity-discover__lists::-webkit-scrollbar { display: none; }
+.activity-discover__lists .btn--chip { flex: none; font-size: var(--fs-sm); }
+.activity-discover__lists .btn--chip.is-active { background: var(--cf-done); border-color: var(--highlight); color: var(--bright-text); }
+.activity-discover .select-chip { flex: none; }
+@media (min-width: 1024px) { .activity-discover__lists { flex-wrap: wrap; overflow: visible; } }

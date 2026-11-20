@@ -173,6 +173,12 @@ activity.get('/', async (c) => {
   if (!isScope(show)) return c.json({ error: 'invalid' }, 400);
   if ((before === undefined) !== (beforeId === undefined)) return c.json({ error: 'invalid' }, 400);
   if (before !== undefined && (before.length > 40 || beforeId!.length > 64)) return c.json({ error: 'invalid' }, 400);
+  // Discover filters (Dan, 2026-11-20): one list (`list=songs`, or a custom `c_…` key) and/or a minimum current rating (`min=8`).
+  const list = c.req.query('list') || null;
+  const minRaw = c.req.query('min');
+  const min = minRaw === undefined || minRaw === '' ? null : Number(minRaw);
+  if (list !== null && !/^[a-z0-9_]{1,40}$/.test(list)) return c.json({ error: 'invalid' }, 400);
+  if (min !== null && !(Number.isFinite(min) && min >= 0 && min <= 10)) return c.json({ error: 'invalid' }, 400);
 
   const db = c.env.DB;
   const viewer = c.var.user.id;
@@ -185,9 +191,9 @@ activity.get('/', async (c) => {
   const anchorSql = `SELECT a.id, a.user_id, a.created_at
       FROM ${from} ON e.id = a.entry_id AND e.user_id = a.user_id
      WHERE a.post_id IS NULL AND ${SCOPE[show]} ${cursor}
+       AND (?4 IS NULL OR e.category = ?4) AND (?5 IS NULL OR e.rating >= ?5)
      ORDER BY a.created_at DESC, a.id DESC LIMIT ${PAGE + 1}`;
-  const anchorStmt = db.prepare(anchorSql);
-  const { results: found } = await (before !== undefined ? anchorStmt.bind(viewer, before, beforeId!) : anchorStmt.bind(viewer))
+  const { results: found } = await db.prepare(anchorSql).bind(viewer, before ?? null, beforeId ?? null, list, min)
     .all<{ id: string; user_id: string; created_at: string }>();
   const anchors = found.slice(0, PAGE);
   const last = anchors[anchors.length - 1];

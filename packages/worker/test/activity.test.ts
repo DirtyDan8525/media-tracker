@@ -732,3 +732,17 @@ describe('deleting your own posts', () => {
   });
 });
 const titles2 = (p: ActivityPage) => [...new Set(p.items.map((i) => i.title))].sort();
+
+describe('feed discover filters (Dan, 2026-11-20)', () => {
+  it('list= keeps one list and min= keeps titles rated at least that; bad values are 400', async () => {
+    await mk(A, { category: 'songs', title: 'Mr. Blue Sky', rating: 9.4 });
+    await mk(A, { category: 'songs', title: 'Meh Song', rating: 6 });
+    await mk(A, { category: 'movies', title: 'Heat', rating: 9 });
+    const titles = (p: ActivityPage) => p.items.map((i) => i.title).sort();
+    expect(titles(await feed(A, '?show=you&list=songs'))).toEqual(['Meh Song', 'Mr. Blue Sky']);
+    expect(titles(await feed(A, '?show=you&min=8'))).toEqual(['Heat', 'Mr. Blue Sky']);
+    expect(titles(await feed(A, '?show=everyone&list=songs&min=8'))).toEqual(['Mr. Blue Sky']);
+    expect((await as(A, '/api/activity?show=you&list=Songs!')).status).toBe(400);
+    expect((await as(A, '/api/activity?show=you&min=11')).status).toBe(400);
+  });
+});

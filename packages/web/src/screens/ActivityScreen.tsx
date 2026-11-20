@@ -29,7 +29,8 @@ import { dayLabel, matchesSearch, timeAgo, type ActivityFilter } from './activit
 import '../design/activity.css';
 import '../design/feed.css';
 import '../design/list-menu.css';
-import { listCfg, listLabel, statusText } from '../lists/registry';
+import { listCfg, listLabel, listName, statusText } from '../lists/registry';
+import { LIST_ORDER } from '../nav';
 
 const ALL_FILTERS: readonly { value: ActivityFilter; label: string }[] = [
   { value: 'everyone', label: 'Everyone' },
@@ -50,6 +51,8 @@ const MAX_SELECT = 100;
  * a Select mode to delete several. A non-friend's name links to their profile; their title is plain
  * text (their entry page is friends-only).
  */
+const MIN_CHOICES = [{ value: 7, label: 'Rated 7+' }, { value: 8, label: 'Rated 8+' }, { value: 9, label: 'Rated 9+' }] as const;
+
 export function ActivityScreen() {
   const me = useSessionMe();
   const toast = useToast();
@@ -76,8 +79,20 @@ export function ActivityScreen() {
     }, { replace: true });
   };
 
+  // Discover filters (Dan, 2026-11-20): only one list (e.g. Songs) and/or only high ratings, kept in the URL.
+  const appLists = useAppSettings().lists;
+  const listChoices = LIST_ORDER.filter((c) => !appLists.hidden.includes(c));
+  const listParam = params.get('list');
+  const listFilter = listParam && (listChoices as readonly string[]).includes(listParam) ? listParam : null;
+  const minParam = Number(params.get('min'));
+  const minFilter = MIN_CHOICES.some((m) => m.value === minParam) ? minParam : null;
+  const setParam = (key: 'list' | 'min', v: string | null) => setParams((prev) => {
+    const p = new URLSearchParams(prev);
+    if (v === null) p.delete(key); else p.set(key, v);
+    return p;
+  }, { replace: true });
   const { data, isPending, isError, isSuccess, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
-    useFeed(filter);
+    useFeed(filter, { list: listFilter, min: minFilter });
   const [commenting, setCommenting] = useState<string | null>(null);
   const textSize = useActivityTextSize();
   const wide = useIsWide();
@@ -155,6 +170,11 @@ export function ActivityScreen() {
     );
   } else if (isPending) {
     body = <div aria-busy="true" className="stack-10"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>;
+  } else if (lines.length === 0 && !hasNextPage && (listFilter !== null || minFilter !== null)) {
+    body = (
+      <EmptyState icon="search" title="No posts match" body="Nobody has posted with these filters yet. Try another list or rating."
+        actionLabel="Clear filters" onAction={() => setParams((prev) => { const p = new URLSearchParams(prev); p.delete('list'); p.delete('min'); return p; }, { replace: true })} />
+    );
   } else if (lines.length === 0 && !hasNextPage && filter !== 'you') {
     body = (
       <EmptyState icon="activity" title="Nothing here yet" body={features.friends ? 'Add a friend to see what they rate.' : 'Rate something and it shows up here.'}
@@ -240,6 +260,19 @@ export function ActivityScreen() {
             )}
           </div>
           <TextSizeControl step={textSize.step} onChange={textSize.set} />
+        </div>
+        <div className="activity-discover">
+          <div className="activity-discover__lists" role="group" aria-label="Show posts from">
+            <Button variant="chip" active={listFilter === null} onClick={() => setParam('list', null)}>All lists</Button>
+            {listChoices.map((c) => (
+              <Button key={c} variant="chip" active={listFilter === c} onClick={() => setParam('list', listFilter === c ? null : c)}>{listName(c)}</Button>
+            ))}
+          </div>
+          <select aria-label="Rating" className={`select-chip${minFilter !== null ? ' is-on' : ''}`} value={minFilter ?? ''}
+            onChange={(e) => setParam('min', e.target.value || null)}>
+            <option value="">Any rating</option>
+            {MIN_CHOICES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
         </div>
         {needle !== '' && hasNextPage && <p className="activity-bar__hint" role="status">Searching loaded posts</p>}
       </PageHeader>

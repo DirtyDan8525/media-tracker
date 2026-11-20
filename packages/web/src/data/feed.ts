@@ -18,16 +18,22 @@ const targetQuery = (t: Target): string =>
 const EMPTY_SOCIAL: PostSocial = { reactions: {}, mine: [], comments: 0 };
 
 /** S6: 30 posts a page for one scope, newest first. Online only; refetches on every visit. */
-export function useFeed(scope: FeedScope) {
+/** Discover filters on the feed (2026-11-20): one list and/or a minimum rating; both optional. */
+export interface FeedFilters { list?: string | null; min?: number | null }
+
+export function useFeed(scope: FeedScope, filters: FeedFilters = {}) {
+  const list = filters.list ?? null;
+  const min = filters.min ?? null;
+  const extra = `${list ? `&list=${encodeURIComponent(list)}` : ''}${min !== null ? `&min=${min}` : ''}`;
   return useInfiniteQuery({
-    queryKey: [...ACTIVITY_KEY, scope],
+    queryKey: [...ACTIVITY_KEY, scope, list, min],
     staleTime: 0,
     initialPageParam: null as Cursor | null,
     queryFn: async ({ pageParam }) => {
       const page = await api.get<ActivityPage>(
         pageParam
-          ? `/api/activity?show=${scope}&before=${encodeURIComponent(pageParam.before)}&beforeId=${encodeURIComponent(pageParam.beforeId)}`
-          : `/api/activity?show=${scope}`,
+          ? `/api/activity?show=${scope}${extra}&before=${encodeURIComponent(pageParam.before)}&beforeId=${encodeURIComponent(pageParam.beforeId)}`
+          : `/api/activity?show=${scope}${extra}`,
       );
       // Custom lists these posts sit on (names, words), before the posts render.
       registerLists(page.lists);

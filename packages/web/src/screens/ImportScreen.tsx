@@ -12,6 +12,8 @@ import { Icon } from '../design/components/Icon';
 import { ProgressBar } from '../design/components/ProgressBar';
 import { AniListImport } from './AniListImport';
 import { chunkRows } from '../import/chunk';
+import type { AfterImport } from '../import/aniListUpdate';
+import { useToast } from '../design/components/Toast';
 import { parseWorkbook } from '../import/parseWorkbook';
 import { LIST_LABEL, LIST_ORDER } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
@@ -36,6 +38,9 @@ interface Run {
   chunks: ImportPreview['rows'][];
   next: number;
   sent: number;
+  /** Updates to entries the person already had (AniList "Use AniList"); run once, after the rows are in. */
+  after?: AfterImport;
+  afterResult?: { updated: number; failed: string[] };
 }
 
 async function readBuffer(file: File): Promise<ArrayBuffer> {
@@ -69,6 +74,7 @@ function presentSettings(s: Partial<UserSettings> | null): Partial<UserSettings>
 /** Import from the Sheet: choose a file → preview → import (in chunks) → done, with Undo. */
 export function ImportScreen() {
   const qc = useQueryClient();
+  const toast = useToast();
   const saveSettings = useSaveSettings();
   const backfill = useBackfill();
   const [stage, setStage] = useState<Stage>({ k: 'choose' });
@@ -78,6 +84,7 @@ export function ImportScreen() {
   const [busy, setBusy] = useState(false);
   const [promptOpen, setPromptOpen] = useState(true);
   const [started, setStarted] = useState(false);
+  const [updating, setUpdating] = useState<{ done: number; total: number } | null>(null);
   const run = useRef<Run | null>(null);
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
@@ -97,8 +104,8 @@ export function ImportScreen() {
     }
   }
 
-  function begin(preview: ImportPreview) {
-    run.current = { importId: crypto.randomUUID(), preview, chunks: chunkRows(preview.rows), next: 0, sent: 0 };
+  function begin(preview: ImportPreview, after?: AfterImport) {
+    run.current = { importId: crypto.randomUUID(), preview, chunks: chunkRows(preview.rows), next: 0, sent: 0, after };
     setSent(0);
     setSettingsFailed(false);
     setPromptOpen(true);
@@ -133,6 +140,13 @@ export function ImportScreen() {
       }
     }
     await refreshCategories(qc, categoriesOf(r.preview));
+    if (r.after && !r.afterResult) {
+      setUpdating({ done: 0, total: r.after.total });
+      r.afterResult = await r.after.run((done) => setUpdating({ done, total: r.after!.total }));
+      setUpdating(null);
+      const u = r.afterResult;
+      toast.show(`Imported ${r.sent} · Updated ${u.updated}${u.failed.length ? ` · ${u.failed.length} failed` : ''}`);
+    }
     setStage({ k: 'done' });
   }
 
@@ -198,6 +212,12 @@ export function ImportScreen() {
             <h2>Importing…</h2>
             <ProgressBar label="Import progress" value={sent} max={total} />
             <p className="muted" role="status">{sent} of {titles(total)}</p>
+            {updating && (
+              <>
+                <ProgressBar label="Update progress" value={updating.done} max={updating.total} />
+                <p className="muted" role="status">Updating titles you already had: {updating.done} of {updating.total}</p>
+              </>
+            )}
           </div>
         )}
 
@@ -217,7 +237,11 @@ export function ImportScreen() {
         {stage.k === 'done' && (
           <>
             <div className="import__panel">
-              <h2>Imported {titles(sent)}</h2>
+              <h2>{sent === 0 && run.current?.afterResult ? `Updated ${titles(run.current.afterResult.updated)}` : `Imported ${titles(sent)}`}</h2>
+              {run.current?.afterResult && (run.current.after?.total ?? 0) > 0 && sent > 0 && <p>Updated {titles(run.current.afterResult.updated)} you already had. Updates can't be undone with Undo.</p>}
+              {run.current?.afterResult && run.current.afterResult.failed.length > 0 && (
+                <p role="alert" className="field-error">Couldn't update: {run.current.afterResult.failed.join(', ')}. The rest were saved.</p>
+              )}
               <p className="muted">They're on your lists now. Nothing was shared with anyone.</p>
               {settingsFailed && <p role="alert" className="field-error">Your Sheet's settings couldn't be saved. You can set them again in Settings.</p>}
               {undoError && <p role="alert" className="field-error">Couldn't undo. Try again.</p>}

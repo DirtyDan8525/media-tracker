@@ -465,3 +465,17 @@ a.group__row:focus-visible { outline-offset: -2px; }
 .anilist__found { display: flex; flex-direction: column; gap: var(--space-5); }
 .anilist__checks { display: flex; flex-wrap: wrap; gap: var(--space-7); }
 .anilist__check { display: inline-flex; align-items: center; gap: var(--space-4); min-height: var(--tap); cursor: pointer; }
+
+/* AniList conflicts sheet */
+.conflict__bulk { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.conflict__list { display: flex; flex-direction: column; gap: var(--space-5); }
+.conflict { border: 1px solid var(--grid-line, currentColor); border-radius: var(--radius-3, 12px); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.conflict__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.conflict__side-h { margin: 0 0 var(--space-3); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.04em; }
+.conflict__dl { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.conflict__dl dt { font-size: 0.75em; opacity: 0.7; }
+.conflict__dl dd { margin: 0; overflow-wrap: anywhere; }
+.conflict__choices { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
+.conflict__choices legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.conflict__opt { display: inline-flex; align-items: center; gap: var(--space-3); min-height: var(--tap); cursor: pointer; }
+.conflict__help { margin: 0; }

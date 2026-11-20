@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ImportRow } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
@@ -85,20 +85,134 @@ describe('Import from AniList', () => {
     expect(screen.getByRole('button', { name: 'Import 0 titles' })).toBeDisabled();
   });
 
-  it('skips titles already on the lists and says how many', async () => {
+  it('summarises matches instead of silently skipping them, and keeps mine by default', async () => {
     const { calls } = backend(ok, [
       makeEntry({ id: 'e1', category: 'anime', title: 'Different Title', source: 'anilist', sourceId: '2' }),
       makeEntry({ id: 'e2', category: 'manga', title: 'manga one!', creator: '' }),
+      makeEntry({ id: 'e3', category: 'anime', title: 'Anime Three Special', releaseDate: '2020' }),
     ]);
     renderApp('/import');
     await lookUp('dan8525');
-    expect(await screen.findByText('Anime 2')).toBeInTheDocument();
+    expect(await screen.findByText('Anime 1')).toBeInTheDocument();
     expect(screen.getByText('Manga 0')).toBeInTheDocument();
-    expect(screen.getByText('2 already on your lists — skipped')).toBeInTheDocument();
+    expect(screen.getByText(/1 new · 2 already on your list · 1 possible match/)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Manga' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Import 2 titles' }));
-    await screen.findByText('Imported 2 titles');
-    expect(importPosts(calls)[0]!.rows.map((r) => r.title)).toEqual(['Anime One', 'Anime Three']);
+    await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
+    await screen.findByText('Imported 1 title');
+    expect(importPosts(calls)[0]!.rows.map((r) => r.title)).toEqual(['Anime One']);
+    expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+  });
+
+  describe('Review sheet', () => {
+    const mineEntries = () => [
+      makeEntry({ id: 'e1', category: 'anime', title: 'Anime Two', status: 'Plan to watch', rating: 5, notes: '' }),
+      makeEntry({ id: 'e2', category: 'anime', title: 'Anime Three', source: 'kitsu', sourceId: '9', notes: 'my notes' }),
+      makeEntry({ id: 'e3', category: 'anime', title: 'Anime One Remix', releaseDate: '2020' }),
+    ];
+    async function review() {
+      await lookUp('dan8525');
+      await screen.findByText(/already on your list/);
+      await userEvent.click(screen.getByRole('button', { name: 'Review' }));
+      return await screen.findByRole('dialog');
+    }
+    const patches = (calls: { method: string; path: string; body?: unknown }[]) => calls.filter((c) => c.method === 'PATCH' && c.path.startsWith('/api/entries/'));
+
+    it('lists each conflict with both sides, mine selected, maybes under their own heading', async () => {
+      backend(ok, mineEntries());
+      renderApp('/import');
+      const dialog = await review();
+      expect(within(dialog).getByRole('heading', { name: 'Already on your list' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('heading', { name: 'Maybe the same title?' })).toBeInTheDocument();
+      expect(within(dialog).getAllByText('On your list')).toHaveLength(3);
+      expect(within(dialog).getAllByText('From AniList')).toHaveLength(3);
+      expect(within(dialog).getAllByRole('radio', { name: 'Keep mine' }).every((r) => (r as HTMLInputElement).checked)).toBe(true);
+      expect(within(dialog).getAllByRole('radio', { name: 'Add as a separate entry' })).toHaveLength(2);
+      expect(within(dialog).getByRole('radio', { name: 'Keep both' })).toBeInTheDocument();
+      expect(within(dialog).getByText(/can't be undone with Undo/)).toBeInTheDocument();
+    });
+
+    it('Use AniList PATCHes the existing entry after the import and toasts the result', async () => {
+      const { calls } = backend(ok, mineEntries());
+      renderApp('/import');
+      const dialog = await review();
+      const group = within(dialog).getByRole('group', { name: 'What to do with Anime Two' });
+      await userEvent.click(within(group).getByRole('radio', { name: 'Use AniList' }));
+      expect(within(dialog).getByText(/Your notes stay/)).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+      expect(screen.getByText('1 to update · 0 to add separately')).toBeInTheDocument();
+      expect(screen.getByText(/can't be undone with Undo/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
+      expect(await screen.findByText('Imported 1 · Updated 1')).toBeInTheDocument();
+      const p = patches(calls);
+      expect(p).toHaveLength(1);
+      expect(p[0]!.path).toBe('/api/entries/e1');
+      expect(p[0]!.body).toEqual({ status: 'Completed', rating: 8, progress: 12, progressTotal: 12, source: 'anilist', sourceId: '2' });
+      // The import went first and did not carry the updated title.
+      expect(importPosts(calls)[0]!.rows.map((r) => r.title)).toEqual(['Manga One']);
+    });
+
+    it('does not overwrite notes that are not empty', async () => {
+      const { calls } = backend((t) => ({ body: t === 'ANIME' ? gql([item(3, 'Anime Three', { notes: 'from anilist' })]) : gql([]) }), mineEntries());
+      renderApp('/import');
+      const dialog = await review();
+      await userEvent.click(within(within(dialog).getByRole('group', { name: 'What to do with Anime Three' })).getByRole('radio', { name: 'Use AniList' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+      await userEvent.click(screen.getByRole('button', { name: /Update 1 title/ }));
+      await screen.findByRole('heading', { name: 'Updated 1 title' });
+      const body = patches(calls)[0]!.body as Record<string, unknown>;
+      expect(body).not.toHaveProperty('notes');
+      expect(body).not.toHaveProperty('source');
+    });
+
+    it('Add as a separate entry puts the AniList row in the import', async () => {
+      const { calls } = backend(ok, mineEntries());
+      renderApp('/import');
+      const dialog = await review();
+      await userEvent.click(within(within(dialog).getByRole('group', { name: 'What to do with Anime Two' })).getByRole('radio', { name: 'Add as a separate entry' }));
+      await userEvent.click(within(within(dialog).getByRole('group', { name: 'What to do with Anime One Remix' })).getByRole('radio', { name: 'Keep both' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Import 3 titles' }));
+      await screen.findByText('Imported 3 titles');
+      expect(importPosts(calls)[0]!.rows.map((r) => r.title).sort()).toEqual(['Anime One', 'Anime Two', 'Manga One']);
+      expect(patches(calls)).toHaveLength(0);
+    });
+
+    it('bulk buttons: Use AniList for all skips the maybes; Keep all mine resets', async () => {
+      const { calls } = backend(ok, mineEntries());
+      renderApp('/import');
+      const dialog = await review();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      expect(within(dialog).getAllByRole('radio', { name: 'Use AniList' }).filter((r) => (r as HTMLInputElement).checked)).toHaveLength(2);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Keep all mine' }));
+      expect(within(dialog).getAllByRole('radio', { name: 'Keep mine' }).every((r) => (r as HTMLInputElement).checked)).toBe(true);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
+      expect(await screen.findByText('Imported 1 · Updated 2')).toBeInTheDocument();
+      expect(patches(calls).map((c) => c.path).sort()).toEqual(['/api/entries/e1', '/api/entries/e2']);
+    });
+
+    it('a failed update is named and the rest still save', async () => {
+      const { calls } = (() => {
+        const b = fakeBackend({
+          entries: mineEntries(),
+          patchFail: (id) => (id === 'e1' ? { status: 500, body: { error: 'boom' } } : undefined),
+          extra: {
+            [GRAPHQL]: (x) => ({ body: (x as { variables: { type: string } }).variables.type === 'ANIME' ? ANIME : MANGA }),
+            'POST /api/import': (x) => ({ body: { inserted: (x as { rows: unknown[] }).rows.length } }),
+          },
+        });
+        return b;
+      })();
+      renderApp('/import');
+      const dialog = await review();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
+      expect(await screen.findByText(/Couldn't update: Anime Two/)).toBeInTheDocument();
+      expect(screen.getByText('Imported 1 · Updated 1 · 1 failed')).toBeInTheDocument();
+      expect(patches(calls).map((c) => c.path)).toEqual(['/api/entries/e1', '/api/entries/e2']);
+    });
   });
 
   it('shows a clear message for not found, private, busy and unreachable', async () => {

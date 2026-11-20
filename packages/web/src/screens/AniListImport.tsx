@@ -1,8 +1,11 @@
-import { AniListError, lookupAniList, type AniListImportPreview, type Category, type FetchDeps, type ImportPreview } from '@media-tracker/shared';
+import { AniListError, lookupAniList, type AniListLookup, type Category, type Entry, type FetchDeps, type ImportPreview } from '@media-tracker/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
+import { aniListUpdates, type AfterImport, type ConflictChoice } from '../import/aniListUpdate';
+import { AniListConflicts } from './AniListConflicts';
 
 const NAME_RE = /^[A-Za-z0-9_]{2,20}$/;
 const LISTS: Category[] = ['anime', 'manga'];
@@ -11,18 +14,21 @@ const LISTS: Category[] = ['anime', 'manga'];
 const deps: FetchDeps = { fetch: (input, init) => fetch(input, init) };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-type Look = { k: 'idle' } | { k: 'loading' } | { k: 'error'; message: string } | { k: 'found'; found: AniListImportPreview };
+type Look = { k: 'idle' } | { k: 'loading' } | { k: 'error'; message: string } | { k: 'found'; found: AniListLookup<Entry> };
 
 /** The message to show for a failed lookup. */
 const errorMessage = (err: unknown): string =>
   err instanceof AniListError ? err.message : "Couldn't reach AniList. Try again in a minute.";
 
 /** Import from AniList: username → Look up → summary with Anime / Manga checkboxes → hands the rows to the shared import flow. */
-export function AniListImport({ onImport }: { onImport: (preview: ImportPreview) => void }) {
+export function AniListImport({ onImport }: { onImport: (preview: ImportPreview, after?: AfterImport) => void }) {
   const ids = useId();
   const [name, setName] = useState('');
   const [look, setLook] = useState<Look>({ k: 'idle' });
+  const qc = useQueryClient();
   const mine = useAllEntries(LISTS);
+  const [choices, setChoices] = useState<ConflictChoice[]>([]);
+  const [review, setReview] = useState(false);
   const [pick, setPick] = useState({ anime: true, manga: true });
   // More → "Import from AniList" links to /import#anilist: bring this panel into view, ready to type.
   const { hash } = useLocation();
@@ -43,10 +49,12 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
     }
     setLook({ k: 'loading' });
     try {
-      // Titles already on the lists (same AniList id, or same title in that list) are left out.
+      // Titles already on the lists (same id, same name, or a close name) come back as matches to review.
       const existing = LISTS.flatMap((c) => mine.data[c] ?? []);
       const found = await lookupAniList(user, existing, deps);
       setPick({ anime: true, manga: true });
+      setChoices(found.matches.map(() => 'mine'));
+      setReview(false);
       setLook({ k: 'found', found });
     } catch (err) {
       setLook({ k: 'error', message: errorMessage(err) });
@@ -54,19 +62,35 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
   }
 
   const found = look.k === 'found' ? look.found : null;
-  const n = found ? (pick.anime ? found.counts.anime : 0) + (pick.manga ? found.counts.manga : 0) : 0;
-  const skipped = found ? found.skipped.anime + found.skipped.manga : 0;
+  const picked = (c: Category) => (c === 'anime' ? pick.anime : c === 'manga' && pick.manga);
+  const matches = found ? found.matches.map((m, i) => ({ m, i })).filter(({ m }) => picked(m.row.category)) : [];
+  const sameN = matches.filter(({ m }) => m.kind === 'same').length;
+  const maybeN = matches.length - sameN;
+  const choice = (i: number): ConflictChoice => choices[i] ?? 'mine';
+  const addMatches = matches.filter(({ i }) => choice(i) === 'both');
+  const updateMatches = matches.filter(({ i }) => choice(i) === 'anilist');
+  const newN = found ? (pick.anime ? found.counts.anime : 0) + (pick.manga ? found.counts.manga : 0) : 0;
+  const n = newN + addMatches.length;
+
+  function setAll(c: ConflictChoice) {
+    // "Use AniList for all" covers only the clear same-title ones; possible matches are never bulk-changed.
+    setChoices((prev) => (found?.matches ?? []).map((m, i) => (c === 'mine' || m.kind === 'same' ? c : (prev[i] ?? 'mine'))));
+  }
 
   function go() {
-    if (!found || n === 0) return;
-    const rows = found.rows.filter((r) => (r.category === 'anime' ? pick.anime : r.category === 'manga' && pick.manga));
+    if (!found || (n === 0 && updateMatches.length === 0)) return;
+    const rows = [
+      ...found.rows.filter((r) => picked(r.category)),
+      ...addMatches.map(({ m }) => m.row),
+    ];
+    const after = updateMatches.length > 0 ? aniListUpdates(qc, updateMatches.map(({ m }) => ({ mine: m.existing, row: m.row }))) : undefined;
     onImport({
       rows,
       counts: { anime: rows.filter((r) => r.category === 'anime').length, manga: rows.filter((r) => r.category === 'manga').length },
       skipped: [],
       warnings: [],
       settings: null,
-    });
+    }, after);
   }
 
   return (
@@ -95,7 +119,19 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
       {found && (
         <div className="anilist__found" role="group" aria-label={`Found on AniList for ${found.user}`}>
           <p><strong>Anime {found.counts.anime}</strong> · <strong>Manga {found.counts.manga}</strong></p>
-          {skipped > 0 && <p className="muted">{skipped} already on your lists — skipped</p>}
+          {matches.length > 0 && (
+            <>
+              <p role="status">
+                {newN} new · {sameN} already on your list{maybeN > 0 ? ` · ${plural(maybeN, 'possible match', 'possible matches')}` : ''}
+              </p>
+              <div>
+                <Button onClick={() => setReview(true)}>Review</Button>
+                {matches.some(({ i }) => choice(i) !== 'mine') && (
+                  <span className="muted"> {updateMatches.length} to update · {addMatches.length} to add separately</span>
+                )}
+              </div>
+            </>
+          )}
           <p className="muted">Scores are on your 0–10 scale. Status, progress, notes and start/finish dates are kept; private entries stay private.</p>
           <div className="anilist__checks">
             {(['anime', 'manga'] as const).map((c) => (
@@ -110,9 +146,21 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
               </label>
             ))}
           </div>
-          <Button variant="primary" disabled={n === 0} onClick={go}>Import {plural(n, 'title', 'titles')}</Button>
-          <p className="import__note">You can undo the whole import afterwards.</p>
+          <Button variant="primary" disabled={n === 0 && updateMatches.length === 0} onClick={go}>
+            {n === 0 && updateMatches.length > 0 ? `Update ${plural(updateMatches.length, 'title', 'titles')}` : `Import ${plural(n, 'title', 'titles')}`}
+          </Button>
+          <p className="import__note">You can undo the whole import afterwards.{updateMatches.length > 0 && ' Updates to titles you already had can\'t be undone with Undo.'}</p>
         </div>
+      )}
+      {found && (
+        <AniListConflicts
+          open={review}
+          matches={found.matches}
+          choices={found.matches.map((_, i) => choice(i))}
+          onChoice={(i, c) => setChoices((p) => found.matches.map((_, j) => (j === i ? c : (p[j] ?? 'mine'))))}
+          onAll={setAll}
+          onClose={() => setReview(false)}
+        />
       )}
     </section>
   );

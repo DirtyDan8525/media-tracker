@@ -17,4 +17,4 @@ export * from './bio';
 export * from './messages';
 export * from './appSettings';
 export * from './userDefaults';
-export { AniListError, lookupAniList, mapAniListEntry, aniListStatus, type AniListEntry, type AniListErrorCode } from './import/anilist';
+export { AniListError, lookupAniList, mapAniListEntry, aniListStatus, aniListNames, findExisting, tokenSimilarity, type AniListEntry, type AniListErrorCode, type AniListLookup, type AniListMatch, type MatchKind, type Existing as AniListExisting } from './import/anilist';

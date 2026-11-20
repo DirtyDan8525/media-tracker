@@ -18,7 +18,7 @@ const QUERY = `query ($user: String, $type: MediaType) {
       status score(format: POINT_10_DECIMAL) progress notes private repeat
       startedAt { year month day } completedAt { year month day }
       media {
-        id idMal title { romaji english } episodes chapters coverImage { large } startDate { year } genres format
+        id idMal title { romaji english native } synonyms episodes chapters coverImage { large } startDate { year } genres format
         studios(isMain: true) { nodes { name } }
         staff(perPage: 1) { nodes { name { full } } }
       }
@@ -58,7 +58,8 @@ export interface AniListEntry {
   completedAt?: FuzzyDate | null;
   media?: {
     id: number;
-    title?: { romaji?: string | null; english?: string | null } | null;
+    title?: { romaji?: string | null; english?: string | null; native?: string | null } | null;
+    synonyms?: (string | null)[] | null;
     episodes?: number | null;
     chapters?: number | null;
     coverImage?: { large?: string | null } | null;
@@ -163,20 +164,107 @@ async function fetchList(user: string, type: 'ANIME' | 'MANGA', d: FetchDeps): P
   return (r.body?.data?.MediaListCollection?.lists ?? []).flatMap((l) => l?.entries ?? []);
 }
 
-export interface Existing { category: Category; title: string; source: string | null; sourceId: string | null }
+/** What matching needs from a title already on the user's lists (a full Entry fits). */
+export interface Existing {
+  category: Category;
+  title: string;
+  source: string | null;
+  sourceId: string | null;
+  /** 'YYYY' or 'YYYY-MM-DD'; used only to rule out close names from different years. */
+  releaseDate?: string | null;
+}
 
-/** Reads and maps both lists, leaving out titles already on the user's lists (same source id, or same normalized title in that list). */
-export async function lookupAniList(user: string, existing: readonly Existing[], deps: FetchDeps): Promise<AniListImportPreview> {
+/** 'same' = same AniList id or an equal title; 'possible' = close names only. */
+export type MatchKind = 'same' | 'possible';
+export interface AniListMatch<E extends Existing = Existing> {
+  kind: MatchKind;
+  /** Why it matched. */
+  reason: 'id' | 'title' | 'close';
+  /** The AniList entry, mapped to an import row. */
+  row: ImportRow;
+  /** The entry already on the user's list. */
+  existing: E;
+}
+
+/** Rows to import (no match), the matches to ask about, and counts. */
+export interface AniListLookup<E extends Existing = Existing> extends AniListImportPreview {
+  matches: AniListMatch<E>[];
+}
+
+/** Every name AniList knows for the title (English, romaji, native, synonyms), normalized, without blanks or repeats. */
+export function aniListNames(e: AniListEntry): string[] {
+  const t = e.media?.title;
+  const all = [t?.english, t?.romaji, t?.native, ...(e.media?.synonyms ?? [])];
+  return [...new Set(all.map((x) => (typeof x === 'string' ? normTitle(x) : '')).filter(Boolean))];
+}
+
+const tokenSet = (s: string) => new Set(s.split(' ').filter(Boolean));
+/** Jaccard similarity of the word sets: 1 = same words in any order. */
+export function tokenSimilarity(a: string, b: string): number {
+  const x = tokenSet(a);
+  const y = tokenSet(b);
+  if (!x.size || !y.size) return 0;
+  let both = 0;
+  x.forEach((t) => { if (y.has(t)) both++; });
+  return both / (x.size + y.size - both);
+}
+
+const yearOf = (v: string | null | undefined): number | null => {
+  const m = /^(\d{4})/.exec(v ?? '');
+  return m ? Number(m[1]) : null;
+};
+
+/** 0..1 closeness of two normalized names, or 0 when they are not close (one contains the other as whole words, 4+ chars, or similar word sets). */
+function closeness(a: string, b: string): number {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (short.length >= 4 && ` ${long} `.includes(` ${short} `)) return 0.9;
+  const t = tokenSimilarity(a, b);
+  return t >= 0.8 ? t : 0;
+}
+
+/** Finds the user's entry for an AniList entry, in the same category only. Id and equal titles beat close names. */
+export function findExisting<E extends Existing>(
+  row: ImportRow,
+  names: readonly string[],
+  year: number | null,
+  existing: readonly E[],
+): { kind: MatchKind; reason: AniListMatch['reason']; existing: E } | null {
+  const pool = existing.filter((e) => e.category === row.category);
+  if (row.sourceId) {
+    const byId = pool.find((e) => e.source === 'anilist' && e.sourceId === row.sourceId);
+    if (byId) return { kind: 'same', reason: 'id', existing: byId };
+  }
+  const nameSet = new Set(names);
+  const norm = pool.map((e) => normTitle(e.title));
+  const eq = pool.findIndex((_, i) => nameSet.has(norm[i]!));
+  if (eq >= 0) return { kind: 'same', reason: 'title', existing: pool[eq]! };
+  let best: { score: number; e: E } | null = null;
+  pool.forEach((e, i) => {
+    const n = norm[i]!;
+    if (!n) return;
+    const ey = yearOf(e.releaseDate);
+    if (year !== null && ey !== null && ey !== year) return;
+    for (const name of names) {
+      const c = closeness(name, n);
+      if (c > 0 && (!best || c > best.score)) best = { score: c, e };
+    }
+  });
+  const hit = best as { score: number; e: E } | null;
+  return hit ? { kind: 'possible', reason: 'close', existing: hit.e } : null;
+}
+
+/**
+ * Reads and maps both lists. Titles with no counterpart on the user's lists are `rows`; the rest are
+ * `matches` (same title, or possibly the same) for the person to decide. `skipped` counts the same-title ones.
+ */
+export async function lookupAniList<E extends Existing>(user: string, existing: readonly E[], deps: FetchDeps): Promise<AniListLookup<E>> {
   const name = user.trim();
   if (!NAME_RE.test(name)) throw new AniListError('invalid_name', 'AniList names are 2 to 20 letters, digits or underscores.');
   // One after the other: AniList's rate limit is tight and a second request is wasted if the first fails.
   const anime = await fetchList(name, 'ANIME', deps);
   const manga = await fetchList(name, 'MANGA', deps);
 
-  const haveId = new Set(existing.filter((e) => e.source === 'anilist' && e.sourceId).map((e) => `${e.category}:${e.sourceId}`));
-  const haveTitle = new Set(existing.map((e) => `${e.category}:${normTitle(e.title)}`));
-
-  const out: AniListImportPreview = { user: name, rows: [], counts: { anime: 0, manga: 0 }, skipped: { anime: 0, manga: 0 } };
+  const out: AniListLookup<E> = { user: name, rows: [], counts: { anime: 0, manga: 0 }, skipped: { anime: 0, manga: 0 }, matches: [] };
   for (const [category, entries] of [['anime', anime], ['manga', manga]] as const) {
     const seen = new Set<string>();
     for (const e of entries) {
@@ -188,8 +276,11 @@ export async function lookupAniList(user: string, existing: readonly Existing[],
       if (seen.has(titleKey) || (idKey && seen.has(idKey))) continue;
       seen.add(titleKey);
       if (idKey) seen.add(idKey);
-      if ((idKey && haveId.has(idKey)) || haveTitle.has(titleKey)) {
-        out.skipped[category]++;
+      const y = e.media?.startDate?.year;
+      const hit = findExisting(row, aniListNames(e), typeof y === 'number' ? y : null, existing);
+      if (hit) {
+        out.matches.push({ ...hit, row });
+        if (hit.kind === 'same') out.skipped[category]++;
         continue;
       }
       out.rows.push(row);

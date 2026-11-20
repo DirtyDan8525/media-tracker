@@ -4,7 +4,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, ApiError } from '../api/client';
 import { removeEntryFromCache } from '../data/entryCache';
-import { refetchAfterDelete, retryOnConflict } from '../data/ratings';
+import { clearCloseCalls, refetchAfterDelete, retryOnConflict, useRatingSet } from '../data/ratings';
 import { SAVE_FAILED, saveEntryChange } from '../data/entryMutations';
 import { useEntry } from '../data/useEntry';
 import { Button } from '../design/components/Button';
@@ -108,6 +108,16 @@ function DetailBody({ entry }: { entry: Entry }) {
   };
   const typedNow = entry.typed ?? entry.rating;
   const planned = entry.status === PLAN_STATUS;
+  // "Clear close calls for this title" shows only while the title has an active pick (the set's picks that are not undone).
+  const picks = useRatingSet(entry.category, !planned && typedNow !== null);
+  const hasPicks = picks.data?.comparisons.some((k) => k.winnerId === entry.id || k.loserId === entry.id) ?? false;
+  const [clearing, setClearing] = useState(false);
+  async function clearPicks() {
+    setClearing(true);
+    const ok = await clearCloseCalls(qc, entry.category, entry.id);
+    setClearing(false);
+    toast.show(ok ? 'Close calls cleared' : "Couldn't clear the close calls. Try again.");
+  }
   const year = entry.releaseDate.slice(0, 4);
   const meta = [year, entry.lengthLabel].filter(Boolean).join(' · ');
   const trimmed = entry.synopsis.endsWith('…');
@@ -168,6 +178,9 @@ function DetailBody({ entry }: { entry: Entry }) {
               </div>
               {entry.rating !== null && typedNow !== null && entry.rating !== typedNow && (
                 <p className="field-hint">You typed {formatRating(typedNow)}; a close call nudged it to {formatRating(entry.rating)}.</p>
+              )}
+              {hasPicks && (
+                <button type="button" className="link-btn" disabled={clearing} onClick={() => void clearPicks()}>Clear close calls for this title</button>
               )}
             </div>
           )}

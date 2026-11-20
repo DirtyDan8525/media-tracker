@@ -157,6 +157,30 @@ export async function saveClosePick(qc: QueryClient, set: RatingSet, pick: Close
   return res.items;
 }
 
+/**
+ * "Clear close calls" (Dan, 2026-11-20): undoes the person's active close-call answers, for one title (`entryId`) or a whole
+ * rating set. Scores go back to the typed numbers. Same cache updates as a close-call save; the pair lists reload
+ * on the next session. True when it saved (after one retry on a 409).
+ */
+export async function clearCloseCalls(qc: QueryClient, set: RatingSet, entryId?: string): Promise<boolean> {
+  let res: { items: SetItem[]; entries: Entry[] };
+  try {
+    res = await withConflictRetry(qc, set, () => api.post<{ items: SetItem[]; entries: Entry[] }>(
+      '/api/ratings/clear', entryId === undefined ? { category: set } : { category: set, entryId }));
+  } catch {
+    return false;
+  }
+  writeEntries(qc, res.entries, listOfSet(set));
+  void qc.invalidateQueries({ queryKey: ratingSetKey(set) });
+  void qc.invalidateQueries({ queryKey: closePairsKey(set) });
+  void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
+  if (isSeasons(set)) {
+    void qc.invalidateQueries({ queryKey: ['seasons'] });
+    void refreshParents(qc, listOfSet(set));
+  }
+  return true;
+}
+
 /** Writes returned rows to the caches; if that throws, the list is reloaded instead. */
 function writeEntries(qc: QueryClient, rows: Entry[], list: Category): void {
   try {

@@ -16,6 +16,7 @@ import { setNavWidth, useNavWidth } from './navWidth';
 import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
 import { AddBubble } from './AddBubble';
+import { QuietBanner } from './QuietBanner';
 import { useSessionMe } from './SessionGate';
 import { useDeviceDefaults } from '../data/deviceDefaults';
 import '../design/nav.css';
@@ -61,6 +62,7 @@ function FrameLayout() {
           collapsed={collapsed} onToggleCollapsed={() => save.mutate({ nav: { collapsed: !collapsed } })}
           side={side} width={navWidth} onWidthChange={setNavWidth} onWidthReset={() => setNavWidth(null)} />
         <main className="frame__main">
+          <QuietBanner />
           <CoverViewerContext.Provider value={me.settings.coverViewer}>
             <CoverViewerNoteContext.Provider value><Outlet /></CoverViewerNoteContext.Provider>
           </CoverViewerContext.Provider>
@@ -71,6 +73,7 @@ function FrameLayout() {
   return (
     <div className="frame frame--phone">
       <main className="frame__main">
+        <QuietBanner />
         <Outlet />
       </main>
       <AddBubble current={current} />

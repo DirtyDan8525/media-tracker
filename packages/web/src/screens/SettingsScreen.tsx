@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router';
 import type { CustomList } from '@media-tracker/shared';
 import { inviteLink, useCopy, useInviteCode, useSaveDisplayName } from '../data/social';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
+import { formatQuietUntil, useQuiet, useSetQuiet } from '../data/quiet';
 import { Button } from '../design/components/Button';
 import { useToast } from '../design/components/Toast';
 import { useAppSettings } from '../data/appSettings';
@@ -39,6 +40,8 @@ export function SettingsScreen() {
   const [editingName, setEditingName] = useState(false);
   const app = useAppSettings();
   const wide = useIsWide();
+  const quiet = useQuiet(me.settings.quietUntil);
+  const setQuiet = useSetQuiet();
 
   function toggle(key: string, on: boolean) {
     save.mutate({ tabs: { [key]: on } });
@@ -100,6 +103,21 @@ export function SettingsScreen() {
                 <span>Cover viewer</span>
               </label>
               <p className="hint">Point at a row in a list (or click it) to see its cover large, with the details and its Spotify, trailer or YouTube buttons, beside the table.</p>
+            </div>
+          </section>
+        )}
+
+        {app.features.feed && (
+          <section aria-labelledby="set-quiet" className="group">
+            <h2 id="set-quiet" className="group__title">Activity</h2>
+            <div className="group__card group__pad stack-10">
+              <label className="switch-row" id="quiet-mode">
+                <input type="checkbox" role="switch" checked={quiet.on} onChange={(e) => setQuiet(e.target.checked)} />
+                <span>Quiet mode: don't post my changes to Activity</span>
+              </label>
+              <p className="hint">
+                {quiet.until ? `On until ${formatQuietUntil(quiet.until)}` : 'Nothing you add, rate or change is posted to Activity. It turns itself off after 24 hours.'}
+              </p>
             </div>
           </section>
         )}

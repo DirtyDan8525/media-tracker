@@ -124,6 +124,47 @@ ratings.get('/:set', async (c) => {
   return c.json({ items: loaded.items.map(toSetItem), comparisons: loaded.comparisons });
 });
 
+// 3-7 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 3: comparisons UPDATE, set UPDATE, Entry re-select.
+// "Clear close calls" (Dan, 2026-11-20): marks the person's active picks undone (every one naming `entryId`,
+// or the whole set's), the same mark a typed re-rate uses, then re-fits the set: titles go back to their typed
+// numbers. Answers like a save. Owner-only by construction (every statement is scoped to the signed-in user);
+// no activity. Registered before /:set/save; a different path, so no clash.
+ratings.post('/clear', async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!isPlainObject(body)) return c.json(invalid, 400);
+  const { category, entryId } = body;
+  if (typeof category !== 'string' || !isSet(category, c.var.user.customLists)) return c.json(invalid, 400);
+  if (entryId !== undefined && !isId(entryId)) return c.json(invalid, 400);
+
+  const db = c.env.DB;
+  const userId = c.var.user.id;
+  const tiers = tiersFor(c.var.user.settings, category);
+  const loaded = await loadSet(db, userId, category, tiers);
+  if (entryId !== undefined && !loaded.items.some((i) => i.id === entryId)) return c.json({ error: 'not_found' }, 404);
+  const named = (k: { winnerId: string; loserId: string }) => entryId === undefined || k.winnerId === entryId || k.loserId === entryId;
+  const gone = loaded.comparisons.filter(named);
+  if (gone.length === 0) return c.json({ items: [], entries: [] });
+
+  const remaining = { ...loaded, comparisons: loaded.comparisons.filter((k) => !named(k)) };
+  const { changed } = planSave(remaining, { picks: [], moves: [], done: [] }, tiers);
+  const stmts: D1PreparedStatement[] = [
+    db.prepare(
+      `UPDATE comparisons SET undone_at = ?4
+        WHERE user_id = ?1 AND category = ?2 AND undone_at IS NULL AND (?3 IS NULL OR winner_id = ?3 OR loser_id = ?3)`,
+    ).bind(userId, category, entryId ?? null, new Date().toISOString()),
+    ...setWriteStatements(db, userId, category, changed, loaded.stored),
+  ];
+  const entryIds = isSeasonSet(category) ? [] : changed.map((i) => i.id);
+  if (entryIds.length > 0) {
+    stmts.push(db.prepare(
+      `${ENTRY_SELECT} WHERE e.user_id = ?2 AND e.id IN (SELECT value FROM json_each(?1)) ORDER BY e.created_at, e.rowid`,
+    ).bind(JSON.stringify(entryIds), userId));
+  }
+  const res = await runBatch(db, stmts);
+  const entries: Entry[] = entryIds.length > 0 ? (res[res.length - 1]!.results as EntryRow[]).map(rowToEntry) : [];
+  return c.json({ items: changed.map(toSetItem), entries });
+});
+
 // 3-9 queries: sign-in (1-3), loadSet (2), then 1 batch of ≤ 4: comparisons INSERT, set UPDATE,
 // queue DELETE, Entry re-select. Picks, rows and done ids each travel as one JSON
 // parameter, so no statement binds more than 4 parameters however large the save.

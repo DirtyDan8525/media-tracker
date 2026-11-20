@@ -47,4 +47,24 @@ describe('Sharpen my ratings (N7, Sharpen board)', () => {
     renderApp('/sharpen?list=movies');
     expect(await screen.findByText('All clear')).toBeInTheDocument();
   });
+
+  it('"Undo all my answers" asks first; Cancel does nothing; Undo posts { category } and reloads the pairs', async () => {
+    const calls = mockApi(makeMe(), {
+      'GET /api/ratings/anime/close': { body: { pairs: [['fr', 'mu']], total: 1, items: [item('fr', 'Frieren', 9.6), item('mu', 'Mushishi', 9.6)] } },
+      'POST /api/ratings/clear': { body: { items: [], entries: [] } },
+    });
+    renderApp('/sharpen?list=anime');
+    await screen.findByText('Close call 1 of 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo all my answers for Anime' }));
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByText("Your scores go back to the numbers you typed. This can't be undone.")).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+    expect(calls.some((c) => c.path === '/api/ratings/clear')).toBe(false);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo all my answers for Anime' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Undo all answers' }));
+    await waitFor(() => expect(calls.find((c) => c.path === '/api/ratings/clear')?.body).toEqual({ category: 'anime' }));
+    await waitFor(() => expect(calls.filter((c) => c.path === '/api/ratings/anime/close').length).toBeGreaterThan(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
 });

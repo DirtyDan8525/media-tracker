@@ -529,3 +529,31 @@ describe('Edit info drop-down', () => {
   });
 });
 });
+
+describe('entry details: clear close calls (Dan, 2026-11-20)', () => {
+  const set = (comparisons: unknown[]) => ({ 'GET /api/ratings/anime': { body: { items: [], comparisons } } });
+  const pickOn = { id: 'k1', winnerId: 'f1', loserId: 'arc', isTie: false, createdAt: '2026-01-01T00:00:00.000Z', undoneAt: null };
+
+  it('shows "Clear close calls for this title" only when the title has an active pick', async () => {
+    fakeBackend({ entries: [frieren({ rating: 9.62, typed: 9.6 })], extra: set([{ ...pickOn, winnerId: 'x', loserId: 'y' }]) });
+    renderApp('/entry/f1');
+    await screen.findByRole('spinbutton', { name: 'Rating' });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByRole('button', { name: 'Clear close calls for this title' })).not.toBeInTheDocument();
+  });
+
+  it('is there when a pick names the title; pressing it posts { category, entryId } and the cache takes the typed numbers', async () => {
+    const back = fakeBackend({
+      entries: [frieren({ rating: 9.62, typed: 9.6 })],
+      extra: {
+        ...set([pickOn]),
+        'POST /api/ratings/clear': () => ({ body: { items: [], entries: [frieren({ rating: 9.6, typed: 9.6 })] } }),
+      },
+    });
+    renderApp('/entry/f1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Clear close calls for this title' }));
+    await waitFor(() => expect(back.calls.find((c) => c.path === '/api/ratings/clear')?.body).toEqual({ category: 'anime', entryId: 'f1' }));
+    await waitFor(() => expect(screen.queryByText(/a close call nudged it/)).not.toBeInTheDocument());
+    expect(screen.getByRole('spinbutton', { name: 'Rating' })).toHaveValue(9.6);
+  });
+});

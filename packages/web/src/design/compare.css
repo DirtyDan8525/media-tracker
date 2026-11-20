@@ -188,3 +188,4 @@
 .close-done__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--tap); color: var(--text); }
 .close-done__num { font-variant-numeric: tabular-nums; color: var(--bright-text); }
 .sharpen { max-width: 680px; }
+.sharpen__undo { margin-top: var(--space-6, 24px); }

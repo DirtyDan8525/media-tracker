@@ -9,6 +9,7 @@ import {
   seasonSetOf,
   tiersFor,
   type Category,
+  isQuiet,
   type Comparison,
   type Entry,
   type RatedItem,
@@ -353,11 +354,14 @@ entries.post('/entries', async (c) => {
   // Activity records the final rating (the re-fitted value). It goes after the INSERT (foreign
   // key); re-fitted neighbours in setStmts log nothing. The compare queue is no longer filled (N9).
   const queued: D1PreparedStatement[] = [];
-  const logged = activityForCreate(db, userId, id, {
-    rating: rated.rating !== null ? rated.rating : edit.rating,
-    status: values.status,
-  }, now);
-  await runBatch(db, [insert, logged, ...setStmts, ...queued, ...planOrderStatements(db, userId, id, values.status)]);
+  // Quiet mode: no activity rows at all (the settings are already on c.var.user; no query).
+  const logged = isQuiet(c.var.user.settings.quietUntil)
+    ? []
+    : [activityForCreate(db, userId, id, {
+      rating: rated.rating !== null ? rated.rating : edit.rating,
+      status: values.status,
+    }, now)];
+  await runBatch(db, [insert, ...logged, ...setStmts, ...queued, ...planOrderStatements(db, userId, id, values.status)]);
 
   const entry = await loadEntry(db, id, userId, c.var.user.settings);
   return c.json({ entry, duplicateOf }, 201);
@@ -408,7 +412,7 @@ entries.patch('/entries/:id', async (c) => {
     .bind(...keys.map((k) => dbValue(rest[k])), now, id, userId);
   // Activity rows compare against the stored row, so they go first: before the update and the
   // set UPDATE in ratingStmts, in the same batch.
-  const logged = activityForPatch(db, userId, id, { rating: loggedRating, status: rest.status }, now);
+  const logged = isQuiet(c.var.user.settings.quietUntil) ? [] : activityForPatch(db, userId, id, { rating: loggedRating, status: rest.status }, now);
   await runBatch(db, [...logged, update, ...ratingStmts, ...queued, ...('status' in rest ? planOrderStatements(db, userId, id, rest.status) : [])]);
   return c.json(await loadEntry(db, id, userId, c.var.user.settings));
 });
@@ -491,7 +495,7 @@ entries.post('/entries/:id/seasons', async (c) => {
     db.prepare(`INSERT INTO seasons (id, entry_id, label, notes, ${RATED_COLS.join(', ')}, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(base.id, entryId, base.label, base.notes, ...ratedValues(rated), now),
     // A rated season posts to the feed (rated, from nothing); re-fitted neighbours log nothing.
-    ...activityForSeason(db, userId, base.id, null, rated.rating, now),
+    ...(isQuiet(c.var.user.settings.quietUntil) ? [] : activityForSeason(db, userId, base.id, null, rated.rating, now)),
     ...setStmts,
   ]);
   return c.json(seasonOf(base, rated), 201);
@@ -525,7 +529,7 @@ entries.patch('/seasons/:id', async (c) => {
       ratingStmts = r.stmts;
       rated = r.item;
       // Only the edited season logs (shown rating changed, not cleared); neighbours re-fitted in ratingStmts never do.
-      logged = activityForSeason(db, userId, id, r.before.rating, r.item.rating, new Date().toISOString());
+      if (!isQuiet(c.var.user.settings.quietUntil)) logged = activityForSeason(db, userId, id, r.before.rating, r.item.rating, new Date().toISOString());
     }
   }
   await runBatch(db, [

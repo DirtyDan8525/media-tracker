@@ -15,6 +15,7 @@ import { PageHeader } from '../../shell/PageHeader';
 import { useSessionMe } from '../../shell/SessionGate';
 import { addNudged, NudgedList, PICK_FAILED, type Nudged } from './CloseCallSheet';
 import { ClosePair, type CloseAnswer } from './ClosePair';
+import { UndoAnswersSheet } from './UndoAnswersSheet';
 import '../../design/settings.css';
 import { listLabel } from '../../lists/registry';
 
@@ -94,6 +95,7 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
   const keyOf = (a: string, b: string) => (a < b ? `${a}~${b}` : `${b}~${a}`);
   const [busy, setBusy] = useState(false);
   const [nudged, setNudged] = useState<Nudged>(new Map());
+  const [undoing, setUndoing] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, [k]);
 
@@ -116,6 +118,15 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
     setSeen(done);
     await refetch();
     setBusy(false);
+    setK(k + 1);
+  }
+
+  async function undone() {
+    setUndoing(false);
+    setNudged(new Map());
+    setSeen(new Set());
+    toast.show(`Your answers for ${setLabel(set)} are undone`);
+    await refetch();
     setK(k + 1);
   }
 
@@ -150,7 +161,13 @@ function SharpenSession({ set, onDone }: { set: RatingSet; onDone: () => void })
   return (
     <div className="screen">
       <PageHeader title={title} titleRef={headingRef} actions={doneButton} />
-      <div className="screen__body sharpen">{body}</div>
+      <div className="screen__body sharpen">
+        {body}
+        <Button variant="ghost" compact className="sharpen__undo" disabled={busy} onClick={() => setUndoing(true)}>
+          {`Undo all my answers for ${setLabel(set)}`}
+        </Button>
+      </div>
+      {undoing && <UndoAnswersSheet set={set} label={setLabel(set)} onClose={() => setUndoing(false)} onDone={() => void undone()} />}
     </div>
   );
 }

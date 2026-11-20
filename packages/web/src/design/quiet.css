@@ -1,0 +1,11 @@
+/* Quiet mode banner: one line above the content, on phone and PC. */
+.quiet-banner {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3, 8px); flex-wrap: nowrap;
+  padding: 6px var(--space-4, 12px); background: var(--card); color: var(--bright-text);
+  border-bottom: 1px solid var(--border, transparent); font-size: var(--fs-sm, 13px); line-height: 1.2;
+}
+.quiet-banner__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quiet-banner__off {
+  flex: none; background: none; border: 0; padding: 4px 2px; color: inherit; font: inherit; font-weight: 600;
+  text-decoration: underline; cursor: pointer; min-height: 32px;
+}

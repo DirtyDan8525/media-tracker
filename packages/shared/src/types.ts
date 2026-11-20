@@ -220,6 +220,8 @@ export interface UserSettings {
   coverViewer: boolean;
   /** Your own order for the lists (side bar, list menus, phone Lists menu). Lists not named keep the admin's order after these. Empty = the admin's order. */
   listOrder: Category[];
+  /** Quiet mode: until this ISO time nothing the person does posts to Activity (null = off). Personal, never an admin default. */
+  quietUntil: string | null;
 }
 
 export const NAV_SIDES = ['left', 'right'] as const;
@@ -245,6 +247,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   nav: { side: 'left', collapsed: false },
   coverViewer: true,
   listOrder: [],
+  quietUntil: null,
 };
 
 // Allowed values for "Ask to compare" (the Sheet's other compare options were dropped).

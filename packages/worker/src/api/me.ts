@@ -10,6 +10,8 @@ import {
   decodeAvatar,
   markCustomized,
   mergePatch,
+  parseQuietUntil,
+  QUIET_MAX_AHEAD_MS,
   validateBio,
   SEARCH_SCOPE,
   THEMES,
@@ -103,6 +105,16 @@ export function sanitizeSettings(partial: unknown, current: UserSettings, custom
     if (typeof partial.coverViewer !== 'boolean') return { ok: false };
     next.coverViewer = partial.coverViewer;
   }
+  if ('quietUntil' in partial) {
+    const q = partial.quietUntil;
+    if (q === null) next.quietUntil = null;
+    else {
+      const iso = parseQuietUntil(q);
+      // An ISO time no further ahead than 24 h (plus slack): quiet mode always ends by itself.
+      if (iso === null || Date.parse(iso) - Date.now() > QUIET_MAX_AHEAD_MS) return { ok: false };
+      next.quietUntil = iso;
+    }
+  }
   const enums = [
     ['compareAsk', COMPARE_ASK],
     ['searchScope', SEARCH_SCOPE],
@@ -192,6 +204,8 @@ me.put('/bio', async (c) => {
 function settingsDelta(partial: Record<string, unknown>, next: UserSettings): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const k of ['theme', 'compareAsk', 'searchScope', 'coverViewer', 'listOrder'] as const) if (k in partial) out[k] = next[k];
+  // Personal: saved, but never marked `customized` (admin Defaults do not touch it). null removes the key.
+  if ('quietUntil' in partial) out.quietUntil = next.quietUntil;
   for (const g of ['tabs', 'colors', 'notify', 'nav'] as const) {
     const p = partial[g];
     if (!isPlainObject(p)) continue;

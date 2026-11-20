@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import {
-  DEFAULT_USER_SETTINGS, isCategoryKey, NOTIFY_KEYS, applyDefaults, parseRecentEmoji, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
+  DEFAULT_USER_SETTINGS, isCategoryKey, NOTIFY_KEYS, applyDefaults, parseRecentEmoji, legacyCustomized, parseCustomized, parseQuietUntil, resolveDefaults, validateTierSet,
   type Category, type CustomList, type Customized, type NewPersonDefaults, type UserSettings,
 } from '@media-tracker/shared';
 import type { Env } from '../env';
@@ -102,8 +102,9 @@ export function loadSettings(json: string): UserSettings {
   if (Array.isArray(known.listOrder)) {
     for (const c of known.listOrder) if (isCategoryKey(c) && !listOrder.includes(c)) listOrder.push(c as Category);
   }
+  const quietUntil = parseQuietUntil(known.quietUntil);
   // merge over defaults so older rows missing a key still get one
-  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer, listOrder };
+  return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer, listOrder, quietUntil };
 }
 
 /** The raw `customized` tree of a stored settings JSON, or null for an account from before tracking (or corrupt JSON). */

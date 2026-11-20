@@ -31,6 +31,7 @@ describe('PlayTrailer', () => {
     expect(frame).toHaveAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     expect(frame).toHaveAttribute('allowfullscreen');
     const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('sheet--video'); // most of the screen on PC (2026-11-20)
     await userEvent.click(screen.getAllByRole('button', { name: 'Close' }).find((b) => b.classList.contains('btn'))!);
     expect(dialog).not.toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();

@@ -10,6 +10,8 @@ export interface SheetProps {
   children: ReactNode;
   /** Optional footer row (e.g. the Save button), pinned under the scrolling body. */
   footer?: ReactNode;
+  /** A video: on PC the dialog grows to most of the screen at 16:9 (trailers, Dan 2026-11-20). */
+  video?: boolean;
 }
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -19,7 +21,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * Escape and the backdrop close it; focus moves in on open (to a `data-autofocus` element, else the first field;
  * on touch screens to the sheet itself so no keyboard pops up), is trapped, and returns on close.
  */
-export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
+export function Sheet({ open, title, onClose, children, footer, video = false }: SheetProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
 
@@ -59,7 +61,7 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   return createPortal(
     <div className="sheet-layer">
       <div className="sheet-backdrop" onClick={onClose} aria-hidden="true" />
-      <div ref={panel} className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
+      <div ref={panel} className={video ? 'sheet sheet--video' : 'sheet'} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
         <div className="sheet__grabber" aria-hidden="true" />
         <div className="sheet__header">
           <h2 id={titleId} className="sheet__title">{title}</h2>

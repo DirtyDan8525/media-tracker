@@ -146,6 +146,8 @@
 @media (min-width: 768px) {
   .sheet-layer { align-items: center; }
   .sheet { width: min(560px, calc(100vw - 64px)); max-height: 85dvh; border-radius: 16px; border: 1px solid var(--grid-line); }
+  /* Trailers: most of the screen, sized so the 16:9 video plus header and footer fit the height. */
+  .sheet--video { width: min(calc(100vw - 64px), calc((92dvh - 150px) * 16 / 9)); max-height: 96dvh; }
   .sheet__grabber { display: none; }
   .sheet__header { padding-top: var(--space-6); }
 }

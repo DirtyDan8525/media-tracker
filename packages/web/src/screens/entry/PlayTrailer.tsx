@@ -34,7 +34,7 @@ export function PlayTrailer({ entry }: { entry: TrailerEntry }) {
   return (
     <>
       <button type="button" className="btn btn--secondary detail__watch" onClick={() => setOpen(true)}>▶ Play trailer</button>
-      <Sheet open={open} title={`${entry.title} trailer`} onClose={() => setOpen(false)} footer={<Button onClick={() => setOpen(false)}>Close</Button>}>
+      <Sheet video open={open} title={`${entry.title} trailer`} onClose={() => setOpen(false)} footer={<Button onClick={() => setOpen(false)}>Close</Button>}>
         <div className="trailer__frame">
           <iframe
             title={`${entry.title} trailer`}

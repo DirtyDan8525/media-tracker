@@ -192,3 +192,8 @@
 .lists-order__arrow { display: flex; }
 .lists-order__arrow--up { transform: rotate(-90deg); }
 .lists-order__arrow--down { transform: rotate(90deg); }
+
+/* A text field has focus on a touch screen (keyboard up): the bottom bar and Add bubble hide so
+   they don't ride up on the keyboard (src/shell/useKeyboardLayout.ts, 2026-11-20). */
+.kbd-open .frame--phone .bottom-tabs, .kbd-open .frame--phone .add-fab { display: none; }
+.kbd-open .frame--phone .frame__main { padding-bottom: 0; }

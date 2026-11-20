@@ -6,6 +6,7 @@ import { useListCounts } from '../data/useEntries';
 import { BottomTabs } from '../design/components/BottomTabs';
 import { SideNav } from '../design/components/SideNav';
 import { useIsWide } from '../hooks';
+import { useKeyboardLayout } from './useKeyboardLayout';
 import { useSaveSettings } from '../data/useMe';
 import { useEnabledLists } from './useLists';
 import { useCurrentList } from './currentList';
@@ -37,6 +38,7 @@ export function AppFrame() {
 function FrameLayout() {
   const me = useSessionMe();
   const wide = useIsWide();
+  useKeyboardLayout();
   const counts = useListCounts().data ?? {};
   const lists = useEnabledLists();
   const { features } = useAppSettings();

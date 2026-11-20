@@ -1,6 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* No pinch zoom (Dan, 2026-11-20), also on iPhone where the viewport tag alone is ignored: only panning is allowed. */
+html { -webkit-text-size-adjust: 100%; touch-action: pan-x pan-y; }
 
 body {
   margin: 0;

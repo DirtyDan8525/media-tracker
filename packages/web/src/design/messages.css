@@ -35,7 +35,14 @@
 
 /* Chat: a column that fills the space above the bottom bar; only the message list scrolls. */
 .chat { height: 100dvh; min-height: 0; overflow: hidden; }
-.frame--phone .chat { height: calc(100dvh - var(--bottom-tabs-h) - env(safe-area-inset-bottom)); flex: none; }
+/* Phone: the open chat is a fixed layer over the visible area (above the keyboard when it's open),
+   so the page can't scroll past the bottom and the message box sits right on the keyboard (2026-11-20). */
+.frame--phone .chat {
+  position: fixed; left: 0; right: 0; top: var(--vv-top, 0px); z-index: 30;
+  height: calc(var(--vv-h, 100dvh) - var(--bottom-tabs-h) - env(safe-area-inset-bottom));
+  background: var(--bg); flex: none;
+}
+.kbd-open .frame--phone .chat { height: var(--vv-h, 100dvh); }
 .chat__top { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-4); border-bottom: 1px solid var(--grid-line); flex: none; }
 .frame--wide .chat__top { padding: var(--space-8) var(--space-16); }
 .chat__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }

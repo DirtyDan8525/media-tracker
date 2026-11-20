@@ -44,3 +44,6 @@ registerSW({
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   },
 });
+
+// iPhone Safari's own pinch gesture (it ignores user-scalable=no): block it so the app never zooms (Dan, 2026-11-20).
+for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });

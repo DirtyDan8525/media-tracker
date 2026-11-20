@@ -56,10 +56,25 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
 
   const length = Array.from(text.trim()).length;
   const over = length > MESSAGE_MAX;
-  const canSend = length > 0 && !over && !sendText.isPending;
+  // A photo waits here after it's chosen; Send sends it (then any typed text), ✕ removes it (Dan, 2026-11-20).
+  const [staged, setStaged] = useState<{ blob: Blob; url: string } | null>(null);
+  useEffect(() => () => { if (staged?.url) URL.revokeObjectURL(staged.url); }, [staged]);
+  const busy = sendText.isPending || sendImage.isPending;
+  const canSend = (length > 0 || staged !== null) && !over && !busy;
 
   async function send() {
     if (!canSend) return;
+    if (staged) {
+      try {
+        await sendImage.mutateAsync(staged.blob);
+        setStaged(null);
+        if (length === 0) onSent();
+      } catch (e) {
+        toast.show(sendErrorText(e, 'picture'));
+        return;
+      }
+      if (length === 0) { field.current?.focus(); return; }
+    }
     try {
       await sendText.mutateAsync({ text: text.trim(), replyTo });
       setText('');
@@ -93,7 +108,7 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
     }
   }
 
-  async function sendPhoto(file: File | undefined) {
+  async function stagePhoto(file: File | undefined) {
     if (!file) return;
     let blob: Blob;
     try {
@@ -103,12 +118,10 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
       toast.show("That file isn't a photo that can be sent.");
       return;
     }
-    try {
-      await sendImage.mutateAsync(blob);
-      onSent();
-    } catch (e) {
-      toast.show(sendErrorText(e, 'picture'));
-    }
+    let url = '';
+    try { url = URL.createObjectURL(blob); } catch { /* no preview, still sendable */ }
+    setStaged({ blob, url });
+    field.current?.focus();
   }
 
   async function sendMemo(blob: Blob, durationMs: number) {
@@ -154,6 +167,15 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
           <IconButton label="Cancel reply" icon="close" look="plain" onClick={() => onCancelReply?.()} />
         </div>
       )}
+      {staged && (
+        <div className="composer__staged" role="group" aria-label="Photo to send">
+          <span className="composer__staged-img">
+            <img src={staged.url} alt="Photo to send" />
+            <IconButton label="Remove photo" icon="close" look="plain" className="composer__staged-remove"
+              onClick={() => { setStaged(null); field.current?.focus(); }} />
+          </span>
+        </div>
+      )}
       <div className="composer__row">
         <div className="composer__more" ref={menuWrap} onKeyDown={onMenuKey}>
           <button ref={plus} type="button" className="icon-btn icon-btn--outlined composer__plus" aria-label="More options" title="More options"
@@ -172,7 +194,7 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
         </div>
         {options.photos && (
           <input ref={fileInput} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true"
-            data-testid="photo-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void sendPhoto(f); }} />
+            data-testid="photo-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void stagePhoto(f); }} />
         )}
         <textarea ref={field} className="input composer__field" rows={1} aria-label="Message" placeholder="Message" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} aria-invalid={over || undefined} />

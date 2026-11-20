@@ -390,7 +390,7 @@ function Bubble({ m, mine, first, showWho, lastOfRun, sender, name, meId, isGrou
           </span>
           {/* Focusable: Enter or Space opens the message menu (the same one a hold, a right-click or "⋯" opens). */}
           <div ref={bubbleRef} tabIndex={0} aria-describedby={HINT_ID}
-            className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}${m.kind === 'voice' && !m.deleted && !m.expired ? ' bubble--voice' : ''}${swiping ? ' is-swiping' : ''}`}
+            className={`bubble${mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : ''}${m.kind === 'rec' && !m.deleted ? ' bubble--rec' : ''}${m.kind === 'voice' && !m.deleted && !m.expired ? ' bubble--voice' : ''}${m.kind === 'image' && !m.deleted && !m.expired ? ' bubble--image' : ''}${swiping ? ' is-swiping' : ''}`}
             style={swiping ? { transform: `translateX(${dx}px)` } : undefined}
             onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onMenu(e.currentTarget); } }}
             {...handlers}>

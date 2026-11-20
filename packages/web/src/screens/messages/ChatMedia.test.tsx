@@ -169,13 +169,34 @@ describe('photos', () => {
     expect(click).toHaveBeenCalled();
     const file = new File([new Uint8Array(5000)], 'IMG_0001.HEIC', { type: 'image/heic' });
     fireEvent.change(input, { target: { files: [file] } });
+    // It waits in the message box (Dan, 2026-11-20): nothing is sent until Send; ✕ would remove it.
+    expect(await screen.findByRole('img', { name: 'Photo to send' })).toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/api/conversations/c1/messages/image')).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/image')).toBe(true));
+    expect(screen.queryByRole('img', { name: 'Photo to send' })).not.toBeInTheDocument();
     expect(resizeImage).toHaveBeenCalledWith(file);
     const post = calls.find((c) => c.path === '/api/conversations/c1/messages/image')!;
     expect((post.init!.headers as Record<string, string>)['content-type']).toBe('image/jpeg');
     expect(post.init!.body).toBeInstanceOf(Blob);
     expect((post.init!.body as Blob).size).toBe(20); // the resized copy, not the original
     expect(await screen.findByRole('img', { name: 'Picture from You' })).toBeInTheDocument();
+  });
+
+  it('a chosen photo can be removed with ✕ before sending', async () => {
+    const { calls } = setup();
+    renderApp('/messages/c1');
+    await waitFor(async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'More options' }));
+      expect(screen.getByRole('menuitem', { name: 'Send a photo' })).toBeInTheDocument();
+    });
+    const input = screen.getByTestId('photo-input') as HTMLInputElement;
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Send a photo' }));
+    fireEvent.change(input, { target: { files: [new File([new Uint8Array(10)], 'a.jpg', { type: 'image/jpeg' })] } });
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove photo' }));
+    expect(screen.queryByRole('img', { name: 'Photo to send' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    expect(calls.some((c) => c.path === '/api/conversations/c1/messages/image')).toBe(false);
   });
 
   it('a file that is not a picture says so and sends nothing', async () => {

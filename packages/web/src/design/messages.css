@@ -85,6 +85,8 @@
 .bubble__text { font-size: calc(var(--fs-body) * var(--chat-scale, 1)); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--bright-text); }
 .bubble__deleted { font-size: var(--fs-sm); font-style: italic; color: var(--muted-text); }
 .bubble__label { font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); padding: 0 var(--space-2); }
+.bubble--image { padding: 0; background: transparent; overflow: hidden; } /* the photo itself, no frame (Dan, 2026-11-20) */
+.bubble--image .bubble__quote { margin: var(--space-3) var(--space-3) 0; }
 .bubble__photo { all: unset; display: block; cursor: pointer; border-radius: var(--radius-lg); overflow: hidden; min-width: 44px; min-height: 44px; }
 .bubble__photo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .bubble__photo img { display: block; max-width: 100%; max-height: 280px; width: auto; height: auto; background: var(--panel); }
@@ -275,3 +277,10 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
   .frame--wide .chat-page > .chat { max-width: calc(960px + 2 * var(--fade)); }
   .frame--wide .chat__list { max-width: 100%; }
 }
+
+/* A chosen photo waits in the composer until Send (Dan, 2026-11-20); ✕ removes it. */
+.composer__staged { display: flex; align-items: flex-start; gap: var(--space-3); padding: 0 0 var(--space-4); }
+.composer__staged-img { position: relative; }
+.composer__staged-img img { display: block; max-height: 96px; max-width: 160px; border-radius: var(--radius-lg); object-fit: cover; }
+.composer__staged-remove { position: absolute; top: -8px; right: -8px; }
+.composer__staged-remove.icon-btn { min-width: 32px; min-height: 32px; width: 32px; height: 32px; border-radius: 50%; background: var(--card); border: 1px solid var(--grid-line); }

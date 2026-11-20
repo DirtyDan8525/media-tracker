@@ -86,3 +86,13 @@
 .activity-discover__lists .btn--chip.is-active { background: var(--cf-done); border-color: var(--highlight); color: var(--bright-text); }
 .activity-discover .select-chip { flex: none; }
 @media (min-width: 1024px) { .activity-discover__lists { flex-wrap: wrap; overflow: visible; } }
+
+/* Phone: Everyone / Friends / You and a Filters button on one row; the filters open in a sheet (2026-11-20). */
+.activity-show { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-5); }
+.activity-show .activity-filter { margin-top: 0; }
+.activity-filters-btn { display: inline-flex; align-items: center; gap: var(--space-3); min-height: var(--tap); padding: 0 var(--space-7); border-radius: 999px; border: 1px solid var(--grid-line); background: var(--card); color: var(--text); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.activity-filters-btn.is-on { border-color: var(--highlight); color: var(--bright-text); }
+.activity-filters__sheet { display: flex; flex-direction: column; gap: var(--space-5); }
+.activity-filters__sheet .activity-discover__lists { flex-wrap: wrap; overflow: visible; }
+.activity-filters__sheet .select-chip { align-self: flex-start; }
+.activity-filters__foot { display: flex; justify-content: space-between; gap: var(--space-4); }

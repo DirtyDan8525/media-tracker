@@ -594,11 +594,14 @@ describe('Activity discover filters (Dan, 2026-11-20)', () => {
   it('a list chip and a rating pick ask the server for just those posts, kept in the URL', async () => {
     const { calls } = fakeBackend({ extra: { 'GET /api/activity': { body: page([]) } } });
     const { router } = renderApp('/activity');
+    // Phone: the filters sit behind one "Filters" button (2026-11-20).
+    if (!screen.queryByRole('button', { name: 'Songs' })) await userEvent.click(await screen.findByRole('button', { name: /^Filters/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Songs' }));
     expect(screen.getByRole('button', { name: 'Songs' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Rating' }), 'Rated 8+');
     await waitFor(() => expect(calls.some((c) => c.path.includes('list=songs') && c.path.includes('min=8'))).toBe(true));
     expect(router.state.location.search).toContain('list=songs');
+    expect(screen.getByRole('button', { name: 'Filters · 2' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'All lists' }));
     expect(router.state.location.search).not.toContain('list=');
   });

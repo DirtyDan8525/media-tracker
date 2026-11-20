@@ -107,6 +107,7 @@ export function ActivityScreen() {
     if (on) settle.current = setTimeout(() => setActive(key), 120);
   };
   const [query, setQuery] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // S8: Everyone and Friends count as seen once they have loaded.
   const markSeen = useMarkSeen();
@@ -244,10 +245,36 @@ export function ActivityScreen() {
     );
   }
 
+  const filterCount = (listFilter !== null ? 1 : 0) + (minFilter !== null ? 1 : 0);
+  const discoverControls = (
+    <>
+      <div className="activity-discover__lists" role="group" aria-label="Show posts from">
+        <Button variant="chip" active={listFilter === null} onClick={() => setParam('list', null)}>All lists</Button>
+        {listChoices.map((c) => (
+          <Button key={c} variant="chip" active={listFilter === c} onClick={() => setParam('list', listFilter === c ? null : c)}>{listName(c)}</Button>
+        ))}
+      </div>
+      <select aria-label="Rating" className={`select-chip${minFilter !== null ? ' is-on' : ''}`} value={minFilter ?? ''}
+        onChange={(e) => setParam('min', e.target.value || null)}>
+        <option value="">Any rating</option>
+        {MIN_CHOICES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+      </select>
+    </>
+  );
+
   return (
     <div className="screen activity-screen" style={{ '--activity-scale': textSize.scale } as CSSProperties}>
       <PageHeader title="Activity" profile>
-        <SegRadio block="activity-filter" label="Show" value={filter} options={FILTERS} onChange={setFilter} />
+        <div className="activity-show">
+          <SegRadio block="activity-filter" label="Show" value={filter} options={FILTERS} onChange={setFilter} />
+          {/* Phone: the list and rating filters live behind one button, so nothing gets cut off (Dan, 2026-11-20). */}
+          {!wide && (
+            <button type="button" className={`activity-filters-btn${filterCount > 0 ? ' is-on' : ''}`} aria-haspopup="dialog"
+              onClick={() => setFiltersOpen(true)}>
+              Filters{filterCount > 0 ? ` · ${filterCount}` : ''}
+            </button>
+          )}
+        </div>
         <div className="activity-bar">
           <div className="search search--compact activity-bar__search">
             <label htmlFor="activity-q" className="sr-only">Search posts</label>
@@ -261,21 +288,20 @@ export function ActivityScreen() {
           </div>
           <TextSizeControl step={textSize.step} onChange={textSize.set} />
         </div>
-        <div className="activity-discover">
-          <div className="activity-discover__lists" role="group" aria-label="Show posts from">
-            <Button variant="chip" active={listFilter === null} onClick={() => setParam('list', null)}>All lists</Button>
-            {listChoices.map((c) => (
-              <Button key={c} variant="chip" active={listFilter === c} onClick={() => setParam('list', listFilter === c ? null : c)}>{listName(c)}</Button>
-            ))}
-          </div>
-          <select aria-label="Rating" className={`select-chip${minFilter !== null ? ' is-on' : ''}`} value={minFilter ?? ''}
-            onChange={(e) => setParam('min', e.target.value || null)}>
-            <option value="">Any rating</option>
-            {MIN_CHOICES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </div>
+        {wide && <div className="activity-discover">{discoverControls}</div>}
         {needle !== '' && hasNextPage && <p className="activity-bar__hint" role="status">Searching loaded posts</p>}
       </PageHeader>
+      {!wide && (
+        <Sheet open={filtersOpen} title="Filters" onClose={() => setFiltersOpen(false)}
+          footer={<div className="activity-filters__foot">
+            <Button onClick={() => setParams((prev) => { const p = new URLSearchParams(prev); p.delete('list'); p.delete('min'); return p; }, { replace: true })} disabled={filterCount === 0}>Clear</Button>
+            <Button variant="primary" onClick={() => setFiltersOpen(false)}>Done</Button>
+          </div>}>
+          <div className="activity-filters__sheet">
+            {discoverControls}
+          </div>
+        </Sheet>
+      )}
       <div className={wide ? 'screen__body activity-layout' : 'screen__body'}>
         <div className="activity-layout__feed">{body}</div>
         {wide && <ActivityPanel props={detailProps(active)} />}

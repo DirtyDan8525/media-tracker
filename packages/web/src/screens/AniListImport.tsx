@@ -73,8 +73,9 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview,
   const n = newN + addMatches.length;
 
   function setAll(c: ConflictChoice) {
-    // "Use AniList for all" covers only the clear same-title ones; possible matches are never bulk-changed.
-    setChoices((prev) => (found?.matches ?? []).map((m, i) => (c === 'mine' || m.kind === 'same' ? c : (prev[i] ?? 'mine'))));
+    // Bulk covers every conflict, close matches too (Dan, 2026-11-20); the sheet asks first when
+    // close matches would be overwritten.
+    setChoices((found?.matches ?? []).map(() => c));
   }
 
   function go() {

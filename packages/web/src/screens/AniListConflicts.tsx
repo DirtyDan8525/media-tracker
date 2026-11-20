@@ -1,5 +1,5 @@
 import { statusLabel, type AniListMatch, type Entry } from '@media-tracker/shared';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
 import type { ConflictChoice } from '../import/aniListUpdate';
@@ -65,6 +65,7 @@ export function AniListConflicts({ open, matches, choices, onChoice, onAll, onCl
   onClose: () => void;
 }) {
   const id = useId();
+  const [confirming, setConfirming] = useState(false);
   const idx = matches.map((_, i) => i);
   const same = idx.filter((i) => matches[i]!.kind === 'same');
   const maybe = idx.filter((i) => matches[i]!.kind === 'possible');
@@ -75,11 +76,25 @@ export function AniListConflicts({ open, matches, choices, onChoice, onAll, onCl
   );
   return (
     <Sheet open={open} title="Review titles you already have" onClose={onClose} footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
-      <div className="conflict__bulk">
-        <Button compact onClick={() => onAll('mine')}>Keep all mine</Button>
-        <Button compact onClick={() => onAll('anilist')} disabled={same.length === 0}>Use AniList for all</Button>
-      </div>
-      <p className="muted">"Use AniList for all" covers the titles that are clearly the same; check the maybes one by one. Updates to titles you already had can't be undone with Undo.</p>
+      {confirming ? (
+        <div className="conflict__confirm" role="alertdialog" aria-labelledby={`${id}-cf`} aria-describedby={`${id}-cfd`}>
+          <p id={`${id}-cf`} className="conflict__confirm-h">Use AniList for all?</p>
+          <p id={`${id}-cfd`}>
+            {maybe.length === 1 ? '1 of these is only a close match' : `${maybe.length} of these are only close matches`} (the
+            names look alike but might be different titles). Your entries for those will be overwritten too.
+          </p>
+          <div className="conflict__bulk">
+            <Button compact onClick={() => setConfirming(false)}>Back</Button>
+            <Button compact variant="primary" onClick={() => { onAll('anilist'); setConfirming(false); }}>Use AniList for all</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="conflict__bulk">
+          <Button compact onClick={() => onAll('mine')}>Keep all mine</Button>
+          <Button compact onClick={() => (maybe.length > 0 ? setConfirming(true) : onAll('anilist'))} disabled={matches.length === 0}>Use AniList for all</Button>
+        </div>
+      )}
+      <p className="muted">Updates to titles you already had can't be undone with Undo.</p>
       {same.length > 0 && (<section aria-label="Already on your list"><h3>Already on your list</h3>{list(same)}</section>)}
       {maybe.length > 0 && (<section aria-label="Maybe the same title"><h3>Maybe the same title?</h3>{list(maybe)}</section>)}
     </Sheet>

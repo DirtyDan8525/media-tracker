@@ -479,3 +479,5 @@ a.group__row:focus-visible { outline-offset: -2px; }
 .conflict__choices legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .conflict__opt { display: inline-flex; align-items: center; gap: var(--space-3); min-height: var(--tap); cursor: pointer; }
 .conflict__help { margin: 0; }
+.conflict__confirm { border: 1px solid var(--highlight); border-radius: var(--radius-md); padding: var(--space-5) var(--space-6); background: var(--card); }
+.conflict__confirm-h { margin: 0 0 var(--space-3); font-weight: 700; color: var(--bright-text); }

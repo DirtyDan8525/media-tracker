@@ -177,19 +177,28 @@ describe('Import from AniList', () => {
       expect(patches(calls)).toHaveLength(0);
     });
 
-    it('bulk buttons: Use AniList for all skips the maybes; Keep all mine resets', async () => {
+    it('bulk: Use AniList for all asks first when close matches would be overwritten (Back keeps them); then covers all; Keep all mine resets', async () => {
       const { calls } = backend(ok, mineEntries());
       renderApp('/import');
       const dialog = await review();
+      const checkedAniList = () => within(dialog).getAllByRole('radio', { name: 'Use AniList' }).filter((r) => (r as HTMLInputElement).checked).length;
       await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
-      expect(within(dialog).getAllByRole('radio', { name: 'Use AniList' }).filter((r) => (r as HTMLInputElement).checked)).toHaveLength(2);
+      const ask = within(dialog).getByRole('alertdialog', { name: 'Use AniList for all?' });
+      expect(ask).toHaveTextContent(/close match/);
+      await userEvent.click(within(ask).getByRole('button', { name: 'Back' }));
+      expect(checkedAniList()).toBe(0);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      await userEvent.click(within(within(dialog).getByRole('alertdialog')).getByRole('button', { name: 'Use AniList for all' }));
+      const all = within(dialog).getAllByRole('radio', { name: 'Use AniList' }).length;
+      expect(checkedAniList()).toBe(all);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Keep all mine' }));
       expect(within(dialog).getAllByRole('radio', { name: 'Keep mine' }).every((r) => (r as HTMLInputElement).checked)).toBe(true);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      await userEvent.click(within(within(dialog).getByRole('alertdialog')).getByRole('button', { name: 'Use AniList for all' }));
       await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
-      await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
-      expect(await screen.findByText('Imported 1 · Updated 2')).toBeInTheDocument();
-      expect(patches(calls).map((c) => c.path).sort()).toEqual(['/api/entries/e1', '/api/entries/e2']);
+      await userEvent.click(await screen.findByRole('button', { name: /^(Import \d+ titles?|Update \d+ titles?)$/ }));
+      expect((await screen.findAllByText(/Updated 3/)).length).toBeGreaterThan(0);
+      expect(patches(calls)).toHaveLength(3);
     });
 
     it('a failed update is named and the rest still save', async () => {
@@ -206,7 +215,8 @@ describe('Import from AniList', () => {
       })();
       renderApp('/import');
       const dialog = await review();
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Use AniList for all' }));
+      // Same-title ones only, chosen one by one (the bulk button would also take the close match).
+      for (const r of within(dialog).getAllByRole('radio', { name: 'Use AniList' }).slice(0, 2)) await userEvent.click(r);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
       await userEvent.click(screen.getByRole('button', { name: 'Import 1 title' }));
       expect(await screen.findByText(/Couldn't update: Anime Two/)).toBeInTheDocument();

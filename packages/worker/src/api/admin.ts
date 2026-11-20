@@ -186,6 +186,13 @@ admin.post('/defaults/apply', async (c) => {
   return c.json({ key, people });
 });
 
+async function saveSetting(db: D1Database, key: string, value: unknown): Promise<void> {
+  await db.prepare(
+    'INSERT INTO app_settings (key, value_json, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT (key) DO UPDATE SET value_json = ?2, updated_at = ?3',
+  ).bind(key, JSON.stringify(value), new Date().toISOString()).run();
+  forgetAppSettings();
+}
+
 // PUT /api/admin/app/:key { value } -> { key, value }: the validated, normalized value, saved. 400 invalid, 404 unknown key.
 // A saved announcement gets a fresh id so a dismissed banner shows again. 1 query (+ sign-in).
 admin.put('/app/:key', async (c) => {
@@ -196,11 +203,17 @@ admin.put('/app/:key', async (c) => {
   const v = validateAppSetting(key, body.value);
   if (!v.ok) return c.json({ error: 'invalid' }, 400);
   const value = key === 'announcement' ? { ...(v.value as object), id: crypto.randomUUID() } : v.value;
-  await c.env.DB.prepare(
-    'INSERT INTO app_settings (key, value_json, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT (key) DO UPDATE SET value_json = ?2, updated_at = ?3',
-  ).bind(key, JSON.stringify(value), new Date().toISOString()).run();
-  forgetAppSettings();
+  await saveSetting(c.env.DB, key, value);
   return c.json({ key, value });
+});
+
+// POST /api/admin/app/reload -> { reloadAt }: "Update everyone's app". Stores the current time as `reloadAt`; every device that sees a
+// newer one (GET /api/app) checks for a new version and reloads once. This isolate's copy is dropped at once; other isolates
+// show it within APP_SETTINGS_TTL_MS (a minute). 1 query (+ sign-in).
+admin.post('/app/reload', async (c) => {
+  const reloadAt = new Date().toISOString();
+  await saveSetting(c.env.DB, 'reloadAt', reloadAt);
+  return c.json({ reloadAt });
 });
 
 // DELETE /api/admin/app/:key: back to the built-in default (the row goes). 204; 404 unknown key. 1 query (+ sign-in).

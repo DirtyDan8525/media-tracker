@@ -56,7 +56,7 @@ const realSources = { ...SOURCES };
 describe('admin only', () => {
   it('every Phase 6c admin route is 403 for a member and 401 signed out', async () => {
     const routes: [string, string][] = [
-      ['GET', '/api/admin/app'], ['PUT', '/api/admin/app/brand'], ['DELETE', '/api/admin/app/brand'],
+      ['GET', '/api/admin/app'], ['POST', '/api/admin/app/reload'], ['PUT', '/api/admin/app/brand'], ['DELETE', '/api/admin/app/brand'],
       ['POST', '/api/admin/defaults/apply'], ['GET', '/api/admin/comments'], ['GET', '/api/admin/numbers'], ['POST', '/api/admin/lookup/check'],
       ['POST', '/api/admin/lookup/explain'], ['GET', '/api/admin/backup'],
     ];
@@ -173,6 +173,30 @@ describe('PUT /api/admin/app/:key (AD1)', () => {
 });
 
 // ---- feature switches (AD2) ----
+describe('POST /api/admin/app/reload ("Update everyone\'s app")', () => {
+  it('is null until pressed, then GET /api/app returns the time the admin sent, at once in this isolate', async () => {
+    expect((await json(await call(null, '/api/app'))).reloadAt).toBeNull(); // fills this isolate's 60 s copy
+    const before = Date.now();
+    const res = await admin('/api/admin/app/reload', 'POST');
+    expect(res.status).toBe(200);
+    const { reloadAt } = await json<{ reloadAt: string }>(res);
+    expect(new Date(reloadAt).toISOString()).toBe(reloadAt);
+    expect(Date.parse(reloadAt)).toBeGreaterThanOrEqual(before);
+    // the cache was cleared, so no wait for the 60 s to pass
+    expect((await json(await call(null, '/api/app'))).reloadAt).toBe(reloadAt);
+    expect((await json(await admin('/api/admin/app'))).settings.reloadAt).toBe(reloadAt);
+  });
+
+  it('pressing again moves it forward; a bad value through PUT is refused', async () => {
+    const a = (await json<{ reloadAt: string }>(await admin('/api/admin/app/reload', 'POST'))).reloadAt;
+    await new Promise((r) => setTimeout(r, 5));
+    const b = (await json<{ reloadAt: string }>(await admin('/api/admin/app/reload', 'POST'))).reloadAt;
+    expect(Date.parse(b)).toBeGreaterThan(Date.parse(a));
+    expect((await put('reloadAt', 'yesterday')).status).toBe(400);
+    expect((await put('reloadAt', 5)).status).toBe(400);
+  });
+});
+
 describe('feature switches', () => {
   const seedPost = () => env.DB.batch([
     env.DB.prepare("INSERT INTO entries (id, user_id, category, title, rating, created_at, updated_at) VALUES ('e1', 'uRen', 'anime', 'Frieren', 9, ?1, ?1)").bind(iso(1)),

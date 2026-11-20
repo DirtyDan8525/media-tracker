@@ -8,7 +8,7 @@ import { IconButton } from '../design/components/IconButton';
 import { Sheet } from '../design/components/Sheet';
 import { Skeleton } from '../design/components/Skeleton';
 import { useToast } from '../design/components/Toast';
-import { useAdminApp, useAdminNumbers } from '../data/adminApp';
+import { useAdminApp, useAdminNumbers, useReloadEveryone } from '../data/adminApp';
 import { accentName } from './admin/parts';
 import { Icon } from '../design/components/Icon';
 import { Link } from 'react-router';
@@ -330,6 +330,7 @@ function AdminHub() {
     { to: '/admin/backup', title: 'Backup', sub: 'Download a copy of everything' },
   ];
   return (
+    <>
     <section aria-labelledby="admin-more" className="group">
       <h2 id="admin-more" className="group__title">More</h2>
       <nav aria-label="Admin sections" className="group__card admin-hub">
@@ -343,6 +344,47 @@ function AdminHub() {
           </Link>
         ))}
       </nav>
+    </section>
+    <UpdateEveryone />
+    </>
+  );
+}
+
+/** "Update everyone's app": every device checks for a new version and reloads the next time it is opened (see pwa/reloadWatcher.ts). */
+function UpdateEveryone() {
+  const send = useReloadEveryone();
+  const [asking, setAsking] = useState(false);
+  const [sentAt, setSentAt] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  async function confirm() {
+    setFailed(false);
+    try {
+      const r = await send.mutateAsync();
+      setSentAt(r.reloadAt);
+      setAsking(false);
+    } catch {
+      setFailed(true);
+    }
+  }
+  const time = sentAt ? new Date(sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null;
+  return (
+    <section aria-labelledby="admin-reload" className="group">
+      <h2 id="admin-reload" className="group__title">Update everyone's app</h2>
+      <div className="admin-card">
+        <p className="hint">Everyone's app reloads to the newest version the next time they open it. Use after a deploy.</p>
+        <Button onClick={() => { setFailed(false); setAsking(true); }}>Update everyone's app</Button>
+        {time && <p role="status" className="admin-ok">Sent at {time}. Some devices may take up to a minute to pick it up.</p>}
+      </div>
+      <Sheet open={asking} title="Update everyone's app?" onClose={() => { if (!send.isPending) setAsking(false); }}
+        footer={
+          <div className="btn-stack">
+            <Button className="btn--big" variant="primary" disabled={send.isPending} onClick={() => void confirm()}>Update everyone</Button>
+            <Button className="btn--big" disabled={send.isPending} onClick={() => setAsking(false)}>Cancel</Button>
+          </div>
+        }>
+        <p className="hint">Every device reloads to the newest version the next time it is opened. Anyone typing is left alone until they finish.</p>
+        {failed && <p role="alert" className="field-error">Couldn't send it. Check your connection and try again.</p>}
+      </Sheet>
     </section>
   );
 }

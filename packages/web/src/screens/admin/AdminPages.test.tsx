@@ -486,3 +486,36 @@ describe('Photos and voice memos (media storage)', () => {
     expect(await screen.findByText(/isn't set up on the server yet/)).toBeInTheDocument();
   });
 });
+
+describe("Update everyone's app (admin home)", () => {
+  it('asks to confirm, posts once, and then says when it was sent', async () => {
+    const sent = '2026-11-20T15:55:00.000Z';
+    const { calls } = adminBackend({
+      'GET /api/admin': { body: { pending: [], active: [], removed: [] } },
+      'GET /api/admin/signup-links': { body: { links: [] } },
+      'GET /api/admin/numbers': { body: { members: 1, active7: 1, titles7: 0, messages7: 0, mostRated: [] } },
+      'POST /api/admin/app/reload': { body: { reloadAt: sent } },
+    });
+    renderApp('/admin');
+    expect(await screen.findByText(/reloads to the newest version the next time they open it/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: "Update everyone's app" }));
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/admin/app/reload')).toHaveLength(0);
+    const sheet = await screen.findByRole('dialog');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Update everyone' }));
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/admin/app/reload')).toHaveLength(1));
+    const time = new Date(sent).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    expect(await screen.findByText(new RegExp(`Sent at ${time.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
+  });
+
+  it('Cancel sends nothing', async () => {
+    const { calls } = adminBackend({
+      'GET /api/admin': { body: { pending: [], active: [], removed: [] } },
+      'GET /api/admin/signup-links': { body: { links: [] } },
+      'GET /api/admin/numbers': { body: { members: 1, active7: 1, titles7: 0, messages7: 0, mostRated: [] } },
+    });
+    renderApp('/admin');
+    await userEvent.click(await screen.findByRole('button', { name: "Update everyone's app" }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/admin/app/reload')).toHaveLength(0);
+  });
+});

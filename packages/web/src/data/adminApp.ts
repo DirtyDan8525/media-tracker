@@ -41,6 +41,15 @@ export function useApplyDefault() {
   });
 }
 
+/** POST /api/admin/app/reload: "Update everyone's app". Resolves with the time it was sent (ISO). */
+export function useReloadEveryone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ reloadAt: string }>('/api/admin/app/reload', {}),
+    onSuccess: () => refreshApp(qc),
+  });
+}
+
 /** DELETE /api/admin/app/:key: back to the built-in default. */
 export function useResetSetting() {
   const qc = useQueryClient();

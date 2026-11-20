@@ -8,7 +8,7 @@ import { BUILTIN_CATEGORIES, COMPARE_ASK, DEFAULT_USER_SETTINGS, NAV_SIDES, NOTI
 import { THEMES } from './theme';
 import { MEDIA_CAP_MB_RANGE, MEDIA_RETENTION_RANGE } from './messages';
 
-export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists', 'media'] as const;
+export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists', 'media', 'reloadAt'] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
 /** Admin settings cover the built-in lists only: custom lists are personal. */
@@ -110,6 +110,8 @@ export interface AppSettings {
   defaults: NewPersonDefaults;
   lists: ListsSetting;
   media: MediaSetting;
+  /** ISO time of the admin's last "Update everyone's app"; null = never. Each device reloads once when this is newer than the one it last saw. */
+  reloadAt: string | null;
 }
 
 export const ANNOUNCEMENT_MAX = 280;
@@ -151,6 +153,7 @@ export const APP_SETTING_DEFAULTS: AppSettings = {
   },
   lists: { order: [...ALL_CATEGORIES], hidden: [] },
   media: { retentionMonths: 6, capMb: 300 },
+  reloadAt: null,
 };
 
 export type Validated<T> = { ok: true; value: T } | { ok: false };
@@ -318,8 +321,15 @@ function media(v: unknown): Validated<MediaSetting> {
   return ok({ retentionMonths: months as number, capMb: cap as number });
 }
 
+/** An ISO time exactly as `toISOString` writes it, or null. */
+function reloadAt(v: unknown): Validated<string | null> {
+  if (v === null) return ok(null);
+  if (typeof v !== 'string' || Number.isNaN(Date.parse(v)) || new Date(v).toISOString() !== v) return bad;
+  return ok(v);
+}
+
 const VALIDATORS: { [K in AppSettingKey]: (v: unknown) => Validated<AppSettings[K]> } = {
-  features, announcement, whatsNew, comingSoon, about, brand, defaults, lists, media,
+  features, announcement, whatsNew, comingSoon, about, brand, defaults, lists, media, reloadAt,
 };
 
 export const isAppSettingKey = (k: string): k is AppSettingKey => (APP_SETTING_KEYS as readonly string[]).includes(k);
@@ -360,6 +370,8 @@ export interface PublicAppSettings {
   device: DeviceDefaults;
   /** The server has photo and voice memo storage (the R2 MEDIA binding). Set by GET /api/app; absent = unknown (treated as no). */
   media?: boolean;
+  /** When the admin last pressed "Update everyone's app" (ISO), or null. */
+  reloadAt: string | null;
 }
 
 /** The public subset; the announcement counts as ended after its last day (UTC). */
@@ -375,6 +387,7 @@ export function publicAppSettings(s: AppSettings, now: Date = new Date()): Publi
     brand: s.brand,
     lists: s.lists,
     device: s.defaults.device,
+    reloadAt: s.reloadAt,
   };
 }
 

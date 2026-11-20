@@ -101,6 +101,8 @@ npm run deploy
 
 **Success:** it ends with a line like `https://media-tracker.<your-subdomain>.workers.dev`. Copy that address.
 
+People's apps pick up a new version on their own within about half an hour of being open (or when they come back to it). To put everyone on the new version right away, after `npm run deploy` press **Admin → Update everyone's app**.
+
 Production uses `ENVIRONMENT = "prod"` (already set in `wrangler.toml`). **Never add `DEV_EMAIL` (or `LOOKUP_FAKE`) to the production settings.** `DEV_EMAIL` is a sign-in shortcut for testing on your own PC and would let anyone in. A test fails if it ever appears there.
 
 ## 8. Add the lookup keys (secrets)

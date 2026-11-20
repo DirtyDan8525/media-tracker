@@ -23,6 +23,7 @@ export function normalizeApp(raw: Partial<PublicAppSettings> | undefined): Publi
     lists: { ...d.lists, ...raw.lists },
     device: { ...d.device, ...raw.device },
     media: raw.media === true,
+    reloadAt: typeof raw.reloadAt === 'string' ? raw.reloadAt : null,
   };
 }
 

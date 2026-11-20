@@ -12,6 +12,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
+import { startReloadWatcher } from './pwa/reloadWatcher';
 import { cachedMe } from './data/useMe';
 import { applyTheme } from './design/theme';
 import { applyTextScale, getDeviceTheme, getTextScale, withDeviceLook } from './design/deviceLook';
@@ -50,6 +51,9 @@ registerSW({
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   },
 });
+
+// "Update everyone's app" (Admin): reload once when the admin has pressed it since this device last looked.
+startReloadWatcher();
 
 // iPhone Safari's own pinch gesture (it ignores user-scalable=no): block it so the app never zooms (Dan, 2026-11-20).
 for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });

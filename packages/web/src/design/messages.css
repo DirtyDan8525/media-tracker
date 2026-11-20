@@ -257,8 +257,9 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
   .frame--wide .messages-screen, .frame--wide .chat-page { min-height: 100dvh; overflow: clip; }
   /* Softer, blurrier sides (Dan, 2026-11-20 night): more blur, and the column fades into them instead of a hard edge. */
   .frame--wide .backdrop--side { inset: 0; height: auto; --backdrop-blur: 90px; }
-  .frame--wide .backdrop--side::after { background: color-mix(in srgb, var(--bg) 45%, transparent); }
-  .frame--wide .backdrop--side img { opacity: 0.8; }
+  /* Much darker (Dan, 2026-11-20: light covers washed the sides out): a dim, desaturated glow, never a bright wash. */
+  .frame--wide .backdrop--side::after { background: color-mix(in srgb, var(--bg) 82%, transparent); }
+  .frame--wide .backdrop--side img { opacity: 0.55; filter: blur(var(--backdrop-blur)) saturate(0.9) brightness(0.55); }
   .frame--wide .messages-col, .frame--wide .chat-page > .chat {
     --fade: 72px;
     margin-inline: auto; width: 100%; min-height: 100dvh; padding-inline: var(--fade);

@@ -92,3 +92,48 @@
   .frame--wide .sharpen { max-width: 880px; }
   .frame--wide .about__body { max-width: 760px; }
 }
+
+/* PC wide pass 2 (item 26, 2026-11-19): remaining thin pages. */
+@media (min-width: 1024px) {
+  /* Stats: the "All media" card and the rating distribution share the top row; By list and genres run full width. */
+  .frame--wide .stats { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .frame--wide .stats > .stats__all { grid-column: 1; grid-row: auto; padding: var(--space-8) var(--space-10); }
+  .frame--wide .stats > .stats__all .stats__all-body { gap: var(--space-8); }
+  .frame--wide .stats > .stats__all .stats__kv { gap: var(--space-6); }
+  .frame--wide .stats > .stats__dist { grid-column: 2; grid-row: auto; align-self: stretch; justify-content: center; }
+  .frame--wide .stats > .stats__lists, .frame--wide .stats > .stats__genres { grid-row: auto; }
+
+  /* Title page: the privacy switches read left to right (the phone's space-between pushes the text away from the box). */
+  .frame--wide .privacy-row { justify-content: flex-start; text-align: left; }
+
+  /* Messages: chats in two columns. */
+  .frame--wide .convo-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-8); align-items: start; }
+
+  /* Help: the topics in two columns (each its own card, so opening one does not shift the other column). */
+  .frame--wide .help__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); align-items: start; background: none; border-radius: 0; overflow: visible; }
+  .frame--wide .help__item { background: var(--card); border-radius: var(--radius-xl); overflow: hidden; }
+  .frame--wide .help__item + .help__item { border-top: none; }
+  .frame--wide .help__empty { grid-column: 1 / -1; }
+
+  /* Install instructions: iPhone, Android and PC side by side. */
+  .frame--wide .screen__body:has(> .install__block) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-10) var(--space-12); align-items: start; }
+  .frame--wide .screen__body:has(> .install__block) > :not(.install__block) { grid-column: 1 / -1; }
+
+  /* What's new: releases left, "Coming soon" right. */
+  .frame--wide .whatsnew { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-10) var(--space-12); align-items: start; }
+  .frame--wide .whatsnew > .group:first-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); align-items: start; }
+  .frame--wide .whatsnew > .group:first-child > .group__title { grid-column: 1 / -1; }
+
+  /* Compare / pick screens: bigger cards and a wider stage. */
+  .compare--wide .compare__top, .compare--wide .compare__body { max-width: 960px; }
+  .compare-ask--wide .duel { gap: var(--space-16); }
+  .compare-ask--wide .pick-col { width: clamp(270px, 24vw, 380px); }
+  .compare-ask--wide .compare__progress { width: min(100%, 480px); }
+
+  /* Admin sub-pages: wider than a phone form. */
+  .frame--wide .admin-page { max-width: 1100px; }
+}
+
+@media (min-width: 1440px) {
+  .frame--wide .detail { grid-template-columns: minmax(0, 900px) 440px; }
+}

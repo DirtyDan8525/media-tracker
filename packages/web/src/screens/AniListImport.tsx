@@ -1,5 +1,6 @@
 import { AniListError, lookupAniList, type AniListImportPreview, type Category, type FetchDeps, type ImportPreview } from '@media-tracker/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useLocation } from 'react-router';
 import { useAllEntries } from '../data/useEntries';
 import { Button } from '../design/components/Button';
 
@@ -23,6 +24,15 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
   const [look, setLook] = useState<Look>({ k: 'idle' });
   const mine = useAllEntries(LISTS);
   const [pick, setPick] = useState({ anime: true, manga: true });
+  // More → "Import from AniList" links to /import#anilist: bring this panel into view, ready to type.
+  const { hash } = useLocation();
+  const sectionRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (hash !== '#anilist') return;
+    sectionRef.current?.scrollIntoView?.({ block: 'start' });
+    inputRef.current?.focus({ preventScroll: true });
+  }, [hash]);
 
   async function lookUp(e: FormEvent) {
     e.preventDefault();
@@ -60,7 +70,7 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
   }
 
   return (
-    <section className="import__panel" aria-labelledby={`${ids}-h`}>
+    <section id="anilist" ref={sectionRef} className="import__panel" aria-labelledby={`${ids}-h`}>
       <h2 id={`${ids}-h`}>Import from AniList</h2>
       <p className="muted">Works for public AniList profiles; no AniList sign-in needed. Nothing is saved until you press Import.</p>
       <form className="anilist__form" onSubmit={(e) => void lookUp(e)}>
@@ -68,6 +78,7 @@ export function AniListImport({ onImport }: { onImport: (preview: ImportPreview)
           <label className="field-label" htmlFor={`${ids}-user`}>AniList username</label>
           <input
             id={`${ids}-user`}
+            ref={inputRef}
             className="input"
             value={name}
             autoComplete="off"

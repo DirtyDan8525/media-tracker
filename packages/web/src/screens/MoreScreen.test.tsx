@@ -10,6 +10,7 @@ describe('More (SettingsMore.v2)', () => {
     renderApp('/more');
     const data = await screen.findByRole('region', { name: 'Your data' });
     expect(within(data).getByRole('link', { name: 'Import from Google Sheets' })).toHaveAttribute('href', '/import');
+    expect(within(data).getByRole('link', { name: 'Import from AniList' })).toHaveAttribute('href', '/import#anilist');
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 

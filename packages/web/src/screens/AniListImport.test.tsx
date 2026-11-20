@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ImportRow } from '@media-tracker/shared';
 import { describe, expect, it } from 'vitest';
@@ -129,5 +129,14 @@ describe('Import from AniList', () => {
     await lookUp('no spaces!');
     expect(await screen.findByRole('alert')).toHaveTextContent(/2 to 20 letters, digits or underscores/);
     expect(aniCalls(calls)).toHaveLength(0);
+  });
+});
+
+describe('More → Import from AniList (Dan, 2026-11-20)', () => {
+  it('/import#anilist focuses the AniList username field', async () => {
+    fakeBackend();
+    renderApp('/import#anilist');
+    const field = await screen.findByRole('textbox', { name: 'AniList username' });
+    await waitFor(() => expect(field).toHaveFocus());
   });
 });

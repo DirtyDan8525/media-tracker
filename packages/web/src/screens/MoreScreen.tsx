@@ -47,6 +47,9 @@ export function MoreScreen() {
             <Link to="/import" className="group__row">
               <span className="group__row-start"><span className="tile-icon"><Icon name="upload" size={18} /></span>Import from Google Sheets</span>
             </Link>
+            <Link to="/import#anilist" className="group__row">
+              <span className="group__row-start"><span className="tile-icon"><Icon name="upload" size={18} /></span>Import from AniList</span>
+            </Link>
             <ExportRow />
           </div>
         </section>

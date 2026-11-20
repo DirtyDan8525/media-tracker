@@ -33,6 +33,7 @@ import { SearchScreen } from './screens/SearchScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AppearanceScreen } from './screens/AppearanceScreen';
 import { TagsScreen } from './screens/settings/TagsScreen';
+import { EditListScreen, NewListScreen } from './screens/settings/ListEditor';
 import { StatsScreen } from './screens/StatsScreen';
 import { Top5Screen } from './screens/Top5Screen';
 import { JoinScreen } from './screens/auth/JoinScreen';
@@ -143,6 +144,8 @@ export const routes: RouteObject[] = [
           { path: 'settings', element: <SettingsScreen /> },
           { path: 'settings/appearance', element: <AppearanceScreen /> },
           { path: 'settings/tags', element: <TagsScreen /> },
+          { path: 'settings/lists/new', element: <NewListScreen /> },
+          { path: 'settings/lists/:id', element: <EditListScreen /> },
           { path: 'settings/tiers', element: <Navigate to="/settings" replace /> },
           { path: 'about', element: <AboutScreen /> },
           { path: 'help', element: <HelpScreen /> },

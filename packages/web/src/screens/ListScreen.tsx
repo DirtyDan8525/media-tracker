@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
+import { isBuiltinCategory, type BuiltinCategory, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router';
@@ -18,7 +18,7 @@ import { genreOptions, isFiltering, matchesFilter, normalizeFilter, readFilter, 
 import { planRows, readPlanView, writePlanView } from '../lists/plan';
 import { useUrlText } from '../lists/useUrlText';
 import { SORT_KEYS, SORT_LABEL, sortEntries, type SortKey } from '../lists/sort';
-import { ADD_NOUN, isCategory, LIST_LABEL, seasonsEnabled } from '../nav';
+import { isCategory, seasonsEnabled } from '../nav';
 import { rememberList } from '../shell/currentList';
 import { ListMenu } from '../shell/ListMenu';
 import { PageHeader } from '../shell/PageHeader';
@@ -32,13 +32,14 @@ import { EntryTable } from './list/EntryTable';
 import { PlanList } from './list/PlanList';
 import { ActiveChips, activeFilters, FilterBar, FilterChips, FilterSheet, PlanSwitch, planLabel, SearchBox } from './list/ListFilters';
 import { useDuplicateConfirm } from './list/DuplicateConfirm';
+import { addNoun, listCfg, listLabel, listName, useListRegistry } from '../lists/registry';
 
 // The sheets are only needed once someone taps Add / Retry / Paste image link.
 const AddEntry = lazy(() => import('./AddEntry').then((m) => ({ default: m.AddEntry })));
 const PickerSheet = lazy(() => import('./PickerSheet').then((m) => ({ default: m.PickerSheet })));
 const PasteImageSheet = lazy(() => import('./PasteImageSheet').then((m) => ({ default: m.PasteImageSheet })));
 
-const NOUN: Record<Category, string> = {
+const NOUN: Record<BuiltinCategory, string> = {
   anime: 'anime', movies: 'movies', tv: 'TV shows', albums: 'albums', songs: 'songs', games: 'games', books: 'books', manga: 'manga', youtube: 'videos',
 };
 
@@ -53,7 +54,9 @@ function SheetFallback({ title, onClose }: { title: string; onClose: () => void 
 
 export function ListScreen() {
   const { category } = useParams();
-  if (!isCategory(category)) return <Navigate to="/" replace />;
+  const me = useSessionMe();
+  // A custom list must be one of yours (a deleted one, or someone else's key, goes home).
+  if (!isCategory(category, me.customLists)) return <Navigate to="/" replace />;
   return <ListBody key={category} category={category} />;
 }
 
@@ -62,7 +65,10 @@ function ListBody({ category }: { category: Category }) {
   const toast = useToast();
   const me = useSessionMe();
   const lists = useEnabledLists();
+  useListRegistry(); // an edited list (name, columns, words) shows at once
   const wide = useIsWide();
+  const builtin = isBuiltinCategory(category);
+  const emptyIcon = builtin ? category : 'lists';
   const { data, isPending, isError } = useEntries(category);
   const counts = useListCounts().data ?? {};
   const dup = useDuplicateConfirm();
@@ -72,7 +78,7 @@ function ListBody({ category }: { category: Category }) {
   const [addOpen, setAddOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Plan to watch (item 15): only lists with a Status column can have planned titles. Remembered per list on this device.
-  const hasStatus = CATEGORY_CONFIG[category].hasStatus;
+  const hasStatus = listCfg(category).hasStatus;
   const [plannedOn, setPlannedOn] = useState(() => hasStatus && readPlanView(category));
   const planned = hasStatus && plannedOn;
   const setPlanned = (on: boolean) => { setPlannedOn(on); writePlanView(category, on); };
@@ -87,7 +93,7 @@ function ListBody({ category }: { category: Category }) {
   }, [askFor, add.state, askClose]);
   const submitAdd = async (input: AddInput) => {
     const entry = await add.add(input);
-    if (entry && input.category && input.category !== category) toast.show(`Added to ${LIST_LABEL[input.category]}`);
+    if (entry && input.category && input.category !== category) toast.show(`Added to ${listLabel(input.category)}`);
     if (entry && entry.rating !== null) setAskFor(entry);
   };
   const [pasteFor, setPasteFor] = useState<Entry | null>(null);
@@ -109,7 +115,7 @@ function ListBody({ category }: { category: Category }) {
   const tags = useMemo(() => tagOptions(data ?? []), [data]);
   // Until the rows load nothing can be judged invalid, so the URL's values stand.
   const clean = useMemo(
-    () => (data ? normalizeFilter(urlFilter, CATEGORY_CONFIG[category].hasStatus, genres, tags) : urlFilter),
+    () => (data ? normalizeFilter(urlFilter, listCfg(category).hasStatus, genres, tags) : urlFilter),
     [data, urlFilter, category, genres, tags],
   );
   // The box keeps its own text; the URL follows ~150 ms later, by `replace` (useUrlText).
@@ -155,9 +161,9 @@ function ListBody({ category }: { category: Category }) {
           {wide && !filtering && average !== null && <> · average <strong className="page-sub__num"><CountUp value={average} /></strong></>}
         </>
       );
-  const label = `${LIST_LABEL[category]} list`;
-  const showSeasonAvg = seasonsEnabled(me.settings, category) && CATEGORY_CONFIG[category].hasSeasons;
-  const addLabel = `Add ${ADD_NOUN[category]}`;
+  const label = `${listLabel(category)} list`;
+  const showSeasonAvg = seasonsEnabled(me.settings, category) && listCfg(category).hasSeasons;
+  const addLabel = `Add ${addNoun(category)}`;
   // PC only: on the phone, Add is the floating bubble.
   const addButton = (
     <Button variant="primary" className="btn--add" aria-label={addLabel} onClick={() => setAddOpen(true)}>
@@ -175,7 +181,7 @@ function ListBody({ category }: { category: Category }) {
   let body: ReactNode;
   if (isPending && !data) {
     body = (
-      <div aria-busy="true" aria-label={`Loading ${NOUN[category]}`} className="stack-10">
+      <div aria-busy="true" aria-label={`Loading ${builtin ? NOUN[category] : listLabel(category)}`} className="stack-10">
         <SkeletonRow /><SkeletonRow /><SkeletonRow />
       </div>
     );
@@ -184,23 +190,25 @@ function ListBody({ category }: { category: Category }) {
   } else if (planned && plannedAll.length === 0) {
     body = (
       <EmptyState
-        icon={category} title="Nothing planned yet"
+        icon={emptyIcon} title="Nothing planned yet"
         body={`Set a title's status to ${planLabel(category)} and it shows up here, in the order you choose.`}
       />
     );
   } else if (total > 0 && rows.length === 0) {
     body = (
       <EmptyState
-        icon="search" title="No matches" body={`Nothing in ${LIST_LABEL[category]} matches your search.`}
+        icon="search" title="No matches" body={`Nothing in ${listLabel(category)} matches your search.`}
         actionLabel="Clear search and filters" onAction={clearAll}
       />
     );
   } else if (rows.length === 0) {
     body = (
       <EmptyState
-        icon={category}
-        title={`No ${NOUN[category]} yet`}
-        body={`Tap Add to put your first ${ADD_NOUN[category]} here. You can also import your Google Sheet.`}
+        icon={emptyIcon}
+        title={builtin ? `No ${NOUN[category]} yet` : `Nothing on ${listLabel(category)} yet`}
+        body={builtin
+          ? `Tap Add to put your first ${addNoun(category)} here. You can also import your Google Sheet.`
+          : `Tap Add to put your first ${addNoun(category)} here.`}
       />
     );
   } else if (planned) {
@@ -219,10 +227,10 @@ function ListBody({ category }: { category: Category }) {
   return (
     <div className="screen">
       <PageHeader
-        title={LIST_LABEL[category]} sub={sub} icon={category} profile
+        title={listLabel(category)} sub={sub} icon={category} profile
         titleSlot={(
           <ListMenu lists={lists} value={category} counts={counts} menuLabel="Switch list" to={(c) => `/list/${c}`} heading>
-            {LIST_LABEL[category]}
+            {listName(category)}
           </ListMenu>
         )}
         actions={wide ? <>{total > 0 && <SearchBox category={category} filter={filter} onChange={changeFilter} />}{planSwitch}{addButton}</> : undefined}

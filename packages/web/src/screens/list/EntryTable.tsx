@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, PROGRESS_CATEGORIES, STATUSES, airingOf, formatRating, showsProgress, statusLabel, type Entry, type Status } from '@media-tracker/shared';
+import { STATUSES, airingOf, formatRating, showsProgress, type Entry, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, type HTMLAttributes, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
@@ -16,8 +16,11 @@ import { PrivateLock } from './PrivateLock';
 import { stagger, type RowActions } from './EntryCards';
 import { ColumnsMenu, OPTIONAL_COLUMNS, TableFrame, useOptionalColumns, useRowViewer, type ColId, type ColumnDef, type ViewerItem } from './tableKit';
 import '../../design/tags.css';
-import { LIST_LABEL } from '../../nav';
 import { backState } from '../../shell/BackButton';
+import { listCfg, listLabel, statusText } from '../../lists/registry';
+
+/** Which of the per-list columns this table shows (built-in lists: cover and genres; custom lists: what they were made with). */
+interface Look { cover: boolean; genres: boolean; year: boolean; link: boolean; tags: boolean }
 
 /** Moves focus to the same column in the nearest row above/below that has it. */
 function onGridKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
@@ -51,50 +54,63 @@ export function EntryTable({ rows, label, showSeasonAvg, ...actions }: EntryTabl
   const first = rows[0];
   const items = useMemo<ViewerItem[]>(() => rows.map((e) => ({
     id: e.id, title: e.title, category: e.category, coverUrl: e.coverUrl, rating: e.rating, status: e.status, creator: e.creator,
-    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, source: e.source, sourceId: e.sourceId, to: `/entry/${e.id}`, state: backState(LIST_LABEL[e.category]),
+    releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, source: e.source, sourceId: e.sourceId, to: `/entry/${e.id}`, state: backState(listLabel(e.category)),
   })), [rows]);
   const viewer = useRowViewer(items);
   const optional = useOptionalColumns(first?.category ?? '');
   if (!first) return null;
-  const cfg = CATEGORY_CONFIG[first.category];
+  const cfg = listCfg(first.category);
   // Columns with nothing to show on this list are left out, so Notes keeps its room (Dan, 2026-11-17).
-  const hasProgress = PROGRESS_CATEGORIES.includes(first.category) && rows.some((r) => showsProgress(r) || (r.progress ?? 0) > 0);
+  const hasProgress = cfg.hasProgress && rows.some((r) => showsProgress(r, cfg.hasProgress) || (r.progress ?? 0) > 0);
   const withAvg = showSeasonAvg && rows.some((r) => r.seasonAvg != null);
-  const columns: ColumnDef[] = [{ id: 'cover', label: 'Cover' }, { id: 'rating', label: 'Rating' }, { id: 'title', label: 'Title' }];
+  // A custom list shows the columns it was made with (New list): a typed-in list has no covers; Tags, Year, Genres and Link are its choice.
+  const look: Look = {
+    cover: !cfg.custom || cfg.lookup !== null, genres: cfg.showGenres, year: cfg.custom && cfg.showYear,
+    link: cfg.custom && cfg.showLink, tags: cfg.custom && cfg.showTags,
+  };
+  const columns: ColumnDef[] = [];
+  if (look.cover) columns.push({ id: 'cover', label: 'Cover' });
+  columns.push({ id: 'rating', label: 'Rating' }, { id: 'title', label: cfg.custom ? cfg.titleLabel : 'Title' });
   if (cfg.hasStatus) columns.push({ id: 'status', label: 'Status' });
   if (hasProgress) columns.push({ id: 'progress', label: 'Progress' });
-  columns.push({ id: 'genres', label: 'Genres' });
+  if (look.genres) columns.push({ id: 'genres', label: 'Genres' });
   if (cfg.creatorLabel) columns.push({ id: 'creator', label: cfg.creatorLabel });
+  if (look.year) columns.push({ id: 'year', label: 'Year' });
   if (withAvg) columns.push({ id: 'avg', label: 'Season Avg' });
-  // Optional columns (Columns menu), after the standard ones and before Notes. Airing is for anime and TV only.
-  const choices = OPTIONAL_COLUMNS.filter((c) => c.id !== 'airing' || first.category === 'anime' || first.category === 'tv');
+  // Optional columns (Columns menu), after the standard ones and before Notes. Airing is for anime and TV only; on a custom list
+  // Tags is one of its own columns (or off), not a choice here.
+  const choices = OPTIONAL_COLUMNS.filter((c) => (c.id !== 'airing' || first.category === 'anime' || first.category === 'tv') && !(cfg.custom && c.id === 'tags'));
   const extra = choices.filter((c) => optional.on.includes(c.id));
   const shown = new Set<ColId>(extra.map((c) => c.id));
-  columns.push(...extra);
+  if (look.tags) shown.add('tags');
+  // Same order as the row's cells: Tags, Link, then the other optional columns.
+  if (shown.has('tags')) columns.push({ id: 'tags', label: 'Tags' });
+  if (look.link) columns.push({ id: 'link', label: 'Link' });
+  columns.push(...extra.filter((c) => c.id !== 'tags'));
   columns.push({ id: 'notes', label: 'Notes' });
   return (
     <>
       <div className="table-tools table-tools--columns"><ColumnsMenu choices={choices} on={optional.on} onToggle={optional.toggle} /></div>
       <TableFrame list={first.category} label={label} columns={columns} viewer={viewer}>
         <tbody onKeyDown={onGridKeyDown}>
-          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} showSeasonAvg={withAvg} hasProgress={hasProgress} extra={shown} rowProps={viewer.rowProps(e.id)} {...actions} />)}
+          {rows.map((e, i) => <TableRow key={e.id} entry={e} index={i} look={look} showSeasonAvg={withAvg} hasProgress={hasProgress} extra={shown} rowProps={viewer.rowProps(e.id)} {...actions} />)}
         </tbody>
       </TableFrame>
     </>
   );
 }
 
-function TableRow({ entry: e, index, showSeasonAvg, hasProgress, extra, rowProps, ...actions }: { entry: Entry; index: number; showSeasonAvg: boolean; hasProgress: boolean; extra: Set<ColId>; rowProps: HTMLAttributes<HTMLTableRowElement> } & RowActions) {
+function TableRow({ entry: e, index, look, showSeasonAvg, hasProgress, extra, rowProps, ...actions }: { entry: Entry; index: number; look: Look; showSeasonAvg: boolean; hasProgress: boolean; extra: Set<ColId>; rowProps: HTMLAttributes<HTMLTableRowElement> } & RowActions) {
   const qc = useQueryClient();
   const toast = useToast();
-  const cfg = CATEGORY_CONFIG[e.category];
+  const cfg = listCfg(e.category);
   const state = effectiveLookupState(e);
   const editable = state !== 'pending';
   const save = (patch: Partial<Entry>) => void saveEntryChange(qc, e, patch, () => toast.show(SAVE_FAILED));
 
   return (
     <tr className={state === 'pending' ? 'is-pending rise-in' : 'rise-in'} style={stagger(index)} {...rowProps}>
-      <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
+      {look.cover && <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>}
       <td>
         {editable ? (
           <EditableCell
@@ -108,7 +124,7 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, extra, rowProps
       </td>
       <td>
         <div className="cell-title">
-          {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} state={backState(LIST_LABEL[e.category])} data-nav="title" data-role="title">{e.title}</Link>}
+          {state === 'pending' ? <span data-role="title">{e.title}</span> : <Link to={`/entry/${e.id}`} state={backState(listLabel(e.category))} data-nav="title" data-role="title">{e.title}</Link>}
           {e.isPrivate && <PrivateLock />}
           <LookupNote entry={e} {...actions} />
         </div>
@@ -118,10 +134,10 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, extra, rowProps
           {editable ? (
             <EditableCell
               col="status" kind="select" label={`Status for ${e.title}`}
-              viewLabel={`Status for ${e.title}: ${e.status ? statusLabel(e.status, e.category) : 'not set'}`}
+              viewLabel={`Status for ${e.title}: ${e.status ? statusText(e.status, e.category) : 'not set'}`}
               view={e.status ? <StatusPill status={e.status} category={e.category} /> : <span className="muted">Set status</span>}
               initial={e.status ?? ''}
-              options={[{ value: '', label: 'No status' }, ...STATUSES.map((s) => ({ value: s, label: statusLabel(s, e.category) }))]}
+              options={[{ value: '', label: 'No status' }, ...STATUSES.map((s) => ({ value: s, label: statusText(s, e.category) }))]}
               validate={(raw) => ({ ok: true, value: (raw || null) as Status | null })}
               onSave={(status) => save({ status })}
             />
@@ -130,17 +146,23 @@ function TableRow({ entry: e, index, showSeasonAvg, hasProgress, extra, rowProps
       )}
       {hasProgress && (
         <td className="col-progress">
-          {editable && showsProgress(e)
+          {editable && showsProgress(e, cfg.hasProgress)
             ? <ProgressControl entry={e} />
             : (e.progress ?? 0) > 0 && <span className="muted">{progressText(e.progress!, e.progressTotal)}</span>}
         </td>
       )}
-      <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
+      {look.genres && <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>}
       {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
+      {look.year && <td className="muted col-year">{e.releaseDate.slice(0, 4)}</td>}
       {showSeasonAvg && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
       {extra.has('tags') && (
         <td className="col-tags" title={(e.tags ?? []).join(', ') || undefined}>
           {(e.tags?.length ?? 0) > 0 && <ul className="tags-cell tag-list" aria-label={`Tags for ${e.title}`}>{e.tags!.map((t) => <li key={t} className="tag-chip tag-chip--read">{t}</li>)}</ul>}
+        </td>
+      )}
+      {look.link && (
+        <td className="col-link">
+          {e.link && <a href={e.link} target="_blank" rel="noopener noreferrer" aria-label={`Open the link for ${e.title} (opens in a new tab)`}>Open ↗</a>}
         </td>
       )}
       {extra.has('started') && <td className="muted col-started">{dayText(e.startedAt)}</td>}

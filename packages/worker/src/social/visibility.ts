@@ -103,6 +103,7 @@ export function toFriendEntry(row: EntryRow, rel: Relation): FriendEntry {
     notes: row.notes_private === 1 ? null : row.notes,
     // The owner's tags go where the title goes (canView above refused a private one): friends and public links.
     tags: parseTags(row.tags_json),
+    link: row.link ?? '',
   };
 }
 

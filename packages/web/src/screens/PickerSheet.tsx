@@ -1,10 +1,11 @@
-import { CATEGORY_CONFIG, type Category, type LookupInfo } from '@media-tracker/shared';
+import { type Category, type LookupInfo } from '@media-tracker/shared';
 import { useId, useState, type CSSProperties, type FormEvent } from 'react';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
 import { Sheet } from '../design/components/Sheet';
 import type { SearchResult } from '../hooks/useAddEntry';
 import { isHttpUrl } from '../lookup/query';
+import { listCfg } from '../lists/registry';
 
 export interface PickerSheetProps {
   category: Category;
@@ -17,7 +18,7 @@ export interface PickerSheetProps {
 
 /** "Which one did you mean?": the closest match first, a search box, and a way out that keeps what was typed. */
 export function PickerSheet({ category, typed, choices, onChoose, onKeepTyped, onSearch }: PickerSheetProps) {
-  const square = CATEGORY_CONFIG[category].square;
+  const square = listCfg(category).square;
   const searchId = useId();
   const [term, setTerm] = useState(typed);
   const [searching, setSearching] = useState(false);

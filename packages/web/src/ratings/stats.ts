@@ -1,4 +1,5 @@
-import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
+import { type Category, type Entry } from '@media-tracker/shared';
+import { listCfg } from '../lists/registry';
 
 export interface ListStats {
   entries: number;
@@ -37,7 +38,7 @@ function listStats(category: Category, rows: StatsRow[]): ListStats {
     entries: rows.length,
     rated: ratings.length,
     average: mean(ratings),
-    completed: CATEGORY_CONFIG[category].hasStatus ? rows.filter((e) => e.status === 'Completed').length : null,
+    completed: listCfg(category).hasStatus ? rows.filter((e) => e.status === 'Completed').length : null,
     highest: maxOf(ratings),
     tiers: tierCounts(rows),
   };

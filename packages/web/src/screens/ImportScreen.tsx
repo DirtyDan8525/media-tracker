@@ -15,8 +15,9 @@ import { chunkRows } from '../import/chunk';
 import type { AfterImport } from '../import/aniListUpdate';
 import { useToast } from '../design/components/Toast';
 import { parseWorkbook } from '../import/parseWorkbook';
-import { LIST_LABEL, LIST_ORDER } from '../nav';
+import { LIST_ORDER } from '../nav';
 import { PageHeader } from '../shell/PageHeader';
+import { listLabel } from '../lists/registry';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const titles = (n: number) => plural(n, 'title', 'titles');
@@ -301,7 +302,7 @@ function Preview({ name, preview, onChange, onImport }: { name: string; preview:
         <ul className="plain-list import__counts">
           {shown.map((c, i) => (
             <li key={c} className="import__count">
-              <span className="import__count-name">{LIST_LABEL[c]}</span>
+              <span className="import__count-name">{listLabel(c)}</span>
               <span className="import__bar" aria-hidden="true">
                 <span className="grow-x" style={{ width: `${Math.round(((preview.counts[c] ?? 0) / most) * 100)}%`, '--i': i } as CSSProperties} />
               </span>

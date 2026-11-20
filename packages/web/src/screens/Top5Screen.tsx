@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, type Category, type Entry } from '@media-tracker/shared';
+import { type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -14,7 +14,6 @@ import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet, useThemeColors } from '../design/ThemeContext';
 import { useIsWide } from '../hooks';
-import { LIST_LABEL } from '../nav';
 import { useEnabledLists } from '../shell/useLists';
 import { backState } from '../shell/BackButton';
 import { PageHeader } from '../shell/PageHeader';
@@ -23,12 +22,13 @@ import type { CardSpec } from '../share/shareImage';
 import { GroupTop5 } from './social/GroupTop5';
 import { ShareSheet, type ShareRequest } from './top5/ShareSheet';
 import '../design/ratings.css';
+import { listCfg, listLabel } from '../lists/registry';
 
 /** A card row for `e` (rated: topFive only returns rated rows). */
 function cardRow(e: Entry, rank: number, listLabel?: string): CardSpec['rows'][number] {
   return {
     rank, ...(listLabel ? { listLabel } : {}), title: e.title, creator: e.creator, rating: e.rating ?? 0,
-    square: CATEGORY_CONFIG[e.category].square, coverUrl: e.coverUrl,
+    square: listCfg(e.category).square, coverUrl: e.coverUrl,
   };
 }
 
@@ -74,12 +74,12 @@ function MineTop5({ toggle }: { toggle: ReactNode }) {
   const theme = { username: me.username ?? '', colors, cf };
   const shareOnes = () => setSharing({
     sheetTitle: 'Share your #1s', filename: 'my-number-ones.png', shareTitle: 'My #1s',
-    card: { ...theme, kind: 'ones', heading: 'My #1s', rows: ones.map((e) => cardRow(e, 1, LIST_LABEL[e.category])) },
+    card: { ...theme, kind: 'ones', heading: 'My #1s', rows: ones.map((e) => cardRow(e, 1, listLabel(e.category))) },
   });
   const shareList = (c: Category, top: Entry[]) => {
-    const heading = `My ${LIST_LABEL[c]} Top 5`;
+    const heading = `My ${listLabel(c)} Top 5`;
     setSharing({
-      sheetTitle: `Share your ${LIST_LABEL[c]} Top 5`, filename: `top5-${c}.png`, shareTitle: heading,
+      sheetTitle: `Share your ${listLabel(c)} Top 5`, filename: `top5-${c}.png`, shareTitle: heading,
       card: { ...theme, kind: 'top5', heading, rows: top.map((e, i) => cardRow(e, i + 1)) },
     });
   };
@@ -116,7 +116,7 @@ function TopBlock({ category, rows, onShare }: {
   rows: Entry[] | undefined;
   onShare: (c: Category, top: Entry[]) => void;
 }) {
-  const name = LIST_LABEL[category];
+  const name = listLabel(category);
   const top = useMemo(() => topFive(rows ?? []), [rows]);
   const id = `top5-${category}`;
   return (
@@ -152,7 +152,7 @@ export function TopRow({ entry, rank, to, backLabel = 'Top 5', sub }: {
   sub?: string;
 }) {
   const wide = useIsWide();
-  const square = CATEGORY_CONFIG[entry.category].square;
+  const square = listCfg(entry.category).square;
   const hero = rank === 1;
   return (
     <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'} data-square={square || undefined}>

@@ -12,7 +12,7 @@ import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
 import { CfSetContext, ThemeColorsContext } from '../../design/ThemeContext';
 import { applyTheme, cfFor, themeColors } from '../../design/theme';
-import { LIST_ORDER } from '../../nav';
+import { presentLists } from '../../lists/registry';
 import { setTitleOverride } from '../../pageTitle';
 import { ListsPanel, monthYear, StatsPanel, Top5Panel } from './FriendProfile';
 import { CategoryChips, PersonAvatar, Tabs, who, type TabDef } from './parts';
@@ -95,7 +95,8 @@ function PublicView({ token, user, bio, memberSince, meId, meLoading }: {
   const entries = usePublicEntries(token);
   const tab: TabId = TABS.some((t) => t.id === params.get('tab')) ? (params.get('tab') as TabId) : 'lists';
   const rows = entries.data;
-  const categories = useMemo(() => LIST_ORDER.filter((c) => rows?.some((e) => e.category === c)), [rows]);
+  // Built-in lists, then their custom lists (shown like a friend sees them).
+  const categories = useMemo(() => presentLists((rows ?? []).map((e) => e.category)), [rows]);
   const asked = params.get('c');
   const category: Category | null = categories.find((c) => c === asked) ?? categories[0] ?? null;
   const setTab = (t: TabId) => setParams((p) => { const n = new URLSearchParams(p); n.set('tab', t); return n; }, { replace: true });

@@ -9,7 +9,9 @@ import {
   closeQuestionsFor,
   countClosePairs,
   tiersFor,
+  isCustomCategory,
   type CloseItem,
+  type CustomList,
   type Entry,
   type PickInput,
   type RatingSet,
@@ -31,7 +33,11 @@ export const ratings = new Hono<AppEnv>();
 const invalid = { error: 'invalid' } as const;
 const MAX_ID = 64;
 
-const isSet = (s: string): s is RatingSet => (RATING_SETS as readonly string[]).includes(s);
+/** A built-in set, or one of the signed-in person's custom lists (each is its own rating set, keyed by its list key). */
+const isSet = (s: string, lists: readonly CustomList[]): s is RatingSet =>
+  (RATING_SETS as readonly string[]).includes(s) || (isCustomCategory(s) && lists.some((l) => l.key === s));
+/** Every rating set the person has: the built-in ones, then their custom lists. */
+const allSets = (lists: readonly CustomList[]): RatingSet[] => [...RATING_SETS, ...lists.map((l) => l.key)];
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length >= 1 && v.length <= MAX_ID;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -74,11 +80,11 @@ export const SHARPEN_MAX_PAIRS = 200;
 
 const closeItem = (i: LoadedItem): CloseItem => ({ id: i.id, title: i.title, typed: i.typed, planned: i.status === PLAN_STATUS });
 
-// 4-13 queries: sign-in (1-3), then 1 batch of 10 (the nine sets' titles, their comparisons). N7.
+// 4-19 queries: sign-in (1-3), then 1 batch of 10-16 (the eleven sets' and any custom lists' titles, their comparisons). N7.
 // Registered before /:set so the static path is never read as a set name.
 ratings.get('/close-counts', async (c) => {
   const settings = c.var.user.settings;
-  const loaded = await loadSets(c.env.DB, c.var.user.id, [...RATING_SETS], (s) => tiersFor(settings, s));
+  const loaded = await loadSets(c.env.DB, c.var.user.id, allSets(c.var.user.customLists), (s) => tiersFor(settings, s));
   const counts: Partial<Record<RatingSet, number>> = {};
   for (const l of loaded) counts[l.set] = countClosePairs(l.items.map(closeItem), l.comparisons);
   return c.json({ counts });
@@ -88,7 +94,7 @@ ratings.get('/close-counts', async (c) => {
 // unanswered close pairs, nearest numbers first, at most SHARPEN_MAX_PAIRS, with their titles.
 ratings.get('/:set/close', async (c) => {
   const set = c.req.param('set');
-  if (!isSet(set)) return c.json(invalid, 400);
+  if (!isSet(set, c.var.user.customLists)) return c.json(invalid, 400);
   const loaded = await loadSet(c.env.DB, c.var.user.id, set, tiersFor(c.var.user.settings, set));
   const items = loaded.items.map(closeItem);
   const pairs = closePairs(items, loaded.comparisons, SHARPEN_MAX_PAIRS);
@@ -100,7 +106,7 @@ ratings.get('/:set/close', async (c) => {
 // (N6): at most 2 titles close to it, nearest first, never answered, never planned.
 ratings.get('/:set/close/:id', async (c) => {
   const set = c.req.param('set');
-  if (!isSet(set)) return c.json(invalid, 400);
+  if (!isSet(set, c.var.user.customLists)) return c.json(invalid, 400);
   const id = c.req.param('id');
   const loaded = await loadSet(c.env.DB, c.var.user.id, set, tiersFor(c.var.user.settings, set));
   const item = loaded.items.find((i) => i.id === id);
@@ -113,7 +119,7 @@ ratings.get('/:set/close/:id', async (c) => {
 // 3-5 queries: sign-in (1-3), then 1 batch of 2 (the set's titles, its comparisons)
 ratings.get('/:set', async (c) => {
   const set = c.req.param('set');
-  if (!isSet(set)) return c.json(invalid, 400);
+  if (!isSet(set, c.var.user.customLists)) return c.json(invalid, 400);
   const loaded = await loadSet(c.env.DB, c.var.user.id, set, tiersFor(c.var.user.settings, set));
   return c.json({ items: loaded.items.map(toSetItem), comparisons: loaded.comparisons });
 });
@@ -123,7 +129,7 @@ ratings.get('/:set', async (c) => {
 // parameter, so no statement binds more than 4 parameters however large the save.
 ratings.post('/:set/save', async (c) => {
   const set = c.req.param('set');
-  if (!isSet(set)) return c.json(invalid, 400);
+  if (!isSet(set, c.var.user.customLists)) return c.json(invalid, 400);
   const payload = parseSavePayload(await readJson(c.req.raw));
   if (!payload) return c.json(invalid, 400);
 

@@ -2,8 +2,9 @@ import type { Category } from '@media-tracker/shared';
 import { useEffect } from 'react';
 import { Link, matchPath, useLocation } from 'react-router';
 import { Icon } from '../design/components/Icon';
-import { ADD_NOUN, addPath, isCategory, showsAddBubble } from '../nav';
+import { addPath, isCategory, showsAddBubble } from '../nav';
 import '../design/list-menu.css';
+import { addNoun } from '../lists/registry';
 
 /** On <html> while the bubble shows, so toasts clear it. */
 export const FAB_CLASS = 'has-add-fab';
@@ -27,7 +28,7 @@ export function AddBubble({ current }: { current: Category | null }) {
   if (!shown || target === null) return null;
   const here = pathname === `/list/${target}`;
   return (
-    <Link to={addPath(target, here ? search : undefined)} replace={here} className="add-fab" aria-label={`Add ${ADD_NOUN[target]}`}>
+    <Link to={addPath(target, here ? search : undefined)} replace={here} className="add-fab" aria-label={`Add ${addNoun(target)}`}>
       <Icon name="plus" size={28} />
     </Link>
   );

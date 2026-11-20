@@ -1,4 +1,4 @@
-import type { Customized, UserSettings } from '@media-tracker/shared';
+import type { CustomList, Customized, UserSettings } from '@media-tracker/shared';
 
 /** GET /api/me */
 export interface Me {
@@ -16,4 +16,6 @@ export interface Me {
   createdAt: string | null;
   /** Phase 4b (A6): 'pending' until Dan approves; a removed user never gets a /api/me answer. */
   status: 'pending' | 'active' | 'removed';
+  /** Phase 7: your custom lists, oldest first. Absent on copies cached before them (normalizeMe fills []). */
+  customLists: CustomList[];
 }

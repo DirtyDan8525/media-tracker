@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, formatRating, statusLabel, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
+import { formatRating, isBuiltinCategory, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TableFrame, useRowViewer, type ColumnDef, type ViewerItem } from '../list/tableKit';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -15,7 +15,7 @@ import { Skeleton } from '../../design/components/Skeleton';
 import { StatusPill } from '../../design/components/StatusPill';
 import { useToast } from '../../design/components/Toast';
 import { sortEntries } from '../../lists/sort';
-import { LIST_LABEL, LIST_ORDER } from '../../nav';
+
 import { computeStats } from '../../ratings/stats';
 import { topFive } from '../../ratings/topFive';
 import { useIsWide } from '../../hooks';
@@ -30,6 +30,7 @@ import '../../design/ratings.css';
 import '../../design/social.css';
 import '../../design/plan.css';
 import '../../design/lists.css';
+import { listCfg, listLabel, presentLists, statusText } from '../../lists/registry';
 
 const TABS: TabDef<'lists' | 'top5' | 'stats' | 'compare'>[] = [
   { id: 'lists', label: 'Lists' }, { id: 'top5', label: 'Top 5' }, { id: 'stats', label: 'Stats' }, { id: 'compare', label: 'Compare' },
@@ -129,9 +130,13 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
   const friends = useFriends();
   const tab: TabId = TABS.some((t) => t.id === params.get('tab')) ? (params.get('tab') as TabId) : 'lists';
   const rows = entries.data;
-  const categories = useMemo(() => LIST_ORDER.filter((c) => rows?.some((e) => e.category === c)), [rows]);
+  // Their lists with something visible: built-in first, then their custom lists (Dan, 2026-11-19 Q2: same rules as built-in).
+  const categories = useMemo(() => presentLists((rows ?? []).map((e) => e.category)), [rows]);
+  // Compare needs the same list on both sides: built-in lists only (a custom list is its owner's own).
+  const compareCategories = useMemo(() => categories.filter((c) => isBuiltinCategory(c)), [categories]);
   const asked = params.get('c');
-  const category: Category | null = categories.find((c) => c === asked) ?? categories[0] ?? null;
+  const shownCategories = tab === 'compare' ? compareCategories : categories;
+  const category: Category | null = shownCategories.find((c) => c === asked) ?? shownCategories[0] ?? null;
   const setTab = (t: TabId) => setParams((p) => { const n = new URLSearchParams(p); n.set('tab', t); return n; }, { replace: true });
   const setCategory = (c: Category) => setParams((p) => { const n = new URLSearchParams(p); n.set('c', c); return n; }, { replace: true });
 
@@ -176,7 +181,7 @@ function FriendView({ user, bio }: { user: PublicUser; bio: string | null }) {
           ) : (
             <>
               {(tab === 'lists' || tab === 'compare') && (
-                <CategoryChips categories={categories} value={category} onChange={setCategory} />
+                <CategoryChips categories={shownCategories} value={category} onChange={setCategory} />
               )}
               {tab === 'lists' && category && <ListsPanel username={user.username} rows={rows.filter((e) => e.category === category)} name={who(user)} />}
               {tab === 'top5' && <Top5Panel username={user.username} rows={rows} categories={categories} name={who(user)} />}
@@ -205,12 +210,12 @@ export function ListsPanel({ username, rows, linkTo, name }: { username: string;
   return (
     <ul className="people plain-list">
       {sorted.map((e) => {
-        const cfg = CATEGORY_CONFIG[e.category];
-        const status = e.status && cfg.hasStatus ? statusLabel(e.status, e.category) : null;
+        const cfg = listCfg(e.category);
+        const status = e.status && cfg.hasStatus ? statusText(e.status, e.category) : null;
         const label = [e.title, status, e.rating !== null ? `rated ${formatRating(e.rating)}` : 'not rated'].filter(Boolean).join(', ');
         const inner = (
           <>
-            <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={cfg.square} width={40} /></span>
+            {(!cfg.custom || cfg.lookup !== null) && <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={cfg.square} width={40} /></span>}
             <span className="person__meta">
               <span className="person__name">{e.title}</span>
               {e.status && cfg.hasStatus && <StatusPill status={e.status} category={e.category} />}
@@ -238,24 +243,34 @@ export function FriendTable({ username, rows, linkTo, name }: { username: string
     releaseDate: e.releaseDate, genres: e.genres, synopsis: e.synopsis, source: e.source, sourceId: e.sourceId, to: href ? href(e.id) : null, state: back,
   })), [rows, href, back.backLabel]); // eslint-disable-line react-hooks/exhaustive-deps
   const viewer = useRowViewer(items);
-  const cfg = CATEGORY_CONFIG[rows[0]!.category];
-  const columns: ColumnDef[] = [{ id: 'cover', label: 'Cover' }, { id: 'rating', label: 'Rating' }, { id: 'title', label: 'Title' }];
+  const cfg = listCfg(rows[0]!.category);
+  // A custom list shows the columns its owner made it with (like their own table).
+  const cover = !cfg.custom || cfg.lookup !== null;
+  const year = cfg.custom && cfg.showYear;
+  const link = cfg.custom && cfg.showLink;
+  const columns: ColumnDef[] = [];
+  if (cover) columns.push({ id: 'cover', label: 'Cover' });
+  columns.push({ id: 'rating', label: 'Rating' }, { id: 'title', label: cfg.custom ? cfg.titleLabel : 'Title' });
   if (cfg.hasStatus) columns.push({ id: 'status', label: 'Status' });
-  columns.push({ id: 'genres', label: 'Genres' });
+  if (cfg.showGenres) columns.push({ id: 'genres', label: 'Genres' });
   if (cfg.creatorLabel) columns.push({ id: 'creator', label: cfg.creatorLabel });
+  if (year) columns.push({ id: 'year', label: 'Year' });
+  if (link) columns.push({ id: 'link', label: 'Link' });
   if (cfg.hasSeasons) columns.push({ id: 'avg', label: 'Season Avg' });
   columns.push({ id: 'notes', label: 'Notes' });
   return (
-    <TableFrame list={rows[0]!.category} label={`${LIST_LABEL[rows[0]!.category]}, @${username}`} columns={columns} viewer={viewer}>
+    <TableFrame list={rows[0]!.category} label={`${listLabel(rows[0]!.category)}, @${username}`} columns={columns} viewer={viewer}>
       <tbody>
         {rows.map((e) => (
           <tr key={e.id} {...viewer.rowProps(e.id)}>
-            <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>
+            {cover && <td><CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={cfg.square} width={40} className="cover--sm" /></td>}
             <td><RatingBadge rating={e.rating} size="sm" /></td>
             <td><div className="cell-title">{href ? <Link to={href(e.id)} state={back} data-role="title">{e.title}</Link> : <span data-role="title">{e.title}</span>}</div></td>
             {cfg.hasStatus && <td>{e.status && <StatusPill status={e.status} category={e.category} />}</td>}
-            <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>
+            {cfg.showGenres && <td className="muted col-genres" title={e.genres || undefined}>{e.genres}</td>}
             {cfg.creatorLabel && <td className="col-creator" title={e.creator || undefined}>{e.creator}</td>}
+            {year && <td className="muted col-year">{e.releaseDate.slice(0, 4)}</td>}
+            {link && <td className="col-link">{e.link && <a href={e.link} target="_blank" rel="noopener noreferrer" aria-label={`Open the link for ${e.title} (opens in a new tab)`}>Open ↗</a>}</td>}
             {cfg.hasSeasons && <td className="muted col-avg">{e.seasonAvg === null ? '' : formatRating(e.seasonAvg)}</td>}
             <td><span className="cell-notes" title={e.notes || undefined}>{e.notes ?? ''}</span></td>
           </tr>
@@ -273,7 +288,7 @@ export function Top5Panel({ username, rows, categories, linkTo, name }: { userna
     <div className="top5">
       {blocks.map(({ c, top }) => (
         <section key={c} aria-labelledby={`ft5-${c}`} className="top5__block">
-          <h2 id={`ft5-${c}`} className="top5__heading">{LIST_LABEL[c]}</h2>
+          <h2 id={`ft5-${c}`} className="top5__heading">{listLabel(c)}</h2>
           <ol className="top5__list">
             {top.map((e, i) => <TopRow key={e.id} entry={e} rank={i + 1} to={href ? href(e.id) : null} backLabel={`${name ?? `@${username}`}'s Top 5`} />)}
           </ol>
@@ -301,7 +316,7 @@ export function StatsPanel({ rows, categories }: { rows: FriendEntry[]; categori
       <section aria-labelledby="fstats-lists" className="stats__lists">
         <h2 id="fstats-lists" className="stats__heading">By list</h2>
         <ul className="stats__cards" aria-label="Stats by list">
-          {stats.lists.map((l, i) => <ListCard key={l.category} name={LIST_LABEL[l.category]} s={l} index={i} tiers={null} />)}
+          {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category)} s={l} index={i} tiers={null} />)}
         </ul>
       </section>
     </div>

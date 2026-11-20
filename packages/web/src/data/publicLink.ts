@@ -1,6 +1,7 @@
-import type { FriendEntry, PublicUser } from '@media-tracker/shared';
+import type { CustomList, FriendEntry, PublicUser } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { registerLists } from '../lists/registry';
 
 /** GET /api/public/:token (item 34): the read-only header of a public profile link. */
 export interface PublicProfileData {
@@ -8,6 +9,8 @@ export interface PublicProfileData {
   memberSince: string | null;
   bio: string | null;
   counts: { titles: number; rated: number };
+  /** Their custom lists (names, words, columns); absent from older servers. */
+  lists?: CustomList[];
 }
 
 const PUBLIC_KEY = ['public'] as const;
@@ -16,7 +19,11 @@ const enc = encodeURIComponent;
 export function usePublicProfile(token: string) {
   return useQuery({
     queryKey: [...PUBLIC_KEY, token, 'profile'],
-    queryFn: () => api.get<PublicProfileData>(`/api/public/${enc(token)}`),
+    queryFn: async () => {
+      const data = await api.get<PublicProfileData>(`/api/public/${enc(token)}`);
+      registerLists(data.lists);
+      return data;
+    },
     retry: false,
     staleTime: 60_000,
   });

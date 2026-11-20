@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, formatRating, type Category, type Entry } from '@media-tracker/shared';
+import { formatRating, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -12,7 +12,6 @@ import { CoverImage } from '../design/components/CoverImage';
 import { Icon } from '../design/components/Icon';
 import { useToast } from '../design/components/Toast';
 import { sortEntries } from '../lists/sort';
-import { LIST_LABEL } from '../nav';
 import { useAppSettings } from '../data/appSettings';
 import { useEnabledLists } from '../shell/useLists';
 import { computeStats } from '../ratings/stats';
@@ -29,6 +28,7 @@ import '../design/settings.css';
 import '../design/nav.css';
 import '../design/wide.css';
 import '../design/plan.css';
+import { listCfg, listLabel } from '../lists/registry';
 
 const READ_ERROR = "Couldn't read that image. Try a JPEG or PNG.";
 const SAVE_ERROR = "Couldn't save your photo. Try again.";
@@ -176,9 +176,9 @@ export function ProfileScreen() {
             <ul className="profile__strip plain-list">
               {ones.map((e) => (
                 <li key={e.id}>
-                  <Link to={`/entry/${e.id}`} className="profile__strip-link" aria-label={`${LIST_LABEL[e.category]} #1: ${e.title}`}>
-                    <CoverImage src={e.coverUrl} alt={`${e.title} cover`} width={64} square={CATEGORY_CONFIG[e.category].square} />
-                    <span className="profile__strip-label">{LIST_LABEL[e.category]}</span>
+                  <Link to={`/entry/${e.id}`} className="profile__strip-link" aria-label={`${listLabel(e.category)} #1: ${e.title}`}>
+                    <CoverImage src={e.coverUrl} alt={`${e.title} cover`} width={64} square={listCfg(e.category).square} />
+                    <span className="profile__strip-label">{listLabel(e.category)}</span>
                   </Link>
                 </li>
               ))}

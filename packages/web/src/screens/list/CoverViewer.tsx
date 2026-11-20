@@ -1,16 +1,15 @@
-import { CATEGORY_CONFIG } from '@media-tracker/shared';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { CoverImage } from '../../design/components/CoverImage';
 import { Icon } from '../../design/components/Icon';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { StatusPill } from '../../design/components/StatusPill';
-import { LIST_LABEL } from '../../nav';
 import { OpenInSpotify } from '../entry/OpenInSpotify';
 import { PlayPreview } from '../entry/PlayPreview';
 import { PlayTrailer } from '../entry/PlayTrailer';
 import { WatchOnYouTube } from '../entry/WatchOnYouTube';
 import type { ViewerItem } from './tableKit';
+import { listCfg, listLabel } from '../../lists/registry';
 
 /** Where the viewer's "You can hide this in Settings." note points: the Cover viewer switch. */
 export const COVER_VIEWER_SETTING_PATH = '/settings#cover-viewer';
@@ -48,7 +47,7 @@ function ViewerActions({ item }: { item: ViewerItem }) {
 export function CoverViewer({ item, onClose }: { item: ViewerItem; onClose: () => void }) {
   const navigate = useNavigate();
   const showNote = useContext(CoverViewerNoteContext);
-  const cfg = CATEGORY_CONFIG[item.category];
+  const cfg = listCfg(item.category);
   const year = item.releaseDate.slice(0, 4);
   const meta = [item.creator, year].filter(Boolean).join(' · ');
   const genres = item.genres.split(',').map((g) => g.trim()).filter(Boolean);
@@ -66,7 +65,7 @@ export function CoverViewer({ item, onClose }: { item: ViewerItem; onClose: () =
       </button>
       <CoverImage src={item.coverUrl} alt={`${item.title} cover`} square={cfg.square} fluid width={320} className="cover--hero cover-viewer__cover" />
       <h2 className="cover-viewer__title">{item.title}</h2>
-      <p className="cover-viewer__list">{LIST_LABEL[item.category]}</p>
+      <p className="cover-viewer__list">{listLabel(item.category)}</p>
       <div className="cover-viewer__facts">
         <RatingBadge rating={item.rating} size="md" />
         {item.status && cfg.hasStatus && <StatusPill status={item.status} category={item.category} />}

@@ -4,7 +4,7 @@
  */
 import { Hono } from 'hono';
 import { loadAppSettings } from '../settings/appSettings';
-import { APP_DEFAULTS_SQL, USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
+import { APP_DEFAULTS_SQL, CUSTOM_LISTS_SQL, USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
 import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
 import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
 import { cleanDisplayName, meBody } from './me';
@@ -150,7 +150,7 @@ auth.post('/login', async (c) => {
   const db = c.env.DB;
   const now = Date.now();
   const [userRes, failRes] = await db.batch([
-    db.prepare(`SELECT ${USER_COLS}, password_hash, ${APP_DEFAULTS_SQL} FROM users WHERE username = ?`).bind(username),
+    db.prepare(`SELECT ${USER_COLS}, password_hash, ${APP_DEFAULTS_SQL}, ${CUSTOM_LISTS_SQL} FROM users u WHERE username = ?`).bind(username),
     db.prepare(`SELECT at FROM login_failures WHERE username = ? ORDER BY at DESC LIMIT ${LOGIN_MAX_FAILURES}`).bind(username),
   ]);
   if (locked((failRes!.results as { at: string }[]).map((r) => r.at), now)) return c.json({ error: 'too_many_attempts' }, 429);

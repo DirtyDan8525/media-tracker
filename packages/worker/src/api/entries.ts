@@ -1,8 +1,8 @@
 import { loadAppSettings } from '../settings/appSettings';
 import { Hono } from 'hono';
 import {
-  CATEGORY_CONFIG,
   ACTIVE_STATUSES,
+  listConfig,
   PLAN_ORDER_MAX,
   PLAN_STATUS,
   findDuplicate,
@@ -22,7 +22,8 @@ import {
   tierFieldsFor, typedOf, type LoadedItem, type RatingEdit,
 } from '../ratings/store';
 import { activityForCreate, activityForPatch, activityForSeason } from './activity';
-import { CATEGORIES, validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
+import { validateEntryInput, validateSeasonInput, type EntryFields } from './entryValidation';
+import { isListOf } from '../lists/sql';
 
 export { validateEntryInput, validateSeasonInput } from './entryValidation';
 
@@ -44,6 +45,8 @@ export interface EntryRow {
   plan_order: number | null;
   progress: number | null; progress_total: number | null;
   started_at?: string | null; finished_at?: string | null; rewatches?: number | null;
+  /** Migration 0020; absent from rows read before it. */
+  link?: string | null;
   /** JSON array of the title's tag names (ENTRY_SELECT's sub-select; absent from `e.*` selects). */
   tags_json?: string | null;
   typed: number | null;
@@ -105,6 +108,7 @@ export function rowToEntry(r: EntryRow): Entry {
     startedAt: r.started_at ?? null,
     finishedAt: r.finished_at ?? null,
     rewatches: r.rewatches ?? 0,
+    link: r.link ?? '',
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -131,7 +135,7 @@ const COLUMNS: Record<keyof PlainFields, string> = {
   synopsis: 'synopsis', lengthLabel: 'length_label', origin: 'origin', detailsState: 'details_state',
   isPrivate: 'is_private', notesPrivate: 'notes_private', source: 'source', sourceId: 'source_id',
   lookupState: 'lookup_state', progress: 'progress', progressTotal: 'progress_total',
-  startedAt: 'started_at', finishedAt: 'finished_at', rewatches: 'rewatches',
+  startedAt: 'started_at', finishedAt: 'finished_at', rewatches: 'rewatches', link: 'link',
 };
 const dbValue = (v: unknown) => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
 
@@ -253,7 +257,7 @@ entries.put('/entries/plan-order', async (c) => {
   const body = (await readJson(c.req.raw)) as { category?: unknown; ids?: unknown } | null;
   const category = body?.category;
   const ids = body?.ids;
-  if (typeof category !== 'string' || !CATEGORIES.includes(category as Category)) return c.json(invalid, 400);
+  if (!isListOf(category, c.var.user.customLists)) return c.json(invalid, 400);
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > PLAN_ORDER_MAX) return c.json(invalid, 400);
   if (!ids.every((i) => typeof i === 'string' && i !== '') || new Set(ids).size !== ids.length) return c.json(invalid, 400);
   const db = c.env.DB;
@@ -273,7 +277,7 @@ entries.put('/entries/plan-order', async (c) => {
 // 1 query
 entries.get('/entries', async (c) => {
   const category = c.req.query('category');
-  if (category !== undefined && !CATEGORIES.includes(category as Category)) return c.json(invalid, 400);
+  if (category !== undefined && !isListOf(category, c.var.user.customLists)) return c.json(invalid, 400);
   const userId = c.var.user.id;
   const stmt = category
     ? c.env.DB.prepare(`${ENTRY_SELECT} WHERE e.user_id = ? AND e.category = ? ORDER BY e.created_at, e.rowid`).bind(userId, category)
@@ -293,9 +297,10 @@ entries.get('/entries/:id', async (c) => {
 entries.post('/entries', async (c) => {
   const body = await readJson(c.req.raw);
   const category = (body as { category?: unknown } | null)?.category;
-  if (typeof category !== 'string' || !CATEGORIES.includes(category as Category)) return c.json(invalid, 400);
-  const cat = category as Category;
-  const v = validateEntryInput(body, 'create', cat);
+  // A custom list must be one of yours (it rides in with the sign-in: no extra query).
+  if (!isListOf(category, c.var.user.customLists)) return c.json(invalid, 400);
+  const cat = category;
+  const v = validateEntryInput(body, 'create', cat, c.var.user.customLists);
   if (!v.ok) return c.json(invalid, 400);
 
   const db = c.env.DB;
@@ -369,7 +374,7 @@ entries.patch('/entries/:id', async (c) => {
     .first<{ category: Category; rating: number | null; typed: number | null; tier: Tier | null; prior_mean: number | null; strength: number | null; score_locked: number; progress: number | null; progress_total: number | null; started_at: string | null; finished_at: string | null }>();
   if (!owned) return c.json(notFound, 404);
 
-  const v = validateEntryInput(await readJson(c.req.raw), 'patch', owned.category);
+  const v = validateEntryInput(await readJson(c.req.raw), 'patch', owned.category, c.var.user.customLists);
   if (!v.ok) return c.json(invalid, 400);
   const { rest, edit, hasEdit } = splitRating(v.value);
   // The count may not pass the total, whichever of the two this patch changes.
@@ -443,7 +448,7 @@ async function ownedEntry(db: D1Database, id: string, userId: string): Promise<{
 entries.get('/entries/:id/seasons', async (c) => {
   const owner = await ownedEntry(c.env.DB, c.req.param('id'), c.var.user.id);
   if (!owner) return c.json(notFound, 404);
-  if (!CATEGORY_CONFIG[owner.category].hasSeasons) return c.json(noSeasons, 400);
+  if (!listConfig(owner.category).hasSeasons) return c.json(noSeasons, 400);
   const { results } = await c.env.DB.prepare('SELECT * FROM seasons WHERE entry_id = ? ORDER BY created_at, id')
     .bind(c.req.param('id'))
     .all<SeasonRow>();
@@ -463,7 +468,7 @@ entries.post('/entries/:id/seasons', async (c) => {
   const owner = await ownedEntry(db, entryId, userId);
   if (!owner) return c.json(notFound, 404);
   const set = seasonSetOf(owner.category);
-  if (!CATEGORY_CONFIG[owner.category].hasSeasons || set === null) return c.json(noSeasons, 400);
+  if (!listConfig(owner.category).hasSeasons || set === null) return c.json(noSeasons, 400);
   const v = validateSeasonInput(await readJson(c.req.raw));
   if (!v.ok) return c.json(invalid, 400);
 
@@ -551,7 +556,7 @@ entries.delete('/seasons/:id', async (c) => {
 });
 
 // 1 batch of 3 statements (counts as 3): entries, seasons, and every comparison (undone ones and
-// every set included; spec §7 "Export my data includes tiers and comparisons").
+// every set included; spec §7 "Export my data includes tiers and comparisons"). Custom lists come with the sign-in.
 entries.get('/export', async (c) => {
   const userId = c.var.user.id;
   const [e, s, k] = await c.env.DB.batch([
@@ -568,6 +573,7 @@ entries.get('/export', async (c) => {
     seasons: (s!.results as (SeasonRow & { category: Category })[]).map((r) => deriveSeason(rowToSeason(r), r.category, c.var.user.settings)),
     comparisons: (k!.results as Parameters<typeof rowToComparison>[0][]).map((r) => ({ category: r.category, ...rowToComparison(r) })),
     settings: c.var.user.settings,
+    customLists: c.var.user.customLists,
   };
   return c.json(body, 200, { 'Content-Disposition': 'attachment; filename="media-tracker-export.json"' });
 });

@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, findDuplicate, formatRating, nameOf, statusLabel, type ActivityLine, type Features, type FriendEntry, type PostSocial, type PublicUser, type Reaction, type Status } from '@media-tracker/shared';
+import { findDuplicate, formatRating, nameOf, type ActivityLine, type Features, type FriendEntry, type PostSocial, type PublicUser, type Reaction, type Status } from '@media-tracker/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useAddToMine } from '../../data/social';
@@ -13,12 +13,12 @@ import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
 import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
-import { LIST_LABEL } from '../../nav';
 import { backState } from '../../shell/BackButton';
 import { useSessionMe } from '../../shell/SessionGate';
 import { CommentList } from '../social/CommentsSheet';
 import { ReactButton, ReactionChips } from '../social/ReactionBar';
 import { timeAgo } from './format';
+import { listCfg, listLabel, statusText } from '../../lists/registry';
 
 type DetailsProps = {
   line: ActivityLine; who: PublicUser | null; friend: boolean; social: PostSocial; features: Features; now: Date; onComment: () => void;
@@ -43,12 +43,14 @@ export function PostDetails({ line, who, friend, social, features, now, onCommen
   const target = { activityId: line.key } as const;
   const toggle = (emoji: Reaction) => react.mutate({ target, emoji });
   const reacted = useReactionsWho(features.reactions && Object.keys(social.reactions).length > 0 ? target : null);
-  const config = CATEGORY_CONFIG[line.category];
-  const status = line.status ? statusLabel(line.status.to as Status, line.category) : null;
+  const config = listCfg(line.category);
+  const status = line.status ? statusText(line.status.to as Status, line.category) : null;
   const to = own ? `/entry/${line.entryId}` : friend ? `/u/${who.username}/entry/${line.entryId}` : null;
   const addToMine = useAddToMine();
   const toast = useToast();
-  const mine = useEntries(line.category).data;
+  // Someone else's custom list is theirs alone: nothing of yours to look in, and nothing to copy it to.
+  const copyable = !config.custom || own;
+  const mine = useEntries(line.category, copyable).data;
   const [added, setAdded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const onList = added ?? (own ? line.entryId : mine ? findDuplicate(mine, { title: line.entryTitle, creator: line.creator }, line.category) : null);
@@ -79,7 +81,7 @@ export function PostDetails({ line, who, friend, social, features, now, onCommen
         <div className="activity-panel__titles">
           <h2 className="activity-panel__title">{line.title}</h2>
           {line.creator && <p className="activity-panel__creator">{line.creator}</p>}
-          <p className="activity-panel__meta">{LIST_LABEL[line.category]}</p>
+          <p className="activity-panel__meta">{listLabel(line.category)}</p>
           {to && <Link className="activity-panel__open" to={to} state={backState('Activity')}>Open</Link>}
         </div>
       </div>
@@ -96,7 +98,7 @@ export function PostDetails({ line, who, friend, social, features, now, onCommen
         <PlayPreview entry={media} />
         <PlayTrailer entry={media} />
         <WatchOnYouTube entry={media} />
-        {!own && (onList
+        {!own && copyable && (onList
           ? <Link className="btn btn--secondary detail__watch" to={`/entry/${onList}`}>On your list</Link>
           : <Button variant="secondary" className="detail__watch" disabled={busy} onClick={() => void add()}>Add to mine</Button>)}
       </div>

@@ -5,6 +5,8 @@ import { Icon, type IconName } from '../design/components/Icon';
 import { useAppName } from '../data/appSettings';
 import { useIsWide } from '../hooks';
 import { BackButton } from './BackButton';
+import { isCustomCategory, type Category } from '@media-tracker/shared';
+import { ListIcon } from '../lists/ListIcon';
 import { ProfileButton } from './ProfileButton';
 
 export interface PageHeaderProps {
@@ -26,7 +28,7 @@ export interface PageHeaderProps {
    * B22 themed bar (list screens): the header is a Header row band holding this icon, the title, the
    * actions and (phone) the profile button; the sub-line and children follow it on Background.
    */
-  icon?: IconName;
+  icon?: IconName | Category;
   /** Replaces the h1 (the list screens' title dropdown holds its own h1). */
   titleSlot?: ReactNode;
   /** B9: the profile button at the top right (phone only; main screens). */
@@ -69,7 +71,7 @@ export function PageHeader({ title, sub, backTo, backUsesHistory, actions, child
       <>
         <header className={['page-header', 'page-header--bar', className].filter(Boolean).join(' ')}>
           <div className="page-header__titles page-header__titles--bar">
-            <span className="page-header__icon"><Icon name={icon} size={26} /></span>
+            <span className="page-header__icon">{isCustomCategory(icon) ? <ListIcon c={icon} size={26} /> : <Icon name={icon as IconName} size={26} />}</span>
             {h1}
           </div>
           {end}

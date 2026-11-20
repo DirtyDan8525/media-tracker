@@ -2,7 +2,6 @@ import type { Category, Entry } from '@media-tracker/shared';
 import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
 import { localDb } from '../db/local';
-import { LIST_ORDER } from '../nav';
 
 /** Network failure (offline, DNS, aborted) as opposed to an HTTP error answer. */
 export const isOffline = (err: unknown): boolean => !(err instanceof ApiError);
@@ -62,11 +61,13 @@ const cacheQueryOptions = (category: Category) => ({
  * A category's entries: painted from the on-device cache first, then fetched; a successful fetch
  * replaces that category in the cache. Offline, the cached rows are the result.
  */
-export function useEntries(category: Category) {
+export function useEntries(category: Category, enabled = true) {
   const qc = useQueryClient();
-  const cached = useQuery(cacheQueryOptions(category));
+  const cached = useQuery({ ...cacheQueryOptions(category), enabled });
   return useQuery({
     ...entriesQueryOptions(qc, category),
+    // Off for a list that is not yours (a friend's custom list in the feed): the API would refuse it.
+    enabled,
     // An empty cache means "unknown", not "empty list": show the loading state instead.
     placeholderData: cached.data?.length ? cached.data : undefined,
   });
@@ -120,10 +121,8 @@ export function useListCounts() {
     queryFn: async () => {
       const out: Partial<Record<Category, number>> = {};
       try {
-        await Promise.all(LIST_ORDER.map(async (c) => {
-          const n = await localDb.entries.where('category').equals(c).count();
-          if (n > 0) out[c] = n;
-        }));
+        // Every list on the device, custom lists included: one pass over the category index (no rows are read).
+        for (const c of (await localDb.entries.orderBy('category').keys()) as Category[]) out[c] = (out[c] ?? 0) + 1;
       } catch {
         // no cache available
       }

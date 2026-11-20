@@ -7,9 +7,10 @@ import { useApplyDefault, useSaveSetting } from '../../data/adminApp';
 import { Button } from '../../design/components/Button';
 import { SegRadio } from '../../design/components/SegRadio';
 import { Sheet } from '../../design/components/Sheet';
-import { LIST_LABEL, LIST_ORDER } from '../../nav';
+import { LIST_ORDER } from '../../nav';
 import { NOTIFICATIONS_ENABLED } from '../settings/NotificationsSection';
 import { AdminPage, Result, saveError, THEME_NAMES, useFeedback } from './parts';
+import { listLabel } from '../../lists/registry';
 
 const BUILT_IN = APP_SETTING_DEFAULTS.defaults;
 const NOTIFY_LABELS: Record<NotifyKey, string> = {
@@ -110,7 +111,7 @@ function DefaultsForm({ initial, people }: { initial: NewPersonDefaults; people:
                 <label key={c} className="admin-swatch">
                   <input type="checkbox" checked={d.lists.includes(c)}
                     onChange={(e) => void change({ lists: LIST_ORDER.filter((x) => (x === c ? e.target.checked : d.lists.includes(x))) }, 'Lists')} />
-                  {LIST_LABEL[c]}
+                  {listLabel(c)}
                 </label>
               ))}
             </fieldset>
@@ -123,7 +124,7 @@ function DefaultsForm({ initial, people }: { initial: NewPersonDefaults; people:
           </Row>
           <Row label="List order" apply="listOrder" onApply={apply} onReset={() => void change({ listOrder: [] }, 'List order')}
             hint="Follows the order set in Admin, Lists. Applying it clears everyone's own order.">
-            <span className="group__value">{d.listOrder.length ? d.listOrder.map((c) => LIST_LABEL[c]).join(', ') : "The admin's order"}</span>
+            <span className="group__value">{d.listOrder.length ? d.listOrder.map((c) => listLabel(c)).join(', ') : "The admin's order"}</span>
           </Row>
           <Row label="Search" apply="searchScope" onApply={apply} onReset={() => void change({ searchScope: BUILT_IN.searchScope }, 'Search')}>
             <SegRadio label="Where Search looks" value={d.searchScope}

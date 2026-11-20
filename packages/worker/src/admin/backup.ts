@@ -37,6 +37,7 @@ export const BACKUP_TABLES: Readonly<Record<string, readonly string[]>> = {
   app_settings: [],
   tags: [],
   entry_tags: [],
+  custom_lists: [],
 };
 
 /** The same for the response's `excluded` note, so the file says what it leaves out. */

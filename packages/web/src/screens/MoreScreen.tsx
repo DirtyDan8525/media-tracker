@@ -7,6 +7,8 @@ import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import { Walkthrough } from './onboarding/Walkthrough';
 import { ExportRow } from './settings/ExportRow';
+import { SETTINGS_TABS_PATH } from './settings/ListEditor';
+import { NewListButton } from './settings/NewListButton';
 import '../design/settings.css';
 import '../design/wide.css';
 
@@ -41,6 +43,17 @@ export function MoreScreen() {
             </Link>
           </div>
         </section>
+        {features.customLists && (
+          <section aria-labelledby="more-lists" className="group">
+            <h2 id="more-lists" className="group__title">Lists</h2>
+            <div className="group__card">
+              <NewListButton row />
+            </div>
+            <p className="hint more-lists__note">
+              To turn lists on or off, edit or delete them, go to <Link to={SETTINGS_TABS_PATH}>Settings</Link>.
+            </p>
+          </section>
+        )}
         <section aria-labelledby="more-data" className="group">
           <h2 id="more-data" className="group__title">Your data</h2>
           <div className="group__card">

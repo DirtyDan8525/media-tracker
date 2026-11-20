@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, PLAN_STATUS, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
+import { PLAN_STATUS, normTitle, similarity, type Category, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
@@ -9,6 +9,7 @@ import { useToast } from '../design/components/Toast';
 import { applyLookupMatch } from '../lookup/apply';
 import { buildLookupQuery } from '../lookup/query';
 import { runLookup } from '../lookup/run';
+import { listCfg } from '../lists/registry';
 
 export interface AddInput {
   title: string;
@@ -20,6 +21,8 @@ export interface AddInput {
   category?: Category;
   /** A note typed in the Add sheet (Dan, 2026-11-17). */
   notes?: string;
+  /** A custom list's Link column: a web or map link (http/https). */
+  link?: string;
 }
 
 export type AddState = 'idle' | 'looking' | 'choose' | 'saved';
@@ -103,10 +106,14 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
     const title = input.title.trim();
     if (!title) return null;
     const category = input.category ?? defaultCategory;
-    const cfg = CATEGORY_CONFIG[category];
+    const cfg = listCfg(category);
     const creator = cfg.creatorLabel ? (input.creator ?? '').trim() : '';
-    const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: 'pending' };
+    // A custom list with no search ("type it in"): what was typed is the whole title, nothing is looked up.
+    const typeIn = cfg.lookup === null;
+    const body: Record<string, unknown> = { category, title, typedTitle: title, lookupState: typeIn ? 'ok' : 'pending' };
     if (creator) body.creator = creator;
+    const link = cfg.showLink ? (input.link ?? '').trim() : '';
+    if (link) body.link = link;
     if (input.notes) body.notes = input.notes;
     if (cfg.hasStatus && input.status) body.status = input.status;
     if (input.rating !== undefined && input.rating !== null && body.status !== PLAN_STATUS) body.rating = input.rating;
@@ -118,7 +125,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
       id: tempId, userId: '', category, title, typedTitle: title, status: (body.status as Status | undefined) ?? null,
       rating: (body.rating as number | undefined) ?? null, typed: (body.rating as number | undefined) ?? null, genres: '', creator, album: '', coverUrl: '', notes: input.notes ?? '',
       releaseDate: '', synopsis: '', lengthLabel: '', origin: '', detailsState: 'none', isPrivate: false, notesPrivate: false,
-      source: null, sourceId: null, lookupState: 'pending', importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
+      source: null, sourceId: null, lookupState: typeIn ? 'ok' : 'pending', link, importId: null, seasonAvg: null, tier: null, priorMean: null, strength: null, scoreLocked: false, createdAt: now, updatedAt: now,
     };
     lookupRunning.add(tempId);
     writeEntry(qc, temp, { persist: false });
@@ -141,7 +148,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
         writeEntry(qc, temp, { persist: false });
         res = await api.post<{ entry: Entry; duplicateOf: string | null }>('/api/entries', { ...body, allowDuplicate: true });
       }
-      lookup = runLookup(buildLookupQuery(category, title, creator));
+      lookup = typeIn ? null : runLookup(buildLookupQuery(category, title, creator));
       entry = res.entry;
       lookupRunning.add(entry.id);
       lookupRunning.delete(tempId);
@@ -154,12 +161,18 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
       toast.show("Couldn't save that. Check your connection and try again.");
       return null;
     }
-    await resolve(entry, title, lookup!);
+    if (!lookup) {
+      lookupRunning.delete(entry.id);
+      setSaved(true);
+      return entry;
+    }
+    await resolve(entry, title, lookup);
     return entry;
   }, [defaultCategory, qc, toast, resolve, confirmDuplicate]);
 
   /** Look an entry up again (Retry), with its own title or `term`. */
   const retry = useCallback(async (entry: Entry, term?: string): Promise<void> => {
+    if (listCfg(entry.category).lookup === null) return;
     const query = (term ?? entry.title).trim() || entry.title;
     lookupRunning.add(entry.id);
     patchLocal(qc, entry, { lookupState: 'pending' });

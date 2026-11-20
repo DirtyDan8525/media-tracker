@@ -5,24 +5,25 @@ import { useFriendsEntries, useFriends } from '../../data/social';
 import { useAllEntries } from '../../data/useEntries';
 import { EmptyState } from '../../design/components/EmptyState';
 import { Skeleton } from '../../design/components/Skeleton';
-import { LIST_LABEL } from '../../nav';
-import { useEnabledLists } from '../../shell/useLists';
+import { useEnabledBuiltinLists } from '../../shell/useLists';
 import { PageHeader } from '../../shell/PageHeader';
 import { useAddFriend } from '../../shell/AddFriendHost';
 import { useSessionMe } from '../../shell/SessionGate';
 import { TopRow } from '../Top5Screen';
 import '../../design/ratings.css';
+import { listLabel } from '../../lists/registry';
 
 /** Top 5's "Friends" view: you and every friend together, per list. A title counts once at least 2 people rated it. */
 export function GroupTop5({ toggle }: { toggle: ReactNode }) {
   const me = useSessionMe();
   const qc = useQueryClient();
   const addFriend = useAddFriend();
-  const lists = useEnabledLists();
+  // Built-in lists only: a custom list is one person's own, so there is no group list to rank (Phase 7).
+  const lists = useEnabledBuiltinLists();
   const mine = useAllEntries(lists);
   const theirs = useFriendsEntries();
   const friends = useFriends();
-  const header = <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile sub="You and your friends, together.">{toggle}</PageHeader>;
+  const header = <PageHeader title="Top 5" backTo="/profile" backUsesHistory profile sub="You and your friends, together. Built-in lists only: custom lists are each person's own.">{toggle}</PageHeader>;
 
   if (theirs.isError || friends.isError) {
     return (
@@ -72,7 +73,7 @@ export function GroupTop5({ toggle }: { toggle: ReactNode }) {
 }
 
 function GroupBlock({ category, rows }: { category: Category; rows: GroupRow[] }) {
-  const name = LIST_LABEL[category];
+  const name = listLabel(category);
   const id = `group5-${category}`;
   return (
     <section aria-labelledby={id} className="top5__block">

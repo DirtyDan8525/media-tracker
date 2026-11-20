@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   CATEGORY_CONFIG,
+  type BuiltinCategory,
   ENTRIES_PER_STATEMENT,
   IMPORT_CHUNK_ROWS,
   IMPORT_CHUNK_SEASONS,
@@ -56,7 +57,7 @@ function cleanRow(input: unknown): CleanRow | null {
   const seasons: CleanSeason[] = [];
   if (input.seasons !== undefined && input.seasons !== null) {
     if (!Array.isArray(input.seasons)) return null;
-    if (input.seasons.length > 0 && !CATEGORY_CONFIG[category as Category].hasSeasons) return null;
+    if (input.seasons.length > 0 && !CATEGORY_CONFIG[category as BuiltinCategory].hasSeasons) return null;
     for (const s of input.seasons) {
       const sv = validateSeasonInput(s);
       if (!sv.ok) return null;

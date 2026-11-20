@@ -4,8 +4,9 @@ import { useResetSetting, useSaveSetting } from '../../data/adminApp';
 import { Button } from '../../design/components/Button';
 import { Icon } from '../../design/components/Icon';
 import { IconButton } from '../../design/components/IconButton';
-import { LIST_LABEL, LIST_ORDER } from '../../nav';
+import { LIST_ORDER } from '../../nav';
 import { AdminPage, Result, saveError, useFeedback } from './parts';
+import { listLabel } from '../../lists/registry';
 
 /** Moves the item at `from` to `to` (a new array). */
 export function move<T>(items: readonly T[], from: number, to: number): T[] {
@@ -44,7 +45,7 @@ function Editor({ initial }: { initial: ListsSetting }) {
     const from = order.indexOf(c);
     if (to < 0 || to >= order.length || to === from) return;
     setOrder(move(order, from, to));
-    setLive(`${LIST_LABEL[c]} moved to position ${to + 1} of ${order.length}`);
+    setLive(`${listLabel(c)} moved to position ${to + 1} of ${order.length}`);
     if (keepFocus) focusAfter.current = { c, part: 'handle' };
   }
 
@@ -79,7 +80,7 @@ function Editor({ initial }: { initial: ListsSetting }) {
     }
   }
   function onUp() {
-    if (dragging) setLive(`${LIST_LABEL[dragging]} dropped at position ${order.indexOf(dragging) + 1} of ${order.length}`);
+    if (dragging) setLive(`${listLabel(dragging)} dropped at position ${order.indexOf(dragging) + 1} of ${order.length}`);
     setDragging(null);
   }
 
@@ -113,16 +114,16 @@ function Editor({ initial }: { initial: ListsSetting }) {
           return (
             <li key={c} ref={(el) => { if (el) rows.current.set(c, el); else rows.current.delete(c); }}
               className={`admin-row${dragging === c ? ' is-dragging' : ''}${isHidden ? ' is-hidden' : ''}`}>
-              <button type="button" className="admin-row__handle" aria-label={`Drag ${LIST_LABEL[c]} to reorder. Position ${i + 1} of ${order.length}. Arrow keys move it.`}
+              <button type="button" className="admin-row__handle" aria-label={`Drag ${listLabel(c)} to reorder. Position ${i + 1} of ${order.length}. Arrow keys move it.`}
                 onPointerDown={(e) => onDown(e, c)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onKeyDown={(e) => onHandleKey(e, c)}>
                 <Icon name="lists" size={20} />
               </button>
-              <span className="admin-row__name">{LIST_LABEL[c]}{isHidden ? ' · hidden' : ''}</span>
+              <span className="admin-row__name">{listLabel(c)}{isHidden ? ' · hidden' : ''}</span>
               <label className="switch-row">
-                <input type="checkbox" role="switch" checked={isHidden} aria-label={`Hide ${LIST_LABEL[c]} for everyone`}
+                <input type="checkbox" role="switch" checked={isHidden} aria-label={`Hide ${listLabel(c)} for everyone`}
                   onChange={(e) => toggleHidden(c, e.target.checked)} />
               </label>
-              <MoveMenu name={LIST_LABEL[c]} first={i === 0} last={i === order.length - 1} onUp={() => moveTo(c, i - 1, false)} onDown={() => moveTo(c, i + 1, false)} />
+              <MoveMenu name={listLabel(c)} first={i === 0} last={i === order.length - 1} onUp={() => moveTo(c, i - 1, false)} onDown={() => moveTo(c, i + 1, false)} />
             </li>
           );
         })}

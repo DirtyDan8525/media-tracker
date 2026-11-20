@@ -13,6 +13,7 @@ import { publicTokenHash } from '../social/publicLink';
 import { PUBLIC_USER_COLS, publicUser, toFriendEntry, type PublicUserRow } from '../social/visibility';
 import { coverUrlOf, serveCover } from './cover';
 import { TAGS_SUBSELECT, type EntryRow } from './entries';
+import { customListsSql, parseLists } from '../lists/sql';
 
 export const publicApi = new Hono<AppEnv>();
 
@@ -27,16 +28,17 @@ publicApi.get('/:token', async (c) => {
   const hash = await publicTokenHash(c.req.param('token'));
   if (!hash) return c.json(notFound, 404, NO_STORE);
   const row = await c.env.DB.prepare(
-    `SELECT ${PUBLIC_USER_COLS}, created_at, bio,
+    `SELECT ${PUBLIC_USER_COLS}, created_at, bio, ${customListsSql('u.id')},
        (SELECT COUNT(*) FROM entries e WHERE e.user_id = u.id AND e.is_private = 0) AS titles,
        (SELECT COUNT(*) FROM entries e WHERE e.user_id = u.id AND e.is_private = 0 AND e.rating IS NOT NULL) AS rated
      FROM users u WHERE u.public_token_hash = ? AND u.status = 'active'`,
   )
     .bind(hash)
-    .first<PublicUserRow & { created_at: string | null; bio: string | null; titles: number; rated: number }>();
+    .first<PublicUserRow & { created_at: string | null; bio: string | null; titles: number; rated: number; custom_lists_json: string | null }>();
   if (!row) return c.json(notFound, 404, NO_STORE);
+  // Custom lists show like the built-in ones (what a friend sees): names, words and columns, never anything private.
   return c.json(
-    { user: publicUser(row), memberSince: row.created_at ?? null, bio: row.bio ?? null, counts: { titles: row.titles, rated: row.rated } },
+    { user: publicUser(row), memberSince: row.created_at ?? null, bio: row.bio ?? null, counts: { titles: row.titles, rated: row.rated }, lists: parseLists(row.custom_lists_json) },
     200,
     NO_STORE,
   );

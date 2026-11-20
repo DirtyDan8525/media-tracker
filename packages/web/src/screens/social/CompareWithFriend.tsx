@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, bothRated, formatRating, theirsNotYours, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
+import { bothRated, formatRating, theirsNotYours, type Category, type FriendEntry, type PublicUser } from '@media-tracker/shared';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useAddToMine, type AddToMineResult } from '../../data/social';
@@ -9,9 +9,9 @@ import { EmptyState } from '../../design/components/EmptyState';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
-import { LIST_LABEL } from '../../nav';
 import { who } from './parts';
 import '../../design/social.css';
+import { listCfg, listLabel } from '../../lists/registry';
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -27,7 +27,7 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
   const [done, setDone] = useState<Record<string, AddToMineResult>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const name = who(user);
-  const label = LIST_LABEL[category];
+  const label = listLabel(category);
   const theirs = useMemo(() => entries.filter((e) => e.category === category), [entries, category]);
   const both = useMemo(() => (mine.data ? bothRated(mine.data, theirs) : []), [mine.data, theirs]);
   // A title you just added stays in the list (as "On your list") instead of vanishing under your finger.
@@ -42,7 +42,7 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
   if (mine.isError || !mine.data) {
     return <EmptyState icon="info" title={`Couldn't load your ${label} list`} body="Check your connection and try again." actionLabel="Retry" onAction={() => void mine.refetch()} />;
   }
-  const square = CATEGORY_CONFIG[category].square;
+  const square = listCfg(category).square;
 
   async function add(e: FriendEntry) {
     setBusy(e.id);

@@ -5,9 +5,9 @@ import { useFriends } from '../../data/social';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
 import { useToast } from '../../design/components/Toast';
-import { LIST_LABEL } from '../../nav';
 import { useSessionMe } from '../../shell/SessionGate';
 import { CheckRow } from './CheckRow';
+import { listLabel } from '../../lists/registry';
 
 /** Share (M7): send this title to friends and/or groups, with an optional note. The caller shows it from a Share button. */
 export function ShareSheet({ open, rec, onClose }: { open: boolean; rec: RecSnapshot; onClose: () => void }) {
@@ -43,7 +43,7 @@ function ShareBody({ rec, onClose }: { rec: RecSnapshot; onClose: () => void }) 
     <Sheet open title={`Recommend ${rec.title}`} onClose={onClose}
       footer={<Button variant="primary" className="btn--big" disabled={count === 0 || share.isPending} onClick={() => void send()}>{count > 0 ? `Send to ${count}` : 'Send'}</Button>}>
       <div className="stack-10">
-        <p className="hint">{LIST_LABEL[rec.category]}{rec.rating !== null ? ` · your rating ${rec.rating.toFixed(1)} shows on the card` : ''}</p>
+        <p className="hint">{listLabel(rec.category)}{rec.rating !== null ? ` · your rating ${rec.rating.toFixed(1)} shows on the card` : ''}</p>
         <section aria-labelledby="share-friends">
           <h3 id="share-friends" className="group__title">Friends</h3>
           {friends.isPending ? <p className="hint">Loading…</p> : (friends.data?.friends.length ?? 0) === 0 ? <p className="hint">No friends yet.</p> : (

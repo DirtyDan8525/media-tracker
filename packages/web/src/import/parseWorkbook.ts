@@ -1,16 +1,6 @@
 import readExcel from 'read-excel-file/universal';
-import {
-  CATEGORY_CONFIG,
-  COMPARE_ASK,
-  STATUS_ALIASES,
-  THEMES,
-  normTitle,
-  type Category,
-  type ImportPreview,
-  type ImportRow,
-  type Status,
-  type UserSettings,
-} from '@media-tracker/shared';
+import { COMPARE_ASK, STATUS_ALIASES, THEMES, normTitle, type Category, type ImportPreview, type ImportRow, type Status, type UserSettings } from '@media-tracker/shared';
+import { listCfg } from '../lists/registry';
 
 type Raw = unknown;
 type Grid = Raw[][];
@@ -176,7 +166,7 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<ImportPreview> {
       continue;
     }
 
-    const cfg = CATEGORY_CONFIG[kind];
+    const cfg = listCfg(kind);
     const col = (name: string) => headers.indexOf(name);
     const titleCol = col(cfg.titleLabel.toLowerCase()) >= 0 ? col(cfg.titleLabel.toLowerCase()) : col('title');
     const c = {

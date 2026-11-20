@@ -1,5 +1,7 @@
 import { SEARCH_SCOPE } from '@media-tracker/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { Link, useLocation } from 'react-router';
+import type { CustomList } from '@media-tracker/shared';
 import { inviteLink, useCopy, useInviteCode, useSaveDisplayName } from '../data/social';
 import { SETTINGS_SAVE_ERROR, useSaveSettings } from '../data/useMe';
 import { Button } from '../design/components/Button';
@@ -18,6 +20,9 @@ import { TagsLink } from './settings/TagsLink';
 import { PublicLinkRow } from './settings/PublicLinkRow';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
+import { DeleteListSheet } from './settings/DeleteListSheet';
+import { editListPath } from './settings/ListEditor';
+import { NewListButton } from './settings/NewListButton';
 import { SegRadio } from '../design/components/SegRadio';
 import '../design/search.css';
 import '../design/settings.css';
@@ -38,23 +43,48 @@ export function SettingsScreen() {
   function toggle(key: string, on: boolean) {
     save.mutate({ tabs: { [key]: on } });
   }
+  const [deleting, setDeleting] = useState<CustomList | null>(null);
+  // More → "go to Settings" links to /settings#tabs: bring the Tabs section into view and put focus on its heading.
+  const { hash } = useLocation();
+  const tabsRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (hash !== '#tabs') return;
+    tabsRef.current?.scrollIntoView?.({ block: 'start' });
+    tabsRef.current?.focus({ preventScroll: true });
+  }, [hash]);
 
   return (
     <div className="screen">
       <PageHeader title="Settings" backTo="/profile" backUsesHistory />
       <div className="screen__body stack-18 wide-cols">
-        <section aria-labelledby="set-tabs" className="group">
-          <h2 id="set-tabs" className="group__title">Tabs</h2>
+        <section aria-labelledby="set-tabs" className="group" id="tabs">
+          <h2 id="set-tabs" className="group__title" ref={tabsRef} tabIndex={-1}>Tabs</h2>
           <div className="group__card switch-grid">
-            {tabSwitches(app.lists, me.settings.listOrder).map(({ key, label }) => (
-              <label key={key} className="switch-row">
-                <input type="checkbox" role="switch" checked={me.settings.tabs[key] !== false}
-                  onChange={(e) => toggle(key, e.target.checked)} />
-                <span>{label}</span>
-              </label>
-            ))}
+            {tabSwitches(app.lists, me.settings.listOrder, me.customLists).map(({ key, label, custom }) => {
+              const sw = (
+                <label key={key} className="switch-row">
+                  <input type="checkbox" role="switch" checked={me.settings.tabs[key] !== false}
+                    onChange={(e) => toggle(key, e.target.checked)} />
+                  <span>{label}</span>
+                </label>
+              );
+              const list = custom ? me.customLists.find((l) => l.key === key) : undefined;
+              if (!list) return sw;
+              // Your own lists: Edit and Delete beside the switch.
+              return (
+                <div key={key} className="switch-row-wrap">
+                  {sw}
+                  <span className="switch-row__actions">
+                    <Link to={editListPath(list)} className="btn btn--ghost btn--compact" aria-label={`Edit ${list.name}`}>Edit</Link>
+                    <Button variant="ghost" compact aria-label={`Delete ${list.name}`} onClick={() => setDeleting(list)}>Delete</Button>
+                  </span>
+                </div>
+              );
+            })}
           </div>
+          <div className="tabs-new-list"><NewListButton /></div>
         </section>
+        {deleting && <DeleteListSheet list={deleting} onClose={() => setDeleting(null)} />}
 
         {wide && (
           <section aria-labelledby="set-pc" className="group">

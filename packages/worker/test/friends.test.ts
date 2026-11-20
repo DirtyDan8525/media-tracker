@@ -178,7 +178,9 @@ describe('search and profile header', () => {
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body).toMatchObject({ user: { username: 'ren' }, relation: 'none' });
-    expect(Object.keys(body)).toEqual(['user', 'memberSince', 'bio', 'relation']);
+    expect(Object.keys(body)).toEqual(['user', 'memberSince', 'bio', 'relation', 'lists']);
+    // A stranger sees no custom lists.
+    expect(body.lists).toEqual([]);
     expect(JSON.stringify(body)).not.toContain('Secret');
     expect((await as(A, '/api/users/nobody')).status).toBe(404);
     expect(await json(await as(A, '/api/users/dan'))).toMatchObject({ relation: 'self' });

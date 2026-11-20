@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import {
   AVATAR_MAX_BYTES,
-  CATEGORY_CONFIG,
+  BUILTIN_CATEGORIES,
   COMPARE_ASK,
+  isBuiltinCategory,
   DEFAULT_USER_SETTINGS,
   NAV_SIDES,
   NOTIFY_KEYS,
@@ -39,7 +40,7 @@ export type SanitizeResult = { ok: true; settings: UserSettings } | { ok: false 
  * dropped too: only PUT /api/ratings/tiers/:list writes it, because a change re-fits scores (Q3).
  * `tabs`, `colors`, `notify` and `nav` merge per key; scalars replace. Does not mutate `current`.
  */
-export function sanitizeSettings(partial: unknown, current: UserSettings): SanitizeResult {
+export function sanitizeSettings(partial: unknown, current: UserSettings, customKeys: readonly string[] = []): SanitizeResult {
   if (!isPlainObject(partial)) return { ok: false };
   const next: UserSettings = { ...current, tabs: { ...current.tabs }, colors: { ...current.colors }, notify: { ...current.notify }, nav: { ...current.nav } };
 
@@ -61,7 +62,7 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
     const t = partial.tabs;
     if (!isPlainObject(t)) return { ok: false };
     for (const [k, v] of Object.entries(t)) {
-      if (!TAB_KEYS.includes(k)) continue;
+      if (!TAB_KEYS.includes(k) && !customKeys.includes(k)) continue;
       if (typeof v !== 'boolean') return { ok: false };
       next.tabs[k] = v;
     }
@@ -89,10 +90,11 @@ export function sanitizeSettings(partial: unknown, current: UserSettings): Sanit
   }
   if ('listOrder' in partial) {
     const o = partial.listOrder;
-    if (!Array.isArray(o) || o.length > Object.keys(CATEGORY_CONFIG).length) return { ok: false };
+    if (!Array.isArray(o) || o.length > BUILTIN_CATEGORIES.length + customKeys.length) return { ok: false };
     const seen = new Set<string>();
     for (const c of o) {
-      if (typeof c !== 'string' || !Object.hasOwn(CATEGORY_CONFIG, c) || seen.has(c)) return { ok: false };
+      // Your own custom lists may be placed too (a deleted one is refused, like any unknown key).
+      if (typeof c !== 'string' || !(isBuiltinCategory(c) || customKeys.includes(c)) || seen.has(c)) return { ok: false };
       seen.add(c);
     }
     next.listOrder = o as Category[];
@@ -135,8 +137,8 @@ export function cleanDisplayName(raw: unknown): string | null | undefined {
 
 /** The one shape every /api/me* response returns. */
 export function meBody(user: AppUser) {
-  const { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status } = user;
-  return { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status };
+  const { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists } = user;
+  return { id, email, username, isAdmin, settings, customized, avatarAt, createdAt, displayName, bio, status, customLists };
 }
 
 // 2 queries (≤ 21 when the lazy typed-number backfill finds sets to re-fit; Ruling N2). The
@@ -206,7 +208,7 @@ me.put('/settings', async (c) => {
   const body = await readJson(c.req.raw);
   if (!body) return c.json(invalid, 400);
   const user = c.var.user;
-  const result = sanitizeSettings(body.settings, user.settings);
+  const result = sanitizeSettings(body.settings, user.settings, user.customLists.map((l) => l.key));
   if (!result.ok) return c.json(invalid, 400);
   const delta = settingsDelta(body.settings as Record<string, unknown>, result.settings);
   // Colours are personal (no admin default), so they are not tracked.

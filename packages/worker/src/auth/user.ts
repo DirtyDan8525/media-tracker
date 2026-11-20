@@ -1,9 +1,10 @@
 import type { MiddlewareHandler } from 'hono';
 import {
-  CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, applyDefaults, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
-  type Category, type Customized, type NewPersonDefaults, type UserSettings,
+  DEFAULT_USER_SETTINGS, isCategoryKey, NOTIFY_KEYS, applyDefaults, legacyCustomized, parseCustomized, resolveDefaults, validateTierSet,
+  type Category, type CustomList, type Customized, type NewPersonDefaults, type UserSettings,
 } from '@media-tracker/shared';
 import type { Env } from '../env';
+import { customListsSql, parseLists } from '../lists/sql';
 import { clearedCookie, readSessionToken, ROLL_AFTER_MS, expiryFrom, sessionCookie, sha256Hex } from './session';
 
 export interface AppUser {
@@ -24,6 +25,8 @@ export interface AppUser {
   bio: string | null;
   /** A6: pending users may only set up their profile; removed users are signed out. */
   status: UserStatus;
+  /** Their custom lists (migration 0020), oldest first; read with the user row at no extra query. */
+  customLists: CustomList[];
 }
 
 export type UserStatus = 'pending' | 'active' | 'removed';
@@ -47,6 +50,8 @@ interface UserRow {
   status: UserStatus;
   /** The `defaults` app_settings value (JSON text), when the query selected it; undefined = no overlay. */
   app_defaults?: string | null;
+  /** CUSTOM_LISTS_SQL, when the query selected it. */
+  custom_lists_json?: string | null;
 }
 
 /** The users columns `toAppUser` reads (prefix each with an alias as needed). */
@@ -54,6 +59,9 @@ export const USER_COLS = 'id, email, username, settings_json, is_admin, avatar_a
 
 /** A select-list item: the admin `defaults` row's JSON, which toAppUser overlays under the person's own changes. */
 export const APP_DEFAULTS_SQL = "(SELECT value_json FROM app_settings WHERE key = 'defaults') AS app_defaults";
+
+/** A select-list item: the user's custom lists (JSON), for a `users` row aliased `u`. */
+export const CUSTOM_LISTS_SQL = customListsSql('u.id');
 
 const SETTINGS_KEYS = Object.keys(DEFAULT_USER_SETTINGS) as (keyof UserSettings)[];
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -75,7 +83,7 @@ export function loadSettings(json: string): UserSettings {
   const tiers: UserSettings['tiers'] = {};
   if (isPlainObject(known.tiers)) {
     for (const [k, v] of Object.entries(known.tiers)) {
-      const t = Object.hasOwn(CATEGORY_CONFIG, k) ? validateTierSet(v) : null;
+      const t = isCategoryKey(k) ? validateTierSet(v) : null;
       if (t !== null) tiers[k as Category] = t;
     }
   }
@@ -89,7 +97,7 @@ export function loadSettings(json: string): UserSettings {
   const coverViewer = typeof known.coverViewer === 'boolean' ? known.coverViewer : DEFAULT_USER_SETTINGS.coverViewer;
   const listOrder: Category[] = [];
   if (Array.isArray(known.listOrder)) {
-    for (const c of known.listOrder) if (typeof c === 'string' && Object.hasOwn(CATEGORY_CONFIG, c) && !listOrder.includes(c as Category)) listOrder.push(c as Category);
+    for (const c of known.listOrder) if (isCategoryKey(c) && !listOrder.includes(c)) listOrder.push(c as Category);
   }
   // merge over defaults so older rows missing a key still get one
   return { ...DEFAULT_USER_SETTINGS, ...(known as Partial<UserSettings>), tiers, notify, nav, coverViewer, listOrder };
@@ -134,13 +142,14 @@ export function toAppUser(row: UserRow, adminEmail: string | undefined, appDefau
     displayName: row.display_name ?? null,
     bio: row.bio ?? null,
     status: row.status,
+    customLists: parseLists(row.custom_lists_json),
     ...readSettings(row.settings_json, appDefaults ?? row.app_defaults),
   };
 }
 
 /** Dev only (DEV_EMAIL): the user with this email, created active on first use. 1 query, 3 on creation. */
 async function getOrCreateUser(env: Env, email: string): Promise<AppUser> {
-  const select = () => env.DB.prepare(`SELECT ${USER_COLS}, ${APP_DEFAULTS_SQL} FROM users WHERE email = ?`).bind(email).first<UserRow>();
+  const select = () => env.DB.prepare(`SELECT ${USER_COLS}, ${APP_DEFAULTS_SQL}, ${CUSTOM_LISTS_SQL} FROM users u WHERE email = ?`).bind(email).first<UserRow>();
 
   const existing = await select();
   if (existing) return toAppUser(existing, env.ADMIN_EMAIL);
@@ -161,7 +170,7 @@ async function getOrCreateUser(env: Env, email: string): Promise<AppUser> {
 /** A6: the only calls a pending user may make (plus /api/auth/*, which is mounted outside requireUser). */
 const PENDING_ALLOWED = new Set(['GET /api/me', 'PUT /api/me/username', 'PUT /api/me/display-name']);
 
-const SESSION_SQL = `SELECT ${USER_COLS.split(', ').map((k) => `u.${k}`).join(', ')}, ${APP_DEFAULTS_SQL}, s.expires_at AS s_expires_at, s.last_used_at AS s_last_used_at
+const SESSION_SQL = `SELECT ${USER_COLS.split(', ').map((k) => `u.${k}`).join(', ')}, ${APP_DEFAULTS_SQL}, ${CUSTOM_LISTS_SQL}, s.expires_at AS s_expires_at, s.last_used_at AS s_last_used_at
   FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`;
 
 /**

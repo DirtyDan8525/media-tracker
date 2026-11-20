@@ -1,12 +1,12 @@
-import { CATEGORY_CONFIG, PLAN_STATUS, STATUSES, statusLabel, type Category, type Status } from '@media-tracker/shared';
+import { PLAN_STATUS, STATUSES, type Category, type Status } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button } from '../../design/components/Button';
 import { Icon } from '../../design/components/Icon';
 import { Sheet } from '../../design/components/Sheet';
 import type { ListFilter } from '../../lists/filter';
 import { SORT_KEYS, SORT_LABEL, type SortKey } from '../../lists/sort';
-import { LIST_LABEL } from '../../nav';
 import '../../design/plan.css';
+import { listCfg, listLabel, statusText } from '../../lists/registry';
 
 export interface ListFiltersProps {
   category: Category;
@@ -22,8 +22,9 @@ export interface ListFiltersProps {
 }
 
 const placeholder = (category: Category): string => {
-  const who = CATEGORY_CONFIG[category].creatorLabel;
-  return who ? `Filter titles, ${who.toLowerCase()}s, genres…` : 'Filter titles, genres…';
+  const cfg = listCfg(category);
+  const parts = [cfg.custom ? 'names' : 'titles', cfg.creatorLabel ? `${cfg.creatorLabel.toLowerCase()}s` : '', cfg.showGenres ? 'genres' : ''].filter(Boolean);
+  return `Filter ${parts.join(', ')}…`;
 };
 
 const isTyping = (t: EventTarget | null): boolean => {
@@ -35,7 +36,7 @@ const isTyping = (t: EventTarget | null): boolean => {
 export function SearchBox({ category, filter, onChange, compact }: Pick<ListFiltersProps, 'category' | 'filter' | 'onChange'> & { compact?: boolean }) {
   const id = useId();
   const ref = useRef<HTMLInputElement>(null);
-  const list = LIST_LABEL[category];
+  const list = listLabel(category);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -67,7 +68,7 @@ export function SearchBox({ category, filter, onChange, compact }: Pick<ListFilt
 
 /** The chip row: Sort, then Status (lists with a Status column) and Genre (lists with genres). */
 export function FilterChips({ category, filter, onChange, genres, tags = [], sort, planned }: ListFiltersProps) {
-  const showStatus = CATEGORY_CONFIG[category].hasStatus && !planned;
+  const showStatus = listCfg(category).hasStatus && !planned;
   const showGenre = genres.length > 0 || filter.genre !== '';
   const genreList = filter.genre && !genres.some((g) => g.genre.toLowerCase() === filter.genre.toLowerCase())
     ? [{ genre: filter.genre, count: 0 }, ...genres] : genres;
@@ -81,7 +82,7 @@ export function FilterChips({ category, filter, onChange, genres, tags = [], sor
         <select aria-label="Status" className={`select-chip${filter.status ? ' is-on' : ''}`} value={filter.status}
           onChange={(e) => onChange({ status: e.target.value as Status | '' })}>
           <option value="">Status: All</option>
-          {STATUSES.map((s) => <option key={s} value={s}>Status: {statusLabel(s, category)}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s}>Status: {statusText(s, category)}</option>)}
         </select>
       )}
       {showGenre && (
@@ -103,7 +104,7 @@ export function FilterChips({ category, filter, onChange, genres, tags = [], sor
 }
 
 /** The list's own word for Plan to watch ("Plan to play" for games, "Plan to read" for books). */
-export const planLabel = (category: Category): string => statusLabel(PLAN_STATUS, category);
+export const planLabel = (category: Category): string => statusText(PLAN_STATUS, category);
 
 /** The Plan to watch switch: on shows only planned titles, in your own order. */
 export function PlanSwitch({ category, on, onChange }: { category: Category; on: boolean; onChange: (on: boolean) => void }) {
@@ -121,7 +122,7 @@ export type FilterKey = 'status' | 'genre' | 'tag';
 /** What the Filters button counts and the chips show: the status, the genre and the tag. */
 export function activeFilters(category: Category, filter: ListFilter, planned: boolean): { key: FilterKey; label: string }[] {
   const out: { key: FilterKey; label: string }[] = [];
-  if (filter.status && !planned) out.push({ key: 'status', label: statusLabel(filter.status, category) });
+  if (filter.status && !planned) out.push({ key: 'status', label: statusText(filter.status, category) });
   if (filter.genre) out.push({ key: 'genre', label: filter.genre });
   if (filter.tag) out.push({ key: 'tag', label: `Tag: ${filter.tag}` });
   return out;
@@ -167,7 +168,7 @@ export function FilterSheet({ category, filter, onChange, genres, tags = [], sor
   planned: boolean; shown: number; onClear: () => void; onClose: () => void;
 }) {
   const [all, setAll] = useState(false);
-  const showStatus = CATEGORY_CONFIG[category].hasStatus && !planned;
+  const showStatus = listCfg(category).hasStatus && !planned;
   const list = filter.genre && !genres.some((g) => g.genre.toLowerCase() === filter.genre.toLowerCase())
     ? [{ genre: filter.genre, count: 0 }, ...genres] : genres;
   const tagList = filter.tag && !tags.some((t) => t.tag.toLowerCase() === filter.tag.toLowerCase()) ? [{ tag: filter.tag, count: 0 }, ...tags] : tags;
@@ -189,7 +190,7 @@ export function FilterSheet({ category, filter, onChange, genres, tags = [], sor
               <Button variant="chip" active={filter.status === ''} onClick={() => onChange({ status: '' })}>All</Button>
               {STATUSES.filter((st) => st !== PLAN_STATUS || filter.status === st).map((st) => (
                 <Button key={st} variant="chip" active={filter.status === st} onClick={() => onChange({ status: filter.status === st ? '' : st })}>
-                  {statusLabel(st, category)}
+                  {statusText(st, category)}
                 </Button>
               ))}
             </div>

@@ -7,6 +7,7 @@ import { searchOnDevice } from '../lookup/device';
 import { lookupDetails } from '../lookup/details';
 import type { LookupQuery } from '../lookup/query';
 import { enabledLists } from '../nav';
+import { listCfg } from '../lists/registry';
 import { useSessionMe } from '../shell/SessionGate';
 import { createBackfillRunner, type BackfillRunner } from './backfill';
 
@@ -55,7 +56,8 @@ const BackfillContext = createContext<Ctx | null>(null);
 export function BackfillProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const me = useSessionMe();
-  const categories = useMemo(() => enabledLists(me.settings), [me.settings]);
+  // Only lists that look titles up (a custom list typed in by hand has nothing to fill).
+  const categories = useMemo(() => enabledLists(me.settings, undefined, me.customLists).filter((c) => listCfg(c).lookup !== null), [me.settings, me.customLists]);
   const catsRef = useRef(categories);
   catsRef.current = categories;
   const [p, setP] = useState({ running: false, done: 0, total: 0 });

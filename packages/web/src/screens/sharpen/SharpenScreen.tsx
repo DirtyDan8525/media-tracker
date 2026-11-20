@@ -1,4 +1,4 @@
-import { seasonSetOf, type ListsSetting, type RatingSet, type SetItem } from '@media-tracker/shared';
+import { seasonSetOf, type Category, type CustomList, type ListsSetting, type RatingSet, type SetItem } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -10,23 +10,24 @@ import { Icon } from '../../design/components/Icon';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
 import { useIsWide } from '../../hooks';
-import { enabledLists, LIST_LABEL, seasonsEnabled } from '../../nav';
+import { enabledLists, seasonsEnabled } from '../../nav';
 import { PageHeader } from '../../shell/PageHeader';
 import { useSessionMe } from '../../shell/SessionGate';
 import { addNudged, NudgedList, PICK_FAILED, type Nudged } from './CloseCallSheet';
 import { ClosePair, type CloseAnswer } from './ClosePair';
 import '../../design/settings.css';
+import { listLabel } from '../../lists/registry';
 
 export const SHARPEN_PATH = '/sharpen';
 
 const SEASON_LABEL: Partial<Record<RatingSet, string>> = { anime_seasons: 'Anime Seasons', tv_seasons: 'TV Seasons' };
-const setLabel = (s: RatingSet): string => SEASON_LABEL[s] ?? LIST_LABEL[s as keyof typeof LIST_LABEL];
+const setLabel = (s: RatingSet): string => SEASON_LABEL[s] ?? listLabel(s as Category);
 const countLine = (n: number | undefined): string =>
   n === undefined ? '' : n === 0 ? '0 — all clear' : n === 1 ? '1 close call' : `${n} close calls`;
 
-/** The enabled lists, each followed by its season tab when that tab is on. */
-function setsOf(settings: Parameters<typeof enabledLists>[0], lists: ListsSetting): RatingSet[] {
-  return enabledLists(settings, lists).flatMap((c) => {
+/** The enabled lists (your custom lists too: each is its own rating set), each followed by its season tab when that tab is on. */
+function setsOf(settings: Parameters<typeof enabledLists>[0], lists: ListsSetting, custom: readonly CustomList[]): RatingSet[] {
+  return enabledLists(settings, lists, custom).flatMap((c) => {
     const s = seasonSetOf(c);
     return s !== null && seasonsEnabled(settings, c) ? [c, s] : [c];
   });
@@ -40,7 +41,7 @@ export function SharpenScreen() {
   const [params, setParams] = useSearchParams();
   const me = useSessionMe();
   const { lists } = useAppSettings();
-  const sets = setsOf(me.settings, lists);
+  const sets = setsOf(me.settings, lists, me.customLists);
   const chosen = params.get('list') as RatingSet | null;
   if (chosen !== null && sets.includes(chosen)) {
     return <SharpenSession key={chosen} set={chosen} onDone={() => setParams({}, { replace: false })} />;

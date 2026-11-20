@@ -3,12 +3,14 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerE
 import { Link, NavLink } from 'react-router';
 import type { Me } from '../../api/types';
 import { useAppName } from '../../data/appSettings';
-import { LIST_LABEL, SEARCH_PATH } from '../../nav';
+import { SEARCH_PATH } from '../../nav';
+import { ListIcon } from '../../lists/ListIcon';
 import { ListsOrderSheet } from '../../shell/ListsOrderSheet';
 import { clampNavWidth, defaultNavWidth, NAV_MAX_W, NAV_MIN_W, NAV_NUDGE_PX } from '../../shell/navWidth';
 import { Avatar } from './Avatar';
 import { countText } from './BottomTabs';
 import { Icon, type IconName } from './Icon';
+import { listLabel, listName, useListRegistry } from '../../lists/registry';
 
 /** One nav row: icon, label and (when there is something new) a count pill. Collapsed (the icon rail): the label is the link's name and tooltip, the pill stays on the icon. */
 function Row({ to, icon, children, count = 0, countLabel, collapsed = false }: { to: string; icon: IconName; children: string; count?: number; countLabel?: string; collapsed?: boolean }) {
@@ -61,6 +63,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
   onWidthReset?: () => void;
 }) {
   const appName = useAppName();
+  useListRegistry(); // a renamed list shows at once
   const friendsBadge = friendsCount + (showMessages ? messagesCount : 0);
   const rowProps = { collapsed };
   const toggleLabel = collapsed ? 'Expand side bar' : 'Collapse side bar';
@@ -116,8 +119,8 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
           {collapsed ? (
             <div role="group" aria-label="Lists" className="side-nav__rail-lists">
               {lists.map((c) => (
-                <NavLink key={c} to={`/list/${c}`} className="side-nav__link side-nav__link--rail" aria-label={LIST_LABEL[c]} title={LIST_LABEL[c]}>
-                  <span className="side-nav__rail-icon"><Icon name={c} size={20} /></span>
+                <NavLink key={c} to={`/list/${c}`} className="side-nav__link side-nav__link--rail" aria-label={listLabel(c)} title={listLabel(c)}>
+                  <span className="side-nav__rail-icon"><ListIcon c={c} size={20} /></span>
                 </NavLink>
               ))}
             </div>
@@ -126,7 +129,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
               <div className="side-nav__label" id="side-nav-lists">Lists</div>
               {lists.map((c) => (
                 <NavLink key={c} to={`/list/${c}`} className="side-nav__list">
-                  <span>{LIST_LABEL[c]}</span>
+                  <span>{listName(c)}</span>
                   {counts[c] !== undefined && <span className="side-nav__count">{counts[c]}</span>}
                 </NavLink>
               ))}

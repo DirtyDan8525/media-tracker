@@ -9,13 +9,13 @@ import { RatingBadge } from '../design/components/RatingBadge';
 import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet } from '../design/ThemeContext';
 import { useIsWide } from '../hooks';
-import { LIST_LABEL } from '../nav';
 import { useEnabledLists } from '../shell/useLists';
 import { computeStats, ratingDistribution, type ListStats } from '../ratings/stats';
 import { TIERS_TOP_FIRST } from '../design/components/TierPicker';
 import { PageHeader } from '../shell/PageHeader';
 import { useSessionMe } from '../shell/SessionGate';
 import '../design/ratings.css';
+import { listLabel } from '../lists/registry';
 
 const DASH = '—';
 const MAX_GENRES = 10;
@@ -138,14 +138,14 @@ export function StatsScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
+                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={listLabel(l.category as Category)} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
                   <StatsRow name="All media" s={all} index={stats.lists.length} total />
                 </tbody>
               </table>
             </div>
           ) : (
             <ul className="stats__cards" aria-label="Stats by list">
-              {stats.lists.map((l, i) => <ListCard key={l.category} name={LIST_LABEL[l.category as Category]} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
+              {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category as Category)} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
             </ul>
           )}
         </section>

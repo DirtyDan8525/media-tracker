@@ -1,6 +1,4 @@
-import {
-  CATEGORY_CONFIG, ORIGIN_LABEL, PLAN_STATUS, PROGRESS_CATEGORIES, PROGRESS_MAX, clampProgress, showsProgress, STATUSES, formatRating, sourceUrl, statusLabel, type Entry, type LookupInfo, type Status,
-} from '@media-tracker/shared';
+import { PLAN_STATUS, PROGRESS_MAX, clampProgress, showsProgress, STATUSES, formatRating, sourceUrl, type Entry, type LookupInfo, type Status } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -26,7 +24,7 @@ import { useToast } from '../design/components/Toast';
 import { parseRating } from '../lists/validate';
 import { buildLookupQuery, isHttpUrl } from '../lookup/query';
 import { refetchEntry } from '../lookup/refetch';
-import { LIST_LABEL, seasonsEnabled } from '../nav';
+import { seasonsEnabled } from '../nav';
 import { BackButton } from '../shell/BackButton';
 import { recFromEntry } from '../data/messages';
 import { ShareButton } from './messages/ShareButton';
@@ -43,6 +41,7 @@ import { OpenInSpotify } from './entry/OpenInSpotify';
 import { WatchOnYouTube } from './entry/WatchOnYouTube';
 import { PlayPreview } from './entry/PlayPreview';
 import { PlayTrailer } from './entry/PlayTrailer';
+import { listCfg, listLabel, statusText } from '../lists/registry';
 
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;
 
@@ -92,7 +91,9 @@ function DetailBody({ entry }: { entry: Entry }) {
   const toast = useToast();
   const navigate = useNavigate();
   const me = useSessionMe();
-  const cfg = CATEGORY_CONFIG[entry.category];
+  const cfg = listCfg(entry.category);
+  /** A custom list with no search: nothing to look up, re-fetch or fill from a source. */
+  const typeIn = cfg.lookup === null;
   const uid = useId();
   const statusId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -118,16 +119,20 @@ function DetailBody({ entry }: { entry: Entry }) {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory pc /><ShareButton rec={recFromEntry(entry)} /></div>
+      <div className="detail-top"><BackButton to={`/list/${entry.category}`} useHistory pc />{!cfg.custom && <ShareButton rec={recFromEntry(entry)} />}</div>
       <div className="screen__body detail">
         <div className="detail__top">
-          <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />
+          {(!typeIn || entry.coverUrl) && <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero rise-in" />}
           <div className="detail__facts">
             <h1 className="detail__title">{entry.title}</h1>
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
-            {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
+            {entry.origin && <span className="detail__fact">{`${listCfg(entry.category).originLabel}: ${entry.origin}`}</span>}
             <div className="detail__actions">
+              {cfg.showLink && entry.link && (
+                <a className="btn btn--secondary btn--compact" href={entry.link} target="_blank" rel="noopener noreferrer"
+                  aria-label={`Open the link for ${entry.title} (opens in a new tab)`}>Open link ↗</a>
+              )}
               <WatchOnYouTube entry={entry} />
               <OpenInSpotify entry={entry} />
               <PlayPreview entry={entry} />
@@ -173,20 +178,20 @@ function DetailBody({ entry }: { entry: Entry }) {
                 onChange={(e) => save({ status: (e.target.value || null) as Status | null })}
               >
                 <option value="">No status</option>
-                {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s, entry.category)}</option>)}
+                {STATUSES.map((s) => <option key={s} value={s}>{statusText(s, entry.category)}</option>)}
               </select>
             </div>
           )}
         </div>
 
-        {showsProgress(entry) && (
+        {showsProgress(entry, cfg.hasProgress) && (
           <div className="tile tile--progress" role="group" aria-label="Progress">
             <span className="field-label">Progress</span>
             <ProgressControl entry={entry} />
           </div>
         )}
 
-        <TagsRow entry={entry} />
+        {cfg.showTags && <TagsRow entry={entry} />}
 
         {entry.detailsState === 'needs_review' && <PickMatch entry={entry} />}
 
@@ -230,14 +235,19 @@ function DetailBody({ entry }: { entry: Entry }) {
               check={(v) => (v.trim() === '' ? 'A title is required.' : null)} onSave={(title) => save({ title })} />
             {cfg.creatorLabel && <DetailField label={cfg.creatorLabel} value={entry.creator} maxLength={300} onSave={(creator) => save({ creator })} />}
             {entry.category === 'songs' && <DetailField label="Album" value={entry.album} maxLength={300} onSave={(album) => save({ album })} />}
-            <DetailField label="Genres" value={entry.genres} maxLength={300} onSave={(genres) => save({ genres })} />
+            {cfg.showLink && (
+              <DetailField label="Link" value={entry.link ?? ''} maxLength={2000} placeholder="https://"
+                check={(v) => (v === '' || isHttpUrl(v.trim()) ? null : 'Enter a link that starts with http:// or https://')}
+                onSave={(link) => save({ link: link.trim() })} />
+            )}
+            {cfg.showGenres && <DetailField label="Genres" value={entry.genres} maxLength={300} onSave={(genres) => save({ genres })} />}
             <DetailField label="Cover image link" value={entry.coverUrl} maxLength={2000} placeholder="https://"
               check={(v) => (v === '' || isHttpUrl(v.trim()) ? null : 'Enter a link that starts with http:// or https://')}
               onSave={(coverUrl) => save({ coverUrl: coverUrl.trim() })} />
-            <DetailField label="Release date" value={entry.releaseDate} placeholder="YYYY or YYYY-MM-DD"
-              check={(v) => (v === '' || DATE_RE.test(v) ? null : 'Use YYYY or YYYY-MM-DD.')} onSave={(releaseDate) => save({ releaseDate })} />
-            {PROGRESS_CATEGORIES.includes(entry.category) && (
-              <DetailField label={entry.category === 'manga' ? 'Total chapters' : 'Total episodes'} type="number" placeholder="Unknown"
+            {(!cfg.custom || cfg.showYear) && <DetailField label={cfg.custom ? 'Year' : 'Release date'} value={entry.releaseDate} placeholder="YYYY or YYYY-MM-DD"
+              check={(v) => (v === '' || DATE_RE.test(v) ? null : 'Use YYYY or YYYY-MM-DD.')} onSave={(releaseDate) => save({ releaseDate })} />}
+            {cfg.hasProgress && (
+              <DetailField label={entry.category === 'manga' ? 'Total chapters' : cfg.custom ? 'Total' : 'Total episodes'} type="number" placeholder="Unknown"
                 value={entry.progressTotal == null ? '' : String(entry.progressTotal)}
                 check={(v) => (v === '' || (/^\d+$/.test(v) && Number(v) <= PROGRESS_MAX) ? null : `Enter a whole number up to ${PROGRESS_MAX}, or leave it empty.`)}
                 onSave={(v) => {
@@ -247,13 +257,15 @@ function DetailBody({ entry }: { entry: Entry }) {
                   save({ progressTotal, ...(progress !== undefined ? { progress } : {}) });
                 }} />
             )}
-            <DetailField label="Length" value={entry.lengthLabel} maxLength={300} onSave={(lengthLabel) => save({ lengthLabel })} />
-            <DetailField label={ORIGIN_LABEL[entry.category]} value={entry.origin} maxLength={300} onSave={(origin) => save({ origin })} />
+            {!typeIn && <DetailField label="Length" value={entry.lengthLabel} maxLength={300} onSave={(lengthLabel) => save({ lengthLabel })} />}
+            {!typeIn && <DetailField label={cfg.originLabel} value={entry.origin} maxLength={300} onSave={(origin) => save({ origin })} />}
             <DetailField label="Synopsis" multiline value={entry.synopsis} maxLength={5000} onSave={(synopsis) => save({ synopsis })} />
           </div>
-          <div className="detail__actions">
-            <Button onClick={() => setSheet('refetch')}>Re-fetch</Button>
-          </div>
+          {!typeIn && (
+            <div className="detail__actions">
+              <Button onClick={() => setSheet('refetch')}>Re-fetch</Button>
+            </div>
+          )}
         </details>
 
         <MoreStats entry={entry} />
@@ -369,7 +381,7 @@ function RefetchSheet({ entry, onClose }: { entry: Entry; onClose: () => void })
   );
 }
 
-const cfg = (e: Entry) => (CATEGORY_CONFIG[e.category].creatorLabel ?? 'creator').toLowerCase();
+const cfg = (e: Entry) => (listCfg(e.category).creatorLabel ?? 'creator').toLowerCase();
 
 function DeleteSheet({ entry, onClose, onDeleted }: { entry: Entry; onClose: () => void; onDeleted: () => void }) {
   const toast = useToast();
@@ -396,7 +408,7 @@ function DeleteSheet({ entry, onClose, onDeleted }: { entry: Entry; onClose: () 
         </div>
       }>
       <p>
-        "{entry.title}" will be removed from your {LIST_LABEL[entry.category]} list{CATEGORY_CONFIG[entry.category].hasSeasons ? ', along with its seasons' : ''}. This can't be undone.
+        "{entry.title}" will be removed from your {listLabel(entry.category)} list{listCfg(entry.category).hasSeasons ? ', along with its seasons' : ''}. This can't be undone.
       </p>
     </Sheet>
   );

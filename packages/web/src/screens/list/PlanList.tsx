@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, type Entry } from '@media-tracker/shared';
+import { type Entry } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link } from 'react-router';
 import { effectiveLookupState } from '../../data/entryCache';
@@ -9,6 +9,7 @@ import { LookupNote } from './LookupNote';
 import { PrivateLock } from './PrivateLock';
 import type { RowActions } from './EntryCards';
 import '../../design/plan.css';
+import { listCfg } from '../../lists/registry';
 
 export interface PlanListProps extends RowActions {
   /** The rows to show, in plan order. */
@@ -170,7 +171,7 @@ interface RowProps extends RowActions {
 }
 
 function PlanRow({ entry: e, position, count, reorderable, dragging, style, hintId, onDown, onMove, onUp, onCancel, onKey, onStep, ...actions }: RowProps) {
-  const cfg = CATEGORY_CONFIG[e.category];
+  const cfg = listCfg(e.category);
   const state = effectiveLookupState(e);
   const meta = [e.creator, e.genres].filter(Boolean).join(' · ');
   const cls = ['plan-row', position === 1 && 'plan-row--first', dragging && 'is-dragging'].filter(Boolean).join(' ');

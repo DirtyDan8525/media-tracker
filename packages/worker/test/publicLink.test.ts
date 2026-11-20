@@ -110,7 +110,7 @@ describe('GET /api/public/:token (no sign-in)', () => {
     expect(body.user).toMatchObject({ username: 'ren', displayName: null, avatarAt: null });
     expect(body.bio).toBe('I like anime');
     expect(body.counts).toEqual({ titles: 3, rated: 3 });
-    expect(Object.keys(body).sort()).toEqual(['bio', 'counts', 'memberSince', 'user']);
+    expect(Object.keys(body).sort()).toEqual(['bio', 'counts', 'lists', 'memberSince', 'user']);
     expect(Object.keys(body.user).sort()).toEqual(['avatarAt', 'displayName', 'id', 'username']);
   });
 

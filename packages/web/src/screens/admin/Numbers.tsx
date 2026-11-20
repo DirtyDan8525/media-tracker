@@ -1,8 +1,8 @@
-import { LIST_LABEL } from '../../nav';
 import { useAdminNumbers } from '../../data/adminApp';
 import { EmptyState } from '../../design/components/EmptyState';
 import { Skeleton } from '../../design/components/Skeleton';
 import { PlainPage } from './parts';
+import { listLabel } from '../../lists/registry';
 
 /** /admin/numbers (AD9): who is using the app, and what is rated most. Non-private entries only. */
 export function NumbersScreen() {
@@ -30,7 +30,7 @@ export function NumbersScreen() {
                     {q.data.mostRated.map((r, i) => (
                       <li key={`${r.category}:${r.title}`}>
                         <span className="admin-rank__n">{i + 1}</span>
-                        <span className="admin-rank__title">{r.title} <span className="muted">· {LIST_LABEL[r.category]}</span></span>
+                        <span className="admin-rank__title">{r.title} <span className="muted">· {listLabel(r.category)}</span></span>
                         <span className="admin-rank__count" aria-label={`rated by ${r.count} ${r.count === 1 ? 'person' : 'people'}`}>{r.count}×</span>
                       </li>
                     ))}

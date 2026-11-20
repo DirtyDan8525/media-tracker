@@ -22,7 +22,7 @@ export function UsernameSetup() {
           submitLabel="Continue"
           onSaved={() => {
             const me = qc.getQueryData<Me>(ME_KEY);
-            navigate(afterSetupPath() ?? (me ? homePath(me.settings) : '/'), { replace: true });
+            navigate(afterSetupPath() ?? (me ? homePath(me.settings, undefined, me.customLists) : '/'), { replace: true });
           }}
         />
       </div>

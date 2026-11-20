@@ -32,7 +32,7 @@ export function useBackdropCover(otherUsernames: string[] = [], enabled = true):
   if (!enabled) return null;
   const settled = !mine.isPending && (member === null || !theirs.isPending);
   if (!chosen.current && settled) {
-    const pool = [...topCovers(Object.values(mine.data).flat()), ...topCovers(theirs.data ?? [])].filter((s, i, all) => all.indexOf(s) === i);
+    const pool = [...topCovers(Object.values(mine.data).flat().filter((e): e is NonNullable<typeof e> => e !== undefined)), ...topCovers(theirs.data ?? [])].filter((s, i, all) => all.indexOf(s) === i);
     if (pool.length > 0) chosen.current = { src: pool[Math.floor(Math.random() * pool.length)]! };
   }
   return chosen.current?.src ?? null;

@@ -7,7 +7,9 @@ import { getDeviceDefaults } from '../../data/deviceDefaults';
 /* ---------- Column widths ---------- */
 
 export type ColId = 'cover' | 'rating' | 'title' | 'status' | 'progress' | 'genres' | 'creator' | 'avg' | 'notes'
-  | 'tags' | 'started' | 'finished' | 'rewatches' | 'airing';
+  | 'tags' | 'started' | 'finished' | 'rewatches' | 'airing'
+  /** Custom lists' Year and Link columns. */
+  | 'year' | 'link';
 
 /**
  * Default column widths in px: each is as narrow as its content allows (Progress holds "− [ 999 ] / [ 999 ] +": two 44 px buttons,
@@ -15,7 +17,7 @@ export type ColId = 'cover' | 'rating' | 'title' | 'status' | 'progress' | 'genr
  * in proportion, so Notes grows with the window but never takes it over. Keep in step with lists.css.
  */
 export const COL_WIDTHS: Record<ColId, number> = { cover: 64, rating: 80, title: 200, status: 140, progress: 260, genres: 150, creator: 140, avg: 96, notes: 220,
-  tags: 180, started: 120, finished: 120, rewatches: 100, airing: 140 };
+  tags: 180, started: 120, finished: 120, rewatches: 100, airing: 140, year: 80, link: 120 };
 /** No column is dragged narrower than this. */
 export const MIN_COL_WIDTH = 48;
 export const NUDGE_PX = 16;

@@ -1,18 +1,19 @@
-import { CATEGORY_CONFIG, PROGRESS_MAX, REWATCHES_MAX, STATUSES, type Category, type Entry, type Tier } from '@media-tracker/shared';
+import { BUILTIN_CATEGORIES, PROGRESS_MAX, REWATCHES_MAX, STATUSES, isLinkUrl, listConfig, type Category, type CustomList, type Entry, type Tier } from '@media-tracker/shared';
 
 const SOURCES = ['anilist', 'kitsu', 'tmdb', 'wiki', 'tvmaze', 'deezer', 'itunes', 'spotify', 'openlibrary', 'steam', 'igdb', 'youtube'];
 const LOOKUP_STATES = ['ok', 'not_found', 'pending'];
 const DETAILS_STATES = ['none', 'filled', 'needs_review'];
 const DATE_RE = /^(\d{4}|\d{4}-\d{2}-\d{2})$/;
 
-export const CATEGORIES = Object.keys(CATEGORY_CONFIG) as Category[];
+/** The built-in lists (custom lists are checked against their owner's: lists/sql.ts isListOf). */
+export const CATEGORIES: Category[] = [...BUILTIN_CATEGORIES];
 
 export type EntryFields = Partial<
   Pick<
     Entry,
     | 'title' | 'typedTitle' | 'status' | 'rating' | 'genres' | 'creator' | 'album' | 'coverUrl' | 'notes'
     | 'releaseDate' | 'synopsis' | 'lengthLabel' | 'origin' | 'detailsState' | 'isPrivate' | 'notesPrivate'
-    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked' | 'progressTotal' | 'startedAt' | 'finishedAt' | 'rewatches'
+    | 'source' | 'sourceId' | 'lookupState' | 'scoreLocked' | 'progressTotal' | 'startedAt' | 'finishedAt' | 'rewatches' | 'link'
   >
 > & { tier?: Tier; progress?: number };
 
@@ -83,14 +84,15 @@ const FIELD_CHECKS: Record<string, (v: unknown) => boolean> = {
   startedAt: (v) => isValidDay(v),
   finishedAt: (v) => isValidDay(v),
   rewatches: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= REWATCHES_MAX,
+  link: isLinkUrl,
 };
 
 /**
  * Validates a create/patch body. Unknown keys (and server-owned ones such as
  * id, userId, category, importId, createdAt) are dropped. Any bad value fails.
- * `category` is the entry's category (from the body on create, the row on patch).
+ * `category` is the entry's category (from the body on create, the row on patch); `lists` the owner's custom lists.
  */
-export function validateEntryInput(input: unknown, mode: 'create' | 'patch', category: Category): EntryValidation {
+export function validateEntryInput(input: unknown, mode: 'create' | 'patch', category: Category, lists: readonly CustomList[] = []): EntryValidation {
   if (!isPlainObject(input)) return { ok: false };
   const out: Record<string, unknown> = {};
 
@@ -107,7 +109,7 @@ export function validateEntryInput(input: unknown, mode: 'create' | 'patch', cat
   if ('status' in input) {
     const s = input.status;
     if (s !== null && !(typeof s === 'string' && (STATUSES as readonly string[]).includes(s))) return { ok: false };
-    if (s !== null && !CATEGORY_CONFIG[category].hasStatus) return { ok: false };
+    if (s !== null && !listConfig(category, lists).hasStatus) return { ok: false };
     out.status = s;
   }
   // Both sent together: the count may not pass the total. (A patch sending one is checked against the stored other.)

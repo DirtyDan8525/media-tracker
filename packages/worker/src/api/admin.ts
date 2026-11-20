@@ -275,9 +275,9 @@ admin.get('/numbers', async (c) => {
     db.prepare(
       `SELECT MIN(trim(e.title)) AS title, e.category, COUNT(DISTINCT e.user_id) AS n, ROUND(AVG(e.rating), 2) AS average
          FROM entries e JOIN users u ON u.id = e.user_id AND u.status = 'active'
-        WHERE e.is_private = 0 AND e.rating IS NOT NULL
+        WHERE e.is_private = 0 AND e.rating IS NOT NULL AND substr(e.category, 1, 2) <> 'c_'
         GROUP BY lower(trim(e.title)), e.category
-        ORDER BY n DESC, average DESC, title LIMIT 10`,
+        ORDER BY n DESC, average DESC, title LIMIT 10`, // built-in lists only: a custom list is one person's own
     ),
   ]);
   const n = (r: D1Result) => (r.results[0] as { n: number }).n;

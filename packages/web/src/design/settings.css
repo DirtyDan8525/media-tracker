@@ -102,3 +102,29 @@
 .tier-editor__actions { display: flex; gap: var(--space-5); }
 .tier-editor__actions .btn { flex: 1; }
 .settings-inline-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* ---------- Custom lists (Phase 7): Settings → Tabs rows, "+ New list", More's note, New / Edit list ---------- */
+/* A custom list's switch takes a whole row of the grid so Edit and Delete fit beside it. */
+.switch-row-wrap { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.switch-row-wrap .switch-row { flex: 1; min-width: 0; }
+.switch-row-wrap .switch-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch-row__actions { display: flex; gap: var(--space-2); flex: none; }
+.tabs-new-list { margin-top: var(--space-5); }
+.new-list-btn { display: inline-flex; align-items: center; gap: var(--space-3); text-decoration: none; }
+.new-list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.new-list--row { align-items: stretch; }
+.new-list--row .new-list__limit { padding: 0 var(--space-7) var(--space-5); }
+button.group__row:disabled { opacity: .6; cursor: not-allowed; }
+.more-lists__note { margin-top: var(--space-4); padding: 0 var(--space-2); }
+.list-editor { max-width: 640px; }
+.list-editor fieldset.group { border: 0; padding: 0; margin: 0; min-width: 0; }
+.list-editor legend.group__title { padding: 0; }
+.list-editor__check { display: inline-flex; align-items: center; gap: var(--space-4); min-height: var(--tap); cursor: pointer; font-size: var(--fs-body); }
+.list-editor__check input { width: 20px; height: 20px; margin: 0; accent-color: var(--highlight); flex: none; }
+.list-editor__checks { display: flex; flex-wrap: wrap; column-gap: var(--space-8); }
+.list-editor__second { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-6); row-gap: var(--space-3); }
+.list-editor__second-name { display: inline-flex; align-items: center; gap: var(--space-4); flex: 1 1 12em; }
+.list-editor__second-name .input { flex: 1; min-width: 0; }
+.list-editor__icon { max-width: 6em; font-size: 1.25em; }
+.list-editor__actions { display: flex; flex-wrap: wrap; gap: var(--space-5); }
+.delete-list__footer { display: flex; justify-content: flex-end; gap: var(--space-5); }

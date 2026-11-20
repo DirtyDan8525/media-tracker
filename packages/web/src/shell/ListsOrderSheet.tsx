@@ -5,8 +5,9 @@ import { useSaveSettings, SETTINGS_SAVE_ERROR } from '../data/useMe';
 import { Button } from '../design/components/Button';
 import { Icon } from '../design/components/Icon';
 import { Sheet } from '../design/components/Sheet';
-import { LIST_LABEL, orderedLists } from '../nav';
+import { orderedLists } from '../nav';
 import { useSessionMe } from './SessionGate';
+import { listLabel, listName } from '../lists/registry';
 
 /** Moves the item at `from` to `to` (a new array). */
 function move<T>(items: readonly T[], from: number, to: number): T[] {
@@ -32,7 +33,7 @@ function Editor() {
   const me = useSessionMe();
   const { lists: adminLists } = useAppSettings();
   const save = useSaveSettings({ errorToast: SETTINGS_SAVE_ERROR });
-  const [order, setOrder] = useState<Category[]>(() => orderedLists(me.settings, adminLists));
+  const [order, setOrder] = useState<Category[]>(() => orderedLists(me.settings, adminLists, me.customLists));
   const [live, setLive] = useState('');
   const [dragging, setDragging] = useState<Category | null>(null);
   const rows = useRef(new Map<Category, HTMLLIElement>());
@@ -60,7 +61,7 @@ function Editor() {
     const next = move(order, from, to);
     setOrder(next);
     commit(next);
-    setLive(`${LIST_LABEL[c]} moved to position ${to + 1} of ${order.length}`);
+    setLive(`${listLabel(c)} moved to position ${to + 1} of ${order.length}`);
     focusAfter.current = { c, part };
   }
 
@@ -91,7 +92,7 @@ function Editor() {
   }
   function onUp() {
     if (!dragging) return;
-    setLive(`${LIST_LABEL[dragging]} dropped at position ${latest.current.indexOf(dragging) + 1} of ${latest.current.length}`);
+    setLive(`${listLabel(dragging)} dropped at position ${latest.current.indexOf(dragging) + 1} of ${latest.current.length}`);
     setDragging(null);
     commit(latest.current);
   }
@@ -105,17 +106,17 @@ function Editor() {
           return (
             <li key={c} ref={(el) => { if (el) rows.current.set(c, el); else rows.current.delete(c); }}
               className={`lists-order__row${dragging === c ? ' is-dragging' : ''}${isOn ? '' : ' is-off'}`}>
-              <button type="button" className="lists-order__handle" aria-label={`Drag ${LIST_LABEL[c]} to reorder. Position ${i + 1} of ${order.length}. Arrow keys move it.`}
+              <button type="button" className="lists-order__handle" aria-label={`Drag ${listLabel(c)} to reorder. Position ${i + 1} of ${order.length}. Arrow keys move it.`}
                 onPointerDown={(e) => onDown(e, c)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onKeyDown={(e) => onHandleKey(e, c)}>
                 <Icon name="lists" size={20} />
               </button>
-              <span className="lists-order__name">{LIST_LABEL[c]}</span>
-              <button type="button" className="lists-order__move" data-move="up" aria-label={`Move ${LIST_LABEL[c]} up`} disabled={i === 0}
+              <span className="lists-order__name">{listName(c)}</span>
+              <button type="button" className="lists-order__move" data-move="up" aria-label={`Move ${listLabel(c)} up`} disabled={i === 0}
                 onClick={() => moveTo(c, i - 1, 'up')}><span className="lists-order__arrow lists-order__arrow--up"><Icon name="chevron" size={18} /></span></button>
-              <button type="button" className="lists-order__move" data-move="down" aria-label={`Move ${LIST_LABEL[c]} down`} disabled={i === order.length - 1}
+              <button type="button" className="lists-order__move" data-move="down" aria-label={`Move ${listLabel(c)} down`} disabled={i === order.length - 1}
                 onClick={() => moveTo(c, i + 1, 'down')}><span className="lists-order__arrow lists-order__arrow--down"><Icon name="chevron" size={18} /></span></button>
               <label className="switch-row">
-                <input type="checkbox" role="switch" checked={isOn} aria-label={`Show ${LIST_LABEL[c]}`} disabled={isOn && shown <= 1}
+                <input type="checkbox" role="switch" checked={isOn} aria-label={`Show ${listLabel(c)}`} disabled={isOn && shown <= 1}
                   onChange={(e) => save.mutate({ tabs: { [c]: e.target.checked } })} />
               </label>
             </li>

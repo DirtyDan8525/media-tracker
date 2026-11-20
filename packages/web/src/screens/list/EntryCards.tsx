@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, type Entry } from '@media-tracker/shared';
+import type { Entry } from '@media-tracker/shared';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { effectiveLookupState } from '../../data/entryCache';
@@ -8,6 +8,7 @@ import { Skeleton } from '../../design/components/Skeleton';
 import { StatusPill } from '../../design/components/StatusPill';
 import { LookupNote } from './LookupNote';
 import { PrivateLock } from './PrivateLock';
+import { listCfg } from '../../lists/registry';
 
 export interface RowActions {
   onRetry: (e: Entry) => void;
@@ -27,9 +28,14 @@ export function EntryCards({ rows, label, ...actions }: { rows: Entry[]; label: 
 export const stagger = (i: number) => ({ '--i': Math.min(i, 10) }) as CSSProperties;
 
 function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: number } & RowActions) {
-  const square = CATEGORY_CONFIG[e.category].square;
+  const cfg = listCfg(e.category);
+  const square = cfg.square;
   const state = effectiveLookupState(e);
-  const meta = [e.creator, e.genres].filter(Boolean).join(' · ');
+  // A custom list shows what it was made with: its second line, and Year / Genres when those columns are on.
+  const meta = [cfg.creatorLabel || !cfg.custom ? e.creator : '', cfg.custom && cfg.showYear ? e.releaseDate.slice(0, 4) : '', cfg.showGenres ? e.genres : '']
+    .filter(Boolean).join(' · ');
+  // A typed-in custom list has no covers: the card is text only.
+  const cover = !cfg.custom || cfg.lookup !== null;
 
   if (state === 'pending') {
     return (
@@ -45,7 +51,7 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
   if (state === 'not_found') {
     return (
       <li className="entry-card rise-in" style={stagger(index)}>
-        <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />
+        {cover && <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />}
         <div className="entry-card__text">
           <Link className="entry-card__title" data-role="title" to={`/entry/${e.id}`}>{e.title}{e.isPrivate && <PrivateLock />}</Link>
           <LookupNote entry={e} {...actions} />
@@ -57,11 +63,11 @@ function EntryCard({ entry: e, index, ...actions }: { entry: Entry; index: numbe
   return (
     <li className="entry-card entry-card--ok rise-in" style={stagger(index)}>
       <Link className="entry-card__link" to={`/entry/${e.id}`}>
-        <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />
+        {cover && <CoverImage src={e.coverUrl} alt={`${e.title} cover`} square={square} />}
         <div className="entry-card__text">
           <span className="entry-card__title" data-role="title">{e.title}{e.isPrivate && <PrivateLock />}</span>
           {meta && <span className="entry-card__meta">{meta}</span>}
-          {e.status && <StatusPill status={e.status} category={e.category} />}
+          {cfg.hasStatus && e.status && <StatusPill status={e.status} category={e.category} />}
         </div>
         <RatingBadge rating={e.rating} className="settle" />
       </Link>

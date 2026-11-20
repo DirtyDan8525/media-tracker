@@ -14,6 +14,7 @@ const SWITCHES: Record<FeatureKey, { label: string; desc: string; off?: string }
   walkthrough: { label: 'Walkthrough', desc: 'First-run tour for new people' },
   installBanner: { label: 'Install banner', desc: '"Add to Home screen" prompt' },
   everyoneNotes: { label: 'Everyone feed shows notes to non-friends', desc: 'Off: only friends see the note on a post. Private notes stay hidden either way.' },
+  customLists: { label: 'Custom lists', desc: 'Off: no one can make a new list. Lists people already have keep working.' },
 };
 
 /** /admin/switches (AD2): one switch per feature, saved the moment it is flipped. */

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { CATEGORY_CONFIG, type FriendEntry, type PublicUser, type Relation } from '@media-tracker/shared';
+import { isCategoryKey, type FriendEntry, type PublicUser, type Relation } from '@media-tracker/shared';
+import { customListsSql, parseLists } from '../lists/sql';
 import type { AppEnv } from '../auth/user';
 import { pushFriendAccepted, pushFriendRequest } from '../push/events';
 import { ctxOf } from '../push/send';
@@ -37,9 +38,9 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 const userByUsername = (db: D1Database, username: string) =>
   db
-    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at, bio FROM users WHERE username = ? AND status = 'active'`)
+    .prepare(`SELECT ${PUBLIC_USER_COLS}, created_at, bio, ${customListsSql('users.id')} FROM users WHERE username = ? AND status = 'active'`)
     .bind(username.toLowerCase())
-    .first<PublicUserRow & { created_at: string | null; bio: string | null }>();
+    .first<PublicUserRow & { created_at: string | null; bio: string | null; custom_lists_json: string | null }>();
 
 // Pending -> accepted when the other side already asked; a fresh pending row otherwise. Never downgrades.
 const REQUEST_SQL = `INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES (?1, ?2, 'pending', ?3, ?4)
@@ -70,7 +71,7 @@ friends.get('/', async (c) => {
 // 1 query (+ sign-in): friend ids ride inside the entries statement. Rated, visible entries of every accepted friend.
 friends.get('/entries', async (c) => {
   const category = c.req.query('category');
-  if (category !== undefined && !Object.hasOwn(CATEGORY_CONFIG, category)) return c.json(invalid, 400);
+  if (category !== undefined && !isCategoryKey(category)) return c.json(invalid, 400);
   const me = c.var.user.id;
   const stmt = c.env.DB.prepare(
     // visibleEntrySql without its "your own" branch (excluded here anyway), so your own titles are never read.
@@ -196,10 +197,12 @@ users.get('/:username', async (c) => {
   const relation: Relation = await relationOf(c.env.DB, c.var.user.id, u.id);
   // The bio is for friends (and yourself): a stranger sees the header only.
   const bio = relation === 'self' || relation === 'friend' ? u.bio ?? null : null;
-  return c.json({ user: publicUser(u), memberSince: u.created_at ?? null, bio, relation });
+  // Their custom lists go where their titles go (Dan, 2026-11-19 Q2: same rules as built-in lists): friends and yourself.
+  const lists = relation === 'self' || relation === 'friend' ? parseLists(u.custom_lists_json) : [];
+  return c.json({ user: publicUser(u), memberSince: u.created_at ?? null, bio, relation, lists });
 });
 
-type Resolved = { user: PublicUserRow; rel: Relation };
+type Resolved = { user: PublicUserRow & { custom_lists_json?: string | null }; rel: Relation };
 async function resolve(c: { env: AppEnv['Bindings']; var: AppEnv['Variables'] }, username: string): Promise<Resolved | null> {
   const user = await userByUsername(c.env.DB, username);
   if (!user) return null;
@@ -209,7 +212,7 @@ async function resolve(c: { env: AppEnv['Bindings']; var: AppEnv['Variables'] },
 // 3 queries (user, relation, entries; 2 for yourself) (+ sign-in). Plan said 2: the 403 needs the relation, so it is one more.
 users.get('/:username/entries', async (c) => {
   const category = c.req.query('category');
-  if (category !== undefined && !Object.hasOwn(CATEGORY_CONFIG, category)) return c.json(invalid, 400);
+  if (category !== undefined && !isCategoryKey(category)) return c.json(invalid, 400);
   const r = await resolve(c, c.req.param('username'));
   if (!r) return c.json(notFound, 404);
   if (r.rel !== 'self' && r.rel !== 'friend') return c.json({ error: 'not_friends' }, 403);
@@ -234,6 +237,8 @@ users.get('/:username/entries/:id', async (c) => {
     .bind(row.id)
     .all<{ id: string; label: string; rating: number | null; notes: string }>();
   const seasons = results.map((s) => ({ id: s.id, label: s.label, rating: s.rating, notes: row.notes_private === 1 ? null : s.notes }));
-  return c.json({ entry, seasons });
+  // A custom list's name, words and columns, so the page reads like the owner's (null on built-in lists).
+  const list = parseLists(r.user.custom_lists_json).find((l) => l.key === entry.category) ?? null;
+  return c.json({ entry, seasons, list });
 });
 

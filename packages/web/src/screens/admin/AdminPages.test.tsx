@@ -88,7 +88,7 @@ describe('Switches (AD2)', () => {
     renderApp('/admin/switches');
     await screen.findByRole('switch', { name: 'Sign-ups open' });
     expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-labelledby') && document.getElementById(s.getAttribute('aria-labelledby')!)!.textContent))
-      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner', 'Everyone feed shows notes to non-friends']);
+      .toEqual(['Sign-ups open', 'Friends', 'Activity feed', 'Comments', 'Reactions', 'Messages', 'Close-call questions', 'Walkthrough', 'Install banner', 'Everyone feed shows notes to non-friends', 'Custom lists']);
   });
 
   it('the notes switch is on by default, off saves everyoneNotes: false, and it is in the admin switch list', async () => {

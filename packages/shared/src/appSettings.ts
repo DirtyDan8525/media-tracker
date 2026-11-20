@@ -4,16 +4,17 @@
  * and reads stored values with `resolveAppSettings`, which falls back to the default for any
  * key that is unset or no longer valid.
  */
-import { CATEGORY_CONFIG, COMPARE_ASK, DEFAULT_USER_SETTINGS, NAV_SIDES, NOTIFY_KEYS, SEARCH_SCOPE, type Category, type NotifyKey } from './types';
+import { BUILTIN_CATEGORIES, COMPARE_ASK, DEFAULT_USER_SETTINGS, NAV_SIDES, NOTIFY_KEYS, SEARCH_SCOPE, isBuiltinCategory, type BuiltinCategory, type NotifyKey } from './types';
 import { THEMES } from './theme';
 
 export const APP_SETTING_KEYS = ['features', 'announcement', 'whatsNew', 'comingSoon', 'about', 'brand', 'defaults', 'lists'] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
-const ALL_CATEGORIES = Object.keys(CATEGORY_CONFIG) as Category[];
+/** Admin settings cover the built-in lists only: custom lists are personal. */
+const ALL_CATEGORIES: BuiltinCategory[] = [...BUILTIN_CATEGORIES];
 
 /** AD2: every switch is on by default. */
-export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner', 'everyoneNotes'] as const;
+export const FEATURE_KEYS = ['signups', 'friends', 'feed', 'comments', 'reactions', 'messages', 'closeCalls', 'walkthrough', 'installBanner', 'everyoneNotes', 'customLists'] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export type Features = Record<FeatureKey, boolean>;
 
@@ -60,11 +61,11 @@ export interface DeviceDefaults {
  */
 export interface NewPersonDefaults {
   /** Which lists are on (Settings -> Tabs). */
-  lists: Category[];
+  lists: BuiltinCategory[];
   animeSeasons: boolean;
   tvSeasons: boolean;
   /** Everyone's own list order; empty = the admin's order (the `lists` setting). */
-  listOrder: Category[];
+  listOrder: BuiltinCategory[];
   theme: string;
   /** Rating: "Ask me to compare close ratings" (a COMPARE_ASK value). */
   compareAsk: string;
@@ -82,13 +83,13 @@ export interface NewPersonDefaults {
 export const TEXT_SIZE_STEPS = [85, 100, 115, 125, 140] as const;
 export const NAV_WIDTH_RANGE = { min: 200, max: 360 } as const;
 /** Column ids a starting width may name (the web table's ColId; a web test keeps the two in step). */
-export const COLUMN_IDS = ['cover', 'rating', 'title', 'status', 'progress', 'genres', 'creator', 'avg', 'notes', 'tags', 'started', 'finished', 'rewatches', 'airing'] as const;
+export const COLUMN_IDS = ['cover', 'rating', 'title', 'status', 'progress', 'genres', 'creator', 'avg', 'notes', 'tags', 'started', 'finished', 'rewatches', 'airing', 'year', 'link'] as const;
 export const COLUMN_WIDTH_RANGE = { min: 48, max: 600 } as const;
 
 export interface ListsSetting {
   /** Every list once, in display order. */
-  order: Category[];
-  hidden: Category[];
+  order: BuiltinCategory[];
+  hidden: BuiltinCategory[];
 }
 
 export interface AppSettings {
@@ -152,10 +153,10 @@ const hasOnly = (o: Record<string, unknown>, keys: readonly string[]) => Object.
 const isStr = (v: unknown, max: number, min = 0): v is string => typeof v === 'string' && v.length >= min && v.length <= max;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const isDate = (v: unknown): v is string => typeof v === 'string' && DATE_RE.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v);
-const isCategory = (v: unknown): v is Category => typeof v === 'string' && Object.hasOwn(CATEGORY_CONFIG, v);
+const isCategory = isBuiltinCategory;
 /** A list of unique categories (each exactly once). */
-const categoryList = (v: unknown): Category[] | null =>
-  Array.isArray(v) && v.every(isCategory) && new Set(v).size === v.length ? (v as Category[]) : null;
+const categoryList = (v: unknown): BuiltinCategory[] | null =>
+  Array.isArray(v) && v.every(isCategory) && new Set(v).size === v.length ? (v as BuiltinCategory[]) : null;
 const isHttpUrl = (v: string) => {
   try {
     const u = new URL(v);
@@ -357,7 +358,7 @@ export function publicAppSettings(s: AppSettings, now: Date = new Date()): Publi
 }
 
 /** AD6: the per-person settings a new account starts with: the chosen lists on, the rest off, and the default theme. */
-export function tabsFor(lists: readonly Category[], base: Record<string, boolean>): Record<string, boolean> {
+export function tabsFor(lists: readonly BuiltinCategory[], base: Record<string, boolean>): Record<string, boolean> {
   const tabs = { ...base };
   for (const c of ALL_CATEGORIES) tabs[c] = lists.includes(c);
   return tabs;

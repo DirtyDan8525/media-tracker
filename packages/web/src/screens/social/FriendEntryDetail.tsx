@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, ORIGIN_LABEL, formatRating, sourceUrl, statusLabel, type FriendEntry } from '@media-tracker/shared';
+import { formatRating, sourceUrl, type FriendEntry } from '@media-tracker/shared';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../../api/client';
@@ -20,6 +20,7 @@ import '../../design/tags.css';
 import { OpenInSpotify } from '../entry/OpenInSpotify';
 import { PlayPreview } from '../entry/PlayPreview';
 import { PlayTrailer } from '../entry/PlayTrailer';
+import { listCfg, listLabel, listName, statusText } from '../../lists/registry';
 
 /** A friend's title (route /u/:username/entry/:id, S10): read-only, with their notes unless private, and Add to mine. */
 export function FriendEntryDetail() {
@@ -54,7 +55,7 @@ export function FriendEntryDetail() {
 function Body({ username, entry, seasons }: {
   username: string; entry: FriendEntry; seasons: { id: string; label: string; rating: number | null; notes: string | null }[];
 }) {
-  const cfg = CATEGORY_CONFIG[entry.category];
+  const cfg = listCfg(entry.category);
   const navigate = useNavigate();
   const toast = useToast();
   const addToMine = useAddToMine();
@@ -80,22 +81,27 @@ function Body({ username, entry, seasons }: {
   return (
     <div className="screen has-backdrop">
       <CoverBackdrop src={entry.coverUrl} className="backdrop--top" />
-      <div className="detail-top"><BackButton to={`/u/${username}?tab=lists&c=${entry.category}`} useHistory pc /><ShareButton rec={recFromEntry({ ...entry, rating: null })} /></div>
+      <div className="detail-top"><BackButton to={`/u/${username}?tab=lists&c=${entry.category}`} useHistory pc />{!cfg.custom && <ShareButton rec={recFromEntry({ ...entry, rating: null })} />}</div>
       <div className="screen__body detail">
         <div className="detail__top">
-          <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero" />
+          {(!cfg.custom || cfg.lookup !== null || entry.coverUrl) && <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero" />}
           <div className="detail__facts">
             <h1 className="detail__title">{entry.title}</h1>
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
-            {entry.origin && <span className="detail__fact">{`${ORIGIN_LABEL[entry.category]}: ${entry.origin}`}</span>}
+            {entry.origin && <span className="detail__fact">{`${listCfg(entry.category).originLabel}: ${entry.origin}`}</span>}
             {entry.category === 'youtube' && sourceUrl(entry.source, entry.sourceId) && (
               // Dan, 2026-11-17: a video links straight to YouTube.
               <a className="btn btn--primary detail__watch" href={sourceUrl(entry.source, entry.sourceId)!} target="_blank" rel="noopener noreferrer">
                 Watch on YouTube
               </a>
             )}
+            {cfg.custom && <span className="detail__fact">{listName(entry.category)}</span>}
             <div className="detail__actions">
+              {cfg.showLink && entry.link && (
+                <a className="btn btn--secondary btn--compact" href={entry.link} target="_blank" rel="noopener noreferrer"
+                  aria-label={`Open the link for ${entry.title} (opens in a new tab)`}>Open link ↗</a>
+              )}
               <OpenInSpotify entry={entry} />
               <PlayPreview entry={entry} />
               <PlayTrailer entry={entry} />
@@ -152,6 +158,10 @@ function Body({ username, entry, seasons }: {
 
           <EntrySocial entryId={entry.id} ownerId={entry.userId} title={entry.title} />
 
+          {cfg.custom ? (
+            // A custom list is its owner's own: there is no list of yours to copy it to.
+            <p className="hint friend-detail__actions">This is on their own list, {listLabel(entry.category)}. Custom lists can't be copied.</p>
+          ) : (
           <div className="friend-detail__actions">
             {dup ? (
               <p className="friend-note" role="status">
@@ -162,10 +172,11 @@ function Body({ username, entry, seasons }: {
             )}
             {!dup && (
               <span className="hint">
-                Adds it to your list{cfg.hasStatus ? ` as "${statusLabel('Plan to watch', entry.category)}"` : ''}, without their rating.
+                Adds it to your list{cfg.hasStatus ? ` as "${statusText('Plan to watch', entry.category)}"` : ''}, without their rating.
               </span>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

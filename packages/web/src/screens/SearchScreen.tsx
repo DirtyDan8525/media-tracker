@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, SEARCH_SCOPE, type Category, type Entry } from '@media-tracker/shared';
+import { SEARCH_SCOPE, type Category, type Entry } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -13,7 +13,6 @@ import { RatingBadge } from '../design/components/RatingBadge';
 import { SkeletonRow } from '../design/components/Skeleton';
 import { searchEntries } from '../lists/search';
 import { useUrlText } from '../lists/useUrlText';
-import { LIST_LABEL } from '../nav';
 import { useEnabledLists } from '../shell/useLists';
 import { useCurrentList } from '../shell/currentList';
 import { backState } from '../shell/BackButton';
@@ -23,6 +22,7 @@ import '../design/search.css';
 import { searchable, useUserSearch } from '../data/social';
 import { PeopleList } from './social/PeopleList';
 import { useDebounced } from './social/parts';
+import { listCfg, listLabel } from '../lists/registry';
 
 /** Results per list before "Show N more". */
 const GROUP_LIMIT = 50;
@@ -79,7 +79,7 @@ export function SearchScreen() {
       <EmptyState
         icon="search" title={`No matches for “${q}”.`}
         body={scope === 'current'
-          ? `Nothing in ${current ? LIST_LABEL[current] : 'this list'} matches. Your other lists might.`
+          ? `Nothing in ${current ? listLabel(current) : 'this list'} matches. Your other lists might.`
           : 'Check the spelling, or try fewer words.'}
         actionLabel={scope === 'current' ? 'Search all lists' : undefined}
         onAction={scope === 'current' ? () => setScope('all') : undefined}
@@ -98,7 +98,7 @@ export function SearchScreen() {
           const id = `search-${category}`;
           return (
             <section key={category} aria-labelledby={id} className="search-group">
-              <h2 id={id} className="search-group__title">{`${LIST_LABEL[category]} · ${rows.length}`}</h2>
+              <h2 id={id} className="search-group__title">{`${listLabel(category)} · ${rows.length}`}</h2>
               <ul className="stack-10 plain-list">
                 {shown.map((e) => <ResultRow key={e.id} entry={e} />)}
               </ul>
@@ -134,7 +134,7 @@ export function SearchScreen() {
           </div>
           {current && (
             <SegRadio label="Search in" value={scope}
-              options={[{ value: 'all', label: 'All lists' }, { value: 'current', label: LIST_LABEL[current] }]}
+              options={[{ value: 'all', label: 'All lists' }, { value: 'current', label: listLabel(current) }]}
               onChange={setScope} />
           )}
         </div>
@@ -154,7 +154,7 @@ export function SearchScreen() {
 }
 
 function ResultRow({ entry: e }: { entry: Entry }) {
-  const square = CATEGORY_CONFIG[e.category].square;
+  const square = listCfg(e.category).square;
   const meta = [e.creator, e.genres].filter(Boolean).join(' · ');
   return (
     <li className="entry-card entry-card--ok">

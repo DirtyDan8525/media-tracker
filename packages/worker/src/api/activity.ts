@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import {
   ACTIVITY_MERGE_MS, FEED_SCOPES, isReaction,
-  type ActivityItem, type ActivityPage, type ActivityType, type Category, type Entry, type FeedScope, type PostSocial, type PublicUser, type Reaction,
+  type ActivityItem, type ActivityPage, type ActivityType, type Category, type CustomList, type Entry, type FeedScope, type PostSocial, type PublicUser, type Reaction,
 } from '@media-tracker/shared';
 import type { AppEnv } from '../auth/user';
+import { entryListSql, parseList } from '../lists/sql';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, feedVisibleSql, publicUser, visibleEntrySql, type PublicUserRow } from '../social/visibility';
 
 export const activity = new Hono<AppEnv>();
@@ -123,6 +124,8 @@ export function activityForSeason(
 interface Row {
   id: string; post_id: string | null; user_id: string; type: ActivityType; entry_id: string; payload_json: string;
   created_at: string; category: Category; title: string; cover_url: string; creator: string; source: Entry['source']; source_id: string | null; release_date: string; note: string | null;
+  /** entryListSql: the custom list a title sits on (JSON), when it is on one. */
+  list_json?: string | null;
 }
 
 function parsePayload(json: string): ActivityItem['payload'] {
@@ -197,6 +200,7 @@ activity.get('/', async (c) => {
     // Every row of these posts; the visibility rule again, so nothing slips through between reads.
     db.prepare(
       `SELECT a.id, a.post_id, a.user_id, a.type, a.entry_id, a.payload_json, a.created_at, e.category, e.title, e.cover_url, e.creator, e.source, e.source_id, e.release_date,
+              ${entryListSql('e')},
               -- The note rides along only for its owner or an accepted friend, and never when the owner made notes private.
               -- A non-private note goes to friends, and to everyone while the admin switch
               -- "Everyone feed shows notes to non-friends" (features.everyoneNotes, default on) is on.
@@ -264,6 +268,13 @@ activity.get('/', async (c) => {
     social,
     next,
   };
+  // The custom lists these posts' titles sit on (name, words), so a post reads "Restaurants" rather than a key.
+  const lists: Record<string, CustomList> = {};
+  for (const r of rowsRes!.results as Row[]) {
+    const l = parseList(r.list_json);
+    if (l) lists[l.key] = l;
+  }
+  if (Object.keys(lists).length > 0) body.lists = lists;
   return c.json(body);
 });
 

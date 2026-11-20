@@ -1,4 +1,4 @@
-import type { Category } from './types';
+import { isCustomCategory, type Category } from './types';
 
 /** Lowercase, drop apostrophes and punctuation, collapse spaces, ignore a leading "the/a/an". */
 export function normTitle(s: string): string {
@@ -108,8 +108,9 @@ export function findDuplicate(
 ): string | null {
   const key = normTitle(cand.title);
   if (!key) return null;
-  const byCreator = category !== 'anime' && category !== 'tv';
   const who = normTitle(cand.creator);
+  // A custom list compares its second line only when one was typed (many have none).
+  const byCreator = isCustomCategory(category) ? who !== '' : category !== 'anime' && category !== 'tv';
   if (byCreator && !who) return null;
   const hit = rows.find(
     (r) => r.id !== cand.id && normTitle(r.title) === key && (!byCreator || normTitle(r.creator) === who),

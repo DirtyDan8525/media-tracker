@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
-import type { Category } from '@media-tracker/shared';
+import type { BuiltinCategory } from '@media-tracker/shared';
 
-export type IconName = Category | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
+export type IconName = BuiltinCategory | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
   | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */

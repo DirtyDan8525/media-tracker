@@ -1,5 +1,4 @@
 import type { Entry } from '@media-tracker/shared';
-import { CATEGORY_CONFIG } from '@media-tracker/shared';
 import { useMemo, useState } from 'react';
 import { useAllEntries } from '../../data/useEntries';
 import { recFromEntry } from '../../data/messages';
@@ -7,15 +6,16 @@ import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { Sheet } from '../../design/components/Sheet';
 import { MESSAGE_MAX } from '@media-tracker/shared';
-import { LIST_LABEL } from '../../nav';
-import { useEnabledLists } from '../../shell/useLists';
+import { useEnabledBuiltinLists } from '../../shell/useLists';
 import { useSessionMe } from '../../shell/SessionGate';
 import type { RecSnapshot } from '@media-tracker/shared';
+import { listCfg, listLabel } from '../../lists/registry';
 
 /** The Recommend picker (the composer's Recommend button): one search over ALL your lists, an optional note, and tapping a title sends it. */
 export function RecommendPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (rec: RecSnapshot, note: string) => void }) {
   const me = useSessionMe();
-  const lists = useEnabledLists();
+  // Built-in lists only: a recommendation is a title a friend can add to the same list (custom lists are each person's own).
+  const lists = useEnabledBuiltinLists();
   const [q, setQ] = useState('');
   const [note, setNote] = useState('');
   const { data } = useAllEntries(lists);
@@ -38,12 +38,12 @@ export function RecommendPicker({ open, onClose, onPick }: { open: boolean; onCl
           <ul className="plain-list people" aria-label="Your titles">
             {rows.map((e) => (
               <li key={e.id}>
-                <button type="button" className="person person--button" aria-label={`${e.title}, ${LIST_LABEL[e.category]}${e.rating !== null ? `, rated ${e.rating}` : ''}`}
+                <button type="button" className="person person--button" aria-label={`${e.title}, ${listLabel(e.category)}${e.rating !== null ? `, rated ${e.rating}` : ''}`}
                   onClick={() => { onPick(recFromEntry(e), note.trim()); setNote(''); setQ(''); }}>
-                  <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={CATEGORY_CONFIG[e.category].square} width={40} /></span>
+                  <span aria-hidden="true"><CoverImage src={e.coverUrl} alt="" square={listCfg(e.category).square} width={40} /></span>
                   <span className="person__meta">
                     <span className="person__name">{e.title}</span>
-                    <span className="person__sub">{LIST_LABEL[e.category]} · you</span>
+                    <span className="person__sub">{listLabel(e.category)} · you</span>
                   </span>
                   <RatingBadge rating={e.rating} size="sm" />
                 </button>

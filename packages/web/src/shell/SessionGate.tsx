@@ -88,7 +88,7 @@ export function SessionGate() {
   }
   if (me.status === 'pending') return <WaitingScreen username={me.username} />;
   if (me.username === null && pathname !== SETUP_PATH) return <ToSetup from={pathname + search} />;
-  if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={afterSetupPath() ?? homePath(me.settings)} replace />;
+  if (me.username !== null && pathname === SETUP_PATH) return <Navigate to={afterSetupPath() ?? homePath(me.settings, undefined, me.customLists)} replace />;
 
   return (
     <ThemeColorsContext.Provider value={themeColors(settings!)}>

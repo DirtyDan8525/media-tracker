@@ -2,8 +2,8 @@ import { nameOf, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
-import { LIST_LABEL } from '../../nav';
 import type { Category } from '@media-tracker/shared';
+import { listName } from '../../lists/registry';
 
 /** The value after it has stopped changing for `ms`. */
 export function useDebounced<T>(value: T, ms = 250): T {
@@ -40,7 +40,7 @@ export function CategoryChips({ categories, value, onChange, label = 'Category' 
   return (
     <div role="group" aria-label={label} className="chip-row">
       {categories.map((c) => (
-        <Button key={c} variant="chip" active={c === value} onClick={() => onChange(c)}>{LIST_LABEL[c]}</Button>
+        <Button key={c} variant="chip" active={c === value} onClick={() => onChange(c)}>{listName(c)}</Button>
       ))}
     </div>
   );

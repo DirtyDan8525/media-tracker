@@ -4,7 +4,7 @@ import type { Category } from '@media-tracker/shared';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
 import type { ConfirmDuplicate } from '../../hooks/useAddEntry';
-import { LIST_LABEL } from '../../nav';
+import { listLabel } from '../../lists/registry';
 
 /** "Already on your list" (Dan, 2026-11-16): Add again / Open it / Cancel. Returns the ask and its sheet. */
 export function useDuplicateConfirm(): { confirm: ConfirmDuplicate; element: ReactNode } {
@@ -27,7 +27,7 @@ export function useDuplicateConfirm(): { confirm: ConfirmDuplicate; element: Rea
           <Button variant="ghost" className="btn--block" onClick={() => done(false)}>Cancel</Button>
         </div>
       )}>
-      <p>{`“${ask.title}” is already on your ${LIST_LABEL[ask.category]} list. Add it a second time?`}</p>
+      <p>{`“${ask.title}” is already on your ${listLabel(ask.category)} list. Add it a second time?`}</p>
     </Sheet>
   );
   return { confirm, element };

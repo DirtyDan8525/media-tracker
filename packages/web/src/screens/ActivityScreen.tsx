@@ -1,6 +1,4 @@
-import {
-  CATEGORY_CONFIG, formatRating, nameOf, statusLabel, foldPosts, type ActivityLine, type Features, type PostSocial, type PublicUser, type Reaction, type Status,
-} from '@media-tracker/shared';
+import { formatRating, nameOf, foldPosts, type ActivityLine, type Features, type PostSocial, type PublicUser, type Reaction, type Status } from '@media-tracker/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAppSettings } from '../data/appSettings';
@@ -17,7 +15,6 @@ import { Icon } from '../design/components/Icon';
 import { TextSizeControl } from '../design/components/TextSizeControl';
 import { useActivityTextSize } from '../design/components/useTextSize';
 import { useIsWide, useNow } from '../hooks';
-import { LIST_LABEL } from '../nav';
 import { useCurrentList } from '../shell/currentList';
 import { useAddFriend } from '../shell/AddFriendHost';
 import { backState } from '../shell/BackButton';
@@ -32,6 +29,7 @@ import { dayLabel, matchesSearch, timeAgo, type ActivityFilter } from './activit
 import '../design/activity.css';
 import '../design/feed.css';
 import '../design/list-menu.css';
+import { listCfg, listLabel, statusText } from '../lists/registry';
 
 const ALL_FILTERS: readonly { value: ActivityFilter; label: string }[] = [
   { value: 'everyone', label: 'Everyone' },
@@ -165,7 +163,7 @@ export function ActivityScreen() {
   } else if (lines.length === 0 && !hasNextPage) {
     body = (
       <EmptyState icon="activity" title="Nothing here yet" body="Add or rate something and it shows up here."
-        actionLabel={current ? `Open ${LIST_LABEL[current]}` : undefined}
+        actionLabel={current ? `Open ${listLabel(current)}` : undefined}
         actionHref={current ? `/list/${current}` : undefined} />
     );
   } else {
@@ -361,12 +359,12 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
   // Songs and albums: the artist follows the title ("Blinding Lights · The Weeknd"); other lists get a muted line of their own.
   const music = line.category === 'songs' || line.category === 'albums';
   const by = music && line.creator ? <span className="activity-line__by"> · {line.creator}</span> : null;
-  const status = line.status ? statusLabel(line.status.to as Status, line.category) : null;
+  const status = line.status ? statusText(line.status.to as Status, line.category) : null;
   let sentence: ReactNode;
   if (line.added) {
     sentence = (
       <>
-        {name} added {title}{by} to {LIST_LABEL[line.category]}
+        {name} added {title}{by} to {listLabel(line.category)}
         {line.rating && ` · rated ${formatRating(line.rating.to)}`}
         {status && ` · marked ${status}`}
       </>
@@ -395,7 +393,7 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
         {children}
       </div>
       <span aria-hidden="true" className="activity-line__cover">
-        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={CATEGORY_CONFIG[line.category].square} width={48} />
+        <CoverImage src={line.coverUrl} alt={`${line.title} cover`} square={listCfg(line.category).square} width={48} />
       </span>
     </div>
   );

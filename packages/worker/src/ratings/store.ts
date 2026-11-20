@@ -1,5 +1,5 @@
 import {
-  CATEGORY_CONFIG,
+  listConfig,
   listOfSet,
   numberFirst,
   priorFromScore,
@@ -151,7 +151,7 @@ export async function loadSets(
   const comps = (res[sets.length]!.results as ComparisonRow[]);
   return sets.map((set, k) => {
     const season = isSeasonSet(set);
-    const square = CATEGORY_CONFIG[listOfSet(set)].square;
+    const square = listConfig(listOfSet(set)).square;
     const setTiers = typeof tiers === 'function' ? tiers(set) : tiers;
     const stored = new Map<string, StoredFields>();
     const items = (res[k]!.results as ItemRow[]).map((r): LoadedItem => {

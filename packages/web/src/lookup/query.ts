@@ -1,4 +1,5 @@
-import { CATEGORY_CONFIG, normTitle, similarity, type Category, type Entry, type LookupInfo } from '@media-tracker/shared';
+import { normTitle, similarity, type Category, type Entry, type LookupInfo } from '@media-tracker/shared';
+import { listCfg } from '../lists/registry';
 
 /** The body of POST /api/lookup. */
 export interface LookupQuery {
@@ -18,13 +19,15 @@ const clip = (s: string, max: number): string => (s.length > max ? s.slice(0, ma
  * helps the search (albums, songs, books) it joins the term and is sent as the hint too.
  */
 export function buildLookupQuery(category: Category, title: string, creator: string): LookupQuery {
-  const hint = CATEGORY_CONFIG[category].creatorIsSearchHint;
+  const cfg = listCfg(category);
+  const hint = cfg.creatorIsSearchHint;
   const t = clip(title, MAX_TERM);
   // The title stays whole; the creator hint is what gets cut to fit under the Worker's limit.
   const room = MAX_TERM - t.length - 1;
   const withCreator = hint && creator && room > 0 ? `${t} ${clip(creator, room)}` : t;
   return {
-    category,
+    // A custom list searches the built-in list it chose (Movies, Books…); one with no search never gets here.
+    category: cfg.lookup ?? category,
     term: withCreator,
     typedTitle: t,
     hint: hint ? clip(creator, MAX_TERM) : '',
@@ -75,7 +78,7 @@ export function buildInfoPatch(
   if (shouldReplaceTitle(typed, info)) patch.title = clip(info.title, 300);
   if (info.cover && isHttpUrl(info.cover)) patch.coverUrl = info.cover;
   if (info.genres) patch.genres = clip(info.genres, 300);
-  const keepTypedCreator = mode === 'add' && entry.creator && !CATEGORY_CONFIG[entry.category].creatorIsSearchHint;
+  const keepTypedCreator = mode === 'add' && entry.creator && !listCfg(entry.category).creatorIsSearchHint;
   if (info.creator && !keepTypedCreator) patch.creator = clip(info.creator, 300);
   if (info.album) patch.album = clip(info.album, 300);
   patch.source = info.source;

@@ -7,9 +7,11 @@ import { resetAuthState } from '../api/auth';
 import { localDb } from '../db/local';
 import { reloadDeviceLook, TEXT_SCALE_KEY, THEME_KEY } from '../design/deviceLook';
 import { setViewportWidth } from './viewport';
+import { resetListRegistry } from '../lists/registry';
 
 beforeEach(async () => {
   setViewportWidth(390);
+  resetListRegistry();
   sessionStorage.clear();
   localStorage.removeItem(THEME_KEY);
   localStorage.removeItem(TEXT_SCALE_KEY);

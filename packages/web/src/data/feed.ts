@@ -3,6 +3,7 @@ import {
 } from '@media-tracker/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../api/client';
+import { registerLists } from '../lists/registry';
 import { useToast } from '../design/components/Toast';
 
 export const ACTIVITY_KEY = ['activity'] as const;
@@ -22,12 +23,16 @@ export function useFeed(scope: FeedScope) {
     queryKey: [...ACTIVITY_KEY, scope],
     staleTime: 0,
     initialPageParam: null as Cursor | null,
-    queryFn: ({ pageParam }) =>
-      api.get<ActivityPage>(
+    queryFn: async ({ pageParam }) => {
+      const page = await api.get<ActivityPage>(
         pageParam
           ? `/api/activity?show=${scope}&before=${encodeURIComponent(pageParam.before)}&beforeId=${encodeURIComponent(pageParam.beforeId)}`
           : `/api/activity?show=${scope}`,
-      ),
+      );
+      // Custom lists these posts sit on (names, words), before the posts render.
+      registerLists(page.lists);
+      return page;
+    },
     getNextPageParam: (last) => last.next,
   });
 }

@@ -1,8 +1,9 @@
-import { statusLabel, type AniListMatch, type Entry } from '@media-tracker/shared';
+import { type AniListMatch, type Entry } from '@media-tracker/shared';
 import { useId, useState } from 'react';
 import { Button } from '../design/components/Button';
 import { Sheet } from '../design/components/Sheet';
 import type { ConflictChoice } from '../import/aniListUpdate';
+import { statusText } from '../lists/registry';
 
 export type EntryMatch = AniListMatch<Entry>;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).trimEnd()}…` : s);
@@ -22,7 +23,7 @@ function Side({ heading, rows }: { heading: string; rows: [string, string][] }) 
 
 function Card({ m, id, value, onChange }: { m: EntryMatch; id: string; value: ConflictChoice; onChange: (c: ConflictChoice) => void }) {
   const { existing: e, row: r } = m;
-  const status = (s: Entry['status']) => (s ? statusLabel(s, e.category) : '—');
+  const status = (s: Entry['status']) => (s ? statusText(s, e.category) : '—');
   const dates = [r.startedAt && `started ${r.startedAt}`, r.finishedAt && `finished ${r.finishedAt}`].filter(Boolean).join(', ');
   const name = `${id}-choice`;
   const opt = (v: ConflictChoice, label: string) => (

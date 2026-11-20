@@ -1,6 +1,20 @@
 import type { Tier, TierSet } from './ratings/types';
 
-export type Category = 'anime' | 'movies' | 'tv' | 'albums' | 'songs' | 'games' | 'books' | 'manga' | 'youtube';
+/** The nine lists every account has. */
+export const BUILTIN_CATEGORIES = ['anime', 'movies', 'tv', 'albums', 'songs', 'games', 'books', 'manga', 'youtube'] as const;
+export type BuiltinCategory = (typeof BUILTIN_CATEGORIES)[number];
+/** A person's own list (custom_lists row `id`): `c_<id>`. Short and URL-safe. */
+export type CustomCategory = `c_${string}`;
+/** A list key: built-in, or a custom list's `c_<id>`. Per-list settings go through `listConfig` (customLists.ts). */
+export type Category = BuiltinCategory | CustomCategory;
+
+export const isBuiltinCategory = (v: unknown): v is BuiltinCategory =>
+  typeof v === 'string' && (BUILTIN_CATEGORIES as readonly string[]).includes(v);
+/** The shape of a custom list key (not whether it exists). */
+export const CUSTOM_KEY_RE = /^c_[a-z0-9]{6,16}$/;
+export const isCustomCategory = (v: unknown): v is CustomCategory => typeof v === 'string' && CUSTOM_KEY_RE.test(v);
+/** A built-in key, or anything shaped like a custom key (whether it exists is checked against its owner's lists). */
+export const isCategoryKey = (v: unknown): v is Category => isBuiltinCategory(v) || isCustomCategory(v);
 
 export type SourceId =
   | 'anilist' | 'kitsu' | 'tmdb' | 'wiki' | 'tvmaze' | 'deezer' | 'itunes' | 'spotify' | 'openlibrary' | 'steam' | 'igdb' | 'youtube';
@@ -57,7 +71,7 @@ export interface Details {
   progressTotal?: number;
 }
 
-export const ORIGIN_LABEL: Record<Category, string> = {
+export const ORIGIN_LABEL: Record<BuiltinCategory, string> = {
   anime: 'Format',
   movies: 'Studio',
   tv: 'Network',
@@ -118,6 +132,8 @@ export interface Entry {
   finishedAt?: string | null;
   /** How many times again you have been through it (absent on rows cached before 0018). */
   rewatches?: number;
+  /** A web or map link (custom lists with a Link column); '' = none (absent on rows cached before 0020). */
+  link?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -165,15 +181,15 @@ export interface Season {
 }
 
 export interface CategoryConfig {
-  titleLabel: 'Title' | 'Album' | 'Song' | 'Video';
-  creatorLabel: 'Studio' | 'Director' | 'Artist' | 'Author' | 'Developer' | 'Channel' | null;
+  titleLabel: string;
+  creatorLabel: string | null;
   hasStatus: boolean;
   creatorIsSearchHint: boolean;
   square: boolean;
   hasSeasons: boolean;
 }
 
-export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
+export const CATEGORY_CONFIG: Record<BuiltinCategory, CategoryConfig> = {
   anime:  { titleLabel: 'Title', creatorLabel: 'Studio',    hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: true },
   movies: { titleLabel: 'Title', creatorLabel: 'Director',  hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: false },
   tv:     { titleLabel: 'Title', creatorLabel: null,        hasStatus: true,  creatorIsSearchHint: false, square: false, hasSeasons: true },
@@ -293,9 +309,13 @@ export const PROGRESS_MAX = 100000;
 /** Lists that count episodes or chapters. */
 export const PROGRESS_CATEGORIES: readonly Category[] = ['anime', 'tv', 'manga'];
 
-/** True when the progress control applies: a progress list and an in-progress status. */
-export function showsProgress(e: Pick<Entry, 'category' | 'status'>): boolean {
-  return PROGRESS_CATEGORIES.includes(e.category) && e.status !== null && PROGRESS_STATUSES.includes(e.status);
+/**
+ * True when the progress control applies: a progress list and an in-progress status. A custom list counts when its
+ * Progress column is on: pass its `hasProgress` (listConfig) as `listHasProgress`.
+ */
+export function showsProgress(e: Pick<Entry, 'category' | 'status'>, listHasProgress?: boolean): boolean {
+  const on = listHasProgress ?? PROGRESS_CATEGORIES.includes(e.category);
+  return on && e.status !== null && PROGRESS_STATUSES.includes(e.status);
 }
 
 /** Clamps a progress count to 0..total (0..PROGRESS_MAX when the total is unknown). */

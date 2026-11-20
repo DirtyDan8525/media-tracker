@@ -10,9 +10,10 @@
  * built-in default follows the admin.
  */
 import { APP_SETTING_DEFAULTS, validateAppSetting, type NewPersonDefaults } from './appSettings';
-import { CATEGORY_CONFIG, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, type Category, type UserSettings } from './types';
+import { BUILTIN_CATEGORIES, DEFAULT_USER_SETTINGS, NOTIFY_KEYS, type UserSettings } from './types';
 
-const ALL_CATEGORIES_LIST = Object.keys(CATEGORY_CONFIG) as Category[];
+/** Defaults cover the built-in lists only: a custom list (`c_` key) is personal, so its switch and place stay the person's own. */
+const ALL_CATEGORIES_LIST = [...BUILTIN_CATEGORIES];
 
 export type Customized = { [key: string]: true | { [key: string]: true } };
 

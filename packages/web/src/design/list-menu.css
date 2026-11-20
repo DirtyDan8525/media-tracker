@@ -27,10 +27,14 @@
 .list-menu__trigger[aria-expanded="true"] .list-menu__chev { transform: rotate(180deg); }
 .list-menu__panel {
   position: absolute; top: 100%; left: 0; z-index: 48; box-sizing: border-box; width: max-content; min-width: 220px; max-width: calc(100vw - 2 * var(--space-8));
-  max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; margin-top: var(--space-2); padding: var(--space-2);
+  /* Custom lists can add up to 6 rows: the panel keeps about today's height (the nine built-in lists) or 60vh, whichever is
+     smaller, and scrolls inside itself; the current list is scrolled into view when it opens (ListMenu). */
+  --list-menu-cap: calc(9 * var(--tap) + 2 * var(--space-2));
+  max-height: min(var(--list-menu-cap), 60vh); overflow-y: auto; overscroll-behavior: contain; margin-top: var(--space-2); padding: var(--space-2);
   border-radius: 12px; border: 1px solid var(--grid-line); background: var(--card); color: var(--text); box-shadow: var(--shadow-float);
 }
 .list-menu--field .list-menu__panel { position: static; width: 100%; max-width: none; margin-top: var(--space-3); box-shadow: none; }
+.list-emoji { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
 .list-menu__item {
   display: flex; align-items: center; gap: var(--space-6); box-sizing: border-box; width: 100%; min-height: var(--tap);
   padding: 0 var(--space-6); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text);

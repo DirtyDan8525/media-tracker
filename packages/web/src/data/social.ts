@@ -1,5 +1,5 @@
 import {
-  CATEGORY_CONFIG, findDuplicate, type Category, type Entry, type FriendEntry, type PublicUser, type Relation,
+  findDuplicate, type Category, type CustomList, type Entry, type FriendEntry, type PublicUser, type Relation,
 } from '@media-tracker/shared';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../api/client';
@@ -9,6 +9,7 @@ import { entriesKey, writeEntry } from './entryCache';
 import { UNREAD_KEY } from './feed';
 import { entriesQueryOptions } from './useEntries';
 import { ME_KEY, normalizeMe, storeMe } from './useMe';
+import { listCfg, registerLists } from '../lists/registry';
 
 /** Every friends/admin query lives under this key; a mutation here refreshes all of them. */
 export const SOCIAL_KEY = ['social'] as const;
@@ -20,8 +21,9 @@ export const inviteLink = (code: string): string => `${location.origin}/add/${co
 
 export type Friend = PublicUser & { since: string };
 export interface FriendsData { friends: Friend[]; incoming: PublicUser[]; outgoing: PublicUser[] }
-export interface ProfileData { user: PublicUser; memberSince: string | null; bio?: string | null; relation: Relation }
-export interface FriendEntryData { entry: FriendEntry; seasons: { id: string; label: string; rating: number | null; notes: string | null }[] }
+/** `lists`: their custom lists (friends and yourself only; absent from older servers). */
+export interface ProfileData { user: PublicUser; memberSince: string | null; bio?: string | null; relation: Relation; lists?: CustomList[] }
+export interface FriendEntryData { entry: FriendEntry; seasons: { id: string; label: string; rating: number | null; notes: string | null }[]; /** The custom list it sits on (null on built-in lists). */ list?: CustomList | null }
 export interface FriendsEntries { userId: string; entries: FriendEntry[] }
 export interface AdminData {
   pending: (PublicUser & { requestedAt: string })[];
@@ -113,7 +115,11 @@ export function useAddByCode() {
 export function useProfile(username: string) {
   return useQuery({
     queryKey: [...SOCIAL_KEY, 'profile', username.toLowerCase()],
-    queryFn: () => api.get<ProfileData>(`/api/users/${encodeURIComponent(username)}`),
+    queryFn: async () => {
+      const data = await api.get<ProfileData>(`/api/users/${encodeURIComponent(username)}`);
+      registerLists(data.lists); // their list names, words and columns, before their lists render
+      return data;
+    },
     staleTime: STALE,
   });
 }
@@ -131,7 +137,11 @@ export function useFriendEntries(username: string, category?: Category, enabled 
 export function useFriendEntry(username: string, id: string) {
   return useQuery({
     queryKey: [...SOCIAL_KEY, 'entry', username.toLowerCase(), id],
-    queryFn: () => api.get<FriendEntryData>(`/api/users/${encodeURIComponent(username)}/entries/${encodeURIComponent(id)}`),
+    queryFn: async () => {
+      const data = await api.get<FriendEntryData>(`/api/users/${encodeURIComponent(username)}/entries/${encodeURIComponent(id)}`);
+      if (data.list) registerLists([data.list]);
+      return data;
+    },
     staleTime: STALE,
   });
 }
@@ -151,7 +161,7 @@ function addBody(e: FriendEntry) {
     category: e.category, title: e.title, creator: e.creator, album: e.album, coverUrl: e.coverUrl, genres: e.genres,
     releaseDate: e.releaseDate, synopsis: e.synopsis, lengthLabel: e.lengthLabel, origin: e.origin,
     source: e.source, sourceId: e.sourceId, lookupState: 'ok', detailsState: e.detailsState,
-    ...(CATEGORY_CONFIG[e.category].hasStatus ? { status: 'Plan to watch' } : {}),
+    ...(listCfg(e.category).hasStatus ? { status: 'Plan to watch' } : {}),
   };
 }
 

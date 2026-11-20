@@ -14,12 +14,12 @@ describe('More (SettingsMore.v2)', () => {
     expect(within(data).getByRole('button', { name: 'Export my data' })).toHaveAccessibleDescription('.json file');
   });
 
-  it('has the sections Ratings (Sharpen my ratings, Top 5, Stats), Your data and App (What is new, Coming soon, About), and nothing else', async () => {
+  it('has the sections Ratings (Sharpen my ratings, Top 5, Stats), Lists (New list), Your data and App (What is new, Coming soon, About), and nothing else', async () => {
     mockApi(makeMe({ isAdmin: false }));
     renderApp('/more');
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent))
-      .toEqual(['Ratings', 'Your data', 'App']);
+      .toEqual(['Ratings', 'Lists', 'Your data', 'App']);
     expect(within(screen.getByRole('region', { name: 'Ratings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Sharpen my ratings', 'Top 5', 'Stats']);
     expect(within(screen.getByRole('region', { name: 'App' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Help & how-tos', 'Install instructions', "What's new", 'Coming soon', 'About Media Tracker']);
   });
@@ -39,9 +39,11 @@ describe('More (SettingsMore.v2)', () => {
     await screen.findByRole('region', { name: 'Ratings' });
     expect(screen.queryByRole('region', { name: 'Settings' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Other lists' })).not.toBeInTheDocument();
-    for (const name of [/^Settings/, /^Appearance/, /^Comparing/, /^Rating tiers/, /^Re-tier review/, /^Books/, /^Songs/, /^Games/]) {
+    for (const name of [/^Appearance/, /^Comparing/, /^Rating tiers/, /^Re-tier review/, /^Books/, /^Songs/, /^Games/]) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
+    // The one Settings link is the custom lists note's, to Settings → Tabs.
+    expect(screen.getAllByRole('link', { name: /^Settings/ }).map((a) => a.getAttribute('href'))).toEqual(['/settings#tabs']);
   });
 
   it('Back on Appearance returns to Settings when you came from Settings', async () => {

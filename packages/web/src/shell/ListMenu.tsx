@@ -2,8 +2,8 @@ import type { Category } from '@media-tracker/shared';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Icon } from '../design/components/Icon';
-import { LIST_LABEL } from '../nav';
 import '../design/list-menu.css';
+import { listLabel, listName } from '../lists/registry';
 
 interface BaseProps {
   lists: Category[];
@@ -55,7 +55,9 @@ export function ListMenu(props: ListMenuProps) {
     const target = start === 'first' ? all[0]
       : start === 'last' ? all[all.length - 1]
         : all.find((i) => i.getAttribute('aria-current') === 'true' || i.getAttribute('aria-checked') === 'true') ?? all[0];
-    target?.focus();
+    // The panel scrolls inside its capped height (list-menu.css): bring the item into view, then focus it without a page jump.
+    target?.scrollIntoView?.({ block: 'nearest' });
+    target?.focus({ preventScroll: true });
   }, [open, start]);
 
   // A tap outside closes it.
@@ -79,7 +81,12 @@ export function ListMenu(props: ListMenuProps) {
     else if (e.key === 'ArrowUp') next = (i - 1 + all.length) % all.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = all.length - 1;
-    if (next !== null) { e.preventDefault(); all[next]?.focus(); return; }
+    if (next !== null) {
+      e.preventDefault();
+      all[next]?.scrollIntoView?.({ block: 'nearest' });
+      all[next]?.focus({ preventScroll: true });
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation(); // a surrounding sheet stays open
@@ -111,14 +118,14 @@ export function ListMenu(props: ListMenuProps) {
             const count = counts?.[c];
             const body = (
               <>
-                <span className="list-menu__label">{LIST_LABEL[c]}</span>
+                <span className="list-menu__label">{listName(c)}</span>
                 {count !== undefined && <span className="list-menu__count">{count}</span>}
                 <span className="list-menu__check">{here && <Icon name="check" size={18} />}</span>
               </>
             );
             return props.heading ? (
               <Link key={c} to={props.to(c)} role="menuitem" className="list-menu__item" tabIndex={-1} aria-current={here ? 'true' : undefined}
-                aria-label={count !== undefined ? `${LIST_LABEL[c]}, ${count}` : LIST_LABEL[c]} onClick={() => setOpen(false)}>
+                aria-label={count !== undefined ? `${listLabel(c)}, ${count}` : listLabel(c)} onClick={() => setOpen(false)}>
                 {body}
               </Link>
             ) : (

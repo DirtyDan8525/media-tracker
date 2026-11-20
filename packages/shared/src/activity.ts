@@ -1,5 +1,6 @@
 import type { Category, Entry } from './types';
 import type { PostSocial, PublicUser } from './social';
+import type { CustomList } from './customLists';
 
 export const ACTIVITY_TYPES = ['added', 'rated', 're-rated', 'status'] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
@@ -47,6 +48,8 @@ export interface ActivityPage {
   friends: string[];
   social: Record<string, PostSocial>;
   next: { before: string; beforeId: string } | null;
+  /** The custom lists (by key) that titles on this page sit on; absent when none do. */
+  lists?: Record<string, CustomList>;
 }
 
 /** One displayed line: one post (every row sharing a post id) folded together. */

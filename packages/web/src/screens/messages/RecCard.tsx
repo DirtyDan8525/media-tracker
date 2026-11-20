@@ -1,4 +1,4 @@
-import { CATEGORY_CONFIG, findDuplicate, type RecSnapshot } from '@media-tracker/shared';
+import { findDuplicate, type RecSnapshot } from '@media-tracker/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useEntries } from '../../data/useEntries';
@@ -7,15 +7,15 @@ import { Button } from '../../design/components/Button';
 import { CoverImage } from '../../design/components/CoverImage';
 import { RatingBadge } from '../../design/components/RatingBadge';
 import { useToast } from '../../design/components/Toast';
-import { LIST_LABEL } from '../../nav';
 import { entryFromRec } from './format';
+import { listCfg, listLabel } from '../../lists/registry';
 
 /**
  * A recommendation (M7): cover, title, list, the sender's rating and note, and Add to mine (as Plan to watch / Plan to
  * read). A title already on your list shows "On your list" as a link to it instead.
  */
 export function RecCard({ rec, senderName, senderUsername, note, own = false }: { rec: RecSnapshot; senderName: string; senderUsername?: string; note: string; own?: boolean }) {
-  const cfg = CATEGORY_CONFIG[rec.category];
+  const cfg = listCfg(rec.category);
   const toast = useToast();
   const addToMine = useAddToMine();
   const mine = useEntries(rec.category).data;
@@ -47,7 +47,7 @@ export function RecCard({ rec, senderName, senderUsername, note, own = false }: 
         <CoverImage src={rec.coverUrl} alt="" square={cfg.square} width={48} />
         <div className="rec-card__meta">
           <b className="rec-card__title">{rec.title}</b>
-          <span className="rec-card__sub">{LIST_LABEL[rec.category]}{rec.creator ? ` · ${rec.creator}` : ''}</span>
+          <span className="rec-card__sub">{listLabel(rec.category)}{rec.creator ? ` · ${rec.creator}` : ''}</span>
           {rec.rating !== null && (
             <span className="rec-card__rated">
               <span>{own ? 'You rated' : `${senderName} rated`}</span>

@@ -3,8 +3,9 @@ import { useId, useState, type FormEvent } from 'react';
 import type { SourceCheck } from '../../api/adminTypes';
 import { useCheckSources, useExplainLookup } from '../../data/adminApp';
 import { Button } from '../../design/components/Button';
-import { LIST_LABEL, LIST_ORDER } from '../../nav';
+import { LIST_ORDER } from '../../nav';
 import { PlainPage, Result, useFeedback } from './parts';
+import { listLabel } from '../../lists/registry';
 
 /** A source slower than this (ms) is flagged "Slow" even though it answered. */
 export const SLOW_MS = 2000;
@@ -79,7 +80,7 @@ function WhyNot() {
         <div className="admin-field">
           <label htmlFor={ids.cat}>List</label>
           <select id={ids.cat} value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-            {LIST_ORDER.filter((c) => c in CATEGORY_CONFIG).map((c) => <option key={c} value={c}>{LIST_LABEL[c]}</option>)}
+            {LIST_ORDER.filter((c) => c in CATEGORY_CONFIG).map((c) => <option key={c} value={c}>{listLabel(c)}</option>)}
           </select>
         </div>
         <div className="admin-field">

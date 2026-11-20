@@ -5,6 +5,7 @@ import type { Me } from '../api/types';
 import { localDb } from '../db/local';
 import { useToast } from '../design/components/Toast';
 import { isOffline } from './useEntries';
+import { registerLists } from '../lists/registry';
 
 export const ME_KEY = ['me'] as const;
 const SETTINGS_MUTATION = ['save-settings'] as const;
@@ -12,8 +13,12 @@ const SETTINGS_MUTATION = ['save-settings'] as const;
 /** Fills any settings the server left out with the defaults (tabs merge per key). */
 export function normalizeMe(me: Me): Me {
   const s: Partial<UserSettings> = me.settings ?? {};
+  const customLists = Array.isArray(me.customLists) ? me.customLists : [];
+  // Before anything renders them: every list name, word and column resolves through the registry.
+  registerLists(customLists);
   return {
     ...me,
+    customLists,
     customized: me.customized ?? {},
     settings: {
       ...DEFAULT_USER_SETTINGS,
@@ -29,7 +34,8 @@ export function normalizeMe(me: Me): Me {
 
 export async function cachedMe(): Promise<Me | null> {
   try {
-    return (await localDb.me.get('me'))?.value ?? null;
+    const copy = (await localDb.me.get('me'))?.value ?? null;
+    return copy ? normalizeMe(copy) : null;
   } catch {
     return null;
   }

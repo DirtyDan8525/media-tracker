@@ -57,3 +57,11 @@
 
 ## Friends tab and PC nav wireframes — approved 2026-11-17
 - `FriendsHub`, `MessagesFromFriends`, `PCNav` (`*.wf.dc.html`) approved with **option B**: Messages is a floating speech-bubble button bottom-right on the Friends tab (with unread badge), not a top-bar button. The top bar keeps Add friend.
+
+## Phase 7 wireframes (docs/design/mockups/Phase7.wf.html) — approved by Dan 2026-11-19
+- Rating on complete, tags, custom lists, optional PC columns, More stats, AniList import, song preview + trailers: approved as drawn.
+- Q1 tags: friends can see your tags (not on private titles).
+- Q2 custom lists: friends can see them, same rules as built-in lists.
+- Q3 custom lists: max **6** per person.
+- Q4 trailers: also for TV shows and anime (not only movies).
+- Dan will send menu reorganisation changes separately; custom-list entry points wait for those.

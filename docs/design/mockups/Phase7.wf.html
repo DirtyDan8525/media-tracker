@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Wireframes · Phase 7 (tags, custom lists, AniList, previews)</title>
+<style>
+body{margin:0;background:#11111a;color:#e6e6ed;font:14px/1.4 Inter,system-ui,sans-serif;padding:24px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:32px 0 6px;color:#ffd166}
+.note{color:#a6a6bb;max-width:880px;margin:0 0 12px}
+.row{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+.ph{width:340px;background:#1b1b25;border:1px solid #2e2e3e;border-radius:22px;padding:16px;box-sizing:border-box}
+.pc{width:860px;background:#1b1b25;border:1px solid #2e2e3e;border-radius:12px;padding:16px;box-sizing:border-box}
+.cap{font-size:12px;color:#a6a6bb;margin:6px 0 0;width:340px}
+.t{font-weight:700;font-size:18px;color:#fff}.m{color:#a6a6bb;font-size:12px}
+.btn{display:inline-block;border:1px solid #3a3a52;border-radius:10px;padding:8px 12px;margin:4px 4px 0 0;color:#fff}
+.pri{background:#ffd166;color:#13131c;border-color:#ffd166;font-weight:700}
+.chip{display:inline-block;border-radius:999px;padding:4px 10px;background:#2a2a3b;margin:3px 3px 0 0;font-size:12px}
+.chip.on{background:#ffd166;color:#13131c}
+.box{border:1px solid #2e2e3e;border-radius:12px;padding:10px;margin-top:10px;background:#232339}
+.f{border:1px solid #3a3a52;border-radius:10px;padding:8px;margin-top:6px;color:#a6a6bb}
+.cov{width:72px;height:96px;background:#2a2a3b;border-radius:8px;float:left;margin-right:12px}
+.sheet{border-top:3px solid #ffd166;border-radius:18px 18px 0 0;background:#232339;padding:14px;margin-top:14px}
+table{border-collapse:collapse;width:100%;font-size:12px}td,th{border-bottom:1px solid #2e2e3e;padding:6px;text-align:left}
+.q{background:#2b2440;border-left:3px solid #c9a7ff;padding:8px 10px;margin-top:10px;max-width:880px}
+.bar{height:6px;background:#2a2a3b;border-radius:3px;margin-top:6px}.bar i{display:block;height:6px;width:35%;background:#ffd166;border-radius:3px}
+</style></head><body>
+<h1>Phase 7 wireframes</h1>
+<p class="note">Cheap sketches for approval. Purple boxes are questions for Dan. Not built yet: polish fixes and the PC wide-screen pass are already underway separately.</p>
+
+<h2>1 · Rating when you complete something</h2>
+<p class="note">When you set a title to Completed (or Watched/Read/Beaten) and it has no rating, this sheet pops up. "Later" just closes it. A title that already has a rating doesn't ask.</p>
+<div class="row"><div><div class="ph">
+<div class="t">Frieren</div><div class="m">Anime · Completed ✓</div>
+<div class="sheet"><b>You finished Frieren 🎉</b><div class="m">Rate it now?</div>
+<div class="f">Rating&nbsp;&nbsp;<b style="color:#fff">9.4</b></div>
+<span class="btn pri">Save rating</span><span class="btn">Later</span></div>
+</div><p class="cap">Saving runs the normal close-call check if it lands near another title.</p></div></div>
+
+<h2>2 · Custom tags</h2>
+<p class="note">Your own labels on any title. Each person's tags are their own. On a title page: a Tags row. In a list's Filters: a Tags filter. On PC: an optional Tags column (see 4).</p>
+<div class="row">
+<div><div class="ph"><div class="cov"></div><div class="t">Invincible</div><div class="m">TV Shows · 9.6</div><div style="clear:both"></div>
+<div class="box"><b>Tags</b><br><span class="chip on">Favorites ✕</span><span class="chip on">With Ren ✕</span><span class="chip">+ Add tag</span>
+<div class="f">Type a tag… <span class="m">(suggests your existing tags: Rewatch, Comfy, With Alberto)</span></div></div></div>
+<p class="cap">Title page. Tap ✕ to remove. Tags are private unless the title is shown to friends — Q1.</p></div>
+<div><div class="ph"><b>Filters</b><div class="m" style="margin-top:8px">Status</div><span class="chip on">All</span><span class="chip">Completed</span><span class="chip">Watching</span>
+<div class="m" style="margin-top:8px">Tags</div><span class="chip">Favorites</span><span class="chip on">With Ren</span><span class="chip">Rewatch</span><span class="chip">Comfy</span>
+<div class="m" style="margin-top:8px">Genres</div><span class="chip">Action</span><span class="chip">Drama</span></div>
+<p class="cap">Filters sheet. Settings → Tags lets you rename or delete a tag everywhere.</p></div>
+</div>
+<div class="q"><b>Q1:</b> Should friends see your tags on your titles? My suggestion: <b>yes</b> (they're fun, e.g. "With Ren"), except on private titles.</div>
+
+<h2>3 · Custom lists (list builder)</h2>
+<p class="note">Settings → Lists → "+ New list". You choose the name and which columns it has. Ratings, notes, Top 5, Stats, sharing and friends all work like the built-in lists. Restaurants is the example.</p>
+<div class="row">
+<div><div class="ph"><b>New list</b>
+<div class="f">Name&nbsp;&nbsp;<b style="color:#fff">Restaurants</b></div>
+<div class="f">One item is a…&nbsp;&nbsp;<b style="color:#fff">restaurant</b> <span class="m">(“Add restaurant”)</span></div>
+<div class="f">Icon&nbsp;&nbsp;🍜</div>
+<div class="m" style="margin-top:10px">Columns</div>
+<div class="f">☑ Second line, called <b style="color:#fff">Cuisine</b> <span class="m">(like Studio / Artist)</span></div>
+<div class="f">☑ Status — words: <span class="chip on">Want to try / Been</span><span class="chip">Watch</span><span class="chip">Read</span><span class="chip">Play</span></div>
+<div class="f">☑ Tags&nbsp;&nbsp;☐ Year&nbsp;&nbsp;☐ Genres&nbsp;&nbsp;☐ Progress (episodes/chapters)</div>
+<div class="f">☑ Link <span class="m">(a website or map link per item)</span></div>
+<div class="m" style="margin-top:10px">Search when adding</div>
+<span class="chip on">None — type it in</span><span class="chip">Movies</span><span class="chip">TV</span><span class="chip">Books</span><span class="chip">Games</span><span class="chip">Music</span>
+<br><span class="btn pri">Create list</span></div>
+<p class="cap">Columns can be changed later. Deleting a custom list asks twice and can be undone for 10 s.</p></div>
+<div><div class="ph"><div class="t">🍜 Restaurants</div><div class="m">12 places</div>
+<table><tr><th>Name</th><th>Cuisine</th><th>Status</th><th>Rating</th></tr>
+<tr><td>Joe's Pho</td><td>Vietnamese</td><td>Been</td><td><b>9.1</b></td></tr>
+<tr><td>Taco Loco</td><td>Mexican</td><td>Been</td><td><b>8.4</b></td></tr>
+<tr><td>Sushi Ten</td><td>Japanese</td><td>Want to try</td><td>—</td></tr></table>
+<span class="btn">+ Add restaurant</span></div><p class="cap">The new list shows in Lists, the side nav and the list dropdown like the others.</p></div>
+</div>
+<div class="q"><b>Q2:</b> Can friends see your custom lists? My suggestion: <b>yes</b>, same rules as built-in lists (friends see them, private items stay hidden). <b>Q3:</b> Max lists per person? Suggest 10.</div>
+
+<h2>4 · Optional PC columns + 5 · "More stats"</h2>
+<div class="row">
+<div><div class="pc"><div style="display:flex;justify-content:space-between"><div class="t">Anime</div><span class="btn">Columns ▾</span></div>
+<div class="box" style="width:260px;float:right;margin:0 0 8px 12px"><b>Show columns</b><br>☑ Progress<br>☑ Genres<br>☐ Tags<br>☐ Started<br>☐ Finished<br>☐ Rewatches<br>☐ Airing</div>
+<table style="width:auto"><tr><th>Cover</th><th>Rating</th><th>Title</th><th>Status</th><th>Progress</th><th>Genres</th><th>Notes</th></tr>
+<tr><td>▢</td><td>9.4</td><td>Frieren</td><td>Completed</td><td>28 / 28</td><td>Fantasy</td><td>…</td></tr></table><div style="clear:both"></div></div>
+<p class="cap" style="width:860px">Remembered per list on this device. Extra columns are off by default.</p></div>
+<div><div class="ph"><div class="t">Frieren</div><div class="m">… rating, status, notes as now …</div>
+<div class="box"><b>More stats ▾</b> <span class="m">(closed by default)</span>
+<div class="f">Started&nbsp;&nbsp;<b style="color:#fff">Sep 29, 2025</b></div>
+<div class="f">Finished&nbsp;&nbsp;<b style="color:#fff">Mar 22, 2026</b></div>
+<div class="f">Rewatches&nbsp;&nbsp;− <b style="color:#fff">1</b> +</div>
+<div class="f">Airing&nbsp;&nbsp;Finished airing · 28 eps</div></div></div>
+<p class="cap">Started fills itself the first time you set Watching; Finished when you set Completed. Both editable. Airing comes from the lookup (anime/TV only).</p></div>
+</div>
+
+<h2>6 · Import from AniList</h2>
+<div class="row"><div><div class="ph"><b>Import from AniList</b><div class="m">Settings → Import</div>
+<div class="f">AniList username&nbsp;&nbsp;<b style="color:#fff">dan8525</b></div><span class="btn pri">Look up</span>
+<div class="box"><b>Found</b><br>Anime: 142 · Manga: 31<br><span class="m">9 already on your lists — skipped<br>Scores converted to 0–10 · status, episodes, notes, start/finish dates kept</span>
+<br><span class="chip on">☑ Anime</span><span class="chip on">☑ Manga</span><br><span class="btn pri">Import 164 titles</span></div>
+<div class="m">After: "Imported 164 · Undo" (like the Sheet import).</div></div>
+<p class="cap">Works for public AniList profiles; no AniList sign-in needed.</p></div></div>
+
+<h2>7 · Song preview + movie trailer</h2>
+<div class="row">
+<div><div class="ph"><div class="cov"></div><div class="t">Blinding Lights</div><div class="m">Songs · The Weeknd · 9.0</div><div style="clear:both"></div>
+<span class="btn">Open in Spotify ↗</span><span class="btn">▶ Play preview</span>
+<div class="box">❚❚ 0:11 / 0:30<div class="bar"><i></i></div></div></div>
+<p class="cap">30-second clip, plays in the app (from Deezer). Albums: plays the first track. Hidden if no clip exists.</p></div>
+<div><div class="ph"><div class="cov"></div><div class="t">Dune: Part Two</div><div class="m">Movies · 2024 · 9.2</div><div style="clear:both"></div>
+<span class="btn">▶ Play trailer</span>
+<div class="sheet"><div style="height:150px;background:#000;border-radius:8px;display:flex;align-items:center;justify-content:center">YouTube player</div><span class="btn">Close</span></div></div>
+<p class="cap">Same spot as Open in Spotify. Plays in a sheet (from TMDB, which the app already uses). Hidden if no trailer is found.</p></div>
+</div>
+<div class="q"><b>Q4:</b> Trailers for TV shows and anime too? Both are easy (TMDB / Kitsu have them). Suggest <b>yes</b>.</div>
+</body></html>

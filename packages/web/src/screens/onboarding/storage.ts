@@ -22,3 +22,8 @@ export const dismissInstall = (): void => write(INSTALL_DISMISSED);
 const ANNOUNCEMENT_PREFIX = 'mt-announcement-dismissed:';
 export const announcementDismissed = (id: string): boolean => read(ANNOUNCEMENT_PREFIX + id);
 export const dismissAnnouncement = (id: string): void => write(ANNOUNCEMENT_PREFIX + id);
+
+/** The "Notifications are here" popup (one per device, not per user: the browser's permission is per device too). */
+const NOTIFY_PROMPT_SEEN = 'mt-notify-prompt-seen';
+export const notifyPromptSeen = (): boolean => read(NOTIFY_PROMPT_SEEN);
+export const markNotifyPromptSeen = (): void => write(NOTIFY_PROMPT_SEEN);

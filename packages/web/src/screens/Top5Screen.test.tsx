@@ -208,7 +208,7 @@ describe('Top 5 sharing (B17)', () => {
   });
 
   it('with Web Share for files, "Share" calls shareOrSave with the file name and title, and closes the sheet', async () => {
-    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { canShare: () => true, share: vi.fn() }));
+    vi.stubGlobal('navigator', Object.defineProperties(Object.create(navigator), { canShare: { value: () => true }, share: { value: vi.fn() }, userAgent: { value: navigator.userAgent }, maxTouchPoints: { value: 0 } }));
     fakeBackend({ entries: rows() });
     renderApp('/top5');
     await userEvent.click(await screen.findByRole('button', { name: 'Share my #1s' }));
@@ -222,7 +222,7 @@ describe('Top 5 sharing (B17)', () => {
   });
 
   it('a share that throws toasts, keeps the sheet open and re-enables the buttons (no unhandled rejection)', async () => {
-    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { canShare: () => true, share: vi.fn() }));
+    vi.stubGlobal('navigator', Object.defineProperties(Object.create(navigator), { canShare: { value: () => true }, share: { value: vi.fn() }, userAgent: { value: navigator.userAgent }, maxTouchPoints: { value: 0 } }));
     vi.mocked(shareOrSave).mockRejectedValue(new Error('boom'));
     fakeBackend({ entries: rows() });
     renderApp('/top5');

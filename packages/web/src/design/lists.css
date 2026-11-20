@@ -178,15 +178,17 @@ textarea.input { height: auto; padding: var(--space-5) var(--space-6); resize: v
 /* entry details (v2: its own cover blurred behind the top; only Text / Bright text over it) */
 .detail { display: flex; flex-direction: column; gap: var(--space-8); max-width: 720px; }
 .detail__top { display: flex; gap: var(--space-9); align-items: flex-start; }
-/* Watch / Spotify / preview / trailer sit in one wrapping row, so extra buttons don't push the cover down (Dan, 2026-11-20). */
-.detail__actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-4); }
-.detail__actions:empty { display: none; }
-.detail__actions .detail__watch { margin-top: 0; }
-.detail__actions .preview { margin-top: 0; }
-.detail__facts { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding-bottom: var(--space-1); }
-.detail__title { font-size: 22px; font-weight: 700; color: var(--bright-text); line-height: 1.25; overflow-wrap: anywhere; }
-.detail__fact { font-size: var(--fs-meta); color: var(--text); }
-.detail__fact--main { font-size: var(--fs-body); font-weight: 600; color: var(--bright-text); }
+/* Watch / Spotify / preview / trailer: one row under the cover, two side by side from the left, so the
+   facts column stays short and the cover and text can be bigger (Dan, 2026-11-20). */
+.detail__media { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); margin-top: calc(-1 * var(--space-2)); }
+.detail__media:empty { display: none; }
+.detail__media > * { flex: 1 1 0; min-width: 0; max-width: calc(50% - var(--space-4) / 2); margin-top: 0; }
+.detail__media .btn, .detail__media .preview > .btn { width: 100%; justify-content: center; }
+.detail__media .detail__watch, .detail__media .preview { margin-top: 0; }
+.detail__facts { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-bottom: var(--space-1); }
+.detail__title { font-size: 26px; font-weight: 700; color: var(--bright-text); line-height: 1.2; overflow-wrap: anywhere; }
+.detail__fact { font-size: var(--fs-body); color: var(--text); }
+.detail__fact--main { font-size: 18px; font-weight: 600; color: var(--bright-text); }
 .detail__genres { display: flex; flex-wrap: wrap; gap: 5px; }
 .genre-pill { padding: 3px var(--space-4); border-radius: var(--radius-pill); font-size: var(--fs-pill); font-weight: 500; color: var(--text); background: color-mix(in srgb, var(--card) 85%, transparent); }
 .tiles { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }

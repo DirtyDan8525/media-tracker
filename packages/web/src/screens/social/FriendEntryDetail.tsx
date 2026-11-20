@@ -84,28 +84,13 @@ function Body({ username, entry, seasons }: {
       <div className="detail-top"><BackButton to={`/u/${username}?tab=lists&c=${entry.category}`} useHistory pc />{!cfg.custom && <ShareButton rec={recFromEntry({ ...entry, rating: null })} />}</div>
       <div className="screen__body detail">
         <div className="detail__top">
-          {(!cfg.custom || cfg.lookup !== null || entry.coverUrl) && <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={132} className="cover--hero" />}
+          {(!cfg.custom || cfg.lookup !== null || entry.coverUrl) && <CoverImage src={entry.coverUrl} alt={`${entry.title} cover`} square={cfg.square} width={168} className="cover--hero" />}
           <div className="detail__facts">
             <h1 className="detail__title">{entry.title}</h1>
             {entry.creator && <span className="detail__fact detail__fact--main">{entry.creator}</span>}
             {meta && <span className="detail__fact">{meta}</span>}
             {entry.origin && <span className="detail__fact">{`${listCfg(entry.category).originLabel}: ${entry.origin}`}</span>}
-            {entry.category === 'youtube' && sourceUrl(entry.source, entry.sourceId) && (
-              // Dan, 2026-11-17: a video links straight to YouTube.
-              <a className="btn btn--primary detail__watch" href={sourceUrl(entry.source, entry.sourceId)!} target="_blank" rel="noopener noreferrer">
-                Watch on YouTube
-              </a>
-            )}
             {cfg.custom && <span className="detail__fact">{listName(entry.category)}</span>}
-            <div className="detail__actions">
-              {cfg.showLink && entry.link && (
-                <a className="btn btn--secondary btn--compact" href={entry.link} target="_blank" rel="noopener noreferrer"
-                  aria-label={`Open the link for ${entry.title} (opens in a new tab)`}>Open link ↗</a>
-              )}
-              <OpenInSpotify entry={entry} />
-              <PlayPreview entry={entry} />
-              <PlayTrailer entry={entry} />
-            </div>
             {genres.length > 0 && (
               <span className="detail__genres">
                 <span className="sr-only">{entry.genres}</span>
@@ -113,6 +98,22 @@ function Body({ username, entry, seasons }: {
               </span>
             )}
           </div>
+        </div>
+        {/* Watch / Spotify / preview / trailer in one row under the cover, side by side (Dan, 2026-11-20). */}
+        <div className="detail__media">
+          {entry.category === 'youtube' && sourceUrl(entry.source, entry.sourceId) && (
+            // Dan, 2026-11-17: a video links straight to YouTube.
+            <a className="btn btn--primary detail__watch" href={sourceUrl(entry.source, entry.sourceId)!} target="_blank" rel="noopener noreferrer">
+              Watch on YouTube
+            </a>
+          )}
+          {cfg.showLink && entry.link && (
+            <a className="btn btn--secondary btn--compact" href={entry.link} target="_blank" rel="noopener noreferrer"
+              aria-label={`Open the link for ${entry.title} (opens in a new tab)`}>Open link ↗</a>
+          )}
+          <OpenInSpotify entry={entry} />
+          <PlayPreview entry={entry} />
+          <PlayTrailer entry={entry} />
         </div>
 
         <div className="friend-panel">

@@ -176,7 +176,11 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
         )}
         <textarea ref={field} className="input composer__field" rows={1} aria-label="Message" placeholder="Message" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} aria-invalid={over || undefined} />
-        <button type="button" className="icon-btn icon-btn--outlined composer__send" aria-label="Send" title="Send" disabled={!canSend} onClick={() => void send()}>
+        <button type="button" className="icon-btn icon-btn--outlined composer__send" aria-label="Send" title="Send" disabled={!canSend}
+          // Keep focus (and the phone keyboard) in the message box: without this the first tap only closed the keyboard,
+          // the layout jumped and a second tap was needed to send (Dan, 2026-11-20).
+          onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}
+          onClick={() => void send()}>
           <Icon name="send" size={22} />
         </button>
       </div>

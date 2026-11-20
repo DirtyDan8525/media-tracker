@@ -44,12 +44,13 @@ h1, h2, h3, p { margin: 0; }
   }
 }
 
-/* Scroll bars follow the theme (Dan, 2026-11-20: the grey PC scroll bars stood out). Thin, a soft tint of Highlight
-   on a transparent track, a bit stronger on hover. Firefox/Chrome 121+ use scrollbar-color; the ::-webkit rules cover older ones. */
-html { scrollbar-color: color-mix(in srgb, var(--highlight) 35%, var(--card)) transparent; }
-* { scrollbar-width: thin; }
+/* Scroll bars follow the theme (Dan, 2026-11-20: the grey PC scroll bars stood out) and stay hidden until the pointer is over
+   the area that scrolls. Thin, a soft tint of Highlight on a transparent track. Firefox/Chrome 121+ use scrollbar-color;
+   the ::-webkit rules cover older ones. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: color-mix(in srgb, var(--highlight) 35%, var(--card)) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--highlight) 35%, var(--card)); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--highlight) 60%, var(--card)); background-clip: padding-box; }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--highlight) 35%, var(--card)); }
+*::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--highlight) 60%, var(--card)); }

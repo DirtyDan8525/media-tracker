@@ -21,6 +21,17 @@ function setup(over: Parameters<typeof messagesBackend>[0] = {}, extra: Record<s
 afterEach(() => vi.useRealTimers());
 
 describe('Chat', () => {
+  it('pressing Send keeps focus in the message box, so the phone keyboard stays open and one tap sends (Dan, 2026-11-20)', async () => {
+    setup({ messages: { c1: [makeMessage({ senderId: REN_U.id, text: 'hey' })] } });
+    renderApp('/messages/c1');
+    const box = await screen.findByRole('textbox', { name: /Message/ });
+    await userEvent.type(box, 'hi');
+    const send = screen.getByRole('button', { name: 'Send' });
+    expect(fireEvent.pointerDown(send)).toBe(false); // default prevented: no blur
+    expect(fireEvent.mouseDown(send)).toBe(false);
+    expect(box).toHaveFocus();
+  });
+
   it("tapping their picture or name opens their profile, and Back returns to the chat (Dan, 2026-11-20)", async () => {
     setup({ messages: { c1: [makeMessage({ senderId: REN_U.id, text: 'hey' })] } });
     const { router } = renderApp('/messages');

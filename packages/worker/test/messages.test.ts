@@ -420,7 +420,8 @@ describe('pictures (M6)', () => {
 
   it('wrong type 415, over 2 MB 413, wrong magic bytes 400, empty 400, nothing stored; a content-type with parameters is fine', async () => {
     const dm = await direct(A, b);
-    expect((await upload(A, dm, PNG, 'image/gif')).status).toBe(415);
+    expect((await upload(A, dm, PNG, 'image/gif')).status).toBe(400); // PNG bytes labelled GIF
+    expect((await upload(A, dm, PNG, 'image/bmp')).status).toBe(415);
     expect((await upload(A, dm, PNG, 'text/plain')).status).toBe(415);
     expect((await upload(A, dm, JPEG, 'image/png')).status).toBe(400); // JPEG bytes labelled PNG
     expect((await upload(A, dm, new TextEncoder().encode('<svg onload=alert(1)>............'), 'image/png')).status).toBe(400);
@@ -434,6 +435,25 @@ describe('pictures (M6)', () => {
     expect((await upload(A, dm, ok, 'image/png; charset=binary')).status).toBe(201);
     expect((await env.MEDIA!.list()).objects).toHaveLength(1);
     expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM messages').first<{ n: number }>())!.n).toBe(1);
+  });
+
+  it('GIF: 87a and 89a accepted up to 8 MB with their type, served as-is; over 8 MB 413; fake GIF 400; JPEG stays at 2 MB', async () => {
+    const dm = await direct(A, b);
+    const gif = (v: string, size: number) => { const g = new Uint8Array(size); g.set(new TextEncoder().encode(`GIF${v}`)); return g; };
+    const g89 = gif('89a', 8 * 1024 * 1024);
+    const res = await upload(A, dm, g89, 'image/gif');
+    expect(res.status).toBe(201);
+    const msg = (await res.json()) as { id: string };
+    expect((await upload(A, dm, gif('87a', 100), 'image/gif')).status).toBe(201);
+    const served = await as(A, `/api/messages/${msg.id}/media`);
+    expect(served.headers.get('Content-Type')).toBe('image/gif');
+    expect(new Uint8Array(await served.arrayBuffer()).byteLength).toBe(8 * 1024 * 1024);
+    expect((await upload(A, dm, gif('89a', 8 * 1024 * 1024 + 1), 'image/gif')).status).toBe(413);
+    expect((await upload(A, dm, gif('88a', 100), 'image/gif')).status).toBe(400);
+    expect((await upload(A, dm, new TextEncoder().encode('GIF89 not really a gif'), 'image/gif')).status).toBe(400);
+    const bigJpeg = new Uint8Array(2 * 1024 * 1024 + 1);
+    bigJpeg.set(JPEG);
+    expect((await upload(A, dm, bigJpeg, 'image/jpeg')).status).toBe(413);
   });
 
   it('a lie about the length in a chunked body is still capped', async () => {

@@ -183,6 +183,33 @@ describe('photos', () => {
     expect(await screen.findByRole('img', { name: 'Picture from You' })).toBeInTheDocument();
   });
 
+  it('a GIF skips the resize and uploads the original bytes; over 8 MB gets a toast', async () => {
+    const { calls } = setup();
+    renderApp('/messages/c1');
+    await waitFor(async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'More options' }));
+      expect(screen.getByRole('menuitem', { name: 'Send a photo' })).toBeInTheDocument();
+    });
+    const input = screen.getByTestId('photo-input') as HTMLInputElement;
+    expect(input.accept).toContain('image/gif');
+    vi.mocked(resizeImage).mockClear();
+    // A GIF by its bytes alone (no type), then one by type.
+    const bytes = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 2, 3, 4]);
+    fireEvent.change(input, { target: { files: [new File([bytes], 'funny.gif', { type: '' })] } });
+    expect(await screen.findByRole('img', { name: 'Photo to send' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/image')).toBe(true));
+    expect(resizeImage).not.toHaveBeenCalled();
+    const post = calls.find((c) => c.path === '/api/conversations/c1/messages/image')!;
+    expect((post.init!.headers as Record<string, string>)['content-type']).toBe('image/gif');
+    expect((post.init!.body as Blob).size).toBe(10);
+    const big = new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'huge.gif', { type: 'image/gif' });
+    fireEvent.change(input, { target: { files: [big] } });
+    expect(await screen.findByText('That GIF is too big to send (max 8 MB).')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Photo to send' })).not.toBeInTheDocument();
+    expect(resizeImage).not.toHaveBeenCalled();
+  });
+
   it('a chosen photo can be removed with ✕ before sending', async () => {
     const { calls } = setup();
     renderApp('/messages/c1');

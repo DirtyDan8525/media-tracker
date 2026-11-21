@@ -8,7 +8,9 @@ export const GROUP_MAX = 20;
 export const GROUP_NAME_MAX = 60;
 /** A photo after the phone/PC has resized and compressed it (longest side 1600 px, quality about 0.8). */
 export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+/** A GIF is sent as it is (no resize, so it keeps moving): up to 8 MB. */
+export const GIF_MAX_BYTES = 8 * 1024 * 1024;
 /** Voice memos: at most 2 minutes and 1 MB (about 24-32 kbps Opus or AAC is well under it). */
 export const VOICE_MAX_BYTES = 1024 * 1024;
 export const VOICE_MAX_MS = 120_000;

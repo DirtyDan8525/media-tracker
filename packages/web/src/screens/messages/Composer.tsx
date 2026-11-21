@@ -1,4 +1,4 @@
-import { MESSAGE_MAX, type RecSnapshot } from '@media-tracker/shared';
+import { GIF_MAX_BYTES, MESSAGE_MAX, type RecSnapshot } from '@media-tracker/shared';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ApiError } from '../../api/client';
 import { useMediaOptions } from '../../data/appSettings';
@@ -10,6 +10,15 @@ import { useIsWide } from '../../hooks';
 import { RecommendPicker } from './RecommendPicker';
 import { resizeImage } from './resizeImage';
 import { VoiceRecorder } from './VoiceRecorder';
+
+/** A GIF by its type or its first bytes (GIF87a / GIF89a). */
+async function isGif(file: Blob): Promise<boolean> {
+  if (file.type === 'image/gif') return true;
+  try {
+    const head = new Uint8Array(await file.slice(0, 6).arrayBuffer());
+    return head.length === 6 && String.fromCharCode(...head).startsWith('GIF8') && (head[4] === 0x37 || head[4] === 0x39) && head[5] === 0x61;
+  } catch { return false; }
+}
 
 /** The counter shows from here on. */
 const COUNTER_FROM = 1800;
@@ -111,7 +120,11 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
   async function stagePhoto(file: File | undefined) {
     if (!file) return;
     let blob: Blob;
-    try {
+    if (await isGif(file)) {
+      // A GIF goes as it is: resizing would flatten it to one frame.
+      if (file.size > GIF_MAX_BYTES) { toast.show('That GIF is too big to send (max 8 MB).'); return; }
+      blob = file.type === 'image/gif' ? file : new Blob([file], { type: 'image/gif' });
+    } else try {
       // Resized (longest side 1600 px) and re-encoded: the copy carries no EXIF or location.
       blob = await resizeImage(file);
     } catch {
@@ -193,7 +206,7 @@ export function Composer({ conversationId, onSent, reply = null, onCancelReply }
           )}
         </div>
         {options.photos && (
-          <input ref={fileInput} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true"
+          <input ref={fileInput} type="file" accept="image/*,image/gif" className="sr-only" tabIndex={-1} aria-hidden="true"
             data-testid="photo-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void stagePhoto(f); }} />
         )}
         <textarea ref={field} className="input composer__field" rows={1} aria-label="Message" placeholder="Message" value={text}

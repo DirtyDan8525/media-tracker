@@ -6,7 +6,7 @@
  */
 import { Hono, type Context } from 'hono';
 import {
-  CATEGORY_CONFIG, GROUP_MAX, GROUP_NAME_MAX, IMAGE_MAX_BYTES, MESSAGES_PAGE, MESSAGE_MAX, MESSAGE_RATE_PER_MIN, RECOMMENDED_MAX,
+  CATEGORY_CONFIG, GROUP_MAX, GROUP_NAME_MAX, GIF_MAX_BYTES, IMAGE_MAX_BYTES, MESSAGES_PAGE, MESSAGE_MAX, MESSAGE_RATE_PER_MIN, RECOMMENDED_MAX,
   VOICE_MAX_BYTES, VOICE_MAX_MS, withRecentEmoji,
   type Conversation, type ConversationKind, type ConversationList, type ConversationSummary, type LastMessage, type Message,
   type MessageKind, type MessagePage, type MessageReaction, type PublicUser, type RecSnapshot, type RecommendedItem, type ReplyInfo, type SourceId,
@@ -589,6 +589,8 @@ messages.post('/conversations/:id/messages', featureOn('messages'), async (c) =>
 const IMAGE_EXT_OK: Record<string, (b: Uint8Array) => boolean> = {
   'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
   'image/png': (b) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => b[i] === v),
+  // GIF87a / GIF89a.
+  'image/gif': (b) => [0x47, 0x49, 0x46, 0x38].every((v, i) => b[i] === v) && (b[4] === 0x37 || b[4] === 0x39) && b[5] === 0x61,
   'image/webp': (b) => [0x52, 0x49, 0x46, 0x46].every((v, i) => b[i] === v) && [0x57, 0x45, 0x42, 0x50].every((v, i) => b[8 + i] === v),
 };
 
@@ -651,7 +653,7 @@ async function uploadMedia(c: Context<AppEnv>, kind: 'photo' | 'voice') {
     if (!Number.isInteger(ms) || ms < 1 || ms > VOICE_MAX_MS + 1000) return c.json({ error: 'too_long' }, 400);
     durationMs = Math.min(ms, VOICE_MAX_MS);
   }
-  const bytes = await readCapped(c.req.raw, kind === 'photo' ? IMAGE_MAX_BYTES : VOICE_MAX_BYTES);
+  const bytes = await readCapped(c.req.raw, kind === 'photo' ? (type === 'image/gif' ? GIF_MAX_BYTES : IMAGE_MAX_BYTES) : VOICE_MAX_BYTES);
   if (bytes === null) return c.json({ error: 'too_large' }, 413);
   if (bytes.byteLength < 12 || !matches(bytes)) return c.json(invalid, 400);
   await makeRoom(c.env, me, settings.media.capMb, bytes.byteLength);

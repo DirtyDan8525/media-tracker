@@ -108,6 +108,33 @@ describe('signed-out screen', () => {
     expect(screen.getByRole('button', { name: tabName })).toBeEnabled();
   });
 
+  it('after a wrong password only the password clears, and focus goes to it', async () => {
+    authBackend({ extra: { 'POST /api/auth/login': { status: 401, body: { error: 'bad_credentials' } } } });
+    renderApp('/');
+    await userEvent.click(await tab('Sign in'));
+    await userEvent.type(screen.getByLabelText('Username'), 'ren');
+    await userEvent.type(screen.getByLabelText('Password'), 'wrongwrong{Enter}');
+    const alert = await screen.findByRole('alert');
+    expect(screen.getByLabelText('Username')).toHaveValue('ren');
+    const pw = screen.getByLabelText('Password');
+    expect(pw).toHaveValue('');
+    await waitFor(() => expect(pw).toHaveFocus());
+    expect(pw).toHaveAttribute('aria-invalid', 'true');
+    expect(pw.getAttribute('aria-describedby')).toContain(alert.id);
+  });
+
+  it('a network failure keeps the typed password but still returns focus to it', async () => {
+    authBackend({ extra: { 'POST /api/auth/login': { status: 500, body: { error: 'x' } } } });
+    renderApp('/');
+    await userEvent.click(await tab('Sign in'));
+    await userEvent.type(screen.getByLabelText('Username'), 'ren');
+    await userEvent.type(screen.getByLabelText('Password'), 'hunter2hunter2{Enter}');
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Username')).toHaveValue('ren');
+    expect(screen.getByLabelText('Password')).toHaveValue('hunter2hunter2');
+    await waitFor(() => expect(screen.getByLabelText('Password')).toHaveFocus());
+  });
+
   it('a bad_credentials answer does not pull the screen out from under you (stays signed out)', async () => {
     authBackend({ extra: { 'POST /api/auth/login': { status: 401, body: { error: 'bad_credentials' } } } });
     renderApp('/');

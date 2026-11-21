@@ -22,6 +22,14 @@ export interface GroupRow {
   coverUrl: string;
   average: number;
   raters: number;
+  /** Each rater's best entry for this title, highest rating first (ties keep the order people were given). */
+  owners: GroupOwner[];
+}
+
+export interface GroupOwner {
+  userId: string;
+  entryId: string;
+  rating: number;
 }
 
 const srcKey = (e: Comparable): string | null => (e.source && e.sourceId ? `src:${e.source}:${e.sourceId}` : null);
@@ -113,11 +121,17 @@ export function groupTop5(
   const rows: (GroupRow & { sort: number })[] = [];
   for (const g of cluster(items)) {
     const per = new Map<string, number>();
-    for (const x of g) per.set(x.who, Math.max(per.get(x.who) ?? -Infinity, x.e.rating));
+    const bestOf = new Map<string, GroupOwner>();
+    for (const x of g) {
+      per.set(x.who, Math.max(per.get(x.who) ?? -Infinity, x.e.rating));
+      const cur = bestOf.get(x.who);
+      if (!cur || x.e.rating > cur.rating) bestOf.set(x.who, { userId: x.who, entryId: x.e.id, rating: x.e.rating });
+    }
     if (per.size < minRaters) continue;
+    const owners = [...bestOf.values()].sort((a, b) => b.rating - a.rating);
     const top = best(g.map((x) => x.e));
     const average = [...per.values()].reduce((a, b) => a + b, 0) / per.size;
-    rows.push({ title: top.title, coverUrl: coverOf(g.map((x) => x.e)), average, raters: per.size, sort: average });
+    rows.push({ title: top.title, coverUrl: coverOf(g.map((x) => x.e)), average, raters: per.size, owners, sort: average });
   }
   return rows
     .sort((a, b) => b.average - a.average || b.raters - a.raters || byTitle(a.title, b.title))

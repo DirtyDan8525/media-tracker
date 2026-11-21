@@ -24,7 +24,6 @@ import { CropSheet, PhotoPreviewSheet, type CropRect } from './profile/AvatarEdi
 import { AvatarTooBigError, makeAvatar, readImage } from './profile/avatarImage';
 import { EditProfileSheet } from './profile/EditProfileSheet';
 import { ShareProfileButton } from './profile/ShareProfileButton';
-import { TierCounts } from './profile/TierCounts';
 import '../design/settings.css';
 import '../design/nav.css';
 import '../design/wide.css';
@@ -187,7 +186,6 @@ export function ProfileScreen() {
           )}
         </section>
 
-        <TierCounts />
         </div>
 
         <div className="profile__col">

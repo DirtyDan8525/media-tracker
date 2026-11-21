@@ -333,8 +333,8 @@ describe("What's new / Coming soon / About (AD4)", () => {
 
 describe('Moderation (AD7)', () => {
   const comments = [
-    { id: 'c1', body: 'Frieren over Naruto', createdAt: new Date().toISOString(), author: { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarUrl: null, avatarAt: null }, entryId: 'e1', title: 'Frieren', category: 'anime', owner: 'dan' },
-    { id: 'c2', body: 'lol no', createdAt: new Date().toISOString(), author: { id: 'u-van', username: 'vance', displayName: null, avatarAt: null }, entryId: 'e2', title: 'Naruto', category: 'anime', owner: null },
+    { id: 'c1', body: 'Frieren over Naruto', createdAt: new Date().toISOString(), author: { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarUrl: null, avatarAt: null }, entryId: 'e1', title: 'Frieren', category: 'anime', owner: 'dan', image: false, expired: false },
+    { id: 'c2', body: 'lol no', createdAt: new Date().toISOString(), author: { id: 'u-van', username: 'vance', displayName: null, avatarAt: null }, entryId: 'e2', title: 'Naruto', category: 'anime', owner: null, image: false, expired: false },
   ];
 
   it('lists recent comments; Delete asks with big buttons, then DELETEs and refreshes', async () => {
@@ -354,6 +354,17 @@ describe('Moderation (AD7)', () => {
     await waitFor(() => expect(screen.queryByText('Frieren over Naruto')).not.toBeInTheDocument());
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/api/comments/c1']);
     expect(screen.getByText('lol no')).toBeInTheDocument();
+  });
+
+  it('a picture-only comment shows a Picture label with a thumbnail, an expired one says Picture expired', async () => {
+    const base = comments[0]!;
+    adminBackend({ 'GET /api/admin/comments': { body: { comments: [
+      { ...base, id: 'p1', body: '', image: true }, { ...base, id: 'p2', body: '', expired: true, entryId: 'e3' },
+    ] } } });
+    renderApp('/admin/moderation');
+    expect(await screen.findByText('📷 Picture')).toBeInTheDocument();
+    expect(document.querySelector('img[src="/api/comments/p1/media"]')).not.toBeNull();
+    expect(screen.getByText('Picture expired')).toBeInTheDocument();
   });
 
   it('Cancel sends nothing', async () => {

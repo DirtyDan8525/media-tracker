@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { Me } from '../api/types';
 import { localDb } from '../db/local';
 import { forgetCurrentList } from '../shell/currentList';
+import { forgetAddList } from '../shell/lastAddList';
 import { APP_KEY } from './appSettings';
 import { cachedMe, ME_KEY, normalizeMe, storeMe } from './useMe';
 
@@ -38,6 +39,7 @@ export async function finishSignIn(qc: QueryClient, me: Me): Promise<void> {
       // best-effort
     }
     forgetCurrentList();
+    forgetAddList();
   }
   const next = normalizeMe(me);
   // The app settings are the same for everyone, so they stay.
@@ -47,3 +49,7 @@ export async function finishSignIn(qc: QueryClient, me: Me): Promise<void> {
   await storeMe(next);
   markSignedIn();
 }
+
+/** Settings → Account → Change password. Needs the current password; every other device is signed out (this one stays). */
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api.post<{ ok: true; signedOutOthers: number }>('/api/auth/password', { currentPassword, newPassword });

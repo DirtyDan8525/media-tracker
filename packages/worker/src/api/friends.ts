@@ -69,13 +69,16 @@ friends.get('/', async (c) => {
 
 // Static paths first: /entries and /code/:code never collide with /:userId.
 // 1 query (+ sign-in): friend ids ride inside the entries statement. Rated, visible entries of every accepted friend.
+// ?brief=1 (group Top 5, friend cards: they only need titles, ratings, covers, sources) leaves out the per-title tag and
+// season-average sub-selects, which cost about 1.5 more rows read per title; those fields come back empty (tags [], seasonAvg null).
 friends.get('/entries', async (c) => {
   const category = c.req.query('category');
   if (category !== undefined && !isCategoryKey(category)) return c.json(invalid, 400);
   const me = c.var.user.id;
+  const brief = c.req.query('brief') === '1';
   const stmt = c.env.DB.prepare(
     // visibleEntrySql without its "your own" branch (excluded here anyway), so your own titles are never read.
-    `${ENTRY_SELECT} WHERE e.user_id <> ?1 AND e.is_private = 0 AND e.user_id IN (${FRIEND_IDS_SQL('?1')})
+    `${brief ? 'SELECT e.* FROM entries e' : ENTRY_SELECT} WHERE e.user_id <> ?1 AND e.is_private = 0 AND e.user_id IN (${FRIEND_IDS_SQL('?1')})
      AND (e.rating IS NOT NULL OR EXISTS (SELECT 1 FROM seasons s WHERE s.entry_id = e.id AND s.rating IS NOT NULL))
      ${category ? 'AND e.category = ?2' : ''} ORDER BY e.user_id, e.created_at, e.rowid`,
   );
@@ -161,10 +164,14 @@ friends.delete('/:userId', async (c) => {
 // 1 query (+ sign-in). Registered before /:username. Empty q = everyone (Dan, 2026-11-16: the Add friend
 // sheet lists all accounts; a private friend group, so up to 200 by username).
 users.get('/search', async (c) => {
-  const q = (c.req.query('q') ?? '').toLowerCase();
+  // A leading @ is allowed ("@ren"), as the web app sends it stripped and other callers may not.
+  const q = (c.req.query('q') ?? '').trim().replace(/^@/, '').toLowerCase();
   if (q !== '' && !USERNAME_Q_RE.test(q)) return c.json(invalid, 400);
+  // An exact username match sorts first, so the LIMIT can never drop the person who was typed in full
+  // (usernames are NOCASE-unique, so at most one row matches). Same rules on who is found: active, named, not you.
   const { results } = await c.env.DB.prepare(
-    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND status = 'active' AND id <> ?1 AND substr(username, 1, ?2) = ?3 ORDER BY username LIMIT ${q === '' ? 200 : 10}`,
+    `SELECT ${PUBLIC_USER_COLS} FROM users WHERE username IS NOT NULL AND status = 'active' AND id <> ?1 AND substr(username, 1, ?2) = ?3
+     ORDER BY (username = ?3 COLLATE NOCASE) DESC, username LIMIT ${q === '' ? 200 : 10}`,
   )
     .bind(c.var.user.id, q.length, q)
     .all<PublicUserRow>();

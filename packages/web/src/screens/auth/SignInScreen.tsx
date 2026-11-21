@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
 import { useAppSettings } from '../../data/appSettings';
 import { finishSignIn, JOIN_INVALID_KEY, login, PASSWORD_MAX, PASSWORD_MIN, signUp, USERNAME_RE } from '../../data/auth';
@@ -47,6 +47,7 @@ export function SignInScreen({ joinToken, banner, onSignedIn }: { joinToken?: st
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   function pick(next: Mode) {
     setPicked(next);
@@ -75,6 +76,11 @@ export function SignInScreen({ joinToken, banner, onSignedIn }: { joinToken?: st
     } catch (err) {
       setError(authError(err, mode));
       setBusy(false);
+      // A wrong password: the username stays, only the password clears, and focus goes to it to try again.
+      if (mode === 'signin') {
+        if (err instanceof ApiError && (err.error === 'bad_credentials' || err.error === 'invalid')) setPassword('');
+        passwordRef.current?.focus();
+      }
     }
   }
 
@@ -106,8 +112,8 @@ export function SignInScreen({ joinToken, banner, onSignedIn }: { joinToken?: st
             </div>
           )}
           <PasswordField label="Password" value={password} onChange={(v) => { setPassword(v); setError(null); }}
-            autoComplete={signup ? 'new-password' : 'current-password'} hint={signup ? PASSWORD_RULES : undefined} invalid={!!error} />
-          {error && <p role="alert" className="field-error">{error}</p>}
+            autoComplete={signup ? 'new-password' : 'current-password'} hint={signup ? PASSWORD_RULES : undefined} invalid={!!error} inputRef={passwordRef} errorId="auth-error" />
+          {error && <p id="auth-error" role="alert" className="field-error">{error}</p>}
           <Button type="submit" variant="primary" className="auth__submit" disabled={busy}>
             {busy ? (signup ? 'Creating account…' : 'Signing in…') : label}
           </Button>

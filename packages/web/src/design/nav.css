@@ -15,7 +15,7 @@
    Only Text / Bright text sit on it (v2Contrast checks the scrim's lightest stop). */
 .profile__banner { min-height: 120px; padding-bottom: var(--space-16); background: var(--header-row); border-bottom: none; }
 .page-header.has-backdrop.profile__banner { padding-bottom: var(--space-16); border-bottom: none; }
-.profile__banner .page-title { font-size: 20px; color: var(--bright-text); }
+.profile__banner .page-title { font-size: calc(20px * var(--app-scale, 1)); color: var(--bright-text); }
 .profile__banner .page-sub { color: var(--text); }
 .page-header.has-backdrop.profile__banner .backdrop::after {
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 60%, transparent) 0%, color-mix(in srgb, var(--bg) 78%, transparent) 60%, var(--bg) 100%);
@@ -29,7 +29,7 @@
 .profile__photo .avatar { width: 96px; height: 96px; border: 4px solid var(--bg); }
 .profile__photo-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
 .profile__photo-actions .btn { border-color: transparent; font-weight: 600; }
-.profile__name { margin: 0; font-size: 18px; font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
+.profile__name { margin: 0; font-size: var(--fs-brand); font-weight: 700; color: var(--bright-text); overflow-wrap: anywhere; }
 .profile__since { margin: 0; font-size: var(--fs-meta); color: var(--muted-text); }
 
 .profile__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.7fr); gap: var(--space-4); }
@@ -41,15 +41,11 @@
 .profile-stat > div { display: flex; flex-direction: column-reverse; align-items: center; gap: var(--space-1); }
 .profile-tile--wide .profile-stat > div { flex-direction: row-reverse; justify-content: center; align-items: baseline; gap: var(--space-3); }
 .profile-stat dd { margin: 0; font-size: var(--fs-title); font-weight: 700; line-height: 1.1; color: var(--bright-text); font-variant-numeric: tabular-nums; }
-.profile-tile--wide .profile-stat dd { font-size: 22px; }
+.profile-tile--wide .profile-stat dd { font-size: calc(22px * var(--app-scale, 1)); }
 .profile-stat dt { font-size: var(--fs-pill); color: var(--muted-text); }
 .profile__add-friend { width: 100%; padding: 0 var(--space-3); font-size: var(--fs-meta); }
 
 .profile__ones { display: flex; flex-direction: column; gap: var(--space-4); }
-.profile__tiers { display: flex; flex-direction: column; gap: var(--space-3); }
-.profile__tier-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; }
-.profile__tier-bar > span { height: 100%; }
-.profile__tier-line { margin: 0; font-size: var(--fs-pill); color: var(--muted-text); }
 .profile__empty { margin: 0; padding: var(--space-6) var(--space-7); border-radius: var(--radius-xl); background: var(--card); color: var(--text); font-size: var(--fs-sm); }
 .profile__strip { display: flex; gap: var(--space-6); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; }
 .profile__strip > li { flex: none; }

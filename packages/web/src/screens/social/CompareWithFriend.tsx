@@ -13,6 +13,7 @@ import { who } from './parts';
 import '../../design/social.css';
 import { listCfg, listLabel } from '../../lists/registry';
 
+const PAGE = 25;
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -26,6 +27,9 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
   const toast = useToast();
   const [done, setDone] = useState<Record<string, AddToMineResult>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  // Both lists are fully loaded, so paging is client-side; reset to one page when the category changes.
+  const [shown, setShown] = useState<{ category: Category; both: number; theirs: number }>({ category, both: PAGE, theirs: PAGE });
+  const lim = shown.category === category ? shown : { category, both: PAGE, theirs: PAGE };
   const name = who(user);
   const label = listLabel(category);
   const theirs = useMemo(() => entries.filter((e) => e.category === category), [entries, category]);
@@ -35,7 +39,7 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
   const missing = useMemo(() => {
     if (!mine.data) return [];
     const byId = new Map(theirs.map((e) => [e.id, e]));
-    return theirsNotYours(mine.data.filter((m) => !added.has(m.id)), theirs).flatMap((c) => byId.get(c.id) ?? []);
+    return theirsNotYours(mine.data.filter((m) => !added.has(m.id)), theirs, Infinity).flatMap((c) => byId.get(c.id) ?? []);
   }, [mine.data, theirs, added]);
 
   if (mine.isPending) return <div className="stack-10" aria-busy="true" aria-label="Loading"><Skeleton height={64} /><Skeleton height={64} /></div>;
@@ -65,7 +69,7 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
           <p className="friend-note">Nothing you've both rated in {label} yet.</p>
         ) : (
           <ul className="people plain-list">
-            {both.map((r) => (
+            {both.slice(0, lim.both).map((r) => (
               <li key={`${r.myId}-${r.theirId}`}>
                 <Link to={`/entry/${r.myId}`} className="person" aria-label={`${r.title}: You ${formatRating(r.mine)}, ${name} ${formatRating(r.theirs)}`}>
                   <span aria-hidden="true"><CoverImage src={r.coverUrl} alt="" square={square} width={40} /></span>
@@ -81,6 +85,10 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
             ))}
           </ul>
         )}
+        {both.length > lim.both && (
+          <Button variant="secondary" className="stats__more"
+            onClick={() => setShown({ ...lim, both: lim.both + PAGE })}>Show more ({both.length - lim.both} left)</Button>
+        )}
       </section>
       <section aria-labelledby="cmp-theirs" className="group">
         <h2 id="cmp-theirs" className="group__title">Theirs, not yours</h2>
@@ -88,7 +96,7 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
           <p className="friend-note">Nothing from {name} to add in {label} right now.</p>
         ) : (
           <ul className="people plain-list">
-            {missing.map((e) => {
+            {missing.slice(0, lim.theirs).map((e) => {
               const r = done[e.id];
               return (
                 <li key={e.id} className="person">
@@ -107,6 +115,10 @@ export function CompareWithFriend({ user, category, entries }: { user: PublicUse
               );
             })}
           </ul>
+        )}
+        {missing.length > lim.theirs && (
+          <Button variant="secondary" className="stats__more"
+            onClick={() => setShown({ ...lim, theirs: lim.theirs + PAGE })}>Show more ({missing.length - lim.theirs} left)</Button>
         )}
       </section>
     </>

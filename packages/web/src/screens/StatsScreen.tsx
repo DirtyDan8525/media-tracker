@@ -1,4 +1,4 @@
-import { formatRating, ratingColor, tiersFor, type Category } from '@media-tracker/shared';
+import { formatRating, ratingColor, type Category } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useAllEntries } from '../data/useEntries';
@@ -10,31 +10,21 @@ import { Skeleton } from '../design/components/Skeleton';
 import { useCfSet } from '../design/ThemeContext';
 import { useIsWide } from '../hooks';
 import { useEnabledLists } from '../shell/useLists';
-import { computeStats, ratingDistribution, type ListStats } from '../ratings/stats';
-import { TIERS_TOP_FIRST } from '../design/components/TierPicker';
+import { computeStats, ratingDistribution, type GenreStat, type ListStats } from '../ratings/stats';
 import { PageHeader } from '../shell/PageHeader';
-import { useSessionMe } from '../shell/SessionGate';
 import '../design/ratings.css';
 import { listLabel } from '../lists/registry';
 
 const DASH = '—';
 const MAX_GENRES = 10;
-/** "Loved 14 · Liked 22 · Fine 6 · Didn't like 2" in the list's own tier names; null when nothing is in a tier. */
-function tierLine(s: ListStats, names: readonly string[]): string | null {
-  if (s.tiers.every((n) => n === 0)) return null;
-  return TIERS_TOP_FIRST.map((t) => `${names[t]} ${s.tiers[t]}`).join(' · ');
-}
 const pct = (n: number, of: number): number => (of > 0 ? Math.round((n / of) * 100) : 0);
 
 /** Counts and averages over the lists that are turned on (route /stats). Charts are drawn in theme colours; every one has a table beside it for screen readers. */
 export function StatsScreen() {
-  const me = useSessionMe();
   const qc = useQueryClient();
-  const cf = useCfSet();
   const lists = useEnabledLists();
   const { data, isPending, isError } = useAllEntries(lists);
   const wide = useIsWide();
-  const [allGenres, setAllGenres] = useState(false);
   // Cheap sums over a few hundred rows; `data` is a fresh object each render, so a memo would never hit.
   const stats = computeStats(data, lists);
   const dist = ratingDistribution(data, lists);
@@ -71,9 +61,6 @@ export function StatsScreen() {
       </div>
     );
   }
-  const maxBin = Math.max(...dist, 1);
-  const genres = allGenres ? stats.animeGenres : stats.animeGenres.slice(0, MAX_GENRES);
-  const maxGenre = Math.max(...genres.map((g) => g.count), 1);
 
   return (
     <div className="screen">
@@ -105,25 +92,7 @@ export function StatsScreen() {
           </div>
         </section>
 
-        <section aria-labelledby="stats-dist" className="stats__card stats__dist">
-          <h2 id="stats-dist" className="stats__card-title stats__card-title--plain">
-            Rating distribution <span className="stats__note">{all.rated} rated</span>
-          </h2>
-          <div className="hist" aria-hidden="true">
-            {dist.map((n, i) => (
-              <div className="hist__col" key={i}>
-                <span className="hist__bar bar-grow-y"
-                  style={{ '--i': i, height: n === 0 ? 2 : `max(4px, calc((100% - 18px) * ${n / maxBin}))`, background: ratingColor(i + 1, cf) } as CSSProperties} />
-                <span className="hist__x">{i + 1}</span>
-              </div>
-            ))}
-          </div>
-          <table className="sr-only">
-            <caption>Ratings by score</caption>
-            <thead><tr><th scope="col">Score</th><th scope="col">Ratings</th></tr></thead>
-            <tbody>{dist.map((n, i) => <tr key={i}><th scope="row">{i + 1}</th><td>{n}</td></tr>)}</tbody>
-          </table>
-        </section>
+        <DistributionCard dist={dist} rated={all.rated} idPrefix="stats" />
 
         <section aria-labelledby="stats-lists" className="stats__lists">
           <h2 id="stats-lists" className="stats__heading">By list</h2>
@@ -138,51 +107,89 @@ export function StatsScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={listLabel(l.category as Category)} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
+                  {stats.lists.map((l, i) => <StatsRow key={l.category} name={listLabel(l.category as Category)} s={l} index={i} />)}
                   <StatsRow name="All media" s={all} index={stats.lists.length} total />
                 </tbody>
               </table>
             </div>
           ) : (
             <ul className="stats__cards" aria-label="Stats by list">
-              {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category as Category)} s={l} index={i} tiers={tierLine(l, tiersFor(me.settings, l.category as Category).names)} />)}
+              {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category as Category)} s={l} index={i} />)}
             </ul>
           )}
         </section>
 
-        {genres.length > 0 && (
-          <section aria-labelledby="stats-genres" className="stats__genres">
-            <h2 id="stats-genres" className="stats__heading">Anime by genre</h2>
-            <div className="stats__table-wrap">
-              <table className="stats__table stats__table--genres">
-                <caption className="sr-only">Anime by genre</caption>
-                <thead>
-                  <tr><th scope="col">Genre</th><th scope="col" className="num">Titles</th><th scope="col" className="num">Average</th></tr>
-                </thead>
-                <tbody>
-                  {genres.map((g, i) => (
-                    <tr key={g.genre}>
-                      <th scope="row">{g.genre}</th>
-                      <td className="num"><Bar value={g.count / maxGenre} index={i} />{g.count}</td>
-                      <td className="num">{g.average === null ? DASH : formatRating(g.average)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {stats.animeGenres.length > MAX_GENRES && (
-              <Button variant="secondary" className="stats__more" aria-expanded={allGenres} onClick={() => setAllGenres((v) => !v)}>
-                {allGenres ? 'Show fewer genres' : `Show all ${stats.animeGenres.length} genres`}
-              </Button>
-            )}
-          </section>
-        )}
+        <GenresCard genres={stats.animeGenres} idPrefix="stats" />
       </div>
     </div>
   );
 }
 
-export function ListCard({ name, s, index, tiers }: { name: string; s: ListStats; index: number; tiers: string | null }) {
+/** The rating histogram (decorative bars) plus a screen-reader table. `dist` is ratingDistribution's output. */
+export function DistributionCard({ dist, rated, idPrefix }: { dist: number[]; rated: number; idPrefix: string }) {
+  const cf = useCfSet();
+  const maxBin = Math.max(...dist, 1);
+  const id = `${idPrefix}-dist`;
+  return (
+    <section aria-labelledby={id} className="stats__card stats__dist">
+      <h2 id={id} className="stats__card-title stats__card-title--plain">
+        Rating distribution <span className="stats__note">{rated} rated</span>
+      </h2>
+      <div className="hist" aria-hidden="true">
+        {dist.map((n, i) => (
+          <div className="hist__col" key={i}>
+            <span className="hist__bar bar-grow-y"
+              style={{ '--i': i, height: n === 0 ? 2 : `max(4px, calc((100% - 18px) * ${n / maxBin}))`, background: ratingColor(i + 1, cf) } as CSSProperties} />
+            <span className="hist__x">{i + 1}</span>
+          </div>
+        ))}
+      </div>
+      <table className="sr-only">
+        <caption>Ratings by score</caption>
+        <thead><tr><th scope="col">Score</th><th scope="col">Ratings</th></tr></thead>
+        <tbody>{dist.map((n, i) => <tr key={i}><th scope="row">{i + 1}</th><td>{n}</td></tr>)}</tbody>
+      </table>
+    </section>
+  );
+}
+
+/** Anime by genre (top 10, expandable). Renders nothing without genres. */
+export function GenresCard({ genres: all, idPrefix }: { genres: GenreStat[]; idPrefix: string }) {
+  const [showAll, setShowAll] = useState(false);
+  if (all.length === 0) return null;
+  const genres = showAll ? all : all.slice(0, MAX_GENRES);
+  const maxGenre = Math.max(...genres.map((g) => g.count), 1);
+  const id = `${idPrefix}-genres`;
+  return (
+    <section aria-labelledby={id} className="stats__genres">
+      <h2 id={id} className="stats__heading">Anime by genre</h2>
+      <div className="stats__table-wrap">
+        <table className="stats__table stats__table--genres">
+          <caption className="sr-only">Anime by genre</caption>
+          <thead>
+            <tr><th scope="col">Genre</th><th scope="col" className="num">Titles</th><th scope="col" className="num">Average</th></tr>
+          </thead>
+          <tbody>
+            {genres.map((g, i) => (
+              <tr key={g.genre}>
+                <th scope="row">{g.genre}</th>
+                <td className="num"><Bar value={g.count / maxGenre} index={i} />{g.count}</td>
+                <td className="num">{g.average === null ? DASH : formatRating(g.average)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {all.length > MAX_GENRES && (
+        <Button variant="secondary" className="stats__more" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
+          {showAll ? 'Show fewer genres' : `Show all ${all.length} genres`}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+export function ListCard({ name, s, index }: { name: string; s: ListStats; index: number }) {
   return (
     <li className="stats__list-card">
       <div className="stats__list-head">
@@ -192,7 +199,6 @@ export function ListCard({ name, s, index, tiers }: { name: string; s: ListStats
       <div className="stats__list-rated" aria-hidden="true">
         <Bar value={s.entries ? s.rated / s.entries : 0} index={index} />{s.rated}/{s.entries}
       </div>
-      {tiers && <p className="stats__tiers">{tiers}</p>}
       <dl className="stats__list-dl">
         <div><dt>Entries</dt><dd>{s.entries}</dd></div>
         <div><dt>Rated</dt><dd>{s.rated}</dd></div>
@@ -204,10 +210,10 @@ export function ListCard({ name, s, index, tiers }: { name: string; s: ListStats
   );
 }
 
-function StatsRow({ name, s, index, total, tiers }: { name: string; s: Omit<ListStats, 'tiers'>; index: number; total?: boolean; tiers?: string | null }) {
+function StatsRow({ name, s, index, total }: { name: string; s: ListStats; index: number; total?: boolean }) {
   return (
     <tr className={total ? 'stats__total' : undefined}>
-      <th scope="row">{name}{tiers && <span className="stats__tiers">{tiers}</span>}</th>
+      <th scope="row">{name}</th>
       <td className="num">{s.entries}</td>
       <td className="num"><Bar value={s.entries ? s.rated / s.entries : 0} index={index} />{s.rated}</td>
       <td className="num">{s.average === null ? DASH : <RatingBadge rating={s.average} size="xs" />}</td>

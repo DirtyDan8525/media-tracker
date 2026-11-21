@@ -27,18 +27,18 @@
   }
   .frame--wide .profile__photo { grid-column: 1; grid-row: 1 / span 5; }
   .frame--wide .profile__display, .frame--wide .profile__name, .frame--wide .profile__bio, .frame--wide .profile__since { grid-column: 2; text-align: left; }
-  .frame--wide .profile__display { grid-row: 2; font-size: var(--fs-title); }
-  .frame--wide .profile__name { grid-row: 3; font-size: 20px; color: var(--text); }
+  .frame--wide .profile__display { grid-row: 2; font-size: calc(26px * var(--app-scale, 1)); }
+  .frame--wide .profile__name { grid-row: 3; font-size: calc(20px * var(--app-scale, 1)); color: var(--text); }
   .frame--wide .profile__bio { grid-row: 4; max-width: 60ch; margin-top: var(--space-2); }
   .frame--wide .profile__since { grid-row: 5; }
   .frame--wide .profile__photo-actions { grid-column: 3; grid-row: 2; justify-content: flex-end; }
   .frame--wide .profile__edit { grid-column: 3; grid-row: 3; justify-self: end; }
   .frame--wide .profile__photo .avatar, .frame--wide .friend-id .avatar { width: var(--pfp) !important; height: var(--pfp) !important; font-size: calc(var(--pfp) * 0.42) !important; }
-  .frame--wide .profile__since { font-size: 16px; }
+  .frame--wide .profile__since { font-size: calc(16px * var(--app-scale, 1)); }
   .frame--wide .profile__tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-8); }
   .frame--wide .profile-tile { padding: var(--space-8) var(--space-10); }
-  .frame--wide .profile-stat dd { font-size: 28px; }
-  .frame--wide .profile-tile--wide .profile-stat dd { font-size: 28px; }
+  .frame--wide .profile-stat dd { font-size: calc(28px * var(--app-scale, 1)); }
+  .frame--wide .profile-tile--wide .profile-stat dd { font-size: calc(28px * var(--app-scale, 1)); }
   .frame--wide .profile__logout { padding-right: 0; }
 
   /* Blocks of cards go in columns. */
@@ -49,8 +49,8 @@
   .frame--wide .top5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: var(--space-12) var(--space-12); align-items: start; }
   /* The Top 5 page fills the width (no 1200/1400 cap): columns of at least 300 px, never more than 4 (Dan, 2026-11-19). */
   .frame--wide .screen__body.top5 { max-width: none; grid-template-columns: repeat(auto-fill, minmax(max(300px, calc((100% - 3 * var(--space-12)) / 4)), 1fr)); }
-  .frame--wide .top5__row .top5__title { font-size: 16px; }
-  .frame--wide .top5__row .top5__creator { font-size: 14px; }
+  .frame--wide .top5__row .top5__title { font-size: calc(16px * var(--app-scale, 1)); }
+  .frame--wide .top5__row .top5__creator { font-size: calc(14px * var(--app-scale, 1)); }
   .frame--wide .top5__row { padding: var(--space-3) var(--space-5); gap: var(--space-8); }
   .frame--wide .top5 > :not(.top5__block) { grid-column: 1 / -1; }
   .frame--wide .social-page .people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); }
@@ -82,7 +82,7 @@
   .frame--wide .activity { gap: var(--space-8); }
   .frame--wide .activity__day > ul { display: flex; flex-direction: column; gap: var(--space-5); }
   .frame--wide .activity-screen { --fs-sm: calc(15px * var(--app-scale, 1)); --fs-meta: calc(14px * var(--app-scale, 1)); }
-  .frame--wide .activity-line__avatar { width: 44px !important; height: 44px !important; font-size: 18px !important; }
+  .frame--wide .activity-line__avatar { width: 44px !important; height: 44px !important; font-size: calc(18px * var(--app-scale, 1)) !important; }
   .frame--wide .activity-filter, .frame--wide .search-screen__controls { max-width: 720px; }
   /* Search: each list's results in two columns. */
   .frame--wide .search-group > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-8); }

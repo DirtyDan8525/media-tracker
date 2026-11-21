@@ -193,9 +193,11 @@ test('phone shell: the title dropdown picks a list, Home returns to it, Add (bub
   const bar = page.getByRole('navigation', { name: 'Main' });
   await bar.getByRole('link', { name: 'Activity' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Add movie' })).toBeVisible();
+  // On Activity the bubble opens Add in place (2026-11-20), so it's a button there.
+  await expect(page.getByRole('button', { name: 'Add movie' })).toBeVisible();
   await bar.getByRole('link', { name: 'More' }).click();
   await expect(page.getByRole('link', { name: 'Add movie' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add movie' })).toHaveCount(0);
   await bar.getByRole('link', { name: 'Home' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Movies' })).toBeVisible();
 
@@ -227,7 +229,7 @@ test('Activity (You) shows "You added Frieren to Anime", reached from the Main n
   await expect(page.getByText(/You\s+added\s+Frieren\s+to\s+Anime/).first()).toBeVisible();
 });
 
-test('number flow: a typed 9.7 counts as Loved in the Profile tier counts; Planned titles have no rating field', async ({ page }) => {
+test('number flow: a typed 9.7 is stored as 9.7; Planned titles have no rating field', async ({ page }) => {
   await signInAndSetUsername(page, 'e2e_user');
   const lovedCount = async () => (await animeRows(page)).filter((e) => e.rating !== null && e.rating >= 9).length;
   const before = await lovedCount();
@@ -244,9 +246,7 @@ test('number flow: a typed 9.7 counts as Loved in the Profile tier counts; Plann
   await expect(page.getByRole('group', { name: 'Tier' })).toHaveCount(0);
   await expect(page.getByRole('switch', { name: 'Lock score' })).toHaveCount(0);
 
-  // Profile: the tier bar and its line count it (Loved comes first in the line).
-  await page.goto('/profile');
-  await expect(page.getByRole('img', { name: new RegExp(`^Loved ${before + 1} · `) })).toBeVisible();
+  // (Profile's Loved/Liked tier counts were removed, Dan 2026-11-20.)
 
   // The Add sheet hides the rating field for a planned title.
   await page.goto('/list/anime');

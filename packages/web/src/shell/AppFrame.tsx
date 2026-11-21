@@ -1,4 +1,5 @@
-import { Outlet } from 'react-router';
+import { Outlet, useSearchParams } from 'react-router';
+import { PopoutContext, PopoutLinks } from './popout';
 import { BackfillProvider } from '../backfill/useBackfill';
 import { useAppSettings } from '../data/appSettings';
 import { useUnread } from '../data/feed';
@@ -16,6 +17,7 @@ import { setNavWidth, useNavWidth } from './navWidth';
 import { OnboardingHost } from '../screens/onboarding/OnboardingHost';
 import { AddFriendProvider } from './AddFriendHost';
 import { AddBubble } from './AddBubble';
+import { AddProvider } from './AddHost';
 import { QuietBanner } from './QuietBanner';
 import { useSessionMe } from './SessionGate';
 import { useDeviceDefaults } from '../data/deviceDefaults';
@@ -26,10 +28,23 @@ import '../design/nav.css';
  * PC: side nav beside the content.
  */
 export function AppFrame() {
+  const [params] = useSearchParams();
+  // The chat pop-out window (?popout=1): just the page, no nav, tabs, Add bubble or prompts.
+  if (params.get('popout') === '1') {
+    return (
+      <BackfillProvider>
+        <AddFriendProvider>
+          <PopoutContext.Provider value><PopoutLinks><div className="frame frame--popout"><main className="frame__main"><Outlet /></main></div></PopoutLinks></PopoutContext.Provider>
+        </AddFriendProvider>
+      </BackfillProvider>
+    );
+  }
   return (
     <BackfillProvider>
       <AddFriendProvider>
-        <FrameLayout />
+        <AddProvider>
+          <FrameLayout />
+        </AddProvider>
         <OnboardingHost />
       </AddFriendProvider>
     </BackfillProvider>

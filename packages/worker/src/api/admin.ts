@@ -238,6 +238,9 @@ export interface AdminComment {
   category: Category;
   /** Whose title it is. */
   owner: string | null;
+  /** The comment carries a picture (the admin can view it at GET /api/comments/:id/media), or its picture has expired. */
+  image: boolean;
+  expired: boolean;
 }
 
 // GET /api/admin/comments?limit=50 -> { comments }: the newest live comments (1-200, default 50) with author and the
@@ -246,14 +249,14 @@ admin.get('/comments', async (c) => {
   const asked = Number.parseInt(c.req.query('limit') ?? '', 10);
   const limit = Number.isFinite(asked) ? Math.min(200, Math.max(1, asked)) : 50;
   const { results } = await c.env.DB.prepare(
-    `SELECT c.id, c.body, c.created_at, e.id AS entry_id, e.title, e.category, ou.username AS owner,
+    `SELECT c.id, c.body, c.created_at, c.media_key IS NOT NULL AS has_image, c.media_expired, e.id AS entry_id, e.title, e.category, ou.username AS owner,
             u.id AS u_id, u.username, u.display_name, u.avatar_at
        FROM comments c JOIN users u ON u.id = c.user_id
        JOIN entries e ON e.id = c.entry_id
        LEFT JOIN users ou ON ou.id = e.user_id
       WHERE c.deleted_at IS NULL ORDER BY c.created_at DESC, c.id LIMIT ?`,
   ).bind(limit).all<{
-    id: string; body: string; created_at: string; entry_id: string; title: string; category: Category;
+    id: string; body: string; created_at: string; has_image: number; media_expired: number; entry_id: string; title: string; category: Category;
     owner: string | null; u_id: string; username: string | null; display_name: string | null; avatar_at: string | null;
   }>();
   const comments: AdminComment[] = results.map((r) => ({
@@ -265,6 +268,8 @@ admin.get('/comments', async (c) => {
     title: r.title,
     category: r.category,
     owner: r.owner,
+    image: r.has_image === 1,
+    expired: r.media_expired === 1,
   }));
   return c.json({ comments });
 });

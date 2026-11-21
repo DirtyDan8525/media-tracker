@@ -79,14 +79,14 @@ describe('app shell', () => {
       expect(profile.querySelector('.nav-dot')).not.toBeNull();
     });
 
-    it('Add on /activity navigates to /list/<current> and opens the Add sheet', async () => {
+    it('Add on /activity opens the Add sheet in place, without leaving Activity', async () => {
       fakeBackend({ extra: { 'GET /api/activity': { body: { items: [], next: null } } } });
       const { router } = renderApp('/activity');
-      const add = (await screen.findByRole('link', { name: 'Add anime' }));
-      expect(add).toHaveAttribute('href', '/list/anime?add=1');
+      const add = (await screen.findByRole('button', { name: 'Add anime' }));
+      expect(add).not.toHaveAttribute('href');
       await userEvent.click(add);
       expect(await screen.findByRole('dialog', { name: 'Add' })).toBeInTheDocument();
-      await waitFor(() => expect(router.state.location.pathname).toBe('/list/anime'));
+      expect(router.state.location.pathname).toBe('/activity');
       expect(router.state.location.search).toBe('');
     });
 
@@ -107,7 +107,7 @@ describe('app shell', () => {
       await screen.findByRole('heading', { level: 1, name: 'Anime' });
       await router.navigate('/activity?show=you');
       await screen.findByRole('heading', { level: 1, name: 'Activity' });
-      expect((await screen.findByRole('link', { name: 'Add anime' }))).toHaveAttribute('href', '/list/anime?add=1');
+      expect((await screen.findByRole('button', { name: 'Add anime' }))).not.toHaveAttribute('href');
     });
 
     it('Add\'s name follows the current list ("Add movie" after visiting /list/movies)', async () => {
@@ -115,8 +115,7 @@ describe('app shell', () => {
       const { router } = renderApp('/list/movies');
       await screen.findByRole('heading', { level: 1, name: 'Movies' });
       await router.navigate('/activity');
-      const add = (await screen.findByRole('link', { name: 'Add movie' }));
-      expect(add).toHaveAttribute('href', '/list/movies?add=1');
+      const add = (await screen.findByRole('button', { name: 'Add movie' }));
       expect(add).toHaveClass('add-fab');
     });
 
@@ -124,7 +123,7 @@ describe('app shell', () => {
       localStorage.setItem('mt-current-list', 'anime');
       mockApi(makeMe({}, { anime: false }));
       renderApp('/activity');
-      expect((await screen.findByRole('link', { name: 'Add movie' }))).toHaveAttribute('href', '/list/movies?add=1');
+      expect(await screen.findByRole('button', { name: 'Add movie' })).toBeInTheDocument();
     });
 
     it('all lists off → no Add bubble (Home still shows)', async () => {
@@ -133,6 +132,7 @@ describe('app shell', () => {
       renderApp('/activity');
       const nav = await mainNav();
       expect(screen.queryByRole('link', { name: /^Add/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Add/ })).not.toBeInTheDocument();
       expect(linkNames(nav)).toEqual(['Home', 'Activity', 'Search', 'Friends', 'More']);
       expect(nav.children).toHaveLength(5);
     });

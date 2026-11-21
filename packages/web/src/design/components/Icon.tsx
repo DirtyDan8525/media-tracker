@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { BuiltinCategory } from '@media-tracker/shared';
 
 export type IconName = BuiltinCategory | 'more' | 'search' | 'close' | 'back' | 'image' | 'plus' | 'upload' | 'settings' | 'info' | 'compare' | 'top5' | 'stats' | 'chevron'
-  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group'
+  | 'activity' | 'palette' | 'check' | 'warning' | 'download' | 'user' | 'logout' | 'lists' | 'share' | 'tiers' | 'lock' | 'eye' | 'eye-off' | 'home' | 'chevron-down' | 'messages' | 'send' | 'group' | 'popout'
   | 'mic' | 'play' | 'pause' | 'reply' | 'bell-off';
 
 /** Stroke paths, 24×24 viewBox. The list icons match the mockups' bottom bar. */
@@ -51,6 +51,7 @@ const PATHS: Record<IconName, ReactElement> = {
   send: <path d="M21 3L10 14M21 3l-7 18-4-7-7-4z" />,
   group: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
   'bell-off': <><path d="M6 17h12l-1.5-2V10a4.5 4.5 0 0 0-7.4-3.4M6.5 10v5L5 17M10 20.5h4" /><path d="M3 3l18 18" /></>,
+  popout: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
   share: <path d="M12 15V3M7 8l5-5 5 5M5 12v8h14v-8" />,
 };
 

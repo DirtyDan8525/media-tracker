@@ -1,6 +1,7 @@
 import { nameOf, type Conversation, type Message, type PublicUser } from '@media-tracker/shared';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
+import { openChatPopout, usePopout } from '../../shell/popout';
 import { backState } from '../../shell/BackButton';
 import { ApiError } from '../../api/client';
 import { conversationTitle, messageImageUrl, useChat, useConversation, useDeleteMessage, useMuteConversation, useReactToMessage } from '../../data/messages';
@@ -14,11 +15,12 @@ import { Sheet } from '../../design/components/Sheet';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
 import { BackButton } from '../../shell/BackButton';
-import { useIsWide } from '../../hooks';
+import { useIsWide, useMediaQuery } from '../../hooks';
 import { useSessionMe } from '../../shell/SessionGate';
 import { dayLabel } from '../activity/format';
 import { Composer, type ReplyDraft } from './Composer';
 import { TextSizeControl } from '../../design/components/TextSizeControl';
+import { setTitleOverride } from '../../pageTitle';
 import { useBubbleMineColors } from './bubbleColors';
 import { useChatTextSize } from '../../design/components/useTextSize';
 import { AddPeopleSheet, LeaveSheet, RenameSheet } from './GroupSheets';
@@ -34,6 +36,7 @@ import '../../design/messages.css';
 /** Back in a chat. Phone: the round arrow to the Messages list. PC (no arrow of its own): a "Back" button that returns to where you opened the chat from, else the Messages list. */
 function ChatBack() {
   const wide = useIsWide();
+  if (usePopout()) return null;
   return <BackButton to="/messages" pc useHistory={wide} />;
 }
 
@@ -98,6 +101,10 @@ function Chat({ conversation }: { conversation: Conversation }) {
   const seen = useRef<Set<string> | null>(null);
 
   const wide = useIsWide();
+  const popout = usePopout();
+  const navigate = useNavigate();
+  // "Pop out" is for a PC with a mouse: 1024 px and wider, fine pointer; not on phones, not inside the pop-out itself.
+  const canPopOut = useMediaQuery('(min-width: 1024px)') && !useMediaQuery('(pointer: coarse)') && !popout;
   const cover = useBackdropCover(conversation.members.filter((m) => m.id !== me.id).map((m) => m.username), wide);
   const isGroup = conversation.kind === 'group';
   const title = conversationTitle(conversation, me.id);
@@ -205,6 +212,13 @@ function Chat({ conversation }: { conversation: Conversation }) {
     );
   });
 
+  useEffect(() => {
+    if (!popout) return;
+    setTitleOverride(`${title} · Chat`);
+    return () => setTitleOverride(null);
+  }, [popout, title]);
+  const popOut = () => { if (openChatPopout(conversation.id)) navigate('/messages'); };
+
   const screenEl = (
     <div className="screen chat"
       style={{ '--chat-scale': textSize.scale, '--bubble-mine-bg': mineColors.bg, '--bubble-mine-text': mineColors.text } as CSSProperties}>
@@ -231,6 +245,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
           <div className="chat__titles"><h1 className="chat__title">{title}</h1></div>
         )}
         <TextSizeControl step={textSize.step} onChange={textSize.set} />
+        {canPopOut && <IconButton label="Pop out chat" icon="popout" look="plain" onClick={popOut} />}
         <div className="chat__menu" ref={menuWrap}
           onKeyDown={(e) => { if (e.key === 'Escape' && menu) { e.stopPropagation(); setMenu(false); menuWrap.current?.querySelector<HTMLElement>('button[aria-haspopup]')?.focus(); } }}>
           <IconButton label={isGroup ? 'Group options' : 'Chat options'} icon="more" look="plain" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)} />

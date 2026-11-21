@@ -1,0 +1,4 @@
+/* Settings → Account → Change password. */
+.pw-form { display: flex; flex-direction: column; gap: var(--space-8); }
+.pw-form .text-field { height: 50px; }
+.pw-form .text-field input { font-size: 16px; } /* 16 px: iOS does not zoom the page on focus */

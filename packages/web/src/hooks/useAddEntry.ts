@@ -10,6 +10,7 @@ import { applyLookupMatch } from '../lookup/apply';
 import { buildLookupQuery } from '../lookup/query';
 import { runLookup } from '../lookup/run';
 import { listCfg } from '../lists/registry';
+import { rememberAddList } from '../shell/lastAddList';
 
 export interface AddInput {
   title: string;
@@ -55,7 +56,10 @@ let tempCounter = 0;
 /** Asked before adding a second copy of a title (Dan, 2026-11-16): resolve true to add it again. */
 export type ConfirmDuplicate = (title: string, category: Category, existingId: string) => Promise<boolean>;
 
-export function useAddEntry(defaultCategory: Category, confirmDuplicate?: ConfirmDuplicate) {
+/** Called as soon as the row is saved (before its lookup finishes). */
+export type OnSaved = (entry: Entry) => void;
+
+export function useAddEntry(defaultCategory: Category, confirmDuplicate?: ConfirmDuplicate, onSaved?: OnSaved) {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(0);
@@ -153,6 +157,8 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
       lookupRunning.add(entry.id);
       lookupRunning.delete(tempId);
       writeEntry(qc, entry, { replaceId: tempId });
+      rememberAddList(category); // Add opens on this list next time, from screens that are not a list
+      onSaved?.(entry);
       if (entry.rating !== null) void qc.invalidateQueries({ queryKey: CLOSE_COUNTS_KEY });
       else if (entry.status === COMPLETED) announceCompleted(entry);
     } catch {
@@ -168,7 +174,7 @@ export function useAddEntry(defaultCategory: Category, confirmDuplicate?: Confir
     }
     await resolve(entry, title, lookup);
     return entry;
-  }, [defaultCategory, qc, toast, resolve, confirmDuplicate]);
+  }, [defaultCategory, qc, toast, resolve, confirmDuplicate, onSaved]);
 
   /** Look an entry up again (Retry), with its own title or `term`. */
   const retry = useCallback(async (entry: Entry, term?: string): Promise<void> => {

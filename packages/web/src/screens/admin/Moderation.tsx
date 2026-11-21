@@ -7,6 +7,7 @@ import { EmptyState } from '../../design/components/EmptyState';
 import { Sheet } from '../../design/components/Sheet';
 import { Skeleton } from '../../design/components/Skeleton';
 import { useToast } from '../../design/components/Toast';
+import { commentImageUrl } from '../../data/feed';
 import { useNow } from '../../hooks';
 import { timeAgo } from '../activity/format';
 import { PlainPage } from './parts';
@@ -42,7 +43,14 @@ export function ModerationScreen() {
                 <li key={c.id} className="person person--admin">
                   <span className="person__meta">
                     <span className="person__name">{nameOf(c.author)} <span className="muted">· {timeAgo(c.createdAt, now)}</span></span>
-                    <span className="admin-comment__body">{c.body}</span>
+                    {c.body !== '' && <span className="admin-comment__body">{c.body}</span>}
+                    {c.expired ? <span className="admin-comment__pic admin-comment__pic--gone">Picture expired</span>
+                      : c.image && (
+                        <span className="admin-comment__pic">
+                          <img src={commentImageUrl(c.id)} alt="" loading="lazy" width={48} height={48} />
+                          <span>📷 Picture</span>
+                        </span>
+                      )}
                     <span className="person__sub">on {c.title}{c.owner ? ` (@${c.owner})` : ''}</span>
                   </span>
                   <Button compact aria-label={`Delete comment by ${nameOf(c.author)}`} onClick={() => setAsking(c)}>Delete</Button>
@@ -58,7 +66,7 @@ export function ModerationScreen() {
             <Button className="btn--big" disabled={del.isPending} onClick={() => setAsking(null)}>Cancel</Button>
           </div>
         }>
-        {asking && <p className="hint">{nameOf(asking.author)}: “{asking.body}”. It disappears for everyone.</p>}
+        {asking && <p className="hint">{nameOf(asking.author)}: {asking.body !== '' ? `“${asking.body}”` : asking.expired ? '(picture expired)' : '(picture only)'}. It disappears for everyone.</p>}
       </Sheet>
     </PlainPage>
   );

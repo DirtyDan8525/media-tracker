@@ -146,11 +146,14 @@ export function useFriendEntry(username: string, id: string) {
   });
 }
 
-/** Every accepted friend's rated, visible entries (friends with none are left out by the server). */
+/**
+ * Every accepted friend's rated, visible entries (friends with none are left out by the server). Brief: no tags or
+ * season averages (the group Top 5 and friend cards use neither), about a third fewer D1 rows read.
+ */
 export function useFriendsEntries(category?: Category) {
   return useQuery({
     queryKey: [...SOCIAL_KEY, 'friends-entries', category ?? 'all'],
-    queryFn: () => api.get<FriendsEntries[]>(`/api/friends/entries${category ? `?category=${category}` : ''}`),
+    queryFn: () => api.get<FriendsEntries[]>(`/api/friends/entries?brief=1${category ? `&category=${category}` : ''}`),
     staleTime: STALE,
   });
 }

@@ -81,6 +81,9 @@
 .admin-check__note { flex-basis: 100%; font-size: var(--fs-meta); color: var(--muted-text); overflow-wrap: anywhere; }
 .admin-steps { margin: 0; padding-left: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); }
 .admin-comment__body { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.admin-comment__pic { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--muted-text); }
+.admin-comment__pic img { width: 48px; height: 48px; border-radius: var(--radius-lg); object-fit: cover; background: var(--panel); }
+.admin-comment__pic--gone { font-style: italic; }
 .admin-details summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; color: var(--highlight); font-weight: 600; }
 .admin-details summary:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .menu__item[aria-disabled='true'] { opacity: 0.5; cursor: default; }

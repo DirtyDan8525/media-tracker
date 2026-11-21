@@ -29,7 +29,7 @@ import { dayLabel, matchesSearch, timeAgo, type ActivityFilter } from './activit
 import '../design/activity.css';
 import '../design/feed.css';
 import '../design/list-menu.css';
-import { listCfg, listLabel, listName, statusText } from '../lists/registry';
+import { listCfg, listLabel, listName, statusPhrase, statusText } from '../lists/registry';
 import { LIST_ORDER } from '../nav';
 
 const ALL_FILTERS: readonly { value: ActivityFilter; label: string }[] = [
@@ -438,7 +438,8 @@ function ActivityRow({ line, now, who, friend, children }: { line: ActivityLine;
       </>
     );
   } else {
-    sentence = <>{name} marked {title}{by} {status}</>;
+    const w = line.status ? statusPhrase(line.status.to as Status, line.category, own) : { verb: 'updated', suffix: '' };
+    sentence = <>{name} {w.verb} {title}{by}{w.suffix}</>;
   }
   return (
     <div className="activity-line">

@@ -412,6 +412,16 @@ describe('moderation', () => {
     expect((await json<{ comments: unknown[] }>(await admin('/api/admin/comments?limit=0'))).comments).toHaveLength(1);
     expect((await json<{ comments: unknown[] }>(await admin('/api/admin/comments?limit=zzz'))).comments).toHaveLength(3);
   });
+
+  it('GET /api/admin/comments: says which comments carry a picture or an expired one, and the admin can open the picture', async () => {
+    await env.DB.exec("UPDATE comments SET body = '', media_key = 'cmt/e1/pic1' WHERE id = 'c1'");
+    await env.DB.exec("UPDATE comments SET media_expired = 1 WHERE id = 'c3'");
+    await env.MEDIA!.put('cmt/e1/pic1', new Uint8Array([0xff, 0xd8, 0xff, 1]), { httpMetadata: { contentType: 'image/jpeg' } });
+    const { comments } = await json<{ comments: { id: string; image: boolean; expired: boolean }[] }>(await admin('/api/admin/comments'));
+    const by = Object.fromEntries(comments.map((c) => [c.id, [c.image, c.expired]]));
+    expect(by).toEqual({ c1: [true, false], c2: [false, false], c3: [false, true] });
+    expect((await admin('/api/comments/c1/media')).status).toBe(200);
+  });
 });
 
 // ---- numbers (AD9) ----

@@ -146,8 +146,10 @@ function TopBlock({ category, rows, onShare }: {
 type TopEntry = Pick<Entry, 'id' | 'category' | 'title' | 'creator' | 'coverUrl' | 'rating'>;
 
 /** One ranked row; it links to your entry, or to `to` (a friend's entry); `to` null is a plain row (the public profile page has no entry page). */
-export function TopRow({ entry, rank, to, backLabel = 'Top 5', sub }: {
+export function TopRow({ entry, rank, to, backLabel = 'Top 5', sub, label }: {
   entry: TopEntry; rank: number; to?: string | null; backLabel?: string;
+  /** Accessible name for the link, when the row text alone reads badly. */
+  label?: string;
   /** Replaces the creator line (the group Top 5 shows how many rated it). */
   sub?: string;
 }) {
@@ -156,7 +158,7 @@ export function TopRow({ entry, rank, to, backLabel = 'Top 5', sub }: {
   const hero = rank === 1;
   return (
     <li className={hero ? 'top5__item top5__item--hero' : 'top5__item'} data-square={square || undefined}>
-      <RowShell to={to === null ? null : to ?? `/entry/${entry.id}`} backLabel={backLabel} className={hero ? 'top5__hero' : 'top5__row'}>
+      <RowShell to={to === null ? null : to ?? `/entry/${entry.id}`} backLabel={backLabel} label={label} className={hero ? 'top5__hero' : 'top5__row'}>
         {hero && <CoverBackdrop src={entry.coverUrl} />}
         <span className="top5__rank">{rank}</span>{' '}
         {/* Decorative: the row's name is its text, so the cover stays out of the link's name. */}
@@ -174,6 +176,6 @@ export function TopRow({ entry, rank, to, backLabel = 'Top 5', sub }: {
   );
 }
 
-function RowShell({ to, className, backLabel, children }: { to: string | null; className: string; backLabel: string; children: ReactNode }) {
-  return to === null ? <div className={className}>{children}</div> : <Link to={to} state={backState(backLabel)} className={className}>{children}</Link>;
+function RowShell({ to, className, backLabel, label, children }: { to: string | null; className: string; backLabel: string; label?: string; children: ReactNode }) {
+  return to === null ? <div className={className}>{children}</div> : <Link to={to} state={backState(backLabel)} className={className} aria-label={label}>{children}</Link>;
 }

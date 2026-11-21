@@ -10,6 +10,8 @@ export interface AdminComment {
   title: string;
   category: Category;
   owner: string | null;
+  image: boolean;
+  expired: boolean;
 }
 
 export interface AdminNumbers {

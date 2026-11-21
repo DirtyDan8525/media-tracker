@@ -38,3 +38,37 @@ export function statusLabel(status: Status, category: Category, lists?: Iterable
     default: return status;
   }
 }
+
+/** The words of a feed line around the title: "<who> <verb> <title><suffix>". */
+export interface StatusSentence { verb: string; suffix: string }
+
+type Family = 'watch' | 'read' | 'play' | 'try';
+
+function familyOf(category: Category, lists?: Iterable<CustomList> | ReadonlyMap<string, CustomList>): Family {
+  if (isBuiltinCategory(category)) return category === 'games' ? 'play' : category === 'books' || category === 'manga' ? 'read' : 'watch';
+  return customListOf(category, lists)?.statusWords ?? 'watch';
+}
+
+/**
+ * How the Activity feed phrases a status change ("started Elden Ring", "finished Frieren", "dropped X",
+ * "wants to read X"). `own` picks "You want to" over "Ren wants to". Display only, like statusLabel.
+ */
+export function statusSentence(
+  status: Status,
+  category: Category,
+  own: boolean,
+  lists?: Iterable<CustomList> | ReadonlyMap<string, CustomList>,
+): StatusSentence {
+  const f = familyOf(category, lists);
+  switch (status) {
+    case 'Watching / In Progress': return { verb: 'started', suffix: '' };
+    case 'Rewatching':
+      return f === 'play' ? { verb: own ? 'are replaying' : 'is replaying', suffix: '' }
+        : f === 'try' ? { verb: own ? 'are going back to' : 'is going back to', suffix: '' }
+        : { verb: f === 'read' ? 'started rereading' : 'started rewatching', suffix: '' };
+    case 'Completed': return { verb: 'finished', suffix: '' };
+    case 'Dropped': return { verb: 'dropped', suffix: '' };
+    case 'Plan to watch': return { verb: `${own ? 'want' : 'wants'} to ${f === 'watch' ? 'watch' : f === 'read' ? 'read' : f === 'play' ? 'play' : 'try'}`, suffix: '' };
+    default: return { verb: 'put', suffix: ' on hold' };
+  }
+}

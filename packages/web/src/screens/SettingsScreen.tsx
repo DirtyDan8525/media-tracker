@@ -19,6 +19,7 @@ import { SettingsLinks } from './settings/SettingsLinks';
 import { SideBarRows } from './settings/SideBarRows';
 import { TagsLink } from './settings/TagsLink';
 import { PublicLinkRow } from './settings/PublicLinkRow';
+import { ChangePasswordRow } from './settings/ChangePasswordRow';
 import { useSessionMe } from '../shell/SessionGate';
 import { UsernameForm } from './UsernameForm';
 import { DeleteListSheet } from './settings/DeleteListSheet';
@@ -162,6 +163,7 @@ export function SettingsScreen() {
               </div>
             )}
             <DisplayNameRow />
+            <ChangePasswordRow />
             <InviteLinkRow />
             <PublicLinkRow />
           </div>

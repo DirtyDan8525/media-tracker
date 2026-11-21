@@ -3,7 +3,7 @@
 .compare__top { min-height: var(--tap); display: flex; align-items: center; }
 .compare__body { padding: var(--space-1) var(--space-4) 0; }
 .compare__head { display: flex; flex-direction: column; gap: var(--space-3); }
-.compare__title { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.2; color: var(--bright-text); }
+.compare__title { margin: 0; font-size: calc(24px * var(--app-scale, 1)); font-weight: 700; line-height: 1.2; color: var(--bright-text); }
 .compare__title:focus { outline: none; }
 .compare__title:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .compare__sub { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted-text); }
@@ -68,7 +68,7 @@
 .rev__arrow { color: var(--muted-text); }
 .rev__new { display: inline-flex; align-items: center; gap: var(--space-3); }
 /* direction chip: a rating-scale fill with Bright text, the pairing the rating badges use */
-.rev__dir { width: 22px; height: 22px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--bright-text); }
+.rev__dir { width: 22px; height: 22px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-size: calc(10px * var(--app-scale, 1)); color: var(--bright-text); }
 .rev__dir--up { background: var(--cf-high); }
 .rev__dir--down { background: var(--cf-low); }
 .compare__end-actions { display: flex; flex-direction: column; gap: var(--space-5); }
@@ -99,7 +99,7 @@
 }
 .cmp-tile.is-on { border-color: var(--highlight); background: var(--panel); }
 .cmp-chips { display: flex; flex-wrap: wrap; gap: var(--space-4); }
-.cmp-h2 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--bright-text); }
+.cmp-h2 { margin: 0; font-size: var(--fs-brand); font-weight: 700; line-height: 1.25; color: var(--bright-text); }
 
 /* PC */
 .compare--wide { padding: var(--space-12) var(--space-16); align-items: center; }
@@ -111,7 +111,7 @@
 .compare-ask--wide .duel { justify-content: center; gap: var(--space-14); }
 .compare-ask--wide .pick-col { flex: none; width: 270px; }
 .compare-ask--wide .pick { padding: var(--space-6) var(--space-6) var(--space-7); }
-.compare-ask--wide .pick__name { font-size: 18px; }
+.compare-ask--wide .pick__name { font-size: var(--fs-brand); }
 .compare-ask--wide .compare__actions { display: flex; flex-wrap: wrap; justify-content: center; }
 .compare-ask--wide .compare__progress { align-self: center; width: 320px; font-size: var(--fs-sm); }
 .compare__home-link {

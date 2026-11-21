@@ -8,7 +8,7 @@ import { setViewportWidth } from '../test/viewport';
 
 beforeEach(() => { localStorage.clear(); setViewportWidth(390); });
 const empty = { 'GET /api/activity': { body: { items: [], next: null } } };
-const addBubble = () => screen.queryByRole('link', { name: /^Add (anime|movie|TV show|album|song|game|book)$/ });
+const addBubble = () => screen.queryByRole(/* a link on a list, a button elsewhere */ 'button', { name: /^Add (anime|movie|TV show|album|song|game|book)$/ }) ?? screen.queryByRole('link', { name: /^Add (anime|movie|TV show|album|song|game|book)$/ });
 
 describe('Home opens the last list', () => {
   it('/ goes to the remembered list', async () => {
@@ -64,13 +64,22 @@ describe('Home opens the last list', () => {
 });
 
 describe('Add bubble (phone)', () => {
-  it.each(['/list/anime', '/activity', '/search'])('shows on %s', async (path) => {
+  it('shows on a list as a link to that list\'s Add sheet', async () => {
     mockApi(makeMe(), empty);
-    renderApp(path);
+    renderApp('/list/anime');
     await screen.findByRole('navigation', { name: 'Main' });
     const add = await screen.findByRole('link', { name: 'Add anime' });
     expect(add).toHaveClass('add-fab');
     expect(add).toHaveAttribute('href', '/list/anime?add=1');
+  });
+
+  it.each(['/activity', '/search'])('shows on %s as a button that opens Add in place (no navigation)', async (path) => {
+    mockApi(makeMe(), empty);
+    renderApp(path);
+    await screen.findByRole('navigation', { name: 'Main' });
+    const add = await screen.findByRole('button', { name: 'Add anime' });
+    expect(add).toHaveClass('add-fab');
+    expect(add).not.toHaveAttribute('href');
   });
 
   it.each([
@@ -102,7 +111,7 @@ describe('Add bubble (phone)', () => {
   it('lifts toasts only while it shows', async () => {
     mockApi(makeMe(), empty);
     const { router } = renderApp('/activity');
-    await screen.findByRole('link', { name: 'Add anime' });
+    await screen.findByRole('button', { name: 'Add anime' });
     expect(document.documentElement).toHaveClass('has-add-fab');
     await router.navigate('/more');
     await waitFor(() => expect(document.documentElement).not.toHaveClass('has-add-fab'));

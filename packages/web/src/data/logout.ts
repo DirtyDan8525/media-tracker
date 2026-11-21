@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { AFTER_SETUP_KEY } from './social';
 import { localDb } from '../db/local';
 import { forgetCurrentList } from '../shell/currentList';
+import { forgetAddList } from '../shell/lastAddList';
 
 /** After logging out the app reloads here: no session, so it opens on the sign-in screen. */
 export const LOGOUT_REDIRECT = '/';
@@ -32,6 +33,7 @@ export async function logOut(qc: QueryClient): Promise<void> {
     () => qc.clear(),
     () => sessionStorage.removeItem(AFTER_SETUP_KEY),
     () => forgetCurrentList(),
+    () => forgetAddList(),
   ];
   const deadline = Date.now() + LOGOUT_DEADLINE_MS;
   for (const step of steps) {

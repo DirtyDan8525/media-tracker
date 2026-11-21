@@ -305,6 +305,22 @@ describe('Top 5 sharing (B17)', () => {
       expect(await screen.findByRole('button', { name: 'Share Anime Top 5' })).toBeInTheDocument();
     });
 
+    it('group rows link to your entry if you have the title, else to the highest-rating friend\'s entry', async () => {
+      const MIKA = { id: 'id-mika', username: 'mika', displayName: 'Mika', avatarAt: null };
+      const fe = [
+        { userId: 'id-ren', entries: [makeFriendEntry({ id: 'r1', title: 'Frieren', rating: 8.5 }), makeFriendEntry({ id: 'r9', title: 'Odd Taxi', rating: 7 })] },
+        { userId: 'id-mika', entries: [makeFriendEntry({ id: 'k1', userId: 'id-mika', title: 'Frieren', rating: 9 }), makeFriendEntry({ id: 'k9', userId: 'id-mika', title: 'Odd Taxi', rating: 9.5 })] },
+      ];
+      fakeBackend({ entries: rows(), extra: extra(fe, friendsOf(REN, MIKA)) });
+      renderApp('/top5');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Friends' }));
+      const anime = await screen.findByRole('region', { name: 'Anime' });
+      const taxi = await within(anime).findByRole('link', { name: /Odd Taxi, group average 8\.3 from 2 ratings/ });
+      expect(taxi).toHaveAttribute('href', '/u/mika/entry/k9');
+      const frieren = within(anime).getByRole('link', { name: /Frieren, group average/ });
+      expect(frieren.getAttribute('href')).toMatch(/^\/entry\//); // you have it: your own page
+    });
+
     it('a list with no title two of you rated says "Rate more together"', async () => {
       fakeBackend({ entries: rows(), extra: extra() });
       renderApp('/top5');

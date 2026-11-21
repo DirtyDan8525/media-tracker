@@ -16,12 +16,12 @@ import { StatusPill } from '../../design/components/StatusPill';
 import { useToast } from '../../design/components/Toast';
 import { sortEntries } from '../../lists/sort';
 
-import { computeStats } from '../../ratings/stats';
+import { computeStats, ratingDistribution } from '../../ratings/stats';
 import { topFive } from '../../ratings/topFive';
 import { useIsWide } from '../../hooks';
 import { BackButton, backState } from '../../shell/BackButton';
 import { useSessionMe } from '../../shell/SessionGate';
-import { ListCard } from '../StatsScreen';
+import { DistributionCard, GenresCard, ListCard } from '../StatsScreen';
 import { TopRow } from '../Top5Screen';
 import { CompareWithFriend } from './CompareWithFriend';
 import { MessageButton } from '../messages/MessageButton';
@@ -299,7 +299,9 @@ export function Top5Panel({ username, rows, categories, linkTo, name }: { userna
 }
 
 export function StatsPanel({ rows, categories }: { rows: FriendEntry[]; categories: Category[] }) {
-  const stats = computeStats(Object.fromEntries(categories.map((c) => [c, rows.filter((e) => e.category === c)])), categories);
+  const byCategory = Object.fromEntries(categories.map((c) => [c, rows.filter((e) => e.category === c)]));
+  const stats = computeStats(byCategory, categories);
+  const dist = ratingDistribution(byCategory, categories);
   const { all } = stats;
   return (
     <div className="stats">
@@ -313,12 +315,14 @@ export function StatsPanel({ rows, categories }: { rows: FriendEntry[]; categori
           <div className="stats__kv-hi"><dt>Highest</dt><dd>{all.highest === null ? DASH : <RatingBadge rating={all.highest} size="sm" />}</dd></div>
         </dl>
       </section>
+      <DistributionCard dist={dist} rated={all.rated} idPrefix="fstats" />
       <section aria-labelledby="fstats-lists" className="stats__lists">
         <h2 id="fstats-lists" className="stats__heading">By list</h2>
         <ul className="stats__cards" aria-label="Stats by list">
-          {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category)} s={l} index={i} tiers={null} />)}
+          {stats.lists.map((l, i) => <ListCard key={l.category} name={listLabel(l.category)} s={l} index={i} />)}
         </ul>
       </section>
+      <GenresCard genres={stats.animeGenres} idPrefix="fstats" />
     </div>
   );
 }

@@ -97,4 +97,25 @@ describe('Compare with a friend', () => {
     renderApp('/u/ren?tab=compare');
     expect(await screen.findByText('Nothing from Ren to add in Anime right now.')).toBeInTheDocument();
   });
+
+  it('pages long lists 25 at a time with "Show more", client-side', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => `Title ${String(i).padStart(2, '0')}`);
+    backend(
+      many.map((t, i) => makeEntry({ id: `mm${i}`, title: `Shared ${t}`, rating: 5 })),
+      { 'GET /api/users/:username/entries': { body: [
+        ...many.map((t, i) => makeFriendEntry({ id: `tt${i}`, title: `Shared ${t}`, rating: 6 + (i % 3) })),
+        ...many.map((t, i) => makeFriendEntry({ id: `nn${i}`, title: `Only ${t}`, rating: 7 })),
+      ] } },
+    );
+    renderApp('/u/ren?tab=compare');
+    const both = await screen.findByRole('region', { name: 'Both rated' });
+    expect(within(both).getAllByRole('link')).toHaveLength(25);
+    await userEvent.click(within(both).getByRole('button', { name: 'Show more (5 left)' }));
+    expect(within(both).getAllByRole('link')).toHaveLength(30);
+    expect(within(both).queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument();
+    const theirs = screen.getByRole('region', { name: 'Theirs, not yours' });
+    expect(within(theirs).getAllByRole('link')).toHaveLength(25);
+    await userEvent.click(within(theirs).getByRole('button', { name: 'Show more (5 left)' }));
+    expect(within(theirs).getAllByRole('link')).toHaveLength(30);
+  });
 });

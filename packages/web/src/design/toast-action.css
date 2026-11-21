@@ -1,0 +1,7 @@
+/* A toast with a button ("Added to Anime · Open"). The button is a real 44 px tap target without making the toast taller. */
+.toast__action {
+  display: inline-block; position: relative; padding: 0 var(--space-2); border: 0; background: transparent;
+  color: var(--highlight); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer;
+}
+.toast__action::after { content: ''; position: absolute; inset: -14px -8px; }
+.toast__action:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; border-radius: var(--radius-sm); }

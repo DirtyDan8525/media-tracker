@@ -47,13 +47,29 @@ describe('ActivityScreen', () => {
     expect(screen.getAllByRole('listitem').filter((li) => li.textContent?.includes('Frieren'))).toHaveLength(1);
   });
 
-  it('status wording uses statusLabel ("marked Playing" for games)', async () => {
+  it('a status change to an active status reads "started <title>"', async () => {
     fakeBackend({ extra: { 'GET /api/activity': { body: page([
       item({ type: 'status', title: 'Celeste', category: 'games', payload: { from: 'Plan to watch', to: 'Watching / In Progress' } }),
     ]) } } });
     renderApp('/activity');
     const row = (await screen.findByRole('link', { name: 'Celeste' })).closest('li')!;
-    expect(row).toHaveTextContent('You marked Celeste Playing');
+    expect(row).toHaveTextContent('You started Celeste');
+  });
+
+  it('other status changes read finished, dropped, wants to, rewatching, on hold', async () => {
+    const st = (title: string, to: string, category = 'anime') => item({ type: 'status', title, category: category as never, payload: { from: null, to } });
+    fakeBackend({ extra: { 'GET /api/activity': { body: page([
+      st('Frieren', 'Completed'), st('Naruto', 'Dropped'), st('Dune', 'Plan to watch', 'books'), st('Celeste', 'Rewatching', 'games'),
+      st('Monster', 'Rewatching'), st('Bleach', 'On Hold'),
+    ]) } } });
+    renderApp('/activity');
+    const text = async (t: string) => (await screen.findByRole('link', { name: t })).closest('li')!;
+    expect(await text('Frieren')).toHaveTextContent('You finished Frieren');
+    expect(await text('Naruto')).toHaveTextContent('You dropped Naruto');
+    expect(await text('Dune')).toHaveTextContent('You want to read Dune');
+    expect(await text('Celeste')).toHaveTextContent('You are replaying Celeste');
+    expect(await text('Monster')).toHaveTextContent('You started rewatching Monster');
+    expect(await text('Bleach')).toHaveTextContent('You put Bleach on hold');
   });
 
   it('added shows "You added Mob Psycho 100 to Anime"', async () => {

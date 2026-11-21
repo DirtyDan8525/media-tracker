@@ -5,7 +5,7 @@
  * from /api/me, a friend's from their profile header, a feed page's from `lists`), before anything renders them.
  */
 import {
-  BUILTIN_CATEGORIES, isCustomCategory, listConfig, listTitle, statusLabel, type Category, type CustomList, type ListConfig, type Status,
+  BUILTIN_CATEGORIES, isCustomCategory, listConfig, listTitle, statusLabel, statusSentence, type Category, type CustomList, type ListConfig, type Status,
 } from '@media-tracker/shared';
 import { useSyncExternalStore } from 'react';
 
@@ -48,6 +48,8 @@ export const listName = (c: Category): string => listTitle(c, registry);
 export const addNoun = (c: Category): string => listCfg(c).noun;
 /** A stored status in the list's own words (shared statusLabel with custom lists' words). */
 export const statusText = (s: Status, c: Category): string => statusLabel(s, c, registry);
+/** A feed line's words for a status change, in the list's own words ("started", "finished", "wants to read"). */
+export const statusPhrase = (s: Status, c: Category, own: boolean) => statusSentence(s, c, own, registry);
 /** A custom list the app knows, by key. */
 export const knownList = (c: Category): CustomList | undefined => registry.get(c);
 

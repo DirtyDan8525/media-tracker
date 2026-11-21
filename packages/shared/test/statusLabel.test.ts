@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STATUSES, statusLabel, type Category } from '../src';
+import { STATUSES, statusLabel, statusSentence, type Category } from '../src';
 
 describe('statusLabel', () => {
   it('leaves anime and tv wording as stored', () => {
@@ -32,5 +32,29 @@ describe('statusLabel', () => {
   });
   it('keeps stored wording on movies (watch wording, like TV) and lists without a Status column', () => {
     for (const c of ['movies', 'albums', 'songs'] as Category[]) for (const s of STATUSES) expect(statusLabel(s, c)).toBe(s);
+  });
+});
+
+describe('statusSentence', () => {
+  const line = (st: Parameters<typeof statusSentence>[0], c: Category, own = false) => {
+    const w = statusSentence(st, c, own);
+    return `${w.verb} X${w.suffix}`;
+  };
+  it('started / finished / dropped on every list', () => {
+    for (const c of ['anime', 'games', 'books', 'manga', 'youtube'] as Category[]) {
+      expect(line('Watching / In Progress', c)).toBe('started X');
+      expect(line('Completed', c)).toBe('finished X');
+      expect(line('Dropped', c)).toBe('dropped X');
+    }
+  });
+  it('uses the list verb for planning and going again, and agrees with You', () => {
+    expect(line('Plan to watch', 'anime')).toBe('wants to watch X');
+    expect(line('Plan to watch', 'manga')).toBe('wants to read X');
+    expect(line('Plan to watch', 'games', true)).toBe('want to play X');
+    expect(line('Rewatching', 'tv')).toBe('started rewatching X');
+    expect(line('Rewatching', 'books')).toBe('started rereading X');
+    expect(line('Rewatching', 'games')).toBe('is replaying X');
+    expect(line('Rewatching', 'games', true)).toBe('are replaying X');
+    expect(line('On Hold', 'anime')).toBe('put X on hold');
   });
 });

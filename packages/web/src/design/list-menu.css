@@ -72,3 +72,6 @@
 .page-header__logo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
 .page-header__center { min-width: 0; display: flex; justify-content: center; }
 .page-header--centered .page-header__actions { justify-self: end; min-width: var(--tap); }
+
+/* The bubble is a button where Add opens in place (Activity, Search). */
+button.add-fab { border: 0; padding: 0; cursor: pointer; font: inherit; }

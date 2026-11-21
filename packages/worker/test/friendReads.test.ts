@@ -165,6 +165,17 @@ describe('GET /api/friends/entries', () => {
     expect(movies[0]!.entries.map((e) => e.title)).toEqual(['MovieOne']);
     expect(await json(await as(S, '/api/friends/entries'))).toEqual([]);
   });
+
+  it('?brief=1 returns the same titles in the same order, without tags or season averages', async () => {
+    const full = await json<{ userId: string; entries: { id: string; title: string }[] }[]>(await as(A, '/api/friends/entries'));
+    const res = await as(A, '/api/friends/entries?brief=1');
+    expect(res.status).toBe(200);
+    const brief = await json<{ userId: string; entries: { id: string; title: string; tags: string[]; seasonAvg: number | null; notes: string | null }[] }[]>(res);
+    expect(brief.map((f) => [f.userId, f.entries.map((e) => e.id)])).toEqual(full.map((f) => [f.userId, f.entries.map((e) => e.id)]));
+    expect(brief[0]!.entries.every((e) => e.tags.length === 0 && e.seasonAvg === null)).toBe(true);
+    expect(brief[0]!.entries.find((e) => e.title === 'QuietNotes')!.notes).toBeNull();
+    expect(await json(await as(S, '/api/friends/entries?brief=1'))).toEqual([]);
+  });
 });
 
 describe('query counts (sign-in excluded)', () => {

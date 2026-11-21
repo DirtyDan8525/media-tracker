@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'chip';
 
@@ -9,6 +9,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Smaller (36 px) height; still padded to a 44 px tap area. */
   compact?: boolean;
   children: ReactNode;
+  /** React 19: a ref is an ordinary prop. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /** primary = Highlight fill (Add, Retry); secondary = Cards fill with a grid-line border; ghost = transparent; chip = pill filter. */

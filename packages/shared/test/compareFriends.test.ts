@@ -101,4 +101,15 @@ describe('groupTop5', () => {
     expect(rows[0]).toMatchObject({ average: 7, raters: 2 });
     expect(groupTop5([p('me', [e('A', 2), e('A', 8)])])).toEqual([]);
   });
+
+  it('carries each rater\'s best entry id, highest rating first', () => {
+    const a = e('Frieren', 7, { id: 'my-low' });
+    const a2 = e('Frieren', 9, { id: 'my-high' });
+    const b = e('Frieren', 9.5, { id: 'ren-1' });
+    const [row] = groupTop5([p('me', [a, a2]), p('ren', [b])]);
+    expect(row!.owners).toEqual([
+      { userId: 'ren', entryId: 'ren-1', rating: 9.5 },
+      { userId: 'me', entryId: 'my-high', rating: 9 },
+    ]);
+  });
 });

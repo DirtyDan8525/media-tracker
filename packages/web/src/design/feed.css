@@ -25,7 +25,7 @@
 }
 .react__emoji {
   all: unset; box-sizing: border-box; width: var(--tap); height: var(--tap); border-radius: 22px; display: flex; align-items: center;
-  justify-content: center; font-size: 22px; cursor: pointer;
+  justify-content: center; font-size: calc(22px * var(--app-scale, 1)); cursor: pointer;
 }
 .react__emoji:hover { background: var(--panel); }
 .react__emoji[aria-pressed='true'] { background: var(--panel); outline: 1px solid var(--highlight); }

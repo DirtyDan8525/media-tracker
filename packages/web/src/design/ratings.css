@@ -51,8 +51,8 @@
 .stats__kv-avg, .stats__kv-hi { grid-column: 1 / -1; }
 .stats__kv-avg { flex-direction: row !important; align-items: baseline; gap: var(--space-5) !important; }
 .stats__kv-hi { flex-direction: row !important; align-items: center; gap: var(--space-4) !important; }
-.stats__big { font-size: 28px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
-.stats__num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stats__big { font-size: var(--fs-title-pc); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stats__num { font-size: var(--fs-brand); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .ring { position: relative; width: 76px; height: 76px; flex-shrink: 0; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -60,8 +60,8 @@
 .ring__track { stroke: var(--grid-line); }
 .ring__arc { stroke: var(--highlight); stroke-linecap: round; }
 .ring__label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ring__n { font-size: 20px; font-weight: 700; line-height: 1; color: var(--bright-text); font-variant-numeric: tabular-nums; }
-.ring__of { margin-top: var(--space-2); font-size: 10px; color: var(--muted-text); }
+.ring__n { font-size: calc(20px * var(--app-scale, 1)); font-weight: 700; line-height: 1; color: var(--bright-text); font-variant-numeric: tabular-nums; }
+.ring__of { margin-top: var(--space-2); font-size: calc(10px * var(--app-scale, 1)); color: var(--muted-text); }
 
 .hist { height: 88px; display: flex; align-items: stretch; gap: var(--space-3); }
 .hist__col { flex: 1; height: 100%; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: var(--space-2); }
@@ -87,10 +87,10 @@
   .stats__all-body { gap: var(--space-14); }
   .stats__kv { display: flex; justify-content: space-between; align-items: center; gap: var(--space-10); }
   .stats__kv > div, .stats__kv-avg, .stats__kv-hi { flex-direction: column !important; align-items: flex-start !important; gap: var(--space-3) !important; }
-  .stats__big { font-size: 40px; }
-  .stats__num { font-size: 32px; }
+  .stats__big { font-size: calc(40px * var(--app-scale, 1)); }
+  .stats__num { font-size: calc(32px * var(--app-scale, 1)); }
   .ring { width: 104px; height: 104px; }
-  .ring__n { font-size: 26px; }
+  .ring__n { font-size: var(--fs-title); }
   .stats__lists { grid-column: 1; grid-row: 3 / span 2; }
   .stats__dist { grid-column: 2; grid-row: 2; }
   .stats__genres { grid-column: 2; grid-row: 3; }
@@ -136,9 +136,6 @@
 .share-sheet__making { position: absolute; margin: 0; color: var(--text); font-size: var(--fs-meta); }
 .share-sheet__actions { display: flex; gap: var(--space-5); }
 .share-sheet__actions .btn { flex: 1; }
-/* each list's tier counts ("Loved 14 · Liked 22 …"), under the list name on phone cards and in the PC table */
-.stats__tiers { display: block; margin: 0; font-size: var(--fs-pill); font-weight: 400; color: var(--muted-text); font-variant-numeric: tabular-nums; }
-.stats__table tbody th .stats__tiers { margin-top: var(--space-1); }
 
 /* The Mine / Friends toggle is a normal-width control on PC, not a full-width bar. */
 @media (min-width: 768px) { .seg--auto { display: inline-flex; align-self: flex-start; width: auto; } .seg--auto .seg__opt { flex: none; min-width: 120px; padding: 0 var(--space-12); } }

@@ -1,10 +1,11 @@
 import type { Category } from '@media-tracker/shared';
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
-import { Link, NavLink } from 'react-router';
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import { Link, NavLink, useLocation } from 'react-router';
 import type { Me } from '../../api/types';
 import { useAppName } from '../../data/appSettings';
 import { SEARCH_PATH } from '../../nav';
 import { ListIcon } from '../../lists/ListIcon';
+import { topOnSameScreen } from '../../shell/scrollTop';
 import { ListsOrderSheet } from '../../shell/ListsOrderSheet';
 import { clampNavWidth, defaultNavWidth, NAV_MAX_W, NAV_MIN_W, NAV_NUDGE_PX } from '../../shell/navWidth';
 import { Avatar } from './Avatar';
@@ -13,11 +14,11 @@ import { Icon, type IconName } from './Icon';
 import { listLabel, listName, useListRegistry } from '../../lists/registry';
 
 /** One nav row: icon, label and (when there is something new) a count pill. Collapsed (the icon rail): the label is the link's name and tooltip, the pill stays on the icon. */
-function Row({ to, icon, children, count = 0, countLabel, collapsed = false }: { to: string; icon: IconName; children: string; count?: number; countLabel?: string; collapsed?: boolean }) {
+function Row({ to, icon, children, count = 0, countLabel, collapsed = false, onClick }: { to: string; icon: IconName; children: string; count?: number; countLabel?: string; collapsed?: boolean; onClick?: (e: MouseEvent<HTMLElement>) => void }) {
   const name = count > 0 && countLabel ? `${children}, ${countText(count)} ${countLabel}` : children;
   if (collapsed) {
     return (
-      <NavLink to={to} className="side-nav__link side-nav__link--rail" aria-label={name} title={children}>
+      <NavLink to={to} className="side-nav__link side-nav__link--rail" aria-label={name} title={children} onClick={onClick}>
         <span className="side-nav__rail-icon">
           <Icon name={icon} size={20} />
           {count > 0 && <span className="count-pill side-nav__rail-count" aria-hidden="true">{countText(count)}</span>}
@@ -26,7 +27,7 @@ function Row({ to, icon, children, count = 0, countLabel, collapsed = false }: {
     );
   }
   return (
-    <NavLink to={to} className="side-nav__link side-nav__link--split"
+    <NavLink to={to} className="side-nav__link side-nav__link--split" onClick={onClick}
       aria-label={count > 0 && countLabel ? name : undefined}>
       <span className="side-nav__link-start"><Icon name={icon} size={18} />{children}</span>
       {count > 0 && <span className="count-pill">{countText(count)}</span>}
@@ -63,6 +64,9 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
   onWidthReset?: () => void;
 }) {
   const appName = useAppName();
+  const { pathname } = useLocation();
+  // Tapping the row for the list you are already on scrolls it to the top (Home too: it opens the list on screen).
+  const onList = (c: string) => topOnSameScreen(pathname === `/list/${c}`);
   useListRegistry(); // a renamed list shows at once
   const friendsBadge = friendsCount + (showMessages ? messagesCount : 0);
   const rowProps = { collapsed };
@@ -104,7 +108,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
           {!collapsed && <b>{appName}</b>}
         </Link>
       </div>
-      <Row to="/" icon="home" {...rowProps}>Home</Row>
+      <Row to="/" icon="home" onClick={topOnSameScreen(pathname.startsWith('/list/'))} {...rowProps}>Home</Row>
       <Row to={SEARCH_PATH} icon="search" {...rowProps}>Search</Row>
       {showActivity && <Row to="/activity" icon="activity" count={activityCount} countLabel="new" {...rowProps}>Activity</Row>}
       {showFriends
@@ -119,7 +123,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
           {collapsed ? (
             <div role="group" aria-label="Lists" className="side-nav__rail-lists">
               {lists.map((c) => (
-                <NavLink key={c} to={`/list/${c}`} className="side-nav__link side-nav__link--rail" aria-label={listLabel(c)} title={listLabel(c)}>
+                <NavLink key={c} to={`/list/${c}`} className="side-nav__link side-nav__link--rail" aria-label={listLabel(c)} title={listLabel(c)} onClick={onList(c)}>
                   <span className="side-nav__rail-icon"><ListIcon c={c} size={20} /></span>
                 </NavLink>
               ))}
@@ -128,7 +132,7 @@ export function SideNav({ lists, counts, activityCount = 0, messagesCount = 0, f
             <>
               <div className="side-nav__label" id="side-nav-lists">Lists</div>
               {lists.map((c) => (
-                <NavLink key={c} to={`/list/${c}`} className="side-nav__list">
+                <NavLink key={c} to={`/list/${c}`} className="side-nav__list" onClick={onList(c)}>
                   <span>{listName(c)}</span>
                   {counts[c] !== undefined && <span className="side-nav__count">{counts[c]}</span>}
                 </NavLink>

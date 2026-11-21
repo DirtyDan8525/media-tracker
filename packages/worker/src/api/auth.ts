@@ -4,7 +4,7 @@
  */
 import { Hono } from 'hono';
 import { loadAppSettings } from '../settings/appSettings';
-import { APP_DEFAULTS_SQL, CUSTOM_LISTS_SQL, USER_COLS, USERNAME_RE, toAppUser, type AppEnv, type AppUser } from '../auth/user';
+import { APP_DEFAULTS_SQL, CUSTOM_LISTS_SQL, USER_COLS, USERNAME_RE, requireUser, toAppUser, type AppEnv, type AppUser } from '../auth/user';
 import { PASSWORD_MAX, hashPassword, validPassword, verifyPassword } from '../auth/password';
 import { RESET_TTL_MS, clearedCookie, expiryFrom, isToken, newToken, readSessionToken, sessionCookie, sha256Hex } from '../auth/session';
 import { cleanDisplayName, meBody } from './me';
@@ -177,6 +177,46 @@ auth.post('/logout', async (c) => {
   const token = readSessionToken(c.req.header('Cookie'));
   if (token) await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256Hex(token)).run();
   return c.body(null, 204, { 'Set-Cookie': clearedCookie() });
+});
+
+// POST /api/auth/password { currentPassword, newPassword } -> { ok, signedOutOthers } for a signed-in user. 3 queries
+// (a batch of 2, then a batch of 4). Same rules as sign-in: PBKDF2 check, the same 10-failures-in-15-minutes lock (a wrong
+// current password counts as a failed sign-in), 8-128 characters. Every OTHER session is deleted; this one stays.
+auth.post('/password', requireUser, async (c) => {
+  const body = await readJson(c.req.raw);
+  if (!body || typeof body.currentPassword !== 'string' || !validPassword(body.newPassword)) return c.json(invalid, 400);
+  const current = body.currentPassword;
+  if (current.length < 1 || [...current].length > PASSWORD_MAX) return c.json(invalid, 400);
+  if (current === body.newPassword) return c.json({ error: 'same_password' }, 400);
+
+  const db = c.env.DB;
+  const user = c.var.user;
+  const key = user.username ?? `id:${user.id}`; // the sign-in lock is keyed by username
+  const now = Date.now();
+  const [hashRes, failRes] = await db.batch([
+    db.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.id),
+    db.prepare(`SELECT at FROM login_failures WHERE username = ? ORDER BY at DESC LIMIT ${LOGIN_MAX_FAILURES}`).bind(key),
+  ]);
+  if (locked((failRes!.results as { at: string }[]).map((r) => r.at), now)) return c.json({ error: 'too_many_attempts' }, 429);
+
+  const stored = (hashRes!.results[0] as { password_hash: string | null } | undefined)?.password_hash;
+  if (!(await verifyPassword(current, stored))) {
+    await db.batch([
+      db.prepare('INSERT INTO login_failures (username, at) VALUES (?, ?)').bind(key, new Date(now).toISOString()),
+      db.prepare('DELETE FROM login_failures WHERE username = ? AND at < ?').bind(key, new Date(now - LOGIN_WINDOW_MS - LOGIN_LOCK_MS).toISOString()),
+    ]);
+    return c.json(badCredentials, 401);
+  }
+
+  const token = readSessionToken(c.req.header('Cookie'));
+  const keep = token ? await sha256Hex(token) : null; // null (dev bypass): no session to keep
+  const [, others] = await db.batch([
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(await hashPassword(body.newPassword), user.id),
+    db.prepare('DELETE FROM sessions WHERE user_id = ?1 AND (?2 IS NULL OR token_hash <> ?2)').bind(user.id, keep),
+    db.prepare('DELETE FROM login_failures WHERE username = ?').bind(key),
+    db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(user.id),
+  ]);
+  return c.json({ ok: true, signedOutOthers: others!.meta.changes ?? 0 });
 });
 
 /** A live reset link's user (never a removed one). 1 query. */

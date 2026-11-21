@@ -1,4 +1,4 @@
-import { groupTop5, type Category, type GroupRow } from '@media-tracker/shared';
+import { formatRating, groupTop5, type Category, type GroupRow } from '@media-tracker/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, type ReactNode } from 'react';
 import { useFriendsEntries, useFriends } from '../../data/social';
@@ -55,6 +55,7 @@ export function GroupTop5({ toggle }: { toggle: ReactNode }) {
       </div>
     );
   }
+  const usernames = new Map(friends.data.friends.map((f) => [f.id, f.username]));
   return (
     <div className="screen">
       {header}
@@ -65,14 +66,25 @@ export function GroupTop5({ toggle }: { toggle: ReactNode }) {
             { userId: me.id, entries: mine.data[c] ?? [] },
             ...theirs.data.map((f) => ({ userId: f.userId, entries: f.entries.filter((e) => e.category === c) })),
           ]);
-          return <GroupBlock key={c} category={c} rows={rows} />;
+          return <GroupBlock key={c} category={c} rows={rows} myId={me.id} usernames={usernames} />;
         })}
       </div>
     </div>
   );
 }
 
-function GroupBlock({ category, rows }: { category: Category; rows: GroupRow[] }) {
+/** Where a group row opens: your own entry if you rated it, else the entry of the friend who rated it highest. */
+export function groupRowHref(r: GroupRow, myId: string, usernames: Map<string, string>): string | null {
+  const mine = r.owners.find((o) => o.userId === myId);
+  if (mine) return `/entry/${mine.entryId}`;
+  for (const o of r.owners) {
+    const u = usernames.get(o.userId);
+    if (u) return `/u/${u}/entry/${o.entryId}`;
+  }
+  return null;
+}
+
+function GroupBlock({ category, rows, myId, usernames }: { category: Category; rows: GroupRow[]; myId: string; usernames: Map<string, string> }) {
   const name = listLabel(category);
   const id = `group5-${category}`;
   return (
@@ -83,7 +95,7 @@ function GroupBlock({ category, rows }: { category: Category; rows: GroupRow[] }
       ) : (
         <ol className="top5__list">
           {rows.map((r, i) => (
-            <TopRow key={r.title} rank={i + 1} to={null} sub={`${r.raters} ratings`}
+            <TopRow key={r.title} rank={i + 1} to={groupRowHref(r, myId, usernames)} backLabel="Friends Top 5" label={`${r.title}, group average ${formatRating(Math.round(r.average * 10) / 10)} from ${r.raters} ratings`} sub={`${r.raters} ratings`}
               entry={{ id: r.title, category, title: r.title, creator: '', coverUrl: r.coverUrl, rating: Math.round(r.average * 10) / 10 }} />
           ))}
         </ol>

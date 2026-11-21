@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router';
 import { SEARCH_PATH } from '../../nav';
+import { topOnSameScreen } from '../../shell/scrollTop';
 import { Icon } from './Icon';
 
 /** Screens reached from More: its tab stays current there. */
@@ -15,7 +16,7 @@ const FRIENDS_PATHS = ['/friends', '/messages', '/u', '/add'];
  * Phone bottom bar: Home, Activity, Search (raised, centre), Friends, More (Dan, 2026-11-17, option B: Friends replaces
  * Messages; its badge is unread messages + incoming friend requests, and Messages is the floating bubble on the Friends hub).
  * With Friends switched off but Messages on, tab 4 is Messages itself. Home (`/`) opens the last list shown, so it is the
- * current tab on every list screen. Add is the floating bubble (AddBubble).
+ * current tab on every list screen; tapped there, it scrolls the list to the top. Add is the floating bubble (AddBubble).
  */
 export function BottomTabs({ activityCount = 0, messagesCount = 0, friendsCount = 0, showActivity = true, showMessages = true, showFriends = true }: {
   activityCount?: number; messagesCount?: number;
@@ -31,7 +32,8 @@ export function BottomTabs({ activityCount = 0, messagesCount = 0, friendsCount 
   const badge = friendsCount + (showMessages ? messagesCount : 0);
   return (
     <nav aria-label="Main" className="bottom-tabs">
-      <Link to="/" className={`bottom-tabs__item${homeCurrent ? ' active' : ''}`} aria-current={homeCurrent ? 'page' : undefined}>
+      <Link to="/" className={`bottom-tabs__item${homeCurrent ? ' active' : ''}`} aria-current={homeCurrent ? 'page' : undefined}
+        onClick={topOnSameScreen(pathname.startsWith('/list/'))}>
         <Icon name="home" size={22} />
         <span>Home</span>
       </Link>

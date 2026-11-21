@@ -163,6 +163,31 @@ describe('search and profile header', () => {
     expect(many).toHaveLength(10);
   });
 
+  it('an exact @name is always first, even past the 10-row prefix limit; case and @ are ignored', async () => {
+    // 12 names that sort before "zedzed" and share its prefix: the plain LIMIT 10 would drop it.
+    for (let i = 0; i < 12; i++) await as(`z${i}@example.com`, '/api/me/username', 'PUT', { username: `zed${String(i).padStart(2, '0')}` });
+    await as('zz@example.com', '/api/me/username', 'PUT', { username: 'zedzed' });
+    for (const q of ['zedzed', '@zedzed', '@ZedZed', 'ZEDZED']) {
+      const res = await json<{ username: string }[]>(await as(A, `/api/users/search?q=${encodeURIComponent(q)}`));
+      expect(res[0]!.username).toBe('zedzed');
+    }
+    const prefix = await json<{ username: string }[]>(await as(A, '/api/users/search?q=zed'));
+    expect(prefix).toHaveLength(10);
+    expect(prefix.some((u) => u.username === 'zedzed')).toBe(false); // a prefix is still just ranked by name
+    // An exact name that is a prefix of others (rex / rexa) still leads.
+    await as('rexa@example.com', '/api/me/username', 'PUT', { username: 'rexa' });
+    const rex = await json<{ username: string }[]>(await as(A, '/api/users/search?q=%40rex'));
+    expect(rex.map((u) => u.username)).toEqual(['rex', 'rexa']);
+  });
+
+  it('an exact name never finds you, a removed or pending user', async () => {
+    expect(await json(await as(A, '/api/users/search?q=dan'))).toEqual([]);
+    await env.DB.prepare("UPDATE users SET status = 'removed' WHERE username = 'ren'").run();
+    expect(await json(await as(A, '/api/users/search?q=%40ren'))).toEqual([]);
+    await env.DB.prepare("UPDATE users SET status = 'pending' WHERE username = 'rex'").run();
+    expect(await json(await as(A, '/api/users/search?q=rex'))).toEqual([]);
+  });
+
   it('an empty q lists everyone active but you, by username (Add friend list)', async () => {
     await setName(A, 'rey');
     const res = await json<{ username: string }[]>(await as(A, '/api/users/search?q='));

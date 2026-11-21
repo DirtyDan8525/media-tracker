@@ -507,6 +507,66 @@ describe('password reset (A7)', () => {
   });
 });
 
+describe('change password (POST /api/auth/password)', () => {
+  const change = (cookie: string | null, body: unknown, o: Opts = {}) => req('/api/auth/password', { ...o, method: 'POST', cookie, body });
+
+  it('needs a session', async () => {
+    expect((await change(null, { currentPassword: PW, newPassword: 'brand new pass' })).status).toBe(401);
+  });
+
+  it('changes the password, keeps this session and signs out the others', async () => {
+    const a = await join('dan');
+    const b = cookieOf(await login('dan'))!;
+    const c = cookieOf(await login('dan'))!;
+    const res = await change(a, { currentPassword: PW, newPassword: 'brand new pass' });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ ok: true, signedOutOthers: 2 });
+    expect((await req('/api/me', { cookie: a })).status).toBe(200);
+    expect((await req('/api/me', { cookie: b })).status).toBe(401);
+    expect((await req('/api/me', { cookie: c })).status).toBe(401);
+    expect((await login('dan', PW)).status).toBe(401);
+    expect((await login('dan', 'brand new pass')).status).toBe(200);
+  });
+
+  it('a wrong current password is 401 and changes nothing; it counts toward the sign-in lock', async () => {
+    const a = await join('dan');
+    const other = cookieOf(await login('dan'))!;
+    const res = await change(a, { currentPassword: 'not it at all', newPassword: 'brand new pass' });
+    expect(res.status).toBe(401);
+    expect(await json(res)).toEqual({ error: 'bad_credentials' });
+    expect(await count("SELECT COUNT(*) AS n FROM login_failures WHERE username = 'dan'")).toBe(1);
+    expect((await req('/api/me', { cookie: other })).status).toBe(200);
+    for (let i = 0; i < 9; i++) await change(a, { currentPassword: 'not it at all', newPassword: 'brand new pass' });
+    const locked = await change(a, { currentPassword: PW, newPassword: 'brand new pass' });
+    expect(locked.status).toBe(429);
+    expect(await json(locked)).toEqual({ error: 'too_many_attempts' });
+    expect((await login('dan', PW)).status).toBe(429);
+  });
+
+  it('enforces 8-128 characters, a different password, and a string current password', async () => {
+    const a = await join('dan');
+    for (const newPassword of ['short', 'x'.repeat(129), 12345678, undefined]) {
+      expect((await change(a, { currentPassword: PW, newPassword })).status).toBe(400);
+    }
+    expect((await change(a, { currentPassword: 5, newPassword: 'brand new pass' })).status).toBe(400);
+    expect((await change(a, { currentPassword: '', newPassword: 'brand new pass' })).status).toBe(400);
+    const same = await change(a, { currentPassword: PW, newPassword: PW });
+    expect(same.status).toBe(400);
+    expect(await json(same)).toEqual({ error: 'same_password' });
+    expect((await change(a, { currentPassword: PW, newPassword: 'x'.repeat(128) })).status).toBe(200);
+  });
+
+  it('success clears earlier failures and leaves other people alone', async () => {
+    const a = await join('dan');
+    const ren = await join('ren');
+    await change(a, { currentPassword: 'nope nope nope', newPassword: 'brand new pass' });
+    expect((await change(a, { currentPassword: PW, newPassword: 'brand new pass' })).status).toBe(200);
+    expect(await count('SELECT COUNT(*) AS n FROM login_failures')).toBe(0);
+    expect((await req('/api/me', { cookie: ren })).status).toBe(200);
+    expect((await login('ren', PW)).status).toBe(200);
+  });
+});
+
 describe('DEV_EMAIL bypass (A10)', () => {
   it('still works in dev, creating the user active', async () => {
     const res = await req('/api/me', { over: { ENVIRONMENT: 'dev', DEV_EMAIL: 'dev@x.com' } });

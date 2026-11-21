@@ -113,6 +113,26 @@ describe('Friend profile', () => {
     expect(screen.getByRole('list', { name: 'Stats by list' })).toBeInTheDocument();
   });
 
+  it('Stats tab draws the rating distribution from their visible entries (9.0 and 8.5 are score 9 and 8; 7.0 is 7)', async () => {
+    backend();
+    renderApp('/u/ren?tab=stats');
+    const dist = await screen.findByRole('region', { name: /Rating distribution/ });
+    expect(dist).toHaveTextContent('3 rated');
+    const rowsOf = within(within(dist).getByRole('table')).getAllByRole('row').slice(1).map((r) => r.textContent);
+    expect(rowsOf).toEqual(['10', '20', '30', '40', '50', '60', '71', '81', '91', '100']);
+    expect(screen.queryByText(/Loved|Liked/)).not.toBeInTheDocument();
+  });
+
+  it('Stats tab lists Anime genres when they have any', async () => {
+    backend({ 'GET /api/users/:username/entries': { body: [
+      makeFriendEntry({ id: 'g1', title: 'A', rating: 9, genres: 'Drama, Fantasy' }),
+      makeFriendEntry({ id: 'g2', title: 'B', rating: 7, genres: 'Drama' }),
+    ] } });
+    renderApp('/u/ren?tab=stats');
+    const g = await screen.findByRole('region', { name: 'Anime by genre' });
+    expect(within(g).getByRole('row', { name: /Drama/ })).toHaveTextContent('2');
+  });
+
   it("a stranger's profile shows only the header and Add friend, and never asks for their entries", async () => {
     const { calls } = backend({
       'GET /api/users/:username': { body: { user: { ...REN, id: 'id-vance', username: 'vance', displayName: null }, memberSince: null, relation: 'none' } },

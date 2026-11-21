@@ -37,7 +37,7 @@ const makeLink = async (email = B) => {
   return tokenOf(link);
 };
 
-const FORBIDDEN = ['strength', 'priorMean', 'scoreLocked', 'comparisons', 'isPrivate', 'notesPrivate', 'email', 'settings', 'public_token_hash', 'publicTokenHash', 'inviteCode'];
+const FORBIDDEN = ['strength', 'priorMean', 'scoreLocked', 'comparisons', 'isPrivate', 'notesPrivate', 'email', 'settings', 'public_token_hash', 'public_token', 'publicTokenHash', 'inviteCode'];
 const expectClean = (text: string) => {
   for (const k of FORBIDDEN) expect(text, k).not.toContain(`"${k}"`);
 };
@@ -65,18 +65,47 @@ afterEach(async () => {
 });
 
 describe('/api/me/public-link (signed in)', () => {
-  it('is off by default, and on after POST without ever showing the link again', async () => {
+  it('is off by default, and on after POST; the link is stored and returned by GET (hash kept for lookups)', async () => {
     expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: false });
     const res = await as(B, '/api/me/public-link', 'POST');
     expect(res.status).toBe(200);
     const { link } = await json<{ link: string }>(res);
     expect(link).toMatch(/^https:\/\/app\.test\/p\/[A-Za-z0-9_-]{22}$/);
-    // Only the hash is stored: later reads say it is on, but cannot give the link back.
-    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: true });
-    const row = await env.DB.prepare("SELECT public_token_hash, public_link_at FROM users WHERE username = 'ren'").first<{ public_token_hash: string; public_link_at: string }>();
+    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: true, link });
+    const row = await env.DB.prepare("SELECT public_token_hash, public_token, public_link_at FROM users WHERE username = 'ren'").first<{ public_token_hash: string; public_token: string; public_link_at: string }>();
     expect(row!.public_token_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(row!.public_token_hash).not.toContain(tokenOf(link));
+    expect(row!.public_token).toBe(tokenOf(link));
     expect(row!.public_link_at).toBeTruthy();
+    expect((await anon(`/api/public/${tokenOf(link)}`)).status).toBe(200);
+  });
+
+  it('a link made before migration 0024 (hash only) reports legacy with no link, and still works publicly', async () => {
+    const token = await makeLink();
+    await env.DB.prepare("UPDATE users SET public_token = NULL WHERE username = 'ren'").run();
+    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: true, link: null, legacy: true });
+    expect((await anon(`/api/public/${token}`)).status).toBe(200);
+    // making a new one replaces it and stores the token
+    const fresh = await makeLink();
+    expect(fresh).not.toBe(token);
+    expect((await anon(`/api/public/${token}`)).status).toBe(404);
+    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: true, link: `https://app.test/p/${fresh}` });
+  });
+
+  it('turning it off clears the hash and the stored token', async () => {
+    await makeLink();
+    expect((await as(B, '/api/me/public-link', 'DELETE')).status).toBe(204);
+    const row = await env.DB.prepare("SELECT public_token_hash, public_token, public_link_at FROM users WHERE username = 'ren'").first();
+    expect(row).toEqual({ public_token_hash: null, public_token: null, public_link_at: null });
+    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: false });
+  });
+
+  it('is owner-only: another user never sees or changes your link', async () => {
+    const token = await makeLink(B);
+    expect(await json(await as(A, '/api/me/public-link'))).toEqual({ on: false });
+    expect((await as(A, '/api/me/public-link', 'DELETE')).status).toBe(204);
+    expect((await anon(`/api/public/${token}`)).status).toBe(200);
+    expect(await json(await as(B, '/api/me/public-link'))).toEqual({ on: true, link: `https://app.test/p/${token}` });
   });
 
   it('a new link replaces the old one, and DELETE turns it off', async () => {

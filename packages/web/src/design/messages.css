@@ -254,7 +254,7 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
 }
 
 /* Title pages: the Share button shows its word beside the icon (still a 44 px tap target). */
-.detail-top .detail-top__share { border-color: transparent; color: var(--text); gap: var(--space-3); min-height: var(--tap); min-width: var(--tap); padding: 0 var(--space-5); font-weight: 600; }
+.detail-top .detail-top__share, .profile__banner .detail-top__share { border-color: transparent; color: var(--text); gap: var(--space-3); min-height: var(--tap); min-width: var(--tap); padding: 0 var(--space-5); font-weight: 600; }
 
 /* PC: the Messages list (~760 px) and an open chat (~960 px) are centred columns with a solid Background, over a blurred cover
    (the same CoverBackdrop as the profile banner and title pages) that shows at the sides (Dan, 2026-11-20). */

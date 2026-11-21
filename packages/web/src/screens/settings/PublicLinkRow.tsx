@@ -9,8 +9,8 @@ const FAILED = "Couldn't change your public link. Try again.";
 
 /**
  * "Public profile link" (item 34): a switch, and when on the link with Copy / Share / Make a new link.
- * The server stores only the link's hash, so the link shows right after it is made and never again; to
- * see or copy it later you make a new one (the old one stops working).
+ * The server stores the link (migration 0024), so it is shown every time while on. A link made before that
+ * has no stored token (`legacy`): it still works, and "Make a new link to share" replaces it.
  */
 export function PublicLinkRow() {
   const mine = useMyPublicLink();
@@ -22,7 +22,8 @@ export function PublicLinkRow() {
   const noteId = useId();
   const linkId = useId();
   const on = mine.data?.on === true;
-  const link = mine.data?.link;
+  const link = mine.data?.link ?? undefined;
+  const legacy = on && !link;
   const busy = make.isPending || off.isPending || mine.isPending;
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
@@ -48,19 +49,21 @@ export function PublicLinkRow() {
           <div className="text-field">
             <input id={linkId} type="text" readOnly value={link} onFocus={(e) => e.target.select()} />
           </div>
-          <span className="field-hint">Copy it now: for your privacy it is shown only once.</span>
         </div>
       )}
-      {on && !link && (
-        <p className="field-hint">Your link is on. For your privacy it is shown only once; to see or copy it again, make a new link (the old one stops working).</p>
+      {legacy && (
+        <p className="field-hint">Your link is on, but it was made before links could be saved, so it can't be shown here. Make a new link to share (the old one keeps working until then).</p>
       )}
       {on && (
         <div className="btn-row">
           {link && <Button compact aria-label="Copy public link" onClick={() => void copy(link)}>Copy</Button>}
           {link && canShare && <Button compact aria-label="Share public link" onClick={() => void share(link)}>Share</Button>}
-          <Button compact variant="ghost" disabled={busy} onClick={() => void run(() => make.mutateAsync())}>Make a new link</Button>
+          <Button compact variant="ghost" disabled={busy} onClick={() => void run(() => make.mutateAsync())}>
+            {legacy ? 'Make a new link to share' : 'Make a new link'}
+          </Button>
         </div>
       )}
+      {on && link && <p className="field-hint">Making a new link stops the current one from working.</p>}
       {failed && <p role="alert" className="field-error">{FAILED}</p>}
     </div>
   );

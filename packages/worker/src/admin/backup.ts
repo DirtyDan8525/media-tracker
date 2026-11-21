@@ -4,7 +4,7 @@
  *
  * EXCLUDED, exactly this and nothing else:
  *  - whole tables sessions and password_resets (they hold only sign-in token hashes);
- *  - users.password_hash and users.public_token_hash (the public profile link's hash; public_link_at stays);
+ *  - users.password_hash, users.public_token_hash and users.public_token (the public profile link's hash and raw token; public_link_at stays);
  *  - signup_links.token_hash (the link's id, dates and who used it stay);
  *  - push_subscriptions.endpoint, p256dh and auth (the push address and its keys; user and dates stay);
  *  - avatars.data (the picture bytes, which JSON cannot carry well; the avatar's owner and date stay).
@@ -15,7 +15,7 @@ export const BACKUP_SKIPPED_TABLES: readonly string[] = ['sessions', 'password_r
 
 /** Included tables, with the columns left out of each. */
 export const BACKUP_TABLES: Readonly<Record<string, readonly string[]>> = {
-  users: ['password_hash', 'public_token_hash'],
+  users: ['password_hash', 'public_token_hash', 'public_token'],
   entries: [],
   seasons: [],
   comparisons: [],

@@ -23,6 +23,7 @@ import { useSessionMe } from '../shell/SessionGate';
 import { CropSheet, PhotoPreviewSheet, type CropRect } from './profile/AvatarEditor';
 import { AvatarTooBigError, makeAvatar, readImage } from './profile/avatarImage';
 import { EditProfileSheet } from './profile/EditProfileSheet';
+import { ShareProfileButton } from './profile/ShareProfileButton';
 import { TierCounts } from './profile/TierCounts';
 import '../design/settings.css';
 import '../design/nav.css';
@@ -133,7 +134,7 @@ export function ProfileScreen() {
   return (
     <div className="screen profile">
       <PageHeader title="Profile" className="profile__banner" backdrop={cover}
-        backTo={current ? `/list/${current}` : '/more'} backUsesHistory />
+        backTo={current ? `/list/${current}` : '/more'} backUsesHistory actions={<ShareProfileButton />} />
       <div className="screen__body profile__body">
         <div className="profile__id">
           <div className="profile__photo"><Avatar me={me} size={96} viewable /></div>

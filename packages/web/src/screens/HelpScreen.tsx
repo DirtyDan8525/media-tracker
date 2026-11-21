@@ -40,7 +40,7 @@ const SECTIONS: Section[] = [
     'Activity shows what friends rate and add. React with an emoji or leave a comment on a rating.',
   ] },
   { title: 'Public profile link', lines: [
-    'In Settings you can turn on a public link. Anyone with it can see your lists read-only, without signing in. Turn it off or make a new link any time.',
+    'In Edit profile (or Settings) you can turn on a public link. Anyone with it can see your lists read-only, without signing in. On your Profile, tap Share to send it. Turn it off or make a new link any time.',
   ] },
   { title: 'Privacy', lines: [
     'Mark a title private and friends will not see it. Private notes stay yours: notes are only shown to friends when you choose.',

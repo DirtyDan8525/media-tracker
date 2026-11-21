@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0023_conversation_mute.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0024_public_link_token.sql`) with a green check.
 
 ## Turn on photos and voice memos (optional, once)
 
@@ -83,7 +83,7 @@ Chats can carry photos and voice memos. They are stored in Cloudflare R2 (a stor
    # bucket_name = "media-tracker-media"
    ```
    (With the lines uncommented but no bucket, the deploy stops with an error about `media-tracker-media`: do step 2 first.)
-4. **Apply the database updates** (adds `0021_message_reactions.sql`, `0022_media.sql` and `0023_conversation_mute.sql` if you don't have them yet):
+4. **Apply the database updates** (adds `0021_message_reactions.sql`, `0022_media.sql`, `0023_conversation_mute.sql` and `0024_public_link_token.sql` if you don't have them yet):
    ```
    npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remote --env production
    ```
@@ -283,6 +283,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0021_message_reactions.sql`: reactions on chat messages (a new table, `message_reactions`), each person's recent custom emojis (a new `recent_emoji` column on users), and voice memos as a kind of message (the `messages` table is rebuilt with the same rows, replies and indexes; nothing is lost). Apply it **before** deploying: the new app reads these.
    - `0022_media.sql`: the list of stored photos and voice memos (a new table, `media`) that the daily clean-up and the storage cap use. Apply it **before** deploying. Turning photos and voice memos on is optional: see "Turn on photos and voice memos" after section 6.
    - `0023_conversation_mute.sql`: lets each person mute a chat (a new `muted` column on chat members; every chat starts unmuted). Apply it **before** deploying: the new app reads it.
+   - `0024_public_link_token.sql`: lets your public profile link be shared any time (a new `public_token` column on users; links made earlier keep working, and the app offers "Make a new link to share" for them). Apply it **before** deploying: the new app reads it.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:

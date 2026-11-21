@@ -318,29 +318,32 @@ me.delete('/avatar', async (c) => {
 // 1 query when the code exists, 2-4 on first use (read, write, read; once more after a unique clash). (+ sign-in)
 me.get('/invite', async (c) => c.json({ code: await ensureInviteCode(c.env.DB, c.var.user.id) }));
 
-// Public profile link (item 34). Only the token's hash is stored, so the link can be shown once: in the
-// answer to the POST that made it. Later reads say only whether it is on; to see or copy the link again
-// the owner makes a new one (the old one stops working). Keeping the plain or encrypted token instead
-// would let a leaked database open every public page, so this trade is deliberate.
-// 1 query (+ sign-in).
+// Public profile link (item 34). The hash (public_token_hash) is the lookup key for /api/public/:token; since
+// 2026-11-20 (migration 0024) the raw token is kept too (public_token) so the owner can share the link any time.
+// Links made before 0024 have no stored token: they are reported as { on: true, link: null, legacy: true } and
+// keep working until the owner makes a new one. 1 query (+ sign-in).
 me.get('/public-link', async (c) => {
-  const row = await c.env.DB.prepare('SELECT public_token_hash IS NOT NULL AS on_ FROM users WHERE id = ?').bind(c.var.user.id).first<{ on_: number }>();
-  return c.json({ on: row?.on_ === 1 }, 200, { 'Cache-Control': 'no-store' });
+  const row = await c.env.DB.prepare('SELECT public_token_hash IS NOT NULL AS on_, public_token FROM users WHERE id = ?')
+    .bind(c.var.user.id).first<{ on_: number; public_token: string | null }>();
+  const h = { 'Cache-Control': 'no-store' };
+  if (row?.on_ !== 1) return c.json({ on: false }, 200, h);
+  if (!row.public_token) return c.json({ on: true, link: null, legacy: true }, 200, h);
+  return c.json({ on: true, link: `${new URL(c.req.url).origin}/p/${row.public_token}` }, 200, h);
 });
 
 // 1 query (+ sign-in). Creates or replaces the link; the old one stops working at once. A clash of two
 // 128-bit random tokens is not a real case, so a unique-index failure is just a 500.
 me.post('/public-link', async (c) => {
   const token = newPublicToken();
-  await c.env.DB.prepare('UPDATE users SET public_token_hash = ?, public_link_at = ? WHERE id = ?')
-    .bind(await publicTokenHash(token), new Date().toISOString(), c.var.user.id)
+  await c.env.DB.prepare('UPDATE users SET public_token_hash = ?, public_token = ?, public_link_at = ? WHERE id = ?')
+    .bind(await publicTokenHash(token), token, new Date().toISOString(), c.var.user.id)
     .run();
   return c.json({ link: `${new URL(c.req.url).origin}/p/${token}` }, 200, { 'Cache-Control': 'no-store' });
 });
 
-// 1 query (+ sign-in). Off: the link stops working.
+// 1 query (+ sign-in). Off: the link stops working and the stored token is cleared.
 me.delete('/public-link', async (c) => {
-  await c.env.DB.prepare('UPDATE users SET public_token_hash = NULL, public_link_at = NULL WHERE id = ?').bind(c.var.user.id).run();
+  await c.env.DB.prepare('UPDATE users SET public_token_hash = NULL, public_token = NULL, public_link_at = NULL WHERE id = ?').bind(c.var.user.id).run();
   return c.body(null, 204);
 });
 

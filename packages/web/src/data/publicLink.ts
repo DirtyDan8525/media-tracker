@@ -2,6 +2,8 @@ import type { CustomList, FriendEntry, PublicUser } from '@media-tracker/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { registerLists } from '../lists/registry';
+import { useAppName } from './appSettings';
+import { useCopy } from './social';
 
 /** GET /api/public/:token (item 34): the read-only header of a public profile link. */
 export interface PublicProfileData {
@@ -48,18 +50,39 @@ export const publicCoverSrc = (token: string, entryId: string): string => `/api/
 export const publicAvatarSrc = (token: string): string => `/api/public/${enc(token)}/avatar`;
 
 /**
- * Your own link. The server keeps only its hash, so `link` is known only in this session, right after
- * it was made (the POST's answer is written into this query's cache); later it is `{ on: true }`.
+ * Your own link. The server stores the link (since migration 0024), so `link` is there whenever the link is on.
+ * `legacy`: it was made before that and has no stored token: it still works but cannot be shown or shared;
+ * make a new one (`link: null`).
  */
-export interface MyPublicLink { on: boolean; link?: string }
+export interface MyPublicLink { on: boolean; link?: string | null; legacy?: boolean }
 export const MY_PUBLIC_LINK_KEY = ['me', 'public-link'] as const;
+const fetchMyPublicLink = () => api.get<MyPublicLink>('/api/me/public-link');
 
 export function useMyPublicLink() {
   return useQuery({
     queryKey: MY_PUBLIC_LINK_KEY,
-    queryFn: () => api.get<MyPublicLink>('/api/me/public-link'),
+    queryFn: fetchMyPublicLink,
     staleTime: Infinity,
   });
+}
+
+/** Always asks the server (the link may have changed on another device) and returns the current state. */
+export function useFreshPublicLink() {
+  const qc = useQueryClient();
+  return () => qc.fetchQuery({ queryKey: MY_PUBLIC_LINK_KEY, queryFn: fetchMyPublicLink, staleTime: 0 });
+}
+
+/** "Share" for a link: the device's share sheet when it has one, else copy with the toast "Link copied". */
+export function useShareLink() {
+  const copy = useCopy();
+  const appName = useAppName();
+  return async (url: string) => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try { await navigator.share({ title: appName, text: `My lists on ${appName}`, url }); } catch { /* cancelled */ }
+      return;
+    }
+    await copy(url);
+  };
 }
 
 /** Turns the link on, or replaces it (the old one stops working). */

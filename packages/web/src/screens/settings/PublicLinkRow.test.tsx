@@ -7,11 +7,11 @@ import { renderApp } from '../../test/renderApp';
 const LINK = 'https://app.test/p/AbCdEfGhIjKlMnOpQrStUv';
 const NOTE = 'Anyone with the link can see your lists, ratings and notes — not private titles or private notes.';
 
-function backend(on: boolean, over: Record<string, MockResponse> = {}) {
-  const state = { on };
+function backend(on: boolean | 'legacy', over: Record<string, MockResponse> = {}) {
+  const state = { on: on !== false, legacy: on === 'legacy', link: LINK };
   const calls = mockApi(makeMe(), {
-    'GET /api/me/public-link': () => ({ body: { on: state.on } }),
-    'POST /api/me/public-link': () => { state.on = true; return { body: { link: LINK } }; },
+    'GET /api/me/public-link': () => ({ body: !state.on ? { on: false } : state.legacy ? { on: true, link: null, legacy: true } : { on: true, link: state.link } }),
+    'POST /api/me/public-link': () => { state.on = true; state.legacy = false; return { body: { link: LINK } }; },
     'DELETE /api/me/public-link': () => { state.on = false; return { status: 204 }; },
     ...over,
   });
@@ -34,7 +34,7 @@ describe('Settings > Public profile link', () => {
     expect(screen.queryByRole('button', { name: 'Copy public link' })).not.toBeInTheDocument();
   });
 
-  it('turning it on makes a link and shows it once, with Copy, Share and Make a new link', async () => {
+  it('turning it on makes a link and shows it, with Copy, Share and Make a new link', async () => {
     const { calls } = backend(false);
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
@@ -54,14 +54,29 @@ describe('Settings > Public profile link', () => {
     expect(screen.getByRole('button', { name: 'Make a new link' })).toBeInTheDocument();
   });
 
-  it('on from before: the link cannot be shown again, so it offers Make a new link (the old one stops working)', async () => {
+  it('already on: shows the stored link every time, with Copy, Share and Make a new link (which warns)', async () => {
     const { calls } = backend(true);
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    renderApp('/settings');
+    const { sw, box } = await section();
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(await within(box).findByDisplayValue(LINK)).toBeInTheDocument();
+    expect(within(box).queryByText(/shown only once/)).not.toBeInTheDocument();
+    expect(within(box).getByText(/stops the current one from working/)).toBeInTheDocument();
+    await userEvent.click(within(box).getByRole('button', { name: 'Share public link' }));
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: LINK }));
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('legacy link (made before links were stored): no link shown, offers Make a new link to share', async () => {
+    const { calls } = backend('legacy');
     renderApp('/settings');
     const { sw, box } = await section();
     await waitFor(() => expect(sw).toBeChecked());
     expect(within(box).queryByDisplayValue(LINK)).not.toBeInTheDocument();
-    expect(within(box).getByText(/shown only once/)).toBeInTheDocument();
-    await userEvent.click(within(box).getByRole('button', { name: 'Make a new link' }));
+    expect(within(box).queryByRole('button', { name: 'Copy public link' })).not.toBeInTheDocument();
+    await userEvent.click(within(box).getByRole('button', { name: 'Make a new link to share' }));
     expect(await within(box).findByDisplayValue(LINK)).toBeInTheDocument();
     expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/me/public-link')).toHaveLength(1);
   });

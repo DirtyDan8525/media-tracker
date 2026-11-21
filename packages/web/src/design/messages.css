@@ -59,7 +59,6 @@
 .chat__empty { text-align: center; margin: auto; }
 .chat__day { text-align: center; margin: var(--space-6) 0 var(--space-3); font-size: var(--fs-meta); font-weight: 600; color: var(--muted-text); text-transform: uppercase; letter-spacing: .06em; }
 .chat__readonly { flex: none; margin: 0; padding: var(--space-8); border-top: 1px solid var(--grid-line); background: var(--header-row); text-align: center; font-size: var(--fs-sm); color: var(--muted-text); }
-.chat__full { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; border-radius: var(--radius-lg); }
 
 .bubble-row { display: flex; align-items: flex-end; gap: var(--space-4); border-radius: var(--radius-xl); outline-offset: 2px; }
 .bubble-row--mine { justify-content: flex-end; }
@@ -279,9 +278,3 @@ button.bubble__quote:focus-visible { outline: 2px solid var(--highlight); outlin
   .frame--wide .chat__list { max-width: 100%; }
 }
 
-/* A chosen photo waits in the composer until Send (Dan, 2026-11-20); ✕ removes it. */
-.composer__staged { display: flex; align-items: flex-start; gap: var(--space-3); padding: 0 0 var(--space-4); }
-.composer__staged-img { position: relative; }
-.composer__staged-img img { display: block; max-height: 96px; max-width: 160px; border-radius: var(--radius-lg); object-fit: cover; }
-.composer__staged-remove { position: absolute; top: -8px; right: -8px; }
-.composer__staged-remove.icon-btn { min-width: 32px; min-height: 32px; width: 32px; height: 32px; border-radius: 50%; background: var(--card); border: 1px solid var(--grid-line); }

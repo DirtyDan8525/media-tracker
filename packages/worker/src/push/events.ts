@@ -32,7 +32,8 @@ export function pushFriendRequest(env: Env, ctx: Ctx, to: string, from: Who): vo
 /** Comments and reactions are the title's (migration 0025): one tag per title, wherever they were left (a post or the title page). */
 export function pushComment(env: Env, ctx: Ctx, to: string, from: Who, entryId: string, text: string): void {
   if (to === from.id) return;
-  notify(env, ctx, to, 'comments', { title: `${nameOf(from)} commented on your post`, body: clip(text), tag: `comment-${entryId}`, url: `/entry/${entryId}` });
+  // A comment that is only a picture reads "Sent a photo" (as in chat).
+  notify(env, ctx, to, 'comments', { title: `${nameOf(from)} commented on your post`, body: text === '' ? 'Sent a photo' : clip(text), tag: `comment-${entryId}`, url: `/entry/${entryId}` });
 }
 
 /** One push per title per 10 minutes. */

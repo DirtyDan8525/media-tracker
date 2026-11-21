@@ -77,7 +77,12 @@ export type Target = { activityId: string } | { entryId: string };
 export interface Comment {
   id: string;
   author: PublicUser;
+  /** May be empty when the comment is only a picture. */
   body: string;
+  /** A photo or GIF is attached (picture at GET /api/comments/:id/media). */
+  image: boolean;
+  /** It had a picture and the clean-up removed it: shown as "Picture expired". */
+  expired: boolean;
   createdAt: string;
   canDelete: boolean;
 }

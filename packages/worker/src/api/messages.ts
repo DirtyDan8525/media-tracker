@@ -18,6 +18,7 @@ import { ctxOf } from '../push/send';
 import { sha256Hex } from '../auth/session';
 import { featureOn, loadAppSettings } from '../settings/appSettings';
 import { makeRoom, removeMedia } from '../media/store';
+import { IMAGE_EXT_OK, readCapped, serveObject } from '../media/files';
 import { FRIEND_IDS_SQL, PUBLIC_USER_COLS, pair, publicUser, type PublicUserRow } from '../social/visibility';
 
 export const messages = new Hono<AppEnv>();
@@ -586,41 +587,6 @@ messages.post('/conversations/:id/messages', featureOn('messages'), async (c) =>
   return c.json(msg, 201);
 });
 
-const IMAGE_EXT_OK: Record<string, (b: Uint8Array) => boolean> = {
-  'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  'image/png': (b) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => b[i] === v),
-  // GIF87a / GIF89a.
-  'image/gif': (b) => [0x47, 0x49, 0x46, 0x38].every((v, i) => b[i] === v) && (b[4] === 0x37 || b[4] === 0x39) && b[5] === 0x61,
-  'image/webp': (b) => [0x52, 0x49, 0x46, 0x46].every((v, i) => b[i] === v) && [0x57, 0x45, 0x42, 0x50].every((v, i) => b[8 + i] === v),
-};
-
-/** The whole body, or null when it runs past `max` bytes (stops reading at once). */
-async function readCapped(req: Request, max: number): Promise<Uint8Array | null> {
-  const declared = Number(req.headers.get('Content-Length'));
-  if (Number.isFinite(declared) && declared > max) return null;
-  if (!req.body) return new Uint8Array(0);
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > max) {
-      await reader.cancel().catch(() => undefined);
-      return null;
-    }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const ch of chunks) {
-    out.set(ch, at);
-    at += ch.byteLength;
-  }
-  return out;
-}
-
 const VOICE_OK: Record<string, (b: Uint8Array) => boolean> = {
   // EBML header (WebM / Matroska).
   'audio/webm': (b) => b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3,
@@ -710,27 +676,7 @@ const serveMedia = async (c: Context<AppEnv>) => {
       WHERE m.id = ?1 AND m.deleted_at IS NULL AND m.image_key IS NOT NULL`,
   ).bind(c.req.param('id') ?? '', c.var.user.id).first<{ image_key: string }>();
   if (!row) return c.json(notFound, 404);
-  if (!c.env.MEDIA) return c.json({ error: 'not_configured' }, 503);
-  const ranged = c.req.header('Range') !== undefined;
-  const obj = await c.env.MEDIA.get(row.image_key, ranged ? { range: c.req.raw.headers } : undefined);
-  if (!obj) return c.json(notFound, 404);
-  const headers: Record<string, string> = {
-    'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    // Private (never a shared cache), and the file under a key never changes.
-    'Cache-Control': 'private, max-age=31536000, immutable',
-    'X-Content-Type-Options': 'nosniff',
-    'Accept-Ranges': 'bytes',
-  };
-  const r = obj.range as { offset?: number; length?: number; suffix?: number } | undefined;
-  if (ranged && r) {
-    const length = r.suffix !== undefined ? Math.min(r.suffix, obj.size) : (r.length ?? obj.size - (r.offset ?? 0));
-    const offset = r.suffix !== undefined ? obj.size - length : (r.offset ?? 0);
-    headers['Content-Range'] = `bytes ${offset}-${offset + length - 1}/${obj.size}`;
-    headers['Content-Length'] = String(length);
-    return new Response(obj.body, { status: 206, headers });
-  }
-  headers['Content-Length'] = String(obj.size);
-  return new Response(obj.body, { headers });
+  return serveObject(c, row.image_key);
 };
 messages.get('/messages/:id/media', serveMedia);
 messages.get('/messages/:id/image', serveMedia);

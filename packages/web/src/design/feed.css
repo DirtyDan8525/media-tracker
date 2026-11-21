@@ -61,6 +61,10 @@
 .comment__head { display: flex; gap: var(--space-4); align-items: baseline; font-size: var(--fs-sm); color: var(--bright-text); }
 .comment__head time { font-size: var(--fs-pill); color: var(--muted-text); }
 .comment__body { margin: 0; font-size: var(--fs-sm); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment__photo { all: unset; display: block; align-self: flex-start; cursor: pointer; border-radius: var(--radius-lg); overflow: hidden; min-width: 44px; min-height: 44px; }
+.comment__photo:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+.comment__photo img { display: block; max-width: 100%; max-height: 240px; width: auto; height: auto; background: var(--panel); }
+.comment__expired { margin: 0; font-size: var(--fs-sm); color: var(--muted-text); font-style: italic; }
 .comment__confirm { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; font-size: var(--fs-sm); color: var(--text); }
 .comment-empty { margin: 0; color: var(--muted-text); font-size: var(--fs-sm); }
 .comment-form { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -69,7 +73,7 @@
   border: 1px solid var(--grid-line); background: var(--bg); color: var(--bright-text); font: 400 var(--fs-body) var(--font);
 }
 .comment-form__row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
-.comment-form__left { font-size: var(--fs-meta); color: var(--muted-text); font-variant-numeric: tabular-nums; }
+.comment-form__left { margin-right: auto; font-size: var(--fs-meta); color: var(--muted-text); font-variant-numeric: tabular-nums; }
 .comment-form__left.is-over { color: var(--bright-text); font-weight: 700; }
 
 /* Unread badges. */

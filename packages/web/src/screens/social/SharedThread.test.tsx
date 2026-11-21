@@ -48,7 +48,7 @@ function server(gets: { reactions: number }) {
     },
     'GET /api/comments': (_b: unknown, url: URL) => (entryOf(url.searchParams) === 'e-song' ? { body: thread.comments } : { status: 404, body: {} }),
     'POST /api/comments': (b: unknown) => {
-      const c: Comment = { id: `c${thread.comments.length + 1}`, author: DAN, body: (b as { body: string }).body, createdAt: new Date().toISOString(), canDelete: true };
+      const c: Comment = { id: `c${thread.comments.length + 1}`, author: DAN, body: (b as { body: string }).body, image: false, expired: false, createdAt: new Date().toISOString(), canDelete: true };
       thread.comments.push(c);
       return { status: 201, body: c };
     },

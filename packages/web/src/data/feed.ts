@@ -5,6 +5,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteD
 import { ApiError, api } from '../api/client';
 import { registerLists } from '../lists/registry';
 import { useToast } from '../design/components/Toast';
+import { upload } from './messages';
 
 export const ACTIVITY_KEY = ['activity'] as const;
 export const UNREAD_KEY = ['activity-unread'] as const;
@@ -168,15 +169,39 @@ export function useReact() {
   });
 }
 
+/** A comment's picture (photo or GIF), served to whoever may read the thread. */
+export const commentImageUrl = (id: string): string => `/api/comments/${encodeURIComponent(id)}/media`;
+
+/**
+ * Posts a comment: text, a picture (`photo`: already resized, uploaded first and attached), or both. A picture without text is fine.
+ */
 export function usePostComment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ target, body }: { target: SocialTarget; body: string }) => api.post<Comment>('/api/comments', { ...apiTarget(target), body }),
+    mutationFn: async ({ target, body, photo }: { target: SocialTarget; body: string; photo?: Blob | null }) => {
+      let mediaId: string | undefined;
+      if (photo) {
+        const up = await upload<{ mediaId: string }>(`/api/comments/media?${targetQuery(target)}`, photo, photo.type || 'image/jpeg');
+        mediaId = up.mediaId;
+      }
+      return api.post<Comment>('/api/comments', { ...apiTarget(target), ...(body ? { body } : {}), ...(mediaId ? { mediaId } : {}) });
+    },
     onSuccess: (comment, { target }) => {
       qc.setQueryData<Comment[]>(['comments', target.entryId], (old) => (old ? [...old, comment] : old));
       patchSocial(qc, target, (s) => ({ ...s, comments: s.comments + 1 }));
     },
   });
+}
+
+/** What to tell the person when a comment (or its picture) could not be posted. */
+export function commentErrorText(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 503) return 'Photos need setup.';
+    if (e.status === 403 && e.error === 'feature_off') return 'Photos in comments are switched off.';
+    if (e.status === 413) return 'That photo is too big to send.';
+    if (e.status === 415 || (e.status === 400 && e.error !== 'invalid')) return "That photo can't be sent.";
+  }
+  return "Couldn't post your comment. Try again.";
 }
 
 export function useDeleteComment() {

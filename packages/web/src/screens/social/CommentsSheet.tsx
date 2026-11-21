@@ -1,9 +1,12 @@
 import { COMMENT_MAX, nameOf, type Comment } from '@media-tracker/shared';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../design/components/Button';
+import { IconButton } from '../../design/components/IconButton';
 import { Sheet } from '../../design/components/Sheet';
 import { useToast } from '../../design/components/Toast';
-import { useComments, useDeleteComment, usePostComment, type SocialTarget } from '../../data/feed';
+import { useMediaOptions } from '../../data/appSettings';
+import { commentErrorText, commentImageUrl, useComments, useDeleteComment, usePostComment, type SocialTarget } from '../../data/feed';
+import { PHOTO_ACCEPT, PictureViewer, StagedPhotoPreview, usePhotoStaging } from '../../media/photoStaging';
 import { timeAgo } from '../activity/format';
 import { useNow } from '../../hooks';
 import { useMe } from '../../data/useMe';
@@ -16,14 +19,18 @@ export function CommentsSheet({ target, open, onClose }: { target: SocialTarget;
   const [text, setText] = useState('');
   const left = COMMENT_MAX - text.length;
   const body = text.trim();
-  const canPost = body.length > 0 && left >= 0 && !post.isPending;
+  // A photo or GIF waits here with a preview and a ✕, as in chat; Post sends it with the text (text is optional then).
+  const { staged, stage, clear } = usePhotoStaging();
+  const photos = useMediaOptions().photos;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const canPost = (body.length > 0 || staged !== null) && left >= 0 && !post.isPending;
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!canPost) return;
-    post.mutate({ target, body }, {
-      onSuccess: () => setText(''),
-      onError: () => toast.show("Couldn't post your comment. Try again."),
+    post.mutate({ target, body, photo: staged?.blob ?? null }, {
+      onSuccess: () => { setText(''); clear(); },
+      onError: (err) => toast.show(commentErrorText(err)),
     });
   }
 
@@ -32,7 +39,15 @@ export function CommentsSheet({ target, open, onClose }: { target: SocialTarget;
       <label className="sr-only" htmlFor="comment-text">Add a comment</label>
       <textarea id="comment-text" className="comment-form__input" rows={2} value={text} placeholder="Add a comment"
         aria-describedby="comment-left" onChange={(e) => setText(e.target.value)} />
+      {staged && <StagedPhotoPreview staged={staged} onRemove={clear} />}
       <div className="comment-form__row">
+        {photos && (
+          <>
+            <IconButton label="Add a photo or GIF" icon="image" look="plain" onClick={() => fileInput.current?.click()} />
+            <input ref={fileInput} type="file" accept={PHOTO_ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="comment-photo-input"
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void stage(f); }} />
+          </>
+        )}
         <span id="comment-left" role="status" className={`comment-form__left${left < 0 ? ' is-over' : ''}`}>
           {left >= 0 ? `${left} left` : `${-left} over`}
         </span>
@@ -72,6 +87,7 @@ function CommentRow({ comment, target }: { comment: Comment; target: SocialTarge
   const toast = useToast();
   const now = useNow();
   const [asking, setAsking] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const who = nameOf(comment.author);
   // The admin may delete any comment (AD7); everyone else, what the server says.
   const admin = useMe().data?.isAdmin === true;
@@ -82,7 +98,17 @@ function CommentRow({ comment, target }: { comment: Comment; target: SocialTarge
         <strong>{who}</strong>
         <time dateTime={comment.createdAt}>{timeAgo(comment.createdAt, now)}</time>
       </div>
-      <p className="comment__body">{comment.body}</p>
+      {comment.body !== '' && <p className="comment__body">{comment.body}</p>}
+      {comment.expired ? (
+        <p className="comment__expired">Picture expired</p>
+      ) : comment.image && (
+        <>
+          <button type="button" className="comment__photo" aria-label={`Open picture from ${who} full size`} onClick={() => setViewing(true)}>
+            <img src={commentImageUrl(comment.id)} alt={`Picture from ${who}`} loading="lazy" />
+          </button>
+          <PictureViewer src={viewing ? commentImageUrl(comment.id) : null} alt={`Picture from ${who}, full size`} onClose={() => setViewing(false)} />
+        </>
+      )}
       {canDelete && !asking && (
         <button type="button" className="link-btn comment__delete" aria-label={`Delete comment by ${who}`} onClick={() => setAsking(true)}>
           Delete

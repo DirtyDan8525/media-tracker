@@ -28,6 +28,7 @@ import { quoteText, snippetOfMessage } from './format';
 import { MessageMenu, reactionGroups } from './MessageMenu';
 import { LONG_PRESS_MS, SWIPE_REPLY_PX, useBubbleGestures } from './useBubbleGestures';
 import { VoicePlayer } from './VoicePlayer';
+import { PictureViewer } from '../../media/photoStaging';
 import '../../design/messages.css';
 
 /** Back in a chat. Phone: the round arrow to the Messages list. PC (no arrow of its own): a "Back" button that returns to where you opened the chat from, else the Messages list. */
@@ -304,9 +305,7 @@ function Chat({ conversation }: { conversation: Conversation }) {
           </ul>
         )}
       </Sheet>
-      <Sheet open={viewing !== null} title="Picture" onClose={() => setViewing(null)}>
-        {viewing && <img className="chat__full" src={messageImageUrl(viewing.id)} alt={`Picture from ${nameFor(viewing.senderId)}, full size`} />}
-      </Sheet>
+      <PictureViewer src={viewing ? messageImageUrl(viewing.id) : null} alt={viewing ? `Picture from ${nameFor(viewing.senderId)}, full size` : ''} onClose={() => setViewing(null)} />
     </div>
   );
   // PC: the chat is a centred column; its sides show a blurred cover (one pick per visit, from your top titles or theirs).

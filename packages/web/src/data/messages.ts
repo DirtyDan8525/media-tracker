@@ -166,7 +166,7 @@ export function useSendRec(conversationId: string) {
 }
 
 /** POSTs raw bytes (a photo or voice memo) with their content type; errors are ApiError like the JSON client's. */
-async function upload(path: string, blob: Blob, type: string): Promise<Message> {
+export async function upload<T = Message>(path: string, blob: Blob, type: string): Promise<T> {
   const res = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': type }, body: blob });
   const text = await res.text();
   let data: unknown;
@@ -175,7 +175,7 @@ async function upload(path: string, blob: Blob, type: string): Promise<Message> 
     const code = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error: string }).error : `http_${res.status}`;
     throw new ApiError(res.status, code, data);
   }
-  return data as Message;
+  return data as T;
 }
 
 /** A photo (already resized and re-encoded, so no EXIF or location): the raw bytes with their content type. */

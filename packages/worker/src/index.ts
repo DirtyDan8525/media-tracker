@@ -49,7 +49,7 @@ app.use('/api/*', async (c, next) => {
   // A photo or voice memo upload is the one raw body: an image or audio type, which a cross-site <form> cannot send without a preflight.
   const path = new URL(c.req.url).pathname;
   const isImageUpload = method === 'POST' && mime !== undefined && (IMAGE_TYPES as readonly string[]).includes(mime)
-    && /^\/api\/conversations\/[^/]+\/messages\/image$/.test(path);
+    && (/^\/api\/conversations\/[^/]+\/messages\/image$/.test(path) || path === '/api/comments/media');
   const isVoiceUpload = method === 'POST' && mime !== undefined && (VOICE_TYPES as readonly string[]).includes(mime)
     && /^\/api\/conversations\/[^/]+\/messages\/voice$/.test(path);
   const isJson = mime === 'application/json' || isImageUpload || isVoiceUpload;

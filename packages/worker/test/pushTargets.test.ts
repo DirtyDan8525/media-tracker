@@ -58,6 +58,24 @@ describe('comment and reaction pushes go by title', () => {
     ]);
   });
 
+  it('a comment that is only a picture says "Sent a photo"; with text it carries the text', async () => {
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3]);
+    const photo = async () => {
+      const up = await app.fetch(new Request('https://app.test/api/comments/media?entryId=song', {
+        method: 'POST', headers: { 'content-type': 'image/png', Origin: 'https://app.test' }, body: png,
+      }), { ...env, ENVIRONMENT: 'dev', DEV_EMAIL: 'dan@x.com' } as Env, ctx);
+      expect(up.status).toBe(201);
+      return ((await up.json()) as { mediaId: string }).mediaId;
+    };
+    expect((await as('dan@x.com', '/api/comments', 'POST', { entryId: 'song', mediaId: await photo() })).status).toBe(201);
+    expect((await as('dan@x.com', '/api/comments', 'POST', { entryId: 'song', body: 'nice', mediaId: await photo() })).status).toBe(201);
+    await settle();
+    expect(sent.map((s) => s.payload.body)).toEqual(['Sent a photo', 'nice']);
+    const listed = await env.MEDIA!.list();
+    await env.MEDIA!.delete(listed.objects.map((o) => o.key));
+    await env.DB.exec('DELETE FROM media');
+  });
+
   it('reactions: one push per title per 10 minutes, across its posts and its page', async () => {
     await as('dan@x.com', '/api/reactions', 'POST', { activityId: 'p1', emoji: '🔥' });
     await settle();

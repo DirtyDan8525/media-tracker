@@ -1,9 +1,11 @@
 /**
- * Photos and voice memos in chats: the `media` ledger (migration 0022) beside the R2 bucket (binding MEDIA).
+ * Photos and voice memos in chats, and pictures in comments (migration 0026): the `media` ledger (migration 0022) beside the R2 bucket (binding MEDIA).
  * Retention (Dan, 2026-11-20): a file older than the admin's months is removed, and when one person's live files add up
  * past the admin's cap their oldest are removed until they fit. Both run daily from the scheduled handler (runRetention);
  * the cap is also checked at upload time (makeRoom). A removed file leaves its message in place: the message's image_key
- * is cleared, so the chat shows "Photo expired" / "Voice memo expired".
+ * is cleared, so the chat shows "Photo expired" / "Voice memo expired". A comment's picture works the same way: the comment's
+ * media_key is cleared and media_expired set ("Picture expired"). A comment picture is uploaded before its comment exists
+ * (a "pending" ledger row, comment_id NULL); one never attached within PENDING_MS is removed by the daily run.
  */
 import { loadAppSettings } from '../settings/appSettings';
 import type { Env } from '../env';
@@ -15,6 +17,8 @@ const MB = 1024 * 1024;
 const LEDGER_KEEP_MS = 30 * 86_400_000;
 /** One sweep removes at most this many files per rule (R2 deletes up to 1000 keys a call; D1 batches stay small). */
 const SWEEP_MAX = 500;
+/** A comment picture uploaded but never posted with a comment is removed after this long. */
+const PENDING_MS = 3_600_000;
 
 /** The ISO time `months` calendar months before `now` (UTC). */
 export function monthsBefore(now: Date, months: number): string {
@@ -36,6 +40,7 @@ export async function removeMedia(env: Pick<Env, 'DB' | 'MEDIA'>, keys: string[]
   await env.DB.batch([
     env.DB.prepare('UPDATE media SET deleted_at = ?1 WHERE key IN (SELECT value FROM json_each(?2)) AND deleted_at IS NULL').bind(now.toISOString(), json),
     env.DB.prepare('UPDATE messages SET image_key = NULL WHERE image_key IN (SELECT value FROM json_each(?1))').bind(json),
+    env.DB.prepare('UPDATE comments SET media_key = NULL, media_expired = 1 WHERE media_key IN (SELECT value FROM json_each(?1))').bind(json),
   ]);
   return keys.length;
 }
@@ -70,7 +75,7 @@ export interface RetentionReport {
   aged: number;
   /** Over someone's storage cap. */
   overCap: number;
-  /** Ledger rows whose message is gone or no longer points at the file (deleted message, left chat, deleted account). */
+  /** Ledger rows whose message or comment is gone or no longer points at the file (deleted message or comment, left chat, deleted account), and comment pictures never posted. */
   orphaned: number;
   /** Removed rows older than 30 days, dropped from the ledger. */
   purged: number;
@@ -82,9 +87,15 @@ export async function runRetention(env: Pick<Env, 'DB' | 'MEDIA'>, now = new Dat
   const { media } = await loadAppSettings(db);
   // 1. Orphans first, so their bytes do not count against anyone's cap.
   const { results: orphanRows } = await db.prepare(
-    `SELECT md.key FROM media md LEFT JOIN messages m ON m.id = md.message_id
-      WHERE md.deleted_at IS NULL AND (m.id IS NULL OR m.image_key IS NULL OR m.image_key <> md.key) LIMIT ${SWEEP_MAX}`,
-  ).all<{ key: string }>();
+    `SELECT md.key FROM media md
+       LEFT JOIN messages m ON m.id = md.message_id
+       LEFT JOIN comments c ON c.id = md.comment_id
+      WHERE md.deleted_at IS NULL AND CASE
+        WHEN md.message_id IS NOT NULL THEN (m.id IS NULL OR m.image_key IS NULL OR m.image_key <> md.key)
+        WHEN md.comment_id IS NOT NULL THEN (c.id IS NULL OR c.deleted_at IS NOT NULL OR c.media_key IS NULL OR c.media_key <> md.key)
+        ELSE md.created_at < ?1 END
+      LIMIT ${SWEEP_MAX}`,
+  ).bind(new Date(now.getTime() - PENDING_MS).toISOString()).all<{ key: string }>();
   const orphaned = await removeMedia(env, orphanRows.map((r) => r.key), now);
   // 2. Age.
   const { results: oldRows } = await db.prepare(

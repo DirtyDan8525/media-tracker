@@ -1,7 +1,7 @@
-import { nameOf, type PublicUser, type Target } from '@media-tracker/shared';
+import { nameOf, type PublicUser } from '@media-tracker/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useReactionsWho } from '../../data/feed';
+import { useReactionsWho, type SocialTarget } from '../../data/feed';
 import { Avatar } from '../../design/components/Avatar';
 import { Sheet } from '../../design/components/Sheet';
 import { useSessionMe } from '../../shell/SessionGate';
@@ -11,7 +11,7 @@ import '../../design/feed.css';
  * "Who reacted": a quiet text button next to the reaction chips that opens the "Reactions" sheet,
  * with "All n" and one tab per emoji, each listing the people (a tap opens their profile).
  */
-export function WhoReactedButton({ target, title }: { target: Target; title: string }) {
+export function WhoReactedButton({ target, title }: { target: SocialTarget; title: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -25,7 +25,7 @@ export function WhoReactedButton({ target, title }: { target: Target; title: str
 
 const ALL = 'all';
 
-export function WhoReactedSheet({ target, onClose }: { target: Target; onClose: () => void }) {
+export function WhoReactedSheet({ target, onClose }: { target: SocialTarget; onClose: () => void }) {
   const me = useSessionMe();
   const who = useReactionsWho(target);
   const [tab, setTab] = useState(ALL);

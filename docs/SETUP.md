@@ -64,7 +64,7 @@ npm exec -w packages/worker -- wrangler d1 migrations apply media-tracker --remo
 
 Type `y` when asked.
 
-**Success:** it lists every migration (`0001_init.sql` up to `0024_public_link_token.sql`) with a green check.
+**Success:** it lists every migration (`0001_init.sql` up to `0025_social_on_titles.sql`) with a green check.
 
 ## Turn on photos and voice memos (optional, once)
 
@@ -284,6 +284,7 @@ Do this each time there is new code (for example, Phase 3: rating tiers and Comp
    - `0022_media.sql`: the list of stored photos and voice memos (a new table, `media`) that the daily clean-up and the storage cap use. Apply it **before** deploying. Turning photos and voice memos on is optional: see "Turn on photos and voice memos" after section 6.
    - `0023_conversation_mute.sql`: lets each person mute a chat (a new `muted` column on chat members; every chat starts unmuted). Apply it **before** deploying: the new app reads it.
    - `0024_public_link_token.sql`: lets your public profile link be shared any time (a new `public_token` column on users; links made earlier keep working, and the app offers "Make a new link to share" for them). Apply it **before** deploying: the new app reads it.
+   - `0025_social_on_titles.sql`: reactions and comments belong to the title, so one left on an Activity post also shows on the title page (yours and your friends' views) and on every other post about that title, and the other way round. Existing ones on posts move to their title; if the same person had left the same emoji on a title more than once that way, the newest is kept; any left on a post or title that no longer exists are dropped. (The `reactions` and `comments` tables are rebuilt without their `activity_id` column.) Apply it **before** deploying: the new app reads only the title.
 
    (An older database also gets `0002_compare_queue.sql`, the list of new ratings waiting to be double-checked.) **Success:** it lists each of these with a green check. It is safe to run more than once: Wrangler records every migration it has applied (in a `d1_migrations` table in your database) and only runs the ones not yet applied, so a second run says there is nothing to apply. Do this step **before** step 6, so the new app never runs against missing tables. Your existing scores do not change: tiers are filled in the first time you open the app afterwards, and a score only moves when you make a pick that involves it.
 6. Put the new app online:

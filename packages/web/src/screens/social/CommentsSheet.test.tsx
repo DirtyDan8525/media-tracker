@@ -15,7 +15,7 @@ function setup(handlers: Parameters<typeof mockFetch>[0]) {
   const calls = mockFetch(handlers);
   render(
     <QueryClientProvider client={makeQueryClient()}>
-      <ToastProvider><CommentsSheet target={{ activityId: 'p1' }} open onClose={() => {}} /></ToastProvider>
+      <ToastProvider><CommentsSheet target={{ activityId: 'p1', entryId: 'e1' }} open onClose={() => {}} /></ToastProvider>
     </QueryClientProvider>,
   );
   return calls;

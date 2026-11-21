@@ -118,12 +118,12 @@ async function seed(db: D1Database) {
     INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at, post_id)
     SELECT 'j' || n.i, a.user_id, a.entry_id, 'status', json_object('from', 'Watching', 'to', 'Completed'), a.created_at, a.created_at, a.id
       FROM n JOIN activity a ON a.id = 'a' || (n.i * 4)`).run();
-  // Reactions and comments on posts.
-  await db.prepare(`INSERT INTO reactions (id, activity_id, user_id, emoji, created_at)
-    SELECT 'r' || a.id || u.id, a.id, u.id, '❤️', a.created_at FROM activity a JOIN users u ON u.id <> a.user_id
+  // Reactions and comments on posts' titles (they are the title's, migration 0025).
+  await db.prepare(`INSERT INTO reactions (id, entry_id, user_id, emoji, created_at)
+    SELECT 'r' || a.id || u.id, a.entry_id, u.id, '❤️', a.created_at FROM activity a JOIN users u ON u.id <> a.user_id
      WHERE a.post_id IS NULL AND CAST(substr(a.id, 2) AS INTEGER) % 50 = 0`).run();
-  await db.prepare(`INSERT INTO comments (id, activity_id, user_id, body, created_at)
-    SELECT 'c' || a.id, a.id, 'u' || ((CAST(substr(a.id, 2) AS INTEGER) + 1) % ${USERS}), 'nice', a.created_at FROM activity a
+  await db.prepare(`INSERT INTO comments (id, entry_id, user_id, body, created_at)
+    SELECT 'c' || a.id, a.entry_id, 'u' || ((CAST(substr(a.id, 2) AS INTEGER) + 1) % ${USERS}), 'nice', a.created_at FROM activity a
      WHERE a.post_id IS NULL AND CAST(substr(a.id, 2) AS INTEGER) % 16 = 0`).run();
   // 200 comparisons a person in anime; 10 tags each on 10 titles.
   await db.prepare(`WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 199)

@@ -6,7 +6,6 @@ export interface AdminComment {
   body: string;
   createdAt: string;
   author: PublicUser;
-  activityId: string | null;
   entryId: string;
   title: string;
   category: Category;

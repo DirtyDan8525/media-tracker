@@ -232,8 +232,7 @@ export interface AdminComment {
   body: string;
   createdAt: string;
   author: PublicUser;
-  /** The post (activity anchor) the comment is on, or null when it is on an entry. */
-  activityId: string | null;
+  /** The title the comment is on (comments are the title's, wherever they were left: migration 0025). */
   entryId: string;
   title: string;
   category: Category;
@@ -247,15 +246,14 @@ admin.get('/comments', async (c) => {
   const asked = Number.parseInt(c.req.query('limit') ?? '', 10);
   const limit = Number.isFinite(asked) ? Math.min(200, Math.max(1, asked)) : 50;
   const { results } = await c.env.DB.prepare(
-    `SELECT c.id, c.body, c.created_at, c.activity_id, e.id AS entry_id, e.title, e.category, ou.username AS owner,
+    `SELECT c.id, c.body, c.created_at, e.id AS entry_id, e.title, e.category, ou.username AS owner,
             u.id AS u_id, u.username, u.display_name, u.avatar_at
        FROM comments c JOIN users u ON u.id = c.user_id
-       LEFT JOIN activity a ON a.id = c.activity_id
-       JOIN entries e ON e.id = COALESCE(c.entry_id, a.entry_id)
+       JOIN entries e ON e.id = c.entry_id
        LEFT JOIN users ou ON ou.id = e.user_id
       WHERE c.deleted_at IS NULL ORDER BY c.created_at DESC, c.id LIMIT ?`,
   ).bind(limit).all<{
-    id: string; body: string; created_at: string; activity_id: string | null; entry_id: string; title: string; category: Category;
+    id: string; body: string; created_at: string; entry_id: string; title: string; category: Category;
     owner: string | null; u_id: string; username: string | null; display_name: string | null; avatar_at: string | null;
   }>();
   const comments: AdminComment[] = results.map((r) => ({
@@ -263,7 +261,6 @@ admin.get('/comments', async (c) => {
     body: r.body,
     createdAt: r.created_at,
     author: publicUser({ id: r.u_id, username: r.username, display_name: r.display_name, avatar_at: r.avatar_at }),
-    activityId: r.activity_id,
     entryId: r.entry_id,
     title: r.title,
     category: r.category,

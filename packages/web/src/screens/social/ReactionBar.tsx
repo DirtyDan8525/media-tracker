@@ -1,4 +1,5 @@
-import { isReaction, REACTIONS, type PostSocial, type Reaction, type Target } from '@media-tracker/shared';
+import { isReaction, REACTIONS, type PostSocial, type Reaction } from '@media-tracker/shared';
+import type { SocialTarget } from '../../data/feed';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../design/components/Button';
 import { WhoReactedButton } from './WhoReacted';
@@ -9,14 +10,14 @@ import '../../design/feed.css';
 /**
  * The reaction summary (FeedV2.wf): one chip per emoji that has at least one reaction, the count
  * beside it, `aria-pressed` for yours; a tap toggles yours. Renders nothing when nobody reacted.
- * The parent owns the (optimistic) state. With `who` (the post or entry, and its title) a "Who reacted"
+ * The parent owns the (optimistic) state. With `who` (the title, and its name) a "Who reacted"
  * button sits after the chips and opens the list of people.
  */
 export function ReactionChips({ social, onToggle, disabled, who }: {
   social: PostSocial;
   onToggle: (emoji: Reaction) => void;
   disabled?: boolean;
-  who?: { target: Target; title: string };
+  who?: { target: SocialTarget; title: string };
 }) {
   const shown = Object.entries(social.reactions).filter(([, n]) => n > 0);
   if (shown.length === 0) return null;

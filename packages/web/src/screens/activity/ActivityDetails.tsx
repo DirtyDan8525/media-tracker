@@ -8,7 +8,7 @@ import { OpenInSpotify } from '../entry/OpenInSpotify';
 import { PlayPreview } from '../entry/PlayPreview';
 import { PlayTrailer } from '../entry/PlayTrailer';
 import { WatchOnYouTube } from '../entry/WatchOnYouTube';
-import { useReact, useReactionsWho } from '../../data/feed';
+import { useReact, useReactionsWho, type SocialTarget } from '../../data/feed';
 import { Avatar } from '../../design/components/Avatar';
 import { Button } from '../../design/components/Button';
 import { CoverImage } from '../../design/components/CoverImage';
@@ -40,7 +40,7 @@ export function PostDetails({ line, who, friend, social, features, now, onCommen
   const me = useSessionMe();
   const own = who === null;
   const react = useReact();
-  const target = { activityId: line.key } as const;
+  const target: SocialTarget = { activityId: line.key, entryId: line.entryId };
   const toggle = (emoji: Reaction) => react.mutate({ target, emoji });
   const reacted = useReactionsWho(features.reactions && Object.keys(social.reactions).length > 0 ? target : null);
   const config = listCfg(line.category);

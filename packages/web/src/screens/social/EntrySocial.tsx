@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppSettings } from '../../data/appSettings';
-import { useEntrySocial, useReact } from '../../data/feed';
+import { useEntrySocial, useReact, type SocialTarget } from '../../data/feed';
 import { Button } from '../../design/components/Button';
 import { ReactButton, ReactionChips } from './ReactionBar';
 import { CommentsSheet } from './CommentsSheet';
@@ -20,7 +20,7 @@ export function EntrySocial({ entryId, ownerId, title }: { entryId: string; owne
   const [open, setOpen] = useState(false);
   const { features } = useAppSettings();
   const s = social.data ?? NONE;
-  const target = { entryId } as const;
+  const target: SocialTarget = { entryId };
   if (!features.reactions && !features.comments) return null;
   return (
     <section className="entry-social" aria-label="Reactions and comments">

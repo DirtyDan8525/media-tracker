@@ -345,8 +345,8 @@ describe('moderation', () => {
       env.DB.prepare("INSERT INTO entries (id, user_id, category, title, is_private, rating, created_at, updated_at) VALUES ('e2', 'uRen', 'anime', 'Open Show', 0, 7, ?1, ?1)").bind(iso(2)),
       env.DB.prepare("INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at) VALUES ('p1', 'uRen', 'e1', 'rated', '{}', ?1, ?1)").bind(iso(2)),
       env.DB.prepare("INSERT INTO activity (id, user_id, entry_id, type, payload_json, created_at, updated_at) VALUES ('p2', 'uRen', 'e2', 'rated', '{}', ?1, ?1)").bind(iso(2)),
-      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c1', 'p1', 'uVance', 'rude one', ?)").bind(iso(1)),
-      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c2', 'p2', 'uVance', 'newer', ?)").bind(iso(0)),
+      env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c1', 'e1', 'uVance', 'rude one', ?)").bind(iso(1)),
+      env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c2', 'e2', 'uVance', 'newer', ?)").bind(iso(0)),
       env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c3', 'e2', 'uVance', 'on entry', ?)").bind(iso(3)),
       env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at, deleted_at) VALUES ('c4', 'e2', 'uVance', 'gone', ?1, ?1)").bind(iso(1)),
     ]);
@@ -362,13 +362,13 @@ describe('moderation', () => {
     expect((await admin('/api/comments/c3', 'DELETE')).status).toBe(204); // an entry comment too
   });
 
-  it('the admin deletes any post with its reactions and comments; a member cannot delete another person\'s', async () => {
-    await env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', 'p1', 'uVance', '👍', ?)").bind(iso(1)).run();
+  it('the admin deletes any post (the title keeps its reactions and comments); a member cannot delete another person\'s', async () => {
+    await env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', 'e1', 'uVance', '👍', ?)").bind(iso(1)).run();
     expect((await call('vance@x.com', '/api/activity/p1', 'DELETE')).status).toBe(404);
     expect((await admin('/api/activity/p1', 'DELETE')).status).toBe(204);
-    const left = async (t: string) => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE activity_id = 'p1'`).first<{ n: number }>())!.n;
-    expect(await left('reactions')).toBe(0);
-    expect(await left('comments')).toBe(0);
+    const left = async (t: string) => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE entry_id = 'e1'`).first<{ n: number }>())!.n;
+    expect(await left('reactions')).toBe(1); // the title's (migration 0025)
+    expect(await left('comments')).toBe(1);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM activity WHERE id = 'p1'").first<{ n: number }>())!.n).toBe(0);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM entries WHERE id = 'e1'").first<{ n: number }>())!.n).toBe(1); // the title stays
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM activity WHERE id = 'p2'").first<{ n: number }>())!.n).toBe(1);
@@ -403,10 +403,11 @@ describe('moderation', () => {
     const { comments } = await json<{ comments: any[] }>(res);
     expect(comments.map((c) => c.id)).toEqual(['c2', 'c1', 'c3']);
     expect(comments[1]).toMatchObject({
-      body: 'rude one', activityId: 'p1', entryId: 'e1', title: 'Secret Show', category: 'anime', owner: 'ren',
+      body: 'rude one', entryId: 'e1', title: 'Secret Show', category: 'anime', owner: 'ren',
       author: { id: 'uVance', username: 'vance' },
     });
-    expect(comments[2]).toMatchObject({ activityId: null, entryId: 'e2', title: 'Open Show' });
+    expect(comments[2]).toMatchObject({ entryId: 'e2', title: 'Open Show' });
+    expect(comments[2]).not.toHaveProperty('activityId');
     expect((await json<{ comments: unknown[] }>(await admin('/api/admin/comments?limit=1'))).comments).toHaveLength(1);
     expect((await json<{ comments: unknown[] }>(await admin('/api/admin/comments?limit=0'))).comments).toHaveLength(1);
     expect((await json<{ comments: unknown[] }>(await admin('/api/admin/comments?limit=zzz'))).comments).toHaveLength(3);

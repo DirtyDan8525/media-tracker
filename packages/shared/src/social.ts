@@ -71,6 +71,7 @@ export type FriendEntry = Pick<
   | 'sourceId' | 'seasonAvg' | 'createdAt'
 > & { notes: string | null; /** The owner's tags on a title the viewer may see (never on private titles). */ tags?: string[]; /** A custom list's per-item link ('' = none). */ link?: string };
 
+/** What the API's reactions and comments routes are asked by. Either way they are the title's (migration 0025): a post id is resolved to its entry. */
 export type Target = { activityId: string } | { entryId: string };
 
 export interface Comment {

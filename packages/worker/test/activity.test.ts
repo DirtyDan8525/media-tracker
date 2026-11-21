@@ -392,7 +392,7 @@ describe('posts (S5): post_id written at insert time', () => {
     await env.DB.exec('DELETE FROM activity');
     await rateAt(a, e.id, 8, at(0));
     const [anchor] = await rows(e.id);
-    await env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?, ?, '🔥', ?)").bind(anchor!.id, a, at(1)).run();
+    await env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', ?, ?, '🔥', ?)").bind(e.id, a, at(1)).run();
     await rateAt(a, e.id, 9, at(8));
     const page = await feed(A);
     expect(new Set(page.items.map((i) => i.postId))).toEqual(new Set([anchor!.id]));
@@ -526,15 +526,36 @@ describe('GET /api/activity?show= (S6)', () => {
     const a = await idOf(A);
     const b = await idOf(B);
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?1, ?4, '❤️', ?3), ('r3', ?1, ?4, '🔥', ?3)")
-        .bind(anchor!.id, a, at(1), b),
-      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at, deleted_at) VALUES ('c1', ?1, ?2, 'nice', ?3, NULL), ('c2', ?1, ?2, 'gone', ?3, ?3)")
-        .bind(anchor!.id, b, at(2)),
+      env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?1, ?4, '❤️', ?3), ('r3', ?1, ?4, '🔥', ?3)")
+        .bind(e.id, a, at(1), b),
+      env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at, deleted_at) VALUES ('c1', ?1, ?2, 'nice', ?3, NULL), ('c2', ?1, ?2, 'gone', ?3, ?3)")
+        .bind(e.id, b, at(2)),
     ]);
     const forB = await feed(B, '?show=friends');
     expect(forB.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️', '🔥'], comments: 1 });
     const forA = await feed(A);
     expect(forA.social[anchor!.id]).toEqual({ reactions: { '❤️': 2, '🔥': 1 }, mine: ['❤️'], comments: 1 });
+  });
+
+  it("a title's reactions and comments show on every post about it, wherever they were left (migration 0025)", async () => {
+    await befriend(A, B);
+    const e = await mk(A, { title: 'Song', rating: 7 });
+    const a = await idOf(A);
+    await env.DB.exec('DELETE FROM activity');
+    await rateAt(a, e.id, 8, at(0));
+    await rateAt(a, e.id, 9, at(30)); // 30 min later: a second post about the same title
+    const posts = (await rows(e.id)).filter((r) => r.post_id === null).map((r) => r.id);
+    expect(posts).toHaveLength(2);
+    // B reacts on the first post, comments on the title page; A reacts on the second post.
+    expect((await as(B, '/api/reactions', 'POST', { activityId: posts[0], emoji: '🔥' })).status).toBe(200);
+    expect((await as(B, '/api/comments', 'POST', { entryId: e.id, body: 'yes' })).status).toBe(201);
+    expect((await as(A, '/api/reactions', 'POST', { activityId: posts[1], emoji: '❤️' })).status).toBe(200);
+    const want = { reactions: { '🔥': 1, '❤️': 1 }, comments: 1 };
+    const forB = await feed(B, '?show=friends');
+    for (const p of posts) expect(forB.social[p]).toEqual({ ...want, mine: ['🔥'] });
+    const forA = await feed(A);
+    for (const p of posts) expect(forA.social[p]).toEqual({ ...want, mine: ['❤️'] });
+    expect(await (await as(B, `/api/reactions?entryId=${e.id}`)).json()).toEqual({ ...want, mine: ['🔥'] });
   });
 
   it('carries the creator, and the note only to its owner or a friend when notes are not private', async () => {
@@ -572,8 +593,8 @@ describe('GET /api/activity?show= (S6)', () => {
     await befriend(A, B);
     for (let i = 0; i < 5; i++) await mk(A, { title: `A${i}`, rating: 7 });
     for (let i = 0; i < 5; i++) await mk(B, { title: `B${i}`, rating: 7 });
-    const post = (await env.DB.prepare('SELECT id FROM activity LIMIT 1').first<{ id: string }>())!.id;
-    await env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c1', ?, ?, 'x', ?)").bind(post, await idOf(B), at(0)).run();
+    const entry = (await env.DB.prepare('SELECT entry_id FROM activity LIMIT 1').first<{ entry_id: string }>())!.entry_id;
+    await env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c1', ?, ?, 'x', ?)").bind(entry, await idOf(B), at(0)).run();
     const spy = spyD1(env.DB);
     const res = await app.fetch(new Request('https://app.test/api/activity?show=everyone'),
       { ...env, DB: spy.db, ENVIRONMENT: 'dev', DEV_EMAIL: B } as Env);
@@ -622,6 +643,18 @@ describe('unread (S8)', () => {
     expect(await unread(A)).toEqual({ feed: 0, requests: 0, messages: 0 });
   });
 
+  it("a comment or reaction left on a post counts for the title's owner, like one on the title page", async () => {
+    await befriend(A, B);
+    const mine = await mk(A, { title: 'Mine', rating: 6 });
+    const [post] = await rows(mine.id);
+    await env.DB.prepare('UPDATE users SET feed_seen_at = ? WHERE email = ?').bind(new Date(Date.now() - 60_000).toISOString(), A).run();
+    expect((await as(B, '/api/reactions', 'POST', { activityId: post!.id, emoji: '🔥' })).status).toBe(200);
+    expect((await as(B, '/api/comments', 'POST', { activityId: post!.id, body: 'nice' })).status).toBe(201);
+    expect((await as(B, '/api/comments', 'POST', { entryId: mine.id, body: 'again' })).status).toBe(201);
+    expect(await unread(A)).toEqual({ feed: 3, requests: 0, messages: 0 });
+    expect(await unread(B)).toMatchObject({ feed: 1 }); // A's post only: B's own comments and reaction never count for B
+  });
+
   it('requests counts incoming pending only; feed caps at 99; 1 query plus sign-in', async () => {
     await befriend(A, B);
     await befriend(C, A, 'pending');
@@ -653,24 +686,24 @@ describe('deleting your own posts', () => {
     return { e, anchor: anchor!.id };
   };
 
-  it('DELETE /api/activity/:postId removes the anchor, its joined rows, reactions and comments; the entry stays', async () => {
+  it("DELETE /api/activity/:postId removes the anchor and its joined rows; the entry and the title's reactions and comments stay", async () => {
     await befriend(A, B);
     const p = await post('Gone');
     const keep = await post('Keep');
     const a = await idOf(A);
     const b = await idOf(B);
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?4, ?2, '❤️', ?3)").bind(p.anchor, b, at(1), keep.anchor),
-      env.DB.prepare("INSERT INTO comments (id, activity_id, user_id, body, created_at) VALUES ('c1', ?1, ?2, 'x', ?3), ('c2', ?4, ?2, 'y', ?3)").bind(p.anchor, b, at(1), keep.anchor),
+      env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('r1', ?1, ?2, '❤️', ?3), ('r2', ?4, ?2, '❤️', ?3)").bind(p.e.id, b, at(1), keep.e.id),
+      env.DB.prepare("INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES ('c1', ?1, ?2, 'x', ?3), ('c2', ?4, ?2, 'y', ?3)").bind(p.e.id, b, at(1), keep.e.id),
     ]);
     expect((await rows(p.e.id)).length).toBeGreaterThan(1);
     const res = await as(A, `/api/activity/${p.anchor}`, 'DELETE');
     expect(res.status).toBe(204);
     expect(await rows(p.e.id)).toEqual([]);
-    expect(await count('SELECT COUNT(*) AS n FROM reactions WHERE activity_id = ?', p.anchor)).toBe(0);
-    expect(await count('SELECT COUNT(*) AS n FROM comments WHERE activity_id = ?', p.anchor)).toBe(0);
-    expect(await count('SELECT COUNT(*) AS n FROM reactions')).toBe(1);
-    expect(await count('SELECT COUNT(*) AS n FROM comments')).toBe(1);
+    // Reactions and comments are the title's (migration 0025): deleting a post leaves them on the title page.
+    expect(await count('SELECT COUNT(*) AS n FROM reactions WHERE entry_id = ?', p.e.id)).toBe(1);
+    expect(await count('SELECT COUNT(*) AS n FROM comments WHERE entry_id = ?', p.e.id)).toBe(1);
+    expect(await (await as(B, `/api/reactions?entryId=${p.e.id}`)).json()).toMatchObject({ reactions: { '❤️': 1 }, comments: 1 });
     expect(await count('SELECT COUNT(*) AS n FROM entries WHERE id = ?', p.e.id)).toBe(1);
     expect(titles2(await feed(A))).toEqual(['Keep']);
     expect(titles2(await feed(B, '?show=friends'))).toEqual(['Keep']);

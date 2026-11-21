@@ -1,16 +1,16 @@
-import { COMMENT_MAX, nameOf, type Comment, type Target } from '@media-tracker/shared';
+import { COMMENT_MAX, nameOf, type Comment } from '@media-tracker/shared';
 import { useState, type FormEvent } from 'react';
 import { Button } from '../../design/components/Button';
 import { Sheet } from '../../design/components/Sheet';
 import { useToast } from '../../design/components/Toast';
-import { useComments, useDeleteComment, usePostComment } from '../../data/feed';
+import { useComments, useDeleteComment, usePostComment, type SocialTarget } from '../../data/feed';
 import { timeAgo } from '../activity/format';
 import { useNow } from '../../hooks';
 import { useMe } from '../../data/useMe';
 import '../../design/feed.css';
 
-/** The comment thread of one post or entry: oldest first, a composer pinned under it. */
-export function CommentsSheet({ target, open, onClose }: { target: Target; open: boolean; onClose: () => void }) {
+/** The comment thread of one title (opened from one of its posts or from its page: the same thread), oldest first, a composer pinned under it. */
+export function CommentsSheet({ target, open, onClose }: { target: SocialTarget; open: boolean; onClose: () => void }) {
   const post = usePostComment();
   const toast = useToast();
   const [text, setText] = useState('');
@@ -49,7 +49,7 @@ export function CommentsSheet({ target, open, onClose }: { target: Target; open:
 }
 
 /** The thread itself (loading, error, empty and the comments): the sheet shows it, and so does the Activity details panel. */
-export function CommentList({ target }: { target: Target }) {
+export function CommentList({ target }: { target: SocialTarget }) {
   const comments = useComments(target);
   if (comments.isPending) return <p className="comment-empty" aria-busy="true">Loading comments…</p>;
   if (comments.isError) {
@@ -67,7 +67,7 @@ export function CommentList({ target }: { target: Target }) {
   );
 }
 
-function CommentRow({ comment, target }: { comment: Comment; target: Target }) {
+function CommentRow({ comment, target }: { comment: Comment; target: SocialTarget }) {
   const del = useDeleteComment();
   const toast = useToast();
   const now = useNow();

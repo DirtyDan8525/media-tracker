@@ -98,7 +98,7 @@ describe('reactions', () => {
     const rows = await env.DB.prepare("SELECT COUNT(*) AS n FROM reactions WHERE emoji = '💩'").first<{ n: number }>();
     expect(rows!.n).toBe(1);
     await expect(
-      env.DB.prepare("INSERT INTO reactions (id, activity_id, user_id, emoji, created_at) VALUES ('dup', 'postPub', 'uG', '💩', ?)").bind(now).run(),
+      env.DB.prepare("INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES ('dup', 'pub', 'uG', '💩', ?)").bind(now).run(),
     ).rejects.toThrow();
   });
 
@@ -117,19 +117,19 @@ describe('reactions', () => {
 
 describe('GET /reactions/who', () => {
   type Who = { emoji: string; users: { id: string; username: string; displayName: string | null; avatarAt: string | null }[] }[];
-  const put = (id: string, act: string | null, ent: string | null, user: string, emoji: string, at: string) =>
-    env.DB.prepare('INSERT INTO reactions (id, activity_id, entry_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, act, ent, user, emoji, at);
+  const put = (id: string, ent: string, user: string, emoji: string, at: string) =>
+    env.DB.prepare('INSERT INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, ent, user, emoji, at);
 
   it('groups by emoji: most first, ties by first reaction; people oldest first', async () => {
     await env.DB.batch([
-      put('r1', 'postPub', null, 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
-      put('r2', 'postPub', null, 'uG', '❤️', '2026-11-16T12:00:02.000Z'),
-      put('r3', 'postPub', null, 'uO', '❤️', '2026-11-16T12:00:03.000Z'),
-      put('r4', 'postPub', null, 'uG', '👏', '2026-11-16T12:00:04.000Z'),
-      put('r5', 'postPub', null, 'uF', '👏', '2026-11-16T12:00:05.000Z'),
-      put('r6', 'postPub', null, 'uF', '❤️', '2026-11-16T12:00:06.000Z'),
-      put('r7', 'postPub', null, 'uG', '🎉', '2026-11-16T12:00:00.500Z'),
+      put('r1', 'pub', 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
+      put('r2', 'pub', 'uG', '❤️', '2026-11-16T12:00:02.000Z'),
+      put('r3', 'pub', 'uO', '❤️', '2026-11-16T12:00:03.000Z'),
+      put('r4', 'pub', 'uG', '👏', '2026-11-16T12:00:04.000Z'),
+      put('r5', 'pub', 'uF', '👏', '2026-11-16T12:00:05.000Z'),
+      put('r6', 'pub', 'uF', '❤️', '2026-11-16T12:00:06.000Z'),
+      put('r7', 'pub', 'uG', '🎉', '2026-11-16T12:00:00.500Z'),
     ]);
     const res = await as('F', '/api/reactions/who?activityId=postPub');
     expect(res.status).toBe(200);
@@ -147,8 +147,8 @@ describe('GET /reactions/who', () => {
   it('works for an entry, leaves out removed people, and answers [] with no reactions', async () => {
     expect(await (await as('F', '/api/reactions/who?entryId=pub')).json()).toEqual([]);
     await env.DB.batch([
-      put('r1', null, 'pub', 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
-      put('r2', null, 'pub', 'uG', '🔥', '2026-11-16T12:00:02.000Z'),
+      put('r1', 'pub', 'uF', '🔥', '2026-11-16T12:00:01.000Z'),
+      put('r2', 'pub', 'uG', '🔥', '2026-11-16T12:00:02.000Z'),
     ]);
     await env.DB.exec("UPDATE users SET status = 'removed' WHERE id = 'uG'");
     const body = (await (await as('O', '/api/reactions/who?entryId=pub')).json()) as Who;
@@ -156,7 +156,7 @@ describe('GET /reactions/who', () => {
   });
 
   it('is hidden like the reactions route: not visible or missing is 404, a bad target 400', async () => {
-    await env.DB.batch([put('r1', 'postPriv', null, 'uO', '🔥', now)]);
+    await env.DB.batch([put('r1', 'priv', 'uO', '🔥', now)]);
     expect((await as('F', '/api/reactions/who?activityId=postPriv')).status).toBe(404);
     expect((await as('S', '/api/reactions/who?entryId=priv')).status).toBe(404);
     expect((await as('S', '/api/reactions/who?entryId=pub')).status).toBe(404); // entry targets are friends-only
@@ -167,7 +167,7 @@ describe('GET /reactions/who', () => {
   });
 
   it('stays within 4 D1 queries (sign-in 1 + target 1-2 + reactions 1)', async () => {
-    await env.DB.batch([put('r1', 'postPub', null, 'uG', '🔥', now), put('r2', null, 'pub', 'uG', '🔥', now)]);
+    await env.DB.batch([put('r1', 'pub', 'uG', '🔥', now), put('r2', 'pub', 'uF', '🔥', now)]);
     for (const q of ['activityId=postPub', 'entryId=pub']) {
       const spy = spyD1(env.DB);
       expect((await as('F', `/api/reactions/who?${q}`, 'GET', undefined, spy.db)).status).toBe(200);
@@ -305,6 +305,64 @@ describe('comments', () => {
     const c = (await (await comment('F', entry, 'x')).json()) as Comment;
     await env.DB.exec("UPDATE entries SET is_private = 1 WHERE id = 'pub'");
     expect((await as('F', `/api/comments/${c.id}`, 'DELETE')).status).toBe(404);
+  });
+});
+
+// Dan 2026-11-20 (migration 0025): a post's reactions and comments ARE its title's, one-to-one, both ways.
+describe('one thread per title: a post and its title share reactions and comments', () => {
+  it('a reaction on a post shows on the title page (and who reacted), and one on the title page shows on the post', async () => {
+    await react('F', post, '🔥');
+    await react('G', entry, '❤️');
+    for (const q of ['activityId=postPub', 'entryId=pub']) {
+      expect(await (await as('O', `/api/reactions?${q}`)).json()).toEqual({ reactions: { '🔥': 1, '❤️': 1 }, mine: [], comments: 0 });
+      const who = (await (await as('O', `/api/reactions/who?${q}`)).json()) as { emoji: string; users: { id: string }[] }[];
+      expect(who.map((g) => [g.emoji, g.users.map((u) => u.id)])).toEqual([['🔥', ['uF']], ['❤️', ['uG']]]);
+    }
+    const stored = await env.DB.prepare('SELECT entry_id, user_id, emoji FROM reactions ORDER BY emoji').all();
+    expect(stored.results).toEqual([{ entry_id: 'pub', user_id: 'uG', emoji: '❤️' }, { entry_id: 'pub', user_id: 'uF', emoji: '🔥' }]);
+  });
+
+  it('the same emoji from the title page toggles off the one left on the post (one per person per emoji per title)', async () => {
+    expect(await (await react('F', post, '🔥')).json()).toMatchObject({ reactions: { '🔥': 1 }, mine: ['🔥'] });
+    expect(await (await react('F', entry, '🔥')).json()).toEqual({ reactions: {}, mine: [], comments: 0 });
+    expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM reactions').first<{ n: number }>())!.n).toBe(0);
+  });
+
+  it('comments both ways: one thread, the same list and count from the post and the title page', async () => {
+    const a = (await (await comment('F', post, 'from the post')).json()) as Comment;
+    await env.DB.prepare("UPDATE comments SET created_at = '2026-11-16T12:00:01.000Z' WHERE id = ?").bind(a.id).run();
+    await comment('G', entry, 'from the page');
+    for (const q of ['activityId=postPub', 'entryId=pub']) {
+      expect((await list('O', q)).map((c) => c.body)).toEqual(['from the post', 'from the page']);
+      expect(await (await as('F', `/api/reactions?${q}`)).json()).toMatchObject({ comments: 2 });
+    }
+    // Deleted from the title page: gone from the post too.
+    expect((await as('O', `/api/comments/${a.id}`, 'DELETE')).status).toBe(204);
+    expect((await list('F', 'activityId=postPub')).map((c) => c.body)).toEqual(['from the page']);
+  });
+
+  it("a stranger who reaches the title through its post sees and adds to the title's thread; the title page stays friends-only", async () => {
+    await comment('F', entry, 'friend on the page');
+    await react('F', entry, '🔥');
+    expect((await list('S', 'activityId=postPub')).map((c) => c.body)).toEqual(['friend on the page']);
+    expect(await (await react('S', post, '👍')).json()).toMatchObject({ reactions: { '🔥': 1, '👍': 1 }, mine: ['👍'] });
+    expect((await as('S', '/api/reactions?entryId=pub')).status).toBe(404);
+    // The owner and friends see the stranger's reaction on the title page.
+    expect(await (await as('F', '/api/reactions?entryId=pub')).json()).toMatchObject({ reactions: { '🔥': 1, '👍': 1 } });
+  });
+
+  it("a private title: neither its post nor its page lets a friend or a stranger see or add; the owner's own reaction on the post is on the page", async () => {
+    expect((await react('O', { activityId: 'postPriv' }, '🔥')).status).toBe(200);
+    for (const k of ['F', 'S'] as const) {
+      for (const q of ['activityId=postPriv', 'entryId=priv']) {
+        expect((await as(k, `/api/reactions?${q}`)).status).toBe(404);
+        expect((await as(k, `/api/comments?${q}`)).status).toBe(404);
+        expect((await as(k, `/api/reactions/who?${q}`)).status).toBe(404);
+      }
+      expect((await react(k, { entryId: 'priv' })).status).toBe(404);
+      expect((await comment(k, { activityId: 'postPriv' }, 'x')).status).toBe(404);
+    }
+    expect(await (await as('O', '/api/reactions?entryId=priv')).json()).toMatchObject({ reactions: { '🔥': 1 }, mine: ['🔥'] });
   });
 });
 

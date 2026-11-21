@@ -62,13 +62,13 @@ export function notify(env: Env, ctx: Pick<ExecutionContext, 'waitUntil'>, userI
 }
 
 /**
- * Reaction throttle (P3): true when this post has not had a reaction push in the last 10 minutes, and records
- * this one. 1 query (an upsert that only takes the row when the old time is past the window).
+ * Reaction throttle (P3): true when this title (entry id: reactions are the title's, migration 0025) has not had a
+ * reaction push in the last 10 minutes, and records this one. 1 query (an upsert that only takes the row when the old time is past the window).
  */
-export async function reactionWindowOpen(db: D1Database, postId: string, now = Date.now()): Promise<boolean> {
+export async function reactionWindowOpen(db: D1Database, entryId: string, now = Date.now()): Promise<boolean> {
   const res = await db.prepare(
     `INSERT INTO push_throttle (key, sent_at) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET sent_at = ?2 WHERE push_throttle.sent_at < ?3`,
-  ).bind(`reaction:${postId}`, new Date(now).toISOString(), new Date(now - 10 * 60_000).toISOString()).run();
+  ).bind(`reaction:${entryId}`, new Date(now).toISOString(), new Date(now - 10 * 60_000).toISOString()).run();
   return (res.meta.changes ?? 0) > 0;
 }
 

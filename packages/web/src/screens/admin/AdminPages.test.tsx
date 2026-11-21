@@ -333,8 +333,8 @@ describe("What's new / Coming soon / About (AD4)", () => {
 
 describe('Moderation (AD7)', () => {
   const comments = [
-    { id: 'c1', body: 'Frieren over Naruto', createdAt: new Date().toISOString(), author: { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarUrl: null, avatarAt: null }, activityId: 'p1', entryId: 'e1', title: 'Frieren', category: 'anime', owner: 'dan' },
-    { id: 'c2', body: 'lol no', createdAt: new Date().toISOString(), author: { id: 'u-van', username: 'vance', displayName: null, avatarAt: null }, activityId: null, entryId: 'e2', title: 'Naruto', category: 'anime', owner: null },
+    { id: 'c1', body: 'Frieren over Naruto', createdAt: new Date().toISOString(), author: { id: 'u-ren', username: 'ren', displayName: 'Ren', avatarUrl: null, avatarAt: null }, entryId: 'e1', title: 'Frieren', category: 'anime', owner: 'dan' },
+    { id: 'c2', body: 'lol no', createdAt: new Date().toISOString(), author: { id: 'u-van', username: 'vance', displayName: null, avatarAt: null }, entryId: 'e2', title: 'Naruto', category: 'anime', owner: null },
   ];
 
   it('lists recent comments; Delete asks with big buttons, then DELETEs and refreshes', async () => {

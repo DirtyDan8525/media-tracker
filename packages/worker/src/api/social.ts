@@ -21,9 +21,6 @@ const invalid = { error: 'invalid' } as const;
 const notFound = { error: 'not_found' } as const;
 const COMMENTS_MAX_LIST = 200;
 
-const col = (t: Target) => ('activityId' in t ? 'activity_id' : 'entry_id');
-const idOf = (t: Target) => ('activityId' in t ? t.activityId : t.entryId);
-
 /** Exactly one of activityId / entryId, as a non-empty string; null otherwise. */
 function parseTarget(src: Record<string, unknown>): Target | null {
   const a = src.activityId;
@@ -46,10 +43,13 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 
 /**
  * The entry behind a reaction/comment target, or null when it is missing or the viewer may not see
- * it. A post id must be an anchor (`post_id IS NULL`). Amends S7 (Dan 2026-11-16: Everyone = all
- * active users): a post is open to you when it is yours or its entry is not private and its author
- * is active, friend or not (1 query); an entry target stays friends-only (1 query, plus 1 for the
- * friendship unless the viewer owns the entry).
+ * it. Reactions and comments are stored on the entry only (Dan 2026-11-20, migration 0025): a post's
+ * reactions and comments are its title's, so `activityId` (still accepted, old clients and the
+ * Activity screen) is resolved to the post's entry here. A post id must be an anchor (`post_id IS
+ * NULL`). Amends S7 (Dan 2026-11-16: Everyone = all active users): a post is open to you when it is
+ * yours or its entry is not private and its author is active, friend or not (1 query), and through
+ * it you see and add to its title's reactions and comments; an entry target stays friends-only (1
+ * query, plus 1 for the friendship unless the viewer owns the entry).
  */
 export async function resolveTarget(
   db: D1Database,
@@ -82,15 +82,14 @@ export async function resolveTarget(
 const BY_ACTIVE = `user_id IN (SELECT id FROM users WHERE status = 'active')`;
 
 /** 1 query: reaction counts per emoji, my emoji, and the live comment count (a '#comments' row). */
-async function socialOf(db: D1Database, viewerId: string, target: Target): Promise<PostSocial> {
-  const c = col(target);
+async function socialOf(db: D1Database, viewerId: string, entryId: string): Promise<PostSocial> {
   const { results } = await db
     .prepare(
-      `SELECT emoji, COUNT(*) AS n, MAX(user_id = ?1) AS mine FROM reactions WHERE ${c} = ?2 AND ${BY_ACTIVE} GROUP BY emoji
+      `SELECT emoji, COUNT(*) AS n, MAX(user_id = ?1) AS mine FROM reactions WHERE entry_id = ?2 AND ${BY_ACTIVE} GROUP BY emoji
        UNION ALL
-       SELECT '#comments', COUNT(*), 0 FROM comments WHERE ${c} = ?2 AND deleted_at IS NULL AND ${BY_ACTIVE}`,
+       SELECT '#comments', COUNT(*), 0 FROM comments WHERE entry_id = ?2 AND deleted_at IS NULL AND ${BY_ACTIVE}`,
     )
-    .bind(viewerId, idOf(target))
+    .bind(viewerId, entryId)
     .all<{ emoji: string; n: number; mine: number }>();
   const out: PostSocial = { reactions: {}, mine: [], comments: 0 };
   for (const r of results) {
@@ -116,15 +115,14 @@ social.post('/reactions', featureOn('reactions'), async (c) => {
   const at = await resolveTarget(db, user.id, target);
   if (!at) return c.json(notFound, 404);
 
-  const column = col(target);
   const removed = await db
-    .prepare(`DELETE FROM reactions WHERE ${column} = ? AND user_id = ? AND emoji = ? RETURNING id`)
-    .bind(idOf(target), user.id, emoji)
+    .prepare('DELETE FROM reactions WHERE entry_id = ? AND user_id = ? AND emoji = ? RETURNING id')
+    .bind(at.entryId, user.id, emoji)
     .first<{ id: string }>();
   if (!removed) {
     const insert = db
-      .prepare(`INSERT OR IGNORE INTO reactions (id, ${column}, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), idOf(target), user.id, emoji, new Date().toISOString());
+      .prepare('INSERT OR IGNORE INTO reactions (id, entry_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), at.entryId, user.id, emoji, new Date().toISOString());
     // A custom emoji (not in the quick set) goes to the front of your "Recent" row, in the same batch.
     const recent = withRecentEmoji(user.recentEmoji, emoji);
     if (JSON.stringify(recent) !== JSON.stringify(user.recentEmoji)) {
@@ -132,17 +130,18 @@ social.post('/reactions', featureOn('reactions'), async (c) => {
     } else {
       await insert.run();
     }
-    pushReaction(c.env, ctxOf(c), at.ownerId, user, idOf(target), at.entryId, emoji);
+    pushReaction(c.env, ctxOf(c), at.ownerId, user, at.entryId, emoji);
   }
-  return c.json(await socialOf(db, user.id, target));
+  return c.json(await socialOf(db, user.id, at.entryId));
 });
 
 // GET /reactions?entryId=|activityId=: 3 queries (+ sign-in)
 social.get('/reactions', async (c) => {
   const target = parseTarget(c.req.query());
   if (!target) return c.json(invalid, 400);
-  if (!(await resolveTarget(c.env.DB, c.var.user.id, target))) return c.json(notFound, 404);
-  return c.json(await socialOf(c.env.DB, c.var.user.id, target));
+  const at = await resolveTarget(c.env.DB, c.var.user.id, target);
+  if (!at) return c.json(notFound, 404);
+  return c.json(await socialOf(c.env.DB, c.var.user.id, at.entryId));
 });
 
 // GET /reactions/who?entryId=|activityId=: 2-3 queries (+ sign-in): target (1-2) + reactions with people (1).
@@ -150,14 +149,15 @@ social.get('/reactions', async (c) => {
 social.get('/reactions/who', async (c) => {
   const target = parseTarget(c.req.query());
   if (!target) return c.json(invalid, 400);
-  if (!(await resolveTarget(c.env.DB, c.var.user.id, target))) return c.json(notFound, 404);
+  const at = await resolveTarget(c.env.DB, c.var.user.id, target);
+  if (!at) return c.json(notFound, 404);
   const { results } = await c.env.DB.prepare(
     `SELECT r.emoji, u.id, u.username, u.display_name, u.avatar_at
      FROM reactions r JOIN users u ON u.id = r.user_id
-     WHERE r.${col(target)} = ? AND u.status = 'active'
+     WHERE r.entry_id = ? AND u.status = 'active'
      ORDER BY r.created_at, r.id`,
   )
-    .bind(idOf(target))
+    .bind(at.entryId)
     .all<{ emoji: string; id: string; username: string | null; display_name: string | null; avatar_at: string | null }>();
   const groups = new Map<string, PublicUser[]>(); // Map keeps first-seen order = first reaction time
   for (const r of results) {
@@ -192,10 +192,10 @@ social.get('/comments', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT c.id, c.body, c.created_at, c.user_id, u.id AS u_id, u.username, u.display_name, u.avatar_at
      FROM comments c JOIN users u ON u.id = c.user_id
-     WHERE c.${col(target)} = ? AND c.deleted_at IS NULL AND u.status = 'active'
+     WHERE c.entry_id = ? AND c.deleted_at IS NULL AND u.status = 'active'
      ORDER BY c.created_at, c.id LIMIT ${COMMENTS_MAX_LIST}`,
   )
-    .bind(idOf(target))
+    .bind(at.entryId)
     .all<CommentRow>();
   const out: Comment[] = results.map((r) => ({
     id: r.id,
@@ -221,10 +221,10 @@ social.post('/comments', featureOn('comments'), async (c) => {
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  await c.env.DB.prepare(`INSERT INTO comments (id, ${col(target)}, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .bind(id, idOf(target), user.id, text, createdAt)
+  await c.env.DB.prepare('INSERT INTO comments (id, entry_id, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, at.entryId, user.id, text, createdAt)
     .run();
-  pushComment(c.env, ctxOf(c), at.ownerId, user, idOf(target), at.entryId, text);
+  pushComment(c.env, ctxOf(c), at.ownerId, user, at.entryId, text);
   const comment: Comment = {
     id,
     author: { id: user.id, username: user.username ?? '', displayName: user.displayName, avatarAt: user.avatarAt },
@@ -235,25 +235,26 @@ social.post('/comments', featureOn('comments'), async (c) => {
   return c.json(comment, 201);
 });
 
-// DELETE /comments/:id: 3 queries (+ sign-in): comment with its entry (1) + friendship (0-1) + soft delete (1).
+// DELETE /comments/:id: 2-3 queries (+ sign-in): comment with its entry (1) + friendship (0-1) + soft delete (1).
 // Author or entry owner -> 204; someone else who can see it -> 403; not visible or gone -> 404.
 social.delete('/comments/:id', async (c) => {
   const user = c.var.user;
   const row = await c.env.DB.prepare(
-    `SELECT c.user_id AS author, c.deleted_at, c.activity_id, e.user_id AS owner, e.is_private, u.status AS owner_status
-     FROM comments c LEFT JOIN activity a ON a.id = c.activity_id
-     JOIN entries e ON e.id = COALESCE(c.entry_id, a.entry_id) JOIN users u ON u.id = e.user_id
+    `SELECT c.user_id AS author, c.deleted_at, e.user_id AS owner, e.is_private, u.status AS owner_status,
+            EXISTS (SELECT 1 FROM activity a WHERE a.user_id = e.user_id AND a.entry_id = e.id AND a.post_id IS NULL) AS has_post
+     FROM comments c JOIN entries e ON e.id = c.entry_id JOIN users u ON u.id = e.user_id
      WHERE c.id = ?`,
   )
     .bind(c.req.param('id'))
-    .first<{ author: string; deleted_at: string | null; activity_id: string | null; owner: string; is_private: number; owner_status: string }>();
+    .first<{ author: string; deleted_at: string | null; owner: string; is_private: number; owner_status: string; has_post: number }>();
   if (!row || row.deleted_at !== null) return c.json(notFound, 404);
   // AD7: the admin moderates any comment, private posts included.
   if (!user.isAdmin) {
-    // A post's thread is open to any active user's non-private post (Dan 2026-11-16); an entry's stays friends-only.
-    const visible = row.activity_id !== null
-      ? canViewPost(user.id, { ownerId: row.owner, isPrivate: row.is_private === 1, ownerStatus: row.owner_status })
-      : canView(await relationOf(c.env.DB, user.id, row.owner), { isPrivate: row.is_private === 1 });
+    // The same rule as reading the thread (resolveTarget): through one of the title's posts (any active user's
+    // non-private post, Dan 2026-11-16), or on the title itself (friends only).
+    const isPrivate = row.is_private === 1;
+    const visible = (row.has_post === 1 && canViewPost(user.id, { ownerId: row.owner, isPrivate, ownerStatus: row.owner_status }))
+      || canView(await relationOf(c.env.DB, user.id, row.owner), { isPrivate });
     if (!visible) return c.json(notFound, 404);
     if (row.author !== user.id && row.owner !== user.id) return c.json({ error: 'forbidden' }, 403);
   }

@@ -1,5 +1,5 @@
 import {
-  type ActivityPage, type Comment, type FeedScope, type PostSocial, type PublicUser, type Reaction, type Target,
+  type ActivityPage, type Comment, type FeedScope, type PostSocial, type PublicUser, type Reaction,
 } from '@media-tracker/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../api/client';
@@ -10,10 +10,19 @@ export const ACTIVITY_KEY = ['activity'] as const;
 export const UNREAD_KEY = ['activity-unread'] as const;
 type Cursor = NonNullable<ActivityPage['next']>;
 
-/** A target's stable key (one of activityId / entryId). */
-export const targetKey = (t: Target): string => ('activityId' in t ? `a:${t.activityId}` : `e:${t.entryId}`);
-const targetQuery = (t: Target): string =>
-  'activityId' in t ? `activityId=${encodeURIComponent(t.activityId)}` : `entryId=${encodeURIComponent(t.entryId)}`;
+/**
+ * What reactions and comments are on: always a title (entryId). They are the title's wherever they are left (Dan,
+ * 2026-11-20): the title page and every Activity post about it show the same ones, so every cache is keyed by entryId.
+ * From a post, `activityId` names the post the viewer reached the title through: the API is asked by post id then, so
+ * someone who sees the post in Everyone (not a friend: no entry page) can still react and comment.
+ */
+export interface SocialTarget { entryId: string; activityId?: string }
+
+/** The one id the API is asked by (the post when there is one, as its visibility rule is the wider one). */
+const apiTarget = (t: SocialTarget): { activityId: string } | { entryId: string } =>
+  t.activityId ? { activityId: t.activityId } : { entryId: t.entryId };
+const targetQuery = (t: SocialTarget): string =>
+  t.activityId ? `activityId=${encodeURIComponent(t.activityId)}` : `entryId=${encodeURIComponent(t.entryId)}`;
 
 const EMPTY_SOCIAL: PostSocial = { reactions: {}, mine: [], comments: 0 };
 
@@ -76,9 +85,9 @@ export function useEntrySocial(entryId: string) {
   });
 }
 
-export function useComments(target: Target | null) {
+export function useComments(target: SocialTarget | null) {
   return useQuery({
-    queryKey: ['comments', target ? targetKey(target) : null],
+    queryKey: ['comments', target?.entryId ?? null],
     enabled: target !== null,
     queryFn: () => api.get<Comment[]>(`/api/comments?${targetQuery(target!)}`),
   });
@@ -87,33 +96,42 @@ export function useComments(target: Target | null) {
 export interface ReactionGroup { emoji: string; users: PublicUser[] }
 
 /** Who reacted, per emoji (most first). Only fetched while `target` is given (the sheet is open). */
-export function useReactionsWho(target: Target | null) {
+export function useReactionsWho(target: SocialTarget | null) {
   return useQuery({
-    queryKey: ['reactions-who', target ? targetKey(target) : null],
+    queryKey: ['reactions-who', target?.entryId ?? null],
     enabled: target !== null,
     queryFn: () => api.get<ReactionGroup[]>(`/api/reactions/who?${targetQuery(target!)}`),
     gcTime: 0,
   });
 }
 
-/** Applies `fn` to the social summary of `target` wherever it is cached (every feed scope, the entry query). */
-function patchSocial(qc: QueryClient, target: Target, fn: (s: PostSocial) => PostSocial): void {
-  if ('activityId' in target) {
-    qc.setQueriesData<InfiniteData<ActivityPage>>({ queryKey: ACTIVITY_KEY }, (data) => {
-      if (!data?.pages.some((p) => p.social[target.activityId] !== undefined || p.items.some((i) => i.postId === target.activityId))) return data;
-      return {
-        ...data,
-        pages: data.pages.map((p) => ({ ...p, social: { ...p.social, [target.activityId]: fn(p.social[target.activityId] ?? EMPTY_SOCIAL) } })),
-      };
-    });
-  } else {
-    qc.setQueryData<PostSocial>(['entry-social', target.entryId], (old) => fn(old ?? EMPTY_SOCIAL));
-  }
+/**
+ * Applies `fn` to the social summary of the title `target.entryId` wherever it is cached: every post about it in every
+ * cached feed scope, and the title page's query. That one only when it holds data, unless `entryToo` (the server's answer,
+ * which is right for the title page as it is for the posts).
+ */
+function patchSocial(qc: QueryClient, target: SocialTarget, fn: (s: PostSocial) => PostSocial, entryToo = false): void {
+  const { entryId } = target;
+  qc.setQueriesData<InfiniteData<ActivityPage>>({ queryKey: ACTIVITY_KEY }, (data) => {
+    if (!data?.pages.some((p) => p.items.some((i) => i.entryId === entryId))) return data;
+    return {
+      ...data,
+      pages: data.pages.map((p) => {
+        const posts = new Set(p.items.filter((i) => i.entryId === entryId).map((i) => i.postId));
+        if (posts.size === 0) return p;
+        const social = { ...p.social };
+        for (const id of posts) social[id] = fn(p.social[id] ?? EMPTY_SOCIAL);
+        return { ...p, social };
+      }),
+    };
+  });
+  if (entryToo || qc.getQueryData(['entry-social', entryId]) !== undefined) qc.setQueryData<PostSocial>(['entry-social', entryId], (old) => fn(old ?? EMPTY_SOCIAL));
 }
 
-/** Sets the social summary of `target` to the server's answer. */
-function setSocial(qc: QueryClient, target: Target, value: PostSocial): void {
-  patchSocial(qc, target, () => value);
+/** Sets the social summary of `target` to the server's answer; the "who reacted" list is read again when next opened. */
+function setSocial(qc: QueryClient, target: SocialTarget, value: PostSocial): void {
+  patchSocial(qc, target, () => value, true);
+  void qc.invalidateQueries({ queryKey: ['reactions-who', target.entryId] });
 }
 
 export function toggleReaction(s: PostSocial, emoji: Reaction): PostSocial {
@@ -130,18 +148,20 @@ export function useReact() {
   const qc = useQueryClient();
   const toast = useToast();
   return useMutation({
-    mutationFn: ({ target, emoji }: { target: Target; emoji: Reaction }) =>
-      api.post<PostSocial>('/api/reactions', { ...target, emoji }),
+    mutationFn: ({ target, emoji }: { target: SocialTarget; emoji: Reaction }) =>
+      api.post<PostSocial>('/api/reactions', { ...apiTarget(target), emoji }),
     onMutate: async ({ target, emoji }) => {
       await qc.cancelQueries({ queryKey: ACTIVITY_KEY });
+      await qc.cancelQueries({ queryKey: ['entry-social', target.entryId] });
       const snapshot = qc.getQueriesData<InfiniteData<ActivityPage>>({ queryKey: ACTIVITY_KEY });
-      const entry = 'entryId' in target ? qc.getQueryData<PostSocial>(['entry-social', target.entryId]) : undefined;
+      const entry = qc.getQueryData<PostSocial>(['entry-social', target.entryId]);
       patchSocial(qc, target, (s) => toggleReaction(s, emoji));
       return { snapshot, entry };
     },
     onError: (_e, { target }, ctx) => {
       ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
-      if ('entryId' in target) qc.setQueryData(['entry-social', target.entryId], ctx?.entry);
+      if (ctx?.entry !== undefined) qc.setQueryData(['entry-social', target.entryId], ctx.entry);
+      else void qc.invalidateQueries({ queryKey: ['entry-social', target.entryId] });
       toast.show("Couldn't save your reaction. Try again.");
     },
     onSuccess: (social, { target }) => setSocial(qc, target, social),
@@ -151,9 +171,9 @@ export function useReact() {
 export function usePostComment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ target, body }: { target: Target; body: string }) => api.post<Comment>('/api/comments', { ...target, body }),
+    mutationFn: ({ target, body }: { target: SocialTarget; body: string }) => api.post<Comment>('/api/comments', { ...apiTarget(target), body }),
     onSuccess: (comment, { target }) => {
-      qc.setQueryData<Comment[]>(['comments', targetKey(target)], (old) => (old ? [...old, comment] : [comment]));
+      qc.setQueryData<Comment[]>(['comments', target.entryId], (old) => (old ? [...old, comment] : old));
       patchSocial(qc, target, (s) => ({ ...s, comments: s.comments + 1 }));
     },
   });
@@ -162,9 +182,9 @@ export function usePostComment() {
 export function useDeleteComment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { target: Target; id: string }) => api.del(`/api/comments/${encodeURIComponent(id)}`),
+    mutationFn: ({ id }: { target: SocialTarget; id: string }) => api.del(`/api/comments/${encodeURIComponent(id)}`),
     onSuccess: (_r, { target, id }) => {
-      qc.setQueryData<Comment[]>(['comments', targetKey(target)], (old) => old?.filter((c) => c.id !== id));
+      qc.setQueryData<Comment[]>(['comments', target.entryId], (old) => old?.filter((c) => c.id !== id));
       patchSocial(qc, target, (s) => ({ ...s, comments: Math.max(0, s.comments - 1) }));
     },
   });

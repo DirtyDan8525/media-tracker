@@ -29,16 +29,17 @@ export function pushFriendRequest(env: Env, ctx: Ctx, to: string, from: Who): vo
   notify(env, ctx, to, 'friendRequests', { title: 'Friend request', body: `${nameOf(from)} wants to be friends`, tag: 'friend-requests', url: '/friends' });
 }
 
-export function pushComment(env: Env, ctx: Ctx, to: string, from: Who, postId: string, entryId: string, text: string): void {
+/** Comments and reactions are the title's (migration 0025): one tag per title, wherever they were left (a post or the title page). */
+export function pushComment(env: Env, ctx: Ctx, to: string, from: Who, entryId: string, text: string): void {
   if (to === from.id) return;
-  notify(env, ctx, to, 'comments', { title: `${nameOf(from)} commented on your post`, body: clip(text), tag: `comment-${postId}`, url: `/entry/${entryId}` });
+  notify(env, ctx, to, 'comments', { title: `${nameOf(from)} commented on your post`, body: clip(text), tag: `comment-${entryId}`, url: `/entry/${entryId}` });
 }
 
-/** One push per post per 10 minutes. */
-export function pushReaction(env: Env, ctx: Ctx, to: string, from: Who, postId: string, entryId: string, emoji: string): void {
+/** One push per title per 10 minutes. */
+export function pushReaction(env: Env, ctx: Ctx, to: string, from: Who, entryId: string, emoji: string): void {
   if (to === from.id) return;
   later(env, ctx, async () => {
-    if (!(await reactionWindowOpen(env.DB, postId))) return;
-    notify(env, ctx, to, 'reactions', { title: 'New reaction', body: `${nameOf(from)} reacted ${emoji} to your post`, tag: `reaction-${postId}`, url: `/entry/${entryId}` });
+    if (!(await reactionWindowOpen(env.DB, entryId))) return;
+    notify(env, ctx, to, 'reactions', { title: 'New reaction', body: `${nameOf(from)} reacted ${emoji} to your post`, tag: `reaction-${entryId}`, url: `/entry/${entryId}` });
   });
 }

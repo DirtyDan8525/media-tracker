@@ -2,7 +2,7 @@ import { formatRating, nameOf, foldPosts, type ActivityLine, type Features, type
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAppSettings } from '../data/appSettings';
-import { useDeletePosts, useFeed, useMarkSeen, useReact } from '../data/feed';
+import { useDeletePosts, useFeed, useMarkSeen, useReact, type SocialTarget } from '../data/feed';
 import { Button } from '../design/components/Button';
 import { IconButton } from '../design/components/IconButton';
 import { Sheet } from '../design/components/Sheet';
@@ -93,7 +93,7 @@ export function ActivityScreen() {
   }, { replace: true });
   const { data, isPending, isError, isSuccess, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } =
     useFeed(filter, { list: listFilter, min: minFilter });
-  const [commenting, setCommenting] = useState<string | null>(null);
+  const [commenting, setCommenting] = useState<SocialTarget | null>(null);
   const textSize = useActivityTextSize();
   const wide = useIsWide();
   // Phone: the post whose details sheet is open.
@@ -159,7 +159,7 @@ export function ActivityScreen() {
     return {
       line, now, features, social: social[line.key] ?? NO_SOCIAL, friend: friends.has(line.userId),
       who: line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null },
-      onComment: () => { setOpened(null); setCommenting(line.key); },
+      onComment: () => { setOpened(null); setCommenting({ activityId: line.key, entryId: line.entryId }); },
     };
   };
 
@@ -223,7 +223,7 @@ export function ActivityScreen() {
               {d.lines.map((line) => (
                 <FeedPost key={line.key} line={line} now={now} social={social[line.key] ?? NO_SOCIAL}
                   who={line.userId === me.id ? null : users[line.userId] ?? { id: line.userId, username: 'friend', displayName: 'A friend', avatarAt: null }}
-                  friend={friends.has(line.userId)} features={features} admin={me.isAdmin} onComments={() => setCommenting(line.key)}
+                  friend={friends.has(line.userId)} features={features} admin={me.isAdmin} onComments={() => setCommenting({ activityId: line.key, entryId: line.entryId })}
                   onOpen={!wide && !selecting ? () => setOpened(line.key) : null}
                   panel={wide ? { active: active === line.key, show: () => { clearTimeout(settle.current); setActive(line.key); }, hover: (on) => hoverPost(line.key, on) } : null}
                   select={selecting && line.userId === me.id ? { on: selected.has(line.key), toggle: () => toggleSelected(line.key), full: selected.size >= MAX_SELECT } : null}
@@ -328,7 +328,7 @@ export function ActivityScreen() {
           </Sheet>
         );
       })()}
-      {commenting && <CommentsSheet target={{ activityId: commenting }} open onClose={() => setCommenting(null)} />}
+      {commenting && <CommentsSheet target={commenting} open onClose={() => setCommenting(null)} />}
     </div>
   );
 }
@@ -348,7 +348,7 @@ function FeedPost({ line, now, social, who, friend, features, admin, select, pan
   onComments: () => void; onDelete: () => void;
 }) {
   const react = useReact();
-  const target = { activityId: line.key } as const;
+  const target: SocialTarget = { activityId: line.key, entryId: line.entryId };
   const n = social.comments;
   const toggle = (emoji: Reaction) => react.mutate({ target, emoji });
   return (
